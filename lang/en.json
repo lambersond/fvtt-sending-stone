@@ -1,0 +1,81 @@
+{
+  "SENDINGSTONE": {
+    "Settings": {
+      "Connection": {
+        "Name": "Listener Connection",
+        "Label": "Configure Connection",
+        "Hint": "Set the URL events are posted to and the shared secret the listener expects, and test the connection."
+      },
+      "Characters": {
+        "Name": "Connected Characters",
+        "Label": "Choose Characters",
+        "Hint": "Choose which player characters are connected to the listener. Connected characters' hit points are included in combat events, and every event says which of them may see it."
+      },
+      "ChatEvents": {
+        "Name": "Send Chat Events",
+        "Hint": "Post chat messages to the listener as they are created, edited and deleted."
+      },
+      "ChatScope": {
+        "Name": "Chat Messages to Send",
+        "Hint": "Send every chat message, or only those spoken by a connected character.",
+        "All": "All messages",
+        "Connected": "Connected characters only"
+      },
+      "CombatEvents": {
+        "Name": "Send Combat Events",
+        "Hint": "Post combat tracker changes to the listener: encounters starting and ending, turns and rounds, and combatants joining, leaving, rolling initiative and being defeated."
+      },
+      "GmContent": {
+        "Name": "Send Gamemaster-Only Information",
+        "Hint": "Also send what only a Gamemaster can see: whispers no player can read, blind rolls, hidden combatants, the hit points of unconnected combatants and the armor class of attack targets. Leave this off if players can see what the listener receives."
+      }
+    },
+    "Connection": {
+      "Title": "Sending Stone: Listener Connection",
+      "Hint": "Events are posted as JSON, one per request, from the active Gamemaster's browser. Nothing is sent while no Gamemaster is connected.",
+      "Url": "Listener URL",
+      "UrlHint": "The http or https address that receives events. The listener must allow cross-origin requests from this Foundry server.",
+      "Secret": "Shared Secret",
+      "SecretHint": "Optional. Sent as a bearer token in the Authorization header. Stored only in this browser, so players cannot read it; enter it in each browser a Gamemaster runs the game from.",
+      "StatusLegend": "Status",
+      "Bridge": "Sending From",
+      "BridgeSelf": "This browser",
+      "BridgeOther": "{name}'s browser",
+      "BridgeNone": "No Gamemaster is connected, so nothing is being sent",
+      "Deliveries": "From This Browser",
+      "StatusIdle": "Nothing sent yet.",
+      "StatusOk": "Last delivered at {time}. {delivered} delivered, {dropped} dropped.",
+      "StatusError": "Failing since {time}: {error}. {delivered} delivered, {dropped} dropped.",
+      "Test": "Test Connection",
+      "Testing": "Sending a test event…",
+      "TestOk": "Delivered: the listener answered HTTP {status} in {elapsed} ms.",
+      "TestFailed": "Not delivered: {error}",
+      "HintNetwork": "Check that the listener is running and reachable from this computer, and that it answers the browser's CORS preflight (OPTIONS) request with Access-Control-Allow-Origin, and Access-Control-Allow-Headers covering Content-Type and Authorization.",
+      "HintMixedContent": "Foundry is served over https but the listener URL is plain http, which browsers block for any host other than localhost. Serve the listener over https.",
+      "HintAuth": "The listener rejected the request. Check the shared secret.",
+      "Submit": "Save Changes",
+      "Saved": "Sending Stone connection saved."
+    },
+    "Characters": {
+      "Title": "Sending Stone: Connected Characters",
+      "Hint": "Connected characters are the ones the listener acts for. Their hit points are included in combat events, chat can be limited to their messages, and every event lists which of them may see it.",
+      "Connected": "Connected",
+      "Character": "Character",
+      "Owners": "Players",
+      "NoOwner": "No player owner",
+      "None": "There are no player characters in this world.",
+      "Submit": "Save Changes",
+      "Saved": "Sending Stone connected characters saved."
+    },
+    "Error": {
+      "InvalidUrl": "The listener URL must be a full http or https address.",
+      "Network": "the listener could not be reached",
+      "Timeout": "the listener did not answer in time",
+      "Status": "the listener answered HTTP {status}"
+    },
+    "Notify": {
+      "Failing": "Sending Stone cannot deliver events to the listener: {error}. Events are being dropped until it recovers.",
+      "Recovered": "Sending Stone is delivering events to the listener again."
+    }
+  }
+}
