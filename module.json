@@ -1,0 +1,35 @@
+{
+  "id": "sending-stone",
+  "title": "Sending Stone",
+  "description": "Send what happens at the table to an external listener. The Gamemaster sets a listener URL, chooses which player characters are connected, and turns chat and combat events on independently; the active Gamemaster's client then posts each event to the listener as JSON. Enriched with roll, item and activity details for D&D Fifth Edition.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14.365"
+  },
+  "authors": [
+    {
+      "name": "David Lamberson",
+      "url": "https://github.com/lambersond"
+    }
+  ],
+  "esmodules": [
+    "scripts/module.mjs"
+  ],
+  "styles": [
+    "styles/sending-stone.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "socket": false,
+  "url": "https://github.com/lambersond/fvtt-sending-stone",
+  "readme": "https://github.com/lambersond/fvtt-sending-stone#readme",
+  "bugs": "https://github.com/lambersond/fvtt-sending-stone/issues",
+  "manifest": "https://github.com/lambersond/fvtt-sending-stone/releases/latest/download/module.json",
+  "download": "https://github.com/lambersond/fvtt-sending-stone/releases/latest/download/module.zip"
+}

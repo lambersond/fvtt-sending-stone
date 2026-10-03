@@ -1,0 +1,84 @@
+/* Connection dialog ------------------------------------------------------- */
+
+#sending-stone-connection .sending-stone-status {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+}
+
+#sending-stone-connection .sending-stone-status dt {
+  font-weight: bold;
+}
+
+#sending-stone-connection .sending-stone-status dd {
+  margin: 0;
+}
+
+/* Test results can run to several lines of hints. */
+#sending-stone-connection .sending-stone-test-result {
+  white-space: pre-line;
+  margin: 0.5rem 0 0;
+}
+
+#sending-stone-connection .sending-stone-test-result:empty {
+  display: none;
+}
+
+#sending-stone-connection [data-state="ok"] {
+  color: var(--color-level-success, #18520b);
+}
+
+#sending-stone-connection [data-state="error"] {
+  color: var(--color-level-error, #6e0000);
+}
+
+/* Connected characters dialog --------------------------------------------- */
+
+/* A world can hold many player characters; the list scrolls rather than the dialog growing. */
+#sending-stone-characters .sending-stone-character-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-block: 0.5rem;
+}
+
+#sending-stone-characters .sending-stone-characters {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#sending-stone-characters .sending-stone-characters th,
+#sending-stone-characters .sending-stone-characters td {
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+#sending-stone-characters .sending-stone-characters thead th {
+  font-weight: bold;
+  border-bottom: 1px solid var(--color-border-light-tertiary, currentColor);
+}
+
+#sending-stone-characters .sending-stone-characters tbody th {
+  font-weight: normal;
+  width: 100%;
+}
+
+#sending-stone-characters .sending-stone-characters label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+#sending-stone-characters .sending-stone-characters img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border: none;
+  flex: none;
+}
+
+#sending-stone-characters .sending-stone-characters td:last-child {
+  white-space: nowrap;
+}
