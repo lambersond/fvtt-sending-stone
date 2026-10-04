@@ -28,13 +28,20 @@ in [PROTOCOL.md](PROTOCOL.md).
 
 ## Setup
 
-1. **Gamemaster:** *Settings → Configure Settings → Sending Stone → Configure Connection*. Enter
-   the destination, the address of the Sending Stone app such as `https://sending-stone.vercel.app`,
-   and, optionally, a shared secret. Events go to `/api/events` under it; you don't type that part.
-   Use **Test Connection** to check it before saving.
-2. **Gamemaster:** *Manage Campaigns*. Add a campaign, give it a title, and tick its player
-   characters. Players use the title to find the campaign, so tell them what it is.
-3. **Gamemaster:** switch on **Send Chat Events** and/or **Send Combat Events**.
+1. **Gamemaster, in the Sending Stone app:** under *Campaigns*, set up each campaign with its
+   title, your game's Forge address and a secret. Campaigns in one world share the module's
+   secret, so give them all the same one.
+2. **Gamemaster, in Foundry:** *Settings → Configure Settings → Sending Stone → Configure
+   Connection*. Enter the destination, the address of the Sending Stone app such as
+   `https://sending-stone.vercel.app`, and the secret. Events go to `/api/events` under it; you
+   don't type that part. Use **Test Connection** to check it before saving.
+3. **Gamemaster:** *Manage Campaigns*. Add each campaign with the same title as in the app, and
+   tick its player characters.
+4. **Gamemaster:** switch on **Send Chat Events** and/or **Send Combat Events**. Then share each
+   campaign's invite link from the app; players open it and choose their character.
+
+While a Gamemaster has the game open, each campaign that has been sent nothing else for 30
+seconds is sent a heartbeat, so the app can show players whether the game is connected.
 
 | Setting | Effect |
 | --- | --- |
@@ -165,6 +172,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/config.mjs` | Setting accessors and the destination |
 | `scripts/settings.mjs` | Settings and setting menu registration |
 | `scripts/bridge.mjs` | Which browser sends, and the `bridge.hello` state snapshot |
+| `scripts/heartbeat.mjs` | Heartbeats to campaigns sent nothing lately, so the app knows the game is connected |
 | `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
 | `scripts/characters.mjs` | A campaign's characters and who owns them |

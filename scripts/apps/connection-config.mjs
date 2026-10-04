@@ -205,6 +205,9 @@ export default class ConnectionConfig extends HandlebarsApplicationMixin(Applica
       else if ( [401, 403].includes(err?.status) ) {
         lines.push(game.i18n.localize("SENDINGSTONE.Connection.HintAuth"));
       }
+      else if ( err?.status === 404 ) {
+        lines.push(game.i18n.localize("SENDINGSTONE.Connection.HintNotSetUp"));
+      }
       report("error", lines.join("\n"));
     } finally {
       target.disabled = false;

@@ -84,6 +84,9 @@ export const EVENTS = Object.freeze({
   /** A connection test from the configuration dialog. Carries no game data. */
   PING: "bridge.ping",
 
+  /** The bridge is still connected. Sent to a campaign that has been sent nothing else lately. */
+  HEARTBEAT: "bridge.heartbeat",
+
   CHAT_CREATED: "chat.message.created",
   CHAT_UPDATED: "chat.message.updated",
   CHAT_DELETED: "chat.message.deleted",

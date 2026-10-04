@@ -56,7 +56,7 @@ The request comes from the Gamemaster's **browser**, so the listener must handle
 | `protocol` | The protocol version, `2`. |
 | `id` | Unique to this event, and unchanged across retries. **Ignore an `id` you have already processed.** |
 | `session` | One page load of the sending browser. Changes when the Gamemaster reloads, or another Gamemaster's browser takes over sending. |
-| `sequence` | Counts up by exactly 1 per event within a session and campaign. A gap means that campaign missed events. `null` on `bridge.ping`, which is outside the event stream. |
+| `sequence` | Counts up by exactly 1 per event within a session and campaign. A gap means that campaign missed events. `null` on `bridge.ping` and `bridge.heartbeat`, which are outside the event stream. |
 | `type` | What happened. Listed below. |
 | `time` | When the event was raised, as an ISO 8601 timestamp. |
 | `world` | The Foundry world the event came from. |
@@ -267,6 +267,14 @@ the destination, the campaigns or any event setting changes.
 | `characters` | Every [character](#character) in the campaign. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 
+### `bridge.heartbeat`
+
+`{}`. The bridge is still connected. Sent to a campaign that has been sent no other event for 30
+seconds, so while a Gamemaster has the game open, each campaign hears something at least every
+30 to 40 seconds. Browsers slow the timers of a background tab, to as little as once a minute, so
+allow for that before deciding the Gamemaster has gone: two minutes without any event is a safe
+sign.
+
 ### `bridge.ping`
 
 `{ userId, name }` of the Gamemaster testing the connection. Sent by **Test Connection**, possibly
@@ -312,6 +320,11 @@ Sent only while **Send Combat Events** is on. Every payload naming a combat carr
 
 While hidden combatants are withheld, revealing one is sent as `combat.combatant.added`, and
 hiding one as `combat.combatant.removed`.
+
+## Additions within protocol 2
+
+- Module 0.3.0 sends [`bridge.heartbeat`](#bridgeheartbeat). A listener that answers `2xx` to
+  types it does not use needs no change.
 
 ## Changes from protocol 1
 

@@ -38,7 +38,7 @@
       "Endpoint": "Events are posted to {url}",
       "EndpointNone": "Enter a destination to see where events are posted.",
       "Secret": "Shared Secret",
-      "SecretHint": "Optional. Sent as a bearer token in the Authorization header. Stored only in this browser, so players cannot read it; enter it in each browser a Gamemaster runs the game from.",
+      "SecretHint": "The secret you gave your campaigns in the Sending Stone app; one secret serves every campaign in this world. Sent as a bearer token in the Authorization header. Stored only in this browser, so players cannot read it; enter it in each browser a Gamemaster runs the game from.",
       "StatusLegend": "Status",
       "Bridge": "Sending From",
       "BridgeSelf": "This browser",
@@ -55,12 +55,13 @@
       "HintNetwork": "Check that the destination is running and reachable from this computer, and that it answers the browser's CORS preflight (OPTIONS) request with Access-Control-Allow-Origin, and Access-Control-Allow-Headers covering Content-Type and Authorization.",
       "HintMixedContent": "Foundry is served over https but the destination is plain http, which browsers block for any host other than localhost. Serve the destination over https.",
       "HintAuth": "The destination rejected the request. Check the shared secret.",
+      "HintNotSetUp": "The destination has no campaign set up for this game. Set up each campaign in the Sending Stone app, with this game's address and the same secret, then test again.",
       "Submit": "Save Changes",
       "Saved": "Sending Stone connection saved."
     },
     "Campaigns": {
       "Title": "Sending Stone: Campaigns",
-      "Hint": "Each campaign gets the events that involve its characters: messages their players can read or they spoke, and combats they are in. Players find a campaign by its title, so give each a different one. A character can be in more than one campaign.",
+      "Hint": "Each campaign gets the events that involve its characters: messages their players can read or they spoke, and combats they are in. Set up each campaign in the Sending Stone app with the same title, so give each a different one. A character can be in more than one campaign.",
       "CampaignTitle": "Campaign Title",
       "TitlePlaceholder": "Curse of Strahd",
       "Untitled": "New Campaign",
