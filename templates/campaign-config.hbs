@@ -1,0 +1,58 @@
+<div class="sending-stone-campaigns-config">
+    <p class="hint">{{localize "SENDINGSTONE.Campaigns.Hint"}}</p>
+
+    <div class="sending-stone-campaign-list">
+        {{#each campaigns as |campaign|}}
+        <fieldset class="sending-stone-campaign">
+            <legend>{{campaign.legend}}</legend>
+            <input type="hidden" name="campaigns.{{campaign.index}}.id" value="{{campaign.id}}">
+
+            <div class="form-group">
+                <label for="sending-stone-campaign-{{campaign.id}}">{{localize "SENDINGSTONE.Campaigns.CampaignTitle"}}</label>
+                <div class="form-fields">
+                    <input type="text" id="sending-stone-campaign-{{campaign.id}}"
+                           name="campaigns.{{campaign.index}}.title" value="{{campaign.title}}" required
+                           placeholder="{{localize "SENDINGSTONE.Campaigns.TitlePlaceholder"}}" autocomplete="off">
+                    <button type="button" class="icon fa-solid fa-trash" data-action="removeCampaign"
+                            data-index="{{campaign.index}}" data-tooltip="SENDINGSTONE.Campaigns.Remove"
+                            aria-label="{{localize "SENDINGSTONE.Campaigns.Remove"}}"></button>
+                </div>
+            </div>
+
+            {{#if @root.hasCharacters}}
+            <table class="sending-stone-characters">
+                <thead>
+                    <tr>
+                        <th scope="col">{{localize "SENDINGSTONE.Campaigns.InCampaign"}}</th>
+                        <th scope="col">{{localize "SENDINGSTONE.Campaigns.Character"}}</th>
+                        <th scope="col">{{localize "SENDINGSTONE.Campaigns.Owners"}}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each campaign.characters as |character|}}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="campaigns.{{campaign.index}}.characters.{{character.id}}"
+                                   id="sending-stone-{{campaign.id}}-{{character.id}}"
+                                   {{#if character.checked}}checked{{/if}}>
+                        </td>
+                        <th scope="row">
+                            <label for="sending-stone-{{campaign.id}}-{{character.id}}">
+                                <img src="{{character.img}}" alt="">
+                                <span>{{character.name}}</span>
+                            </label>
+                        </th>
+                        <td>{{character.owners}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{else}}
+            <p class="sending-stone-empty">{{localize "SENDINGSTONE.Campaigns.NoCharacters"}}</p>
+            {{/if}}
+        </fieldset>
+        {{else}}
+        <p class="sending-stone-empty">{{localize "SENDINGSTONE.Campaigns.None"}}</p>
+        {{/each}}
+    </div>
+</div>

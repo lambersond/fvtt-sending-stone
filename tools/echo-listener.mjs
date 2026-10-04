@@ -8,7 +8,8 @@
  *   node tools/echo-listener.mjs
  *   PORT=9000 SECRET=hunter2 node tools/echo-listener.mjs
  *
- * Then set the module's listener URL to http://localhost:8787/events (any path is accepted).
+ * Then set the module's destination to http://localhost:8787. Events arrive at /api/events, though
+ * any path is accepted.
  */
 import { createServer } from "node:http";
 
@@ -16,7 +17,7 @@ const PORT = Number(process.env.PORT ?? 8787);
 const SECRET = process.env.SECRET ?? "";
 const VERBOSE = process.env.QUIET !== "1";
 
-/** The last sequence number seen from each bridge session, to spot missed events. */
+/** The last sequence number seen from each bridge session and campaign, to spot missed events. */
 const sequences = new Map();
 
 /** Recently seen envelope ids, to spot retried duplicates. */
@@ -45,7 +46,7 @@ function allowCors(request, response) {
  * @param {object} envelope
  */
 function print(envelope) {
-  const { session, sequence, type, id, time } = envelope;
+  const { session, sequence, type, id, time, campaign } = envelope;
   const label = sequence === null ? "--" : `#${sequence}`;
 
   // A retry whose earlier attempt arrived but whose answer was lost. A real listener should
@@ -58,13 +59,16 @@ function print(envelope) {
   if ( seen.size > 1000 ) seen.delete(seen.values().next().value);
 
   const notes = [];
+  // Each campaign's events are numbered separately.
   if ( sequence !== null ) {
-    const last = sequences.get(session);
+    const stream = `${session}/${campaign?.id ?? ""}`;
+    const last = sequences.get(stream);
     if ( (last !== undefined) && (sequence !== last + 1) ) notes.push(`gap: expected #${last + 1}`);
-    sequences.set(session, sequence);
+    sequences.set(stream, sequence);
   }
 
-  console.log(`\n[${time}] ${session} ${label} ${type}${notes.length ? `  (${notes.join(", ")})` : ""}`);
+  const to = campaign ? ` → ${campaign.title}` : "";
+  console.log(`\n[${time}] ${session} ${label} ${type}${to}${notes.length ? `  (${notes.join(", ")})` : ""}`);
   if ( VERBOSE ) console.log(JSON.stringify(envelope.data, null, 2));
 }
 
@@ -93,6 +97,6 @@ const server = createServer((request, response) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Sending Stone echo listener on http://localhost:${PORT}/events`);
+  console.log(`Sending Stone echo listener: set the destination to http://localhost:${PORT}`);
   if ( SECRET ) console.log("Requiring the shared secret from SECRET.");
 });

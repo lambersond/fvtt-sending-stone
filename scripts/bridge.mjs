@@ -1,7 +1,9 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
-import { chatEnabled, chatScope, combatEnabled, getListenerUrl, includeGmContent } from "./config.mjs";
+import { chatEnabled, chatScope, combatEnabled, getDestination, includeGmContent } from "./config.mjs";
+import { forgetCombats, noteCombatSent } from "./campaign-combats.mjs";
+import { getCampaigns } from "./campaigns.mjs";
 import { roster } from "./characters.mjs";
-import { snapshotCombat } from "./combat-data.mjs";
+import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
 import { send } from "./transport.mjs";
 
 /**
@@ -32,19 +34,20 @@ export function isBridge() {
  * @returns {boolean}
  */
 export function canSend() {
-  return isBridge() && (getListenerUrl() !== "");
+  return isBridge() && (getDestination() !== "");
 }
 
 /* -------------------------------------------- */
 
 /**
- * Send the full current state, so the listener can discard whatever it held and start afresh.
+ * Send each campaign its full current state, so the listener can discard whatever it held for the
+ * campaign and start afresh: its characters, and the combats they are in.
  * @returns {void}
  */
 export function announce() {
   if ( !canSend() ) return;
   const module = game.modules.get(MODULE_ID);
-  send(EVENTS.HELLO, {
+  const shared = {
     module: { id: MODULE_ID, version: module?.version ?? null },
     foundry: { version: game.version, generation: game.release?.generation ?? null },
     system: { id: game.system.id, title: game.system.title, version: game.system.version },
@@ -54,19 +57,19 @@ export function announce() {
       chatScope: chatScope(),
       combat: combatEnabled(),
       gmContent: includeGmContent()
-    },
-    characters: roster(),
-    combats: combatEnabled() ? game.combats.map(snapshotCombat) : []
-  });
-}
+    }
+  };
 
-/**
- * Tell the listener the connected characters changed.
- * @returns {void}
- */
-export function announceCharacters() {
-  if ( !canSend() ) return;
-  send(EVENTS.CHARACTERS_UPDATED, { characters: roster() });
+  forgetCombats();
+  for ( const campaign of getCampaigns() ) {
+    const combats = combatEnabled() ? game.combats.filter(combat => involvesCampaign(combat, campaign)) : [];
+    for ( const combat of combats ) noteCombatSent(combat.id, campaign.id);
+    send(EVENTS.HELLO, {
+      ...shared,
+      characters: roster(campaign),
+      combats: combats.map(combat => snapshotCombat(combat, campaign))
+    }, campaign);
+  }
 }
 
 /* -------------------------------------------- */

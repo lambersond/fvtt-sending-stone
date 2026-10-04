@@ -1,13 +1,13 @@
 # Sending Stone
 
-A Foundry VTT **v14** module that sends what happens at the table to an external listener. Chat
-messages and combat tracker changes are posted as JSON to a URL you choose, so another app can
-follow the game as it happens.
+A Foundry VTT **v14** module that sends what happens at the table to the Sending Stone app, or any
+listener that speaks its [protocol](PROTOCOL.md). Chat messages and combat tracker changes are
+posted as JSON, campaign by campaign, so players can follow their game as it happens.
 
 It is built for D&D Fifth Edition (dnd5e 5.3.x): roll messages carry the kind of roll, advantage,
 and the item, activity and targets involved. Chat and combat events work under any system.
 
-This is the outbound half. Later, the listener will also be able to act *for* a connected
+This is the outbound half. Later, the listener will also be able to act *for* a campaign's
 character (rolling a check, attacking, casting a spell) as if its player had done it in Foundry.
 
 ## How it works
@@ -29,23 +29,40 @@ in [PROTOCOL.md](PROTOCOL.md).
 ## Setup
 
 1. **Gamemaster:** *Settings → Configure Settings → Sending Stone → Configure Connection*. Enter
-   the listener URL and, optionally, a shared secret. Use **Test Connection** to check it before
-   saving.
-2. **Gamemaster:** *Choose Characters*. Tick the player characters to connect.
+   the destination, the address of the Sending Stone app such as `https://sending-stone.vercel.app`,
+   and, optionally, a shared secret. Events go to `/api/events` under it; you don't type that part.
+   Use **Test Connection** to check it before saving.
+2. **Gamemaster:** *Manage Campaigns*. Add a campaign, give it a title, and tick its player
+   characters. Players use the title to find the campaign, so tell them what it is.
 3. **Gamemaster:** switch on **Send Chat Events** and/or **Send Combat Events**.
 
 | Setting | Effect |
 | --- | --- |
-| Listener Connection | The URL events are posted to, and the shared secret sent as `Authorization: Bearer …`. |
-| Connected Characters | The player characters the listener acts for. |
+| Destination | The app events are posted to, and the shared secret sent as `Authorization: Bearer …`. |
+| Campaigns | Titled groups of player characters. Each event goes to the campaigns it involves. |
 | Send Chat Events | Chat messages created, edited and deleted, and the log being cleared. |
-| Chat Messages to Send | Every message, or only those spoken by a connected character. |
+| Chat Messages to Send | Every message a campaign's players can read, or only those its characters spoke. |
 | Send Combat Events | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
 | Send Gamemaster-Only Information | Also send what only a Gamemaster can see. Off by default. |
 
 **The shared secret is stored only in the browser you enter it in.** World settings are sent to
 every connected user, so a secret stored there could be read by players. Enter it in each browser
 a Gamemaster runs the game from; the connection dialog shows which browser is currently sending.
+
+### Campaigns
+
+A world can run more than one campaign, such as two parties sharing a setting, and a character can
+be in more than one. Every event names the campaign it is for, and each campaign gets only what
+involves its characters, described for it alone:
+
+- **Chat:** messages one of its characters said, or that the player of one of its characters can
+  read. Every public message reaches every campaign with characters.
+- **Combat:** encounters while any of its characters are in them. A fight reaches the campaign
+  when its first character joins and ends for it when its last one leaves.
+- **Hit points and audiences** cover only its own characters.
+
+Worlds set up before campaigns keep working: the connected characters chosen then are moved into a
+campaign titled after the world the first time a Gamemaster loads it.
 
 ### The listener must allow cross-origin requests
 
@@ -72,7 +89,7 @@ Two further browser rules apply:
 every event and handles all of the above. With Node 18 or later:
 
 ```sh
-node tools/echo-listener.mjs                  # http://localhost:8787/events
+node tools/echo-listener.mjs                  # destination: http://localhost:8787
 SECRET=hunter2 node tools/echo-listener.mjs   # also require a shared secret
 ```
 
@@ -83,17 +100,17 @@ With **Send Gamemaster-Only Information** off, the listener receives what player
 | Information | Sent? |
 | --- | --- |
 | Public chat messages | Yes. |
-| Whispers, and private or self rolls | Yes, marked with which players and connected characters can read them. |
+| Whispers, and private or self rolls | Yes, to the campaigns of the characters whose players can read them, marked with which they are. |
 | Whispers only Gamemasters can read, private Gamemaster rolls, blind rolls | No. |
 | A blind roll the Gamemaster later reveals | Yes, from then on, as an update. |
 | A message made private after it was sent | The listener is told to delete it. |
 | Hidden combatants | No. Their turns are reported with no combatant. Revealing one reports it joining; hiding one reports it leaving. |
-| Hit points | Connected characters only. |
+| Hit points | The campaign's own characters only. |
 | Attack targets | Name only; armor class is withheld. |
 | Success or failure against a DC | Left out of roll summaries, so a hidden DC is not revealed. |
 
-Every chat message carries an `audience` listing which players, and which connected characters,
-can read it. That lets the listener route each message to the right player even with
+Every chat message carries an `audience` listing which players, and which of the campaign's
+characters, can read it. That lets the listener route each message to the right player even with
 Gamemaster-only information switched on.
 
 ## Behavior notes
@@ -145,16 +162,18 @@ between releases; check the published manifest, not this file, to see what actua
 | --- | --- |
 | `scripts/module.mjs` | Entry point and hook registration |
 | `scripts/constants.mjs` | Shared identifiers, setting keys and event types |
-| `scripts/config.mjs` | Setting accessors and URL checks |
+| `scripts/config.mjs` | Setting accessors and the destination |
 | `scripts/settings.mjs` | Settings and setting menu registration |
 | `scripts/bridge.mjs` | Which browser sends, and the `bridge.hello` state snapshot |
 | `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status |
-| `scripts/characters.mjs` | Connected characters and who owns them |
+| `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
+| `scripts/characters.mjs` | A campaign's characters and who owns them |
 | `scripts/chat.mjs` | Chat hooks |
 | `scripts/chat-data.mjs` | Chat message serialization and audience |
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
-| `scripts/apps/connection-config.mjs` | Listener URL, secret and connection test dialog |
-| `scripts/apps/character-config.mjs` | Connected characters dialog |
+| `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
+| `scripts/apps/connection-config.mjs` | Destination, secret and connection test dialog |
+| `scripts/apps/campaign-config.mjs` | Campaigns dialog |
 | `tools/echo-listener.mjs` | Stand-in listener for development |
 | `PROTOCOL.md` | Event envelope and payload reference |

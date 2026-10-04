@@ -10,10 +10,16 @@ export const MODULE_ID = "sending-stone";
 
 /**
  * The version of the event envelope and payload shapes. Incremented only for changes a listener
- * must adapt to; adding a field is not one of them.
+ * must adapt to; adding a field is not one of them. Version 2 sends each event to campaigns.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
+
+/**
+ * Where events are posted, under the destination the Gamemaster sets.
+ * @type {string}
+ */
+export const EVENTS_PATH = "/api/events";
 
 /**
  * Keys for the settings and setting menus this module registers.
@@ -23,8 +29,9 @@ export const SETTINGS = Object.freeze({
   /** Setting menu key for the listener connection dialog. */
   CONNECTION: "connection",
 
-  /** World-scope URL that every event is posted to. */
-  LISTENER_URL: "listenerUrl",
+  /** World-scope destination: the origin of the app events are posted to. The key is from when
+   *  this held a full listener URL; only the origin of what it holds is used. */
+  DESTINATION: "listenerUrl",
 
   /** Client-scope shared secret, sent as a bearer token. Client scope so that it never leaves the
    *  Gamemaster's browser: world settings are readable by every connected user. */
@@ -42,10 +49,14 @@ export const SETTINGS = Object.freeze({
   /** World-scope switch for sending information only a Gamemaster can see. */
   GM_CONTENT: "gmContent",
 
-  /** Setting menu key for the connected characters dialog. */
-  CHARACTERS_MENU: "charactersMenu",
+  /** Setting menu key for the campaigns dialog. */
+  CAMPAIGNS_MENU: "campaignsMenu",
 
-  /** World-scope set of the actor ids of connected characters. */
+  /** World-scope list of campaigns: {id, title, characters}, characters being actor ids. */
+  CAMPAIGNS: "campaigns",
+
+  /** World-scope set of the actor ids of connected characters, from before campaigns. Read once,
+   *  to move them into a campaign. */
   CHARACTERS: "characters"
 });
 
@@ -57,7 +68,7 @@ export const CHAT_SCOPES = Object.freeze({
   /** Every message, subject to the Gamemaster-only rule. */
   ALL: "all",
 
-  /** Only messages spoken by a connected character. */
+  /** Only messages spoken by one of a campaign's characters. */
   CONNECTED: "connected"
 });
 
@@ -72,9 +83,6 @@ export const EVENTS = Object.freeze({
 
   /** A connection test from the configuration dialog. Carries no game data. */
   PING: "bridge.ping",
-
-  /** The set of connected characters changed. */
-  CHARACTERS_UPDATED: "characters.updated",
 
   CHAT_CREATED: "chat.message.created",
   CHAT_UPDATED: "chat.message.updated",

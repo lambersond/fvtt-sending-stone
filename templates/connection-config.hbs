@@ -2,12 +2,14 @@
     <p class="hint">{{localize "SENDINGSTONE.Connection.Hint"}}</p>
 
     <div class="form-group">
-        <label for="sending-stone-url">{{localize "SENDINGSTONE.Connection.Url"}}</label>
+        <label for="sending-stone-destination">{{localize "SENDINGSTONE.Connection.Destination"}}</label>
         <div class="form-fields">
-            <input type="url" id="sending-stone-url" name="url" value="{{url}}"
-                   placeholder="http://localhost:8787/events" spellcheck="false" autocomplete="off">
+            <input type="text" id="sending-stone-destination" name="destination" value="{{destination}}"
+                   placeholder="https://sending-stone.vercel.app" spellcheck="false" autocomplete="off"
+                   inputmode="url" aria-describedby="sending-stone-endpoint">
         </div>
-        <p class="hint">{{localize "SENDINGSTONE.Connection.UrlHint"}}</p>
+        <p class="hint">{{localize "SENDINGSTONE.Connection.DestinationHint"}}</p>
+        <p class="hint sending-stone-endpoint" id="sending-stone-endpoint" data-endpoint>{{endpoint}}</p>
     </div>
 
     <div class="form-group">

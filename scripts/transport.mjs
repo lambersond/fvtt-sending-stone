@@ -1,5 +1,6 @@
 import { MODULE_ID, PROTOCOL_VERSION, STATUS_HOOK } from "./constants.mjs";
-import { getListenerUrl, getSecret, parseListenerUrl } from "./config.mjs";
+import { describeCampaign } from "./campaigns.mjs";
+import { eventsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 
 /**
  * Delivering events to the listener.
@@ -48,10 +49,11 @@ let draining = false;
 let session = null;
 
 /**
- * The sequence number of the last envelope built in this session.
- * @type {number}
+ * The sequence number of the last envelope built in this session, for each campaign. Each
+ * campaign's events form their own stream, so a gap in one means that campaign missed something.
+ * @type {Map<string, number>}
  */
-let sequence = 0;
+const sequences = new Map();
 
 /**
  * The outcome of recent deliveries from this browser.
@@ -94,33 +96,43 @@ export class DeliveryError extends Error {
  * @param {string} type                     One of EVENTS.
  * @param {object} data                     The event payload.
  * @param {object} [options]
+ * @param {Campaign|null} [options.campaign]  The campaign the event is for. Only a connection
+ *                                          test, which belongs to no campaign, goes without.
  * @param {boolean} [options.sequenced]     Is this part of the event stream? A connection test is
- *                                          not: it may go to a listener other than the configured
- *                                          one, and must not leave a gap in the sequence there.
+ *                                          not: it may go to a destination other than the
+ *                                          configured one, and must not leave a gap there.
  * @returns {object}
  */
-export function buildEnvelope(type, data, { sequenced=true }={}) {
+export function buildEnvelope(type, data, { campaign=null, sequenced=true }={}) {
   session ??= foundry.utils.randomID(16);
+  let sequence = null;
+  if ( sequenced ) {
+    const key = campaign?.id ?? "";
+    sequence = (sequences.get(key) ?? 0) + 1;
+    sequences.set(key, sequence);
+  }
   return {
     protocol: PROTOCOL_VERSION,
     id: foundry.utils.randomID(16),
     session,
-    sequence: sequenced ? ++sequence : null,
+    sequence,
     type,
     time: new Date().toISOString(),
     world: { id: game.world.id, title: game.world.title },
+    campaign: campaign ? describeCampaign(campaign) : null,
     data
   };
 }
 
 /**
- * Queue an event for delivery to the configured listener.
- * @param {string} type     One of EVENTS.
- * @param {object} data     The event payload. Must be plain, JSON-serializable data.
+ * Queue an event for delivery to the configured destination.
+ * @param {string} type           One of EVENTS.
+ * @param {object} data           The event payload. Must be plain, JSON-serializable data.
+ * @param {Campaign} campaign     The campaign the event is for.
  * @returns {void}
  */
-export function send(type, data) {
-  queue.push(buildEnvelope(type, data));
+export function send(type, data, campaign) {
+  queue.push(buildEnvelope(type, data, { campaign }));
   if ( queue.length > MAX_QUEUE ) {
     queue.shift();
     status.dropped++;
@@ -131,19 +143,20 @@ export function send(type, data) {
 /* -------------------------------------------- */
 
 /**
- * Post one envelope to the listener, without retrying.
+ * Post one envelope to the destination, without retrying.
  * @param {object} envelope                 The envelope to post.
  * @param {object} [options]
- * @param {string} [options.url]            The listener URL. Defaults to the configured one.
+ * @param {string} [options.destination]    The destination. Defaults to the configured one.
  * @param {string} [options.secret]         The shared secret. Defaults to this browser's.
  * @returns {Promise<{status: number, elapsed: number}>}
  * @throws {DeliveryError}
  */
-export async function deliver(envelope, { url=getListenerUrl(), secret=getSecret() }={}) {
-  const target = parseListenerUrl(url);
-  if ( !target ) {
-    throw new DeliveryError(game.i18n.localize("SENDINGSTONE.Error.InvalidUrl"), { retryable: false });
+export async function deliver(envelope, { destination=getDestination(), secret=getSecret() }={}) {
+  const parsed = parseDestination(destination);
+  if ( !parsed ) {
+    throw new DeliveryError(game.i18n.localize("SENDINGSTONE.Error.InvalidDestination"), { retryable: false });
   }
+  const target = eventsUrl(parsed);
 
   let body;
   try {
@@ -201,8 +214,8 @@ async function drain() {
       // oldest waiting event rather than this one.
       const envelope = queue.shift();
 
-      // The listener may have been removed while events were waiting.
-      if ( !getListenerUrl() ) {
+      // The destination may have been removed while events were waiting.
+      if ( !getDestination() ) {
         queue.length = 0;
         break;
       }

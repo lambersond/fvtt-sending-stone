@@ -1,12 +1,13 @@
 import { CHAT_SCOPES, EVENTS } from "./constants.mjs";
 import { chatEnabled, chatScope } from "./config.mjs";
 import { canSend } from "./bridge.mjs";
-import { connectedId } from "./characters.mjs";
+import { getCampaigns } from "./campaigns.mjs";
+import { campaignCharacterId } from "./characters.mjs";
 import { chatAudience, isAudienceShared, serializeMessage } from "./chat-data.mjs";
 import { send } from "./transport.mjs";
 
 /**
- * Chat message events.
+ * Chat message events, sent to each campaign a message belongs to.
  */
 
 /**
@@ -36,15 +37,30 @@ function active() {
 }
 
 /**
- * Is this message one the listener should hear about?
+ * Does a message belong to a campaign? It does when one of the campaign's characters said it, or
+ * when the player of one of its characters can read it, as everyone can a public message.
  * @param {ChatMessage} message
- * @param {object} audience   The message's audience.
+ * @param {object} audience     The message's audience in the campaign.
+ * @param {Campaign} campaign
  * @returns {boolean}
  */
-function isInScope(message, audience) {
+function isInScope(message, audience, campaign) {
   if ( !isAudienceShared(audience) ) return false;
-  if ( chatScope() === CHAT_SCOPES.CONNECTED ) return connectedId(message.speakerActor) !== null;
-  return true;
+  const spokenByCampaign = campaignCharacterId(message.speakerActor, campaign) !== null;
+  if ( chatScope() === CHAT_SCOPES.CONNECTED ) return spokenByCampaign;
+  return spokenByCampaign || (audience.characters.length > 0);
+}
+
+/**
+ * Every campaign, with the message's audience there and whether the message belongs to it.
+ * @param {ChatMessage} message
+ * @returns {{campaign: Campaign, audience: object, inScope: boolean}[]}
+ */
+function campaignsFor(message) {
+  return getCampaigns().map(campaign => {
+    const audience = chatAudience(message, campaign);
+    return { campaign, audience, inScope: isInScope(message, audience, campaign) };
+  });
 }
 
 /* -------------------------------------------- */
@@ -54,17 +70,17 @@ function isInScope(message, audience) {
  */
 function onCreateMessage(message) {
   if ( !active() ) return;
-  const audience = chatAudience(message);
-  if ( !isInScope(message, audience) ) return;
-  send(EVENTS.CHAT_CREATED, { message: serializeMessage(message, audience) });
+  for ( const { campaign, audience, inScope } of campaignsFor(message) ) {
+    if ( inScope ) send(EVENTS.CHAT_CREATED, { message: serializeMessage(message, campaign, audience) }, campaign);
+  }
 }
 
 /**
  * Report a change to a message, with the message as it now stands.
  *
  * A message can become visible after it was created, as when a Gamemaster reveals a blind roll, so
- * the listener may receive an update for a message it never saw created. It can also become
- * private, in which case the listener is told to delete it.
+ * a campaign may receive an update for a message it never saw created. It can also become private,
+ * in which case the campaign is told to delete it.
  * @param {ChatMessage} message
  * @param {object} changed   The differential data that was written.
  */
@@ -73,12 +89,12 @@ function onUpdateMessage(message, changed) {
   const changes = Object.keys(changed).filter(key => key !== "_id");
   if ( !changes.length ) return;
 
-  const audience = chatAudience(message);
-  if ( isInScope(message, audience) ) {
-    send(EVENTS.CHAT_UPDATED, { changes, message: serializeMessage(message, audience) });
-  }
-  else if ( ("whisper" in changed) || ("blind" in changed) ) {
-    send(EVENTS.CHAT_DELETED, { id: message.id });
+  const visibilityChanged = ("whisper" in changed) || ("blind" in changed);
+  for ( const { campaign, audience, inScope } of campaignsFor(message) ) {
+    if ( inScope ) {
+      send(EVENTS.CHAT_UPDATED, { changes, message: serializeMessage(message, campaign, audience) }, campaign);
+    }
+    else if ( visibilityChanged ) send(EVENTS.CHAT_DELETED, { id: message.id }, campaign);
   }
 }
 
@@ -93,11 +109,12 @@ function onDeleteMessage(message, options) {
     if ( clearing ) return;
     clearing = true;
     setTimeout(() => clearing = false, 0);
-    send(EVENTS.CHAT_CLEARED, {});
+    for ( const campaign of getCampaigns() ) send(EVENTS.CHAT_CLEARED, {}, campaign);
     return;
   }
 
-  // Never reveal that a message the listener was not allowed to see existed.
-  if ( !isInScope(message, chatAudience(message)) ) return;
-  send(EVENTS.CHAT_DELETED, { id: message.id });
+  // Never reveal to a campaign that a message it was not allowed to see existed.
+  for ( const { campaign, inScope } of campaignsFor(message) ) {
+    if ( inScope ) send(EVENTS.CHAT_DELETED, { id: message.id }, campaign);
+  }
 }

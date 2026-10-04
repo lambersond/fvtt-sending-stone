@@ -1,24 +1,25 @@
 import { includeGmContent } from "./config.mjs";
-import { charactersSeenBy, connectedActors, connectedId } from "./characters.mjs";
+import { campaignActors, campaignCharacterId, charactersSeenBy } from "./characters.mjs";
 
 /**
  * Turning chat messages into plain data for the listener.
  */
 
 /**
- * Which players can read a message, and which connected characters those players own.
+ * Which players can read a message, and which of a campaign's characters those players own.
  *
  * Gamemasters are left out of the reader list: they can read everything, so including them would
  * make every message look like it had an audience. A message with no player readers is
  * Gamemaster-only, which covers whispers to the Gamemaster, private Gamemaster rolls and blind
  * rolls, whose own author is not allowed to see the result.
  * @param {ChatMessage} message
+ * @param {Campaign} campaign
  * @returns {{public: boolean, gmOnly: boolean, users: string[], characters: string[]}}
  */
-export function chatAudience(message) {
+export function chatAudience(message, campaign) {
   const whisper = Array.from(message.whisper ?? []);
   if ( !whisper.length ) {
-    return { public: true, gmOnly: false, users: [], characters: connectedActors().map(actor => actor.id) };
+    return { public: true, gmOnly: false, users: [], characters: campaignActors(campaign).map(actor => actor.id) };
   }
 
   const readers = new Set(whisper);
@@ -29,7 +30,7 @@ export function chatAudience(message) {
     const user = game.users.get(id);
     return user && !user.isGM;
   });
-  return { public: false, gmOnly: users.length === 0, users, characters: charactersSeenBy(users) };
+  return { public: false, gmOnly: users.length === 0, users, characters: charactersSeenBy(users, campaign) };
 }
 
 /**
@@ -44,12 +45,13 @@ export function isAudienceShared(audience) {
 /* -------------------------------------------- */
 
 /**
- * Describe a chat message.
+ * Describe a chat message for a campaign.
  * @param {ChatMessage} message
- * @param {object} [audience]   The message's audience, if already computed.
+ * @param {Campaign} campaign
+ * @param {object} [audience]   The message's audience in that campaign, if already computed.
  * @returns {object}
  */
-export function serializeMessage(message, audience=chatAudience(message)) {
+export function serializeMessage(message, campaign, audience=chatAudience(message, campaign)) {
   const author = message.author;
   const speaker = message.speaker ?? {};
   return {
@@ -65,7 +67,7 @@ export function serializeMessage(message, audience=chatAudience(message)) {
       tokenId: speaker.token ?? null,
       sceneId: speaker.scene ?? null
     },
-    character: connectedId(message.speakerActor),
+    character: campaignCharacterId(message.speakerActor, campaign),
     title: message.title || null,
     flavor: message.flavor ?? "",
     content: message.content ?? "",
