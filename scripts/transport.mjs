@@ -56,6 +56,12 @@ let session = null;
 const sequences = new Map();
 
 /**
+ * When each campaign was last sent an event, by campaign id, in milliseconds since the epoch.
+ * @type {Map<string, number>}
+ */
+const lastSent = new Map();
+
+/**
  * The outcome of recent deliveries from this browser.
  * @type {{state: "idle"|"ok"|"error", delivered: number, dropped: number,
  *         lastDelivered: number|null, lastError: {message: string, at: number}|null}}
@@ -126,18 +132,32 @@ export function buildEnvelope(type, data, { campaign=null, sequenced=true }={}) 
 
 /**
  * Queue an event for delivery to the configured destination.
- * @param {string} type           One of EVENTS.
- * @param {object} data           The event payload. Must be plain, JSON-serializable data.
- * @param {Campaign} campaign     The campaign the event is for.
+ * @param {string} type                 One of EVENTS.
+ * @param {object} data                 The event payload. Must be plain, JSON-serializable data.
+ * @param {Campaign} campaign           The campaign the event is for.
+ * @param {object} [options]
+ * @param {boolean} [options.sequenced] Is this part of the campaign's event stream? A heartbeat
+ *                                      is not, so missing one leaves no gap.
  * @returns {void}
  */
-export function send(type, data, campaign) {
-  queue.push(buildEnvelope(type, data, { campaign }));
+export function send(type, data, campaign, { sequenced=true }={}) {
+  queue.push(buildEnvelope(type, data, { campaign, sequenced }));
+  lastSent.set(campaign.id, Date.now());
   if ( queue.length > MAX_QUEUE ) {
     queue.shift();
     status.dropped++;
   }
   drain();
+}
+
+/**
+ * How long ago a campaign was last sent an event.
+ * @param {string} campaignId
+ * @returns {number}            In milliseconds; Infinity if it has been sent nothing.
+ */
+export function sinceLastSent(campaignId) {
+  const at = lastSent.get(campaignId);
+  return at === undefined ? Infinity : Date.now() - at;
 }
 
 /* -------------------------------------------- */

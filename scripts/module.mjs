@@ -2,6 +2,7 @@ import { checkBridge } from "./bridge.mjs";
 import { migrateConnectedCharacters } from "./campaigns.mjs";
 import { registerChatHooks } from "./chat.mjs";
 import { registerCombatHooks } from "./combat.mjs";
+import { startHeartbeat } from "./heartbeat.mjs";
 import { registerSettings } from "./settings.mjs";
 
 Hooks.once("init", () => {
@@ -16,5 +17,6 @@ Hooks.once("init", () => {
 Hooks.once("ready", async () => {
   await migrateConnectedCharacters();
   checkBridge();
+  startHeartbeat();
 });
 Hooks.on("userConnected", checkBridge);
