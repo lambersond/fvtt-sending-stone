@@ -1,5 +1,5 @@
 import { includeGmContent } from "./config.mjs";
-import { connectedId, hitPoints } from "./characters.mjs";
+import { campaignCharacterId, hitPoints } from "./characters.mjs";
 
 /**
  * Turning combats and combatants into plain data for the listener.
@@ -17,16 +17,29 @@ export function isCombatantShared(combatant) {
 }
 
 /**
- * Describe a combatant.
+ * Does a combat include any of a campaign's characters that the listener may be told about?
+ * @param {Combat} combat
+ * @param {Campaign} campaign
+ * @param {string} [leaving]   The id of a combatant to leave out, as it is being removed.
+ * @returns {boolean}
+ */
+export function involvesCampaign(combat, campaign, leaving) {
+  return combat.combatants.some(combatant => (combatant.id !== leaving) && isCombatantShared(combatant)
+    && campaign.characters.has(combatant.actorId));
+}
+
+/**
+ * Describe a combatant for a campaign.
  *
- * Hit points are included for connected characters, whose players can see them anyway, and for
- * everyone else only when Gamemaster-only information is being sent.
+ * Hit points are included for the campaign's characters, whose players can see them anyway, and
+ * for everyone else only when Gamemaster-only information is being sent.
  * @param {Combatant} combatant
+ * @param {Campaign} campaign
  * @returns {object}
  */
-export function summarizeCombatant(combatant) {
+export function summarizeCombatant(combatant, campaign) {
   const actor = combatant.actor;
-  const character = connectedId(actor);
+  const character = campaignCharacterId(actor, campaign);
   const gmContent = includeGmContent();
   const summary = {
     id: combatant.id,
@@ -47,23 +60,25 @@ export function summarizeCombatant(combatant) {
 }
 
 /**
- * Describe a combatant if the listener may be told about it.
+ * Describe a combatant for a campaign, if the listener may be told about it.
  * @param {Combatant|null|undefined} combatant
+ * @param {Campaign} campaign
  * @returns {object|null}
  */
-export function shareCombatant(combatant) {
-  return isCombatantShared(combatant) ? summarizeCombatant(combatant) : null;
+export function shareCombatant(combatant, campaign) {
+  return isCombatantShared(combatant) ? summarizeCombatant(combatant, campaign) : null;
 }
 
 /**
- * Describe a combat: its state and its combatants in turn order.
+ * Describe a combat for a campaign: its state and its combatants in turn order.
  *
  * Positions in the turn order are deliberately not given as indices. Hidden combatants are left
  * out, so an index would not match the list sent, and would reveal how many were left out.
  * @param {Combat} combat
+ * @param {Campaign} campaign
  * @returns {object}
  */
-export function snapshotCombat(combat) {
+export function snapshotCombat(combat, campaign) {
   const current = combat.combatant;
   return {
     id: combat.id,
@@ -74,6 +89,6 @@ export function snapshotCombat(combat) {
     round: combat.round,
     // Before the first round the tracker may already point at someone, but it is nobody's turn.
     combatantId: (combat.started && isCombatantShared(current)) ? current.id : null,
-    combatants: (combat.turns ?? []).filter(isCombatantShared).map(summarizeCombatant)
+    combatants: (combat.turns ?? []).filter(isCombatantShared).map(combatant => summarizeCombatant(combatant, campaign))
   };
 }

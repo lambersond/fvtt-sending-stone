@@ -1,16 +1,18 @@
 # Sending Stone protocol
 
-What a listener receives, and how it should answer. Protocol version **1**.
+What a listener receives, and how it should answer. Protocol version **2**.
 
 The version in each envelope's `protocol` field changes only for changes a listener must adapt to.
 New fields may appear in any payload at any time; ignore the ones you do not recognize.
 
 ## Transport
 
-Each event is one HTTP request:
+The Gamemaster sets a **destination**: the address of the listening app, such as
+`https://sending-stone.vercel.app`. Only its origin is used. Each event is one HTTP request to a
+fixed path under it:
 
 ```
-POST <listener URL>
+POST <destination>/api/events
 Content-Type: application/json
 Authorization: Bearer <shared secret>     (only when a secret is configured)
 
@@ -37,38 +39,63 @@ The request comes from the Gamemaster's **browser**, so the listener must handle
 
 ```json
 {
-  "protocol": 1,
+  "protocol": 2,
   "id": "0_rIUebRgh6Gm7hZ",
   "session": "NXUK8rWJac7xwtdn",
   "sequence": 2,
   "type": "chat.message.created",
   "time": "2026-10-03T21:49:00.054Z",
   "world": { "id": "my-world", "title": "My World" },
+  "campaign": { "id": "k3jd8s7aQ1pZ0vXe", "title": "Curse of Strahd" },
   "data": { }
 }
 ```
 
 | Field | Meaning |
 | --- | --- |
-| `protocol` | The protocol version, `1`. |
+| `protocol` | The protocol version, `2`. |
 | `id` | Unique to this event, and unchanged across retries. **Ignore an `id` you have already processed.** |
 | `session` | One page load of the sending browser. Changes when the Gamemaster reloads, or another Gamemaster's browser takes over sending. |
-| `sequence` | Counts up by exactly 1 per event within a session. A gap means events were dropped. `null` on `bridge.ping`, which is outside the event stream. |
+| `sequence` | Counts up by exactly 1 per event within a session and campaign. A gap means that campaign missed events. `null` on `bridge.ping`, which is outside the event stream. |
 | `type` | What happened. Listed below. |
 | `time` | When the event was raised, as an ISO 8601 timestamp. |
 | `world` | The Foundry world the event came from. |
+| `campaign` | The [campaign](#campaigns) the event is for: its `id`, which never changes, and its `title`, which the Gamemaster may change. `null` only on `bridge.ping`. |
 | `data` | The payload, which depends on `type`. |
 
 ### Keeping in step
 
-- **Every session starts with `bridge.hello`**, which carries the full current state. Treat it
-  as a reset: discard what you held for that world and rebuild from it.
+- **Every session starts with a `bridge.hello` for each campaign**, which carries that campaign's
+  full current state. Treat it as a reset: discard what you held for that campaign and rebuild
+  from it.
 - A `sequence` gap means you missed events. The payloads that matter most carry full snapshots
   (each `combat.turn` includes the whole combat), so you will be back in step at the next one.
 - **`*.updated` events are upserts.** A message can become visible after it was created, for
   instance when the Gamemaster reveals a blind roll, so you may receive an update for something
   you never saw created.
 - Deletions may name something you never saw. Ignore them.
+
+## Campaigns
+
+The Gamemaster groups player characters into campaigns, each with a title. A world can run
+several, and a character can be in more than one. Hold state per campaign: everything below is
+about one campaign at a time, keyed by its `id`.
+
+Each event is sent separately to every campaign it involves, each copy with its own envelope `id`
+and described for that campaign alone: an `audience` lists only that campaign's characters, a
+`character` field names only one of its characters, and hit points are included only for its
+characters.
+
+| Event | Sent to |
+| --- | --- |
+| A chat message | Each campaign one of whose characters said it, or whose characters' players can read it. A public message reaches every campaign with characters. |
+| `chat.cleared` | Every campaign. |
+| A combat event | Each campaign with a character in the combat. |
+
+A campaign hears about a combat while any of its characters are in it. When the first of them
+joins, the combat arrives as **`combat.created` with its full snapshot**, which may already be
+under way. When the last of them leaves, the campaign is sent **`combat.ended`**: for that
+campaign, the fight is over.
 
 ## Visibility
 
@@ -83,7 +110,7 @@ Every chat message carries an `audience`:
 | `public` | Everyone can read it. |
 | `gmOnly` | No player can read it. Only ever `true` when Gamemaster-only information is on. |
 | `users` | The ids of the players who can read it. Empty when `public`. Gamemasters are never listed. |
-| `characters` | The ids of the connected characters whose players can read it. All of them when `public`. |
+| `characters` | The ids of the campaign's characters whose players can read it. All of them when `public`. |
 
 Use `characters` to route a message to the right player's device.
 
@@ -114,7 +141,7 @@ Use `characters` to route a message to the right player's device.
 | `timestamp` | When it was created, in milliseconds since the epoch. |
 | `author` | `{ id, name }` of the user who created it. |
 | `speaker` | `{ alias, actorId, tokenId, sceneId }`. The ids are `null` when not spoken by an actor. |
-| `character` | The connected character's actor id if one spoke it, else `null`. |
+| `character` | The campaign character's actor id if one spoke it, else `null`. |
 | `title` | The pop-out title, or `null`. |
 | `flavor`, `content` | As stored, in HTML. Content links are not yet rendered: they appear as `@UUID[…]{Label}`. |
 | `text` | `content` as plain text, with content links reduced to their labels. |
@@ -218,8 +245,8 @@ would not match the list and would reveal how many were left out.
 }
 ```
 
-`initiative` is `null` until rolled. `character` is the connected character's actor id, or `null`.
-`hp` is present for connected characters, and for every combatant when Gamemaster-only
+`initiative` is `null` until rolled. `character` is the campaign character's actor id, or `null`.
+`hp` is present for the campaign's characters, and for every combatant when Gamemaster-only
 information is on; it is `null` when the system does not model hit points the way dnd5e does.
 `hidden` is present only when Gamemaster-only information is on.
 
@@ -227,8 +254,8 @@ information is on; it is `null` when the system does not model hit points the wa
 
 ### `bridge.hello`
 
-The full current state. Sent first in every session, and again whenever the listener URL or any
-event setting changes.
+A campaign's full current state. Sent to each campaign first in every session, and again whenever
+the destination, the campaigns or any event setting changes.
 
 | Field | Meaning |
 | --- | --- |
@@ -236,19 +263,15 @@ event setting changes.
 | `foundry` | `{ version, generation }`, such as `"14.365"` and `14`. |
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
-| `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` or `"connected"`, and whether Gamemaster-only information is sent. |
-| `characters` | Every connected [character](#character). |
-| `combats` | Every [combat](#combat) in the world, when combat events are on; otherwise empty. |
+| `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
+| `characters` | Every [character](#character) in the campaign. |
+| `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 
 ### `bridge.ping`
 
 `{ userId, name }` of the Gamemaster testing the connection. Sent by **Test Connection**, possibly
-to a URL that has not been saved, and from a browser that may not be the one sending events.
-Answer `2xx` and otherwise ignore it.
-
-### `characters.updated`
-
-`{ characters }`: every connected [character](#character), after the selection changed.
+to a destination that has not been saved, and from a browser that may not be the one sending
+events. It belongs to no campaign. Answer `2xx` and otherwise ignore it.
 
 ### Chat
 
@@ -268,11 +291,11 @@ Sent only while **Send Combat Events** is on. Every payload naming a combat carr
 
 | Type | Payload |
 | --- | --- |
-| `combat.created` | `{ combat }`. An encounter was created; it has not started. |
+| `combat.created` | `{ combat }`. An encounter now includes the campaign's characters. Usually it has just been set up, but it may already be under way. |
 | `combat.started` | `{ combat }`. Round 1 began. Followed immediately by a `combat.turn` for the first turn. |
 | `combat.turn` | `{ combatId, round, newRound, direction, combatant, previousCombatantId, combat }` |
 | `combat.updated` | `{ changes, combat }`: the encounter's `name`, `active` or `scene` changed. |
-| `combat.ended` | `{ combat }`. The encounter was ended, which deletes it. The snapshot is its final state. |
+| `combat.ended` | `{ combat }`. The encounter was ended, which deletes it, or the campaign's last character left it. The snapshot is its final state. |
 | `combat.combatant.added` | `{ combatId, combatant }` |
 | `combat.combatant.updated` | `{ combatId, changes, combatant }`: any of `name`, `img`, `initiative`, `defeated`, `hidden` or `group` changed. |
 | `combat.combatant.removed` | `{ combatId, combatantId }` |
@@ -290,10 +313,19 @@ Sent only while **Send Combat Events** is on. Every payload naming a combat carr
 While hidden combatants are withheld, revealing one is sent as `combat.combatant.added`, and
 hiding one as `combat.combatant.removed`.
 
+## Changes from protocol 1
+
+- Events are posted to `<destination>/api/events`; the Gamemaster sets only the destination.
+- Every envelope carries `campaign`, and each event is sent once per campaign it involves,
+  described for that campaign. `sequence` counts per campaign.
+- `bridge.hello` is sent per campaign, with that campaign's characters and combats.
+- `characters.updated` is no longer sent: a change to the campaigns sends `bridge.hello` instead.
+- `combat.created` and `combat.ended` also mark a campaign's characters joining or leaving a fight.
+
 ## Coming next
 
-The listener will be able to act for a connected character: rolling a check, attacking, casting a
+The listener will be able to act for a campaign's character: rolling a check, attacking, casting a
 spell, as if its player had done it in Foundry. Because a browser cannot accept incoming
 requests, that will need the Gamemaster's browser to hold a connection open to the listener
-rather than the listener calling Foundry. The shared secret and connected characters configured
-now are what that connection will use.
+rather than the listener calling Foundry. The shared secret and campaigns configured now are what
+that connection will use.

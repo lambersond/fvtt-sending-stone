@@ -2,39 +2,41 @@
   "SENDINGSTONE": {
     "Settings": {
       "Connection": {
-        "Name": "Listener Connection",
+        "Name": "Destination",
         "Label": "Configure Connection",
-        "Hint": "Set the URL events are posted to and the shared secret the listener expects, and test the connection."
+        "Hint": "Set the Sending Stone app events are posted to and the shared secret it expects, and test the connection."
       },
-      "Characters": {
-        "Name": "Connected Characters",
-        "Label": "Choose Characters",
-        "Hint": "Choose which player characters are connected to the listener. Connected characters' hit points are included in combat events, and every event says which of them may see it."
+      "Campaigns": {
+        "Name": "Campaigns",
+        "Label": "Manage Campaigns",
+        "Hint": "Group player characters into campaigns, each with its own title. Events involving a campaign's characters are sent to that campaign, described for it alone."
       },
       "ChatEvents": {
         "Name": "Send Chat Events",
-        "Hint": "Post chat messages to the listener as they are created, edited and deleted."
+        "Hint": "Post chat messages as they are created, edited and deleted."
       },
       "ChatScope": {
         "Name": "Chat Messages to Send",
-        "Hint": "Send every chat message, or only those spoken by a connected character.",
+        "Hint": "Send each campaign every chat message its players can read, or only those spoken by one of its characters.",
         "All": "All messages",
-        "Connected": "Connected characters only"
+        "Connected": "Its characters' messages only"
       },
       "CombatEvents": {
         "Name": "Send Combat Events",
-        "Hint": "Post combat tracker changes to the listener: encounters starting and ending, turns and rounds, and combatants joining, leaving, rolling initiative and being defeated."
+        "Hint": "Post combat tracker changes: encounters starting and ending, turns and rounds, and combatants joining, leaving, rolling initiative and being defeated."
       },
       "GmContent": {
         "Name": "Send Gamemaster-Only Information",
-        "Hint": "Also send what only a Gamemaster can see: whispers no player can read, blind rolls, hidden combatants, the hit points of unconnected combatants and the armor class of attack targets. Leave this off if players can see what the listener receives."
+        "Hint": "Also send what only a Gamemaster can see: whispers no player can read, blind rolls, hidden combatants, the hit points of combatants outside a campaign and the armor class of attack targets. Leave this off if players can see what the destination receives."
       }
     },
     "Connection": {
-      "Title": "Sending Stone: Listener Connection",
+      "Title": "Sending Stone: Connection",
       "Hint": "Events are posted as JSON, one per request, from the active Gamemaster's browser. Nothing is sent while no Gamemaster is connected.",
-      "Url": "Listener URL",
-      "UrlHint": "The http or https address that receives events. The listener must allow cross-origin requests from this Foundry server.",
+      "Destination": "Destination",
+      "DestinationHint": "The address of the Sending Stone app, such as https://sending-stone.vercel.app. Only the host is needed; the path events go to is added for you. The app must allow cross-origin requests from this Foundry server.",
+      "Endpoint": "Events are posted to {url}",
+      "EndpointNone": "Enter a destination to see where events are posted.",
       "Secret": "Shared Secret",
       "SecretHint": "Optional. Sent as a bearer token in the Authorization header. Stored only in this browser, so players cannot read it; enter it in each browser a Gamemaster runs the game from.",
       "StatusLegend": "Status",
@@ -48,34 +50,42 @@
       "StatusError": "Failing since {time}: {error}. {delivered} delivered, {dropped} dropped.",
       "Test": "Test Connection",
       "Testing": "Sending a test event…",
-      "TestOk": "Delivered: the listener answered HTTP {status} in {elapsed} ms.",
+      "TestOk": "Delivered: the destination answered HTTP {status} in {elapsed} ms.",
       "TestFailed": "Not delivered: {error}",
-      "HintNetwork": "Check that the listener is running and reachable from this computer, and that it answers the browser's CORS preflight (OPTIONS) request with Access-Control-Allow-Origin, and Access-Control-Allow-Headers covering Content-Type and Authorization.",
-      "HintMixedContent": "Foundry is served over https but the listener URL is plain http, which browsers block for any host other than localhost. Serve the listener over https.",
-      "HintAuth": "The listener rejected the request. Check the shared secret.",
+      "HintNetwork": "Check that the destination is running and reachable from this computer, and that it answers the browser's CORS preflight (OPTIONS) request with Access-Control-Allow-Origin, and Access-Control-Allow-Headers covering Content-Type and Authorization.",
+      "HintMixedContent": "Foundry is served over https but the destination is plain http, which browsers block for any host other than localhost. Serve the destination over https.",
+      "HintAuth": "The destination rejected the request. Check the shared secret.",
       "Submit": "Save Changes",
       "Saved": "Sending Stone connection saved."
     },
-    "Characters": {
-      "Title": "Sending Stone: Connected Characters",
-      "Hint": "Connected characters are the ones the listener acts for. Their hit points are included in combat events, chat can be limited to their messages, and every event lists which of them may see it.",
-      "Connected": "Connected",
+    "Campaigns": {
+      "Title": "Sending Stone: Campaigns",
+      "Hint": "Each campaign gets the events that involve its characters: messages their players can read or they spoke, and combats they are in. Players find a campaign by its title, so give each a different one. A character can be in more than one campaign.",
+      "CampaignTitle": "Campaign Title",
+      "TitlePlaceholder": "Curse of Strahd",
+      "Untitled": "New Campaign",
+      "Remove": "Remove Campaign",
+      "InCampaign": "In Campaign",
       "Character": "Character",
       "Owners": "Players",
       "NoOwner": "No player owner",
-      "None": "There are no player characters in this world.",
+      "NoCharacters": "There are no player characters in this world.",
+      "None": "No campaigns yet. Add one, then tick the characters in it.",
+      "Add": "Add Campaign",
       "Submit": "Save Changes",
-      "Saved": "Sending Stone connected characters saved."
+      "TitleRequired": "Every campaign needs a title.",
+      "TitleTaken": "Each campaign needs a different title.",
+      "Saved": "Sending Stone campaigns saved."
     },
     "Error": {
-      "InvalidUrl": "The listener URL must be a full http or https address.",
-      "Network": "the listener could not be reached",
-      "Timeout": "the listener did not answer in time",
-      "Status": "the listener answered HTTP {status}"
+      "InvalidDestination": "The destination must be a web address, such as https://sending-stone.vercel.app.",
+      "Network": "the destination could not be reached",
+      "Timeout": "the destination did not answer in time",
+      "Status": "the destination answered HTTP {status}"
     },
     "Notify": {
-      "Failing": "Sending Stone cannot deliver events to the listener: {error}. Events are being dropped until it recovers.",
-      "Recovered": "Sending Stone is delivering events to the listener again."
+      "Failing": "Sending Stone cannot deliver events to the destination: {error}. Events are being dropped until it recovers.",
+      "Recovered": "Sending Stone is delivering events to the destination again."
     }
   }
 }

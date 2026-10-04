@@ -1,15 +1,13 @@
-import { connectedIds } from "./config.mjs";
-
 /**
- * Connected characters: the player characters the Gamemaster has chosen to link to the listener.
+ * Player characters, as campaigns see them.
  *
- * Connection decides whose details the listener receives. A connected character's combatant
- * carries its hit points, its chat messages can be singled out, and every event says which
- * connected characters may see it, so the listener can route each one to the right player.
+ * A campaign's characters decide whose details it receives: their combatants carry hit points,
+ * their chat messages can be singled out, and every event says which of them may see it, so the
+ * listener can route each one to the right player.
  */
 
 /**
- * The actors offered in the connected characters dialog, sorted by name.
+ * The actors offered when choosing a campaign's characters, sorted by name.
  *
  * Under a system with a "character" actor type, as D&D Fifth Edition has, those are the player
  * characters. Under any other, the best available signal is an actor that a player owns.
@@ -23,24 +21,26 @@ export function candidateActors() {
 }
 
 /**
- * The connected characters that still exist, in the order they were chosen.
+ * A campaign's characters that still exist, in the order they were chosen.
+ * @param {Campaign} campaign
  * @returns {Actor[]}
  */
-export function connectedActors() {
-  return Array.from(connectedIds(), id => game.actors.get(id)).filter(Boolean);
+export function campaignActors(campaign) {
+  return Array.from(campaign.characters, id => game.actors.get(id)).filter(Boolean);
 }
 
 /**
- * The id of the connected character an actor represents, if it represents one.
+ * The id of the campaign character an actor represents, if it represents one.
  *
  * A token's synthetic actor shares the id of the world actor it was made from, so a character
  * speaking through an unlinked token still resolves.
  * @param {Actor|null|undefined} actor
+ * @param {Campaign} campaign
  * @returns {string|null}
  */
-export function connectedId(actor) {
+export function campaignCharacterId(actor, campaign) {
   if ( !actor ) return null;
-  return connectedIds().has(actor.id) ? actor.id : null;
+  return campaign.characters.has(actor.id) ? actor.id : null;
 }
 
 /**
@@ -53,13 +53,14 @@ export function playerOwners(actor) {
 }
 
 /**
- * The connected characters owned by any of the given users.
+ * A campaign's characters owned by any of the given users.
  * @param {Iterable<string>} userIds   Ids of the users who can see something.
- * @returns {string[]}                  Actor ids of the connected characters those users own.
+ * @param {Campaign} campaign
+ * @returns {string[]}                  Actor ids of the campaign characters those users own.
  */
-export function charactersSeenBy(userIds) {
+export function charactersSeenBy(userIds, campaign) {
   const users = Array.from(userIds, id => game.users.get(id)).filter(Boolean);
-  return connectedActors()
+  return campaignActors(campaign)
     .filter(actor => users.some(user => actor.testUserPermission(user, "OWNER")))
     .map(actor => actor.id);
 }
@@ -83,11 +84,12 @@ export function summarizeCharacter(actor) {
 }
 
 /**
- * Describe every connected character for the listener.
+ * Describe every character in a campaign for the listener.
+ * @param {Campaign} campaign
  * @returns {object[]}
  */
-export function roster() {
-  return connectedActors().map(summarizeCharacter);
+export function roster(campaign) {
+  return campaignActors(campaign).map(summarizeCharacter);
 }
 
 /**

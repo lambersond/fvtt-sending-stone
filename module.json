@@ -1,7 +1,7 @@
 {
   "id": "sending-stone",
   "title": "Sending Stone",
-  "description": "Send what happens at the table to an external listener. The Gamemaster sets a listener URL, chooses which player characters are connected, and turns chat and combat events on independently; the active Gamemaster's client then posts each event to the listener as JSON. Enriched with roll, item and activity details for D&D Fifth Edition.",
+  "description": "Send what happens at the table to the Sending Stone app. The Gamemaster sets the app's address, groups player characters into campaigns and turns chat and combat events on independently; the active Gamemaster's client then posts each event, as JSON, to every campaign it involves. Enriched with roll, item and activity details for D&D Fifth Edition.",
   "version": "0.1.0",
   "compatibility": {
     "minimum": "14",

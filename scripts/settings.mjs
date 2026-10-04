@@ -1,7 +1,9 @@
 import { CHAT_SCOPES, MODULE_ID, SETTINGS } from "./constants.mjs";
-import { announce, announceCharacters } from "./bridge.mjs";
-import CharacterConfig from "./apps/character-config.mjs";
+import { announce } from "./bridge.mjs";
+import CampaignConfig from "./apps/campaign-config.mjs";
 import ConnectionConfig from "./apps/connection-config.mjs";
+
+const { ArrayField, SchemaField, SetField, StringField } = foundry.data.fields;
 
 /**
  * Register this module's settings and setting menus.
@@ -13,7 +15,7 @@ export function registerSettings() {
   const reannounce = foundry.utils.debounce(announce, 250);
 
   // Where events go, and how the bridge authenticates. Edited together in their own dialog, which
-  // can test the connection before saving.
+  // can test the connection before saving. Only the destination's origin is kept.
   game.settings.registerMenu(MODULE_ID, SETTINGS.CONNECTION, {
     name: "SENDINGSTONE.Settings.Connection.Name",
     label: "SENDINGSTONE.Settings.Connection.Label",
@@ -23,7 +25,7 @@ export function registerSettings() {
     restricted: true
   });
 
-  game.settings.register(MODULE_ID, SETTINGS.LISTENER_URL, {
+  game.settings.register(MODULE_ID, SETTINGS.DESTINATION, {
     scope: "world",
     config: false,
     type: String,
@@ -40,21 +42,34 @@ export function registerSettings() {
     default: ""
   });
 
-  game.settings.registerMenu(MODULE_ID, SETTINGS.CHARACTERS_MENU, {
-    name: "SENDINGSTONE.Settings.Characters.Name",
-    label: "SENDINGSTONE.Settings.Characters.Label",
-    hint: "SENDINGSTONE.Settings.Characters.Hint",
-    icon: "fa-solid fa-users",
-    type: CharacterConfig,
+  game.settings.registerMenu(MODULE_ID, SETTINGS.CAMPAIGNS_MENU, {
+    name: "SENDINGSTONE.Settings.Campaigns.Name",
+    label: "SENDINGSTONE.Settings.Campaigns.Label",
+    hint: "SENDINGSTONE.Settings.Campaigns.Hint",
+    icon: "fa-solid fa-flag",
+    type: CampaignConfig,
     restricted: true
   });
 
+  // Which campaign an event belongs to decides what it says, so every campaign is told afresh.
+  game.settings.register(MODULE_ID, SETTINGS.CAMPAIGNS, {
+    scope: "world",
+    config: false,
+    type: new ArrayField(new SchemaField({
+      id: new StringField({ blank: false }),
+      title: new StringField({ blank: false }),
+      characters: new ArrayField(new StringField({ blank: false }))
+    })),
+    default: [],
+    onChange: () => reannounce()
+  });
+
+  // Kept only so connected characters chosen before campaigns can be moved into one.
   game.settings.register(MODULE_ID, SETTINGS.CHARACTERS, {
     scope: "world",
     config: false,
-    type: new foundry.data.fields.SetField(new foundry.data.fields.StringField({ blank: false })),
-    default: [],
-    onChange: () => announceCharacters()
+    type: new SetField(new StringField({ blank: false })),
+    default: []
   });
 
   game.settings.register(MODULE_ID, SETTINGS.CHAT_EVENTS, {

@@ -1,11 +1,11 @@
 import { EVENTS, MODULE_ID, SETTINGS, STATUS_HOOK } from "../constants.mjs";
-import { getListenerUrl, getSecret, isMixedContent, parseListenerUrl } from "../config.mjs";
+import { eventsUrl, getDestination, getSecret, isMixedContent, parseDestination } from "../config.mjs";
 import { buildEnvelope, deliver, DeliveryError, status } from "../transport.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
- * A Gamemaster-only dialog for the listener URL and shared secret, which can test the connection
+ * A Gamemaster-only dialog for the destination and shared secret, which can test the connection
  * with the values as typed, before anything is saved.
  * @extends ApplicationV2
  * @mixes HandlebarsApplication
@@ -54,7 +54,8 @@ export default class ConnectionConfig extends HandlebarsApplicationMixin(Applica
   /** @override */
   async _prepareContext(_options = {}) {
     return {
-      url: getListenerUrl(),
+      destination: getDestination(),
+      endpoint: ConnectionConfig.#describeEndpoint(getDestination()),
       secret: getSecret(),
       bridge: ConnectionConfig.#describeBridge(),
       status: ConnectionConfig.#describeStatus(),
@@ -78,6 +79,17 @@ export default class ConnectionConfig extends HandlebarsApplicationMixin(Applica
   /* -------------------------------------------- */
 
   /** @inheritDoc */
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    // Show where events will go as the destination is typed.
+    const input = this.element.querySelector("[name=destination]");
+    const endpoint = this.element.querySelector("[data-endpoint]");
+    input?.addEventListener("input", () => {
+      endpoint.textContent = ConnectionConfig.#describeEndpoint(input.value);
+    });
+  }
+
+  /** @inheritDoc */
   async _onFirstRender(context, options) {
     await super._onFirstRender(context, options);
     // Updated in place rather than by re-rendering, which would discard anything typed but unsaved.
@@ -97,6 +109,17 @@ export default class ConnectionConfig extends HandlebarsApplicationMixin(Applica
   }
 
   /* -------------------------------------------- */
+
+  /**
+   * Where events go for a destination as typed.
+   * @param {string} destination
+   * @returns {string}
+   */
+  static #describeEndpoint(destination) {
+    const parsed = parseDestination(destination);
+    if ( !parsed ) return game.i18n.localize("SENDINGSTONE.Connection.EndpointNone");
+    return game.i18n.format("SENDINGSTONE.Connection.Endpoint", { url: eventsUrl(parsed) });
+  }
 
   /**
    * Which browser events are sent from.
@@ -135,18 +158,18 @@ export default class ConnectionConfig extends HandlebarsApplicationMixin(Applica
   /* -------------------------------------------- */
 
   /**
-   * Read the URL and secret as currently typed.
-   * @returns {{url: string, secret: string}}
+   * Read the destination and secret as currently typed.
+   * @returns {{destination: string, secret: string}}
    */
   #readForm() {
     const value = name => String(this.element.querySelector(`[name="${name}"]`)?.value ?? "").trim();
-    return { url: value("url"), secret: value("secret") };
+    return { destination: value("destination"), secret: value("secret") };
   }
 
   /* -------------------------------------------- */
 
   /**
-   * Post a ping to the URL as typed and report the outcome in the dialog.
+   * Post a ping to the destination as typed and report the outcome in the dialog.
    * @this {ConnectionConfig}
    * @param {PointerEvent} event   The originating click event.
    * @param {HTMLButtonElement} target   The test button.
@@ -160,15 +183,15 @@ export default class ConnectionConfig extends HandlebarsApplicationMixin(Applica
       output.textContent = message;
     };
 
-    const { url, secret } = this.#readForm();
-    const parsed = parseListenerUrl(url);
-    if ( !parsed ) return report("error", game.i18n.localize("SENDINGSTONE.Error.InvalidUrl"));
+    const { destination, secret } = this.#readForm();
+    const parsed = parseDestination(destination);
+    if ( !parsed ) return report("error", game.i18n.localize("SENDINGSTONE.Error.InvalidDestination"));
 
     target.disabled = true;
     report("pending", game.i18n.localize("SENDINGSTONE.Connection.Testing"));
     try {
       const envelope = buildEnvelope(EVENTS.PING, { userId: game.user.id, name: game.user.name }, { sequenced: false });
-      const result = await deliver(envelope, { url, secret });
+      const result = await deliver(envelope, { destination, secret });
       report("ok", game.i18n.format("SENDINGSTONE.Connection.TestOk", result));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -191,7 +214,8 @@ export default class ConnectionConfig extends HandlebarsApplicationMixin(Applica
   /* -------------------------------------------- */
 
   /**
-   * Persist the URL for the world and the secret for this browser.
+   * Persist the destination for the world and the secret for this browser. Only the destination's
+   * origin is stored: the path events go to under it is fixed.
    * @this {ConnectionConfig}
    * @param {SubmitEvent} _event          The originating form submission event.
    * @param {HTMLFormElement} _form       The submitted form element.
@@ -199,17 +223,17 @@ export default class ConnectionConfig extends HandlebarsApplicationMixin(Applica
    * @returns {Promise<void>}
    */
   static async #onSubmit(_event, _form, formData) {
-    const url = String(formData.object.url ?? "").trim();
+    const destination = String(formData.object.destination ?? "").trim();
     const secret = String(formData.object.secret ?? "").trim();
+    const parsed = parseDestination(destination);
 
     // Thrown rather than notified, so that the dialog stays open with what was typed.
-    if ( url && !parseListenerUrl(url) ) throw new Error(game.i18n.localize("SENDINGSTONE.Error.InvalidUrl"));
+    if ( destination && !parsed ) throw new Error(game.i18n.localize("SENDINGSTONE.Error.InvalidDestination"));
 
     await game.settings.set(MODULE_ID, SETTINGS.SECRET, secret);
-    await game.settings.set(MODULE_ID, SETTINGS.LISTENER_URL, url);
+    await game.settings.set(MODULE_ID, SETTINGS.DESTINATION, parsed?.origin ?? "");
     ui.notifications.info("SENDINGSTONE.Connection.Saved", { localize: true });
 
-    const parsed = parseListenerUrl(url);
     if ( parsed && isMixedContent(parsed) ) {
       ui.notifications.warn("SENDINGSTONE.Connection.HintMixedContent", { localize: true });
     }

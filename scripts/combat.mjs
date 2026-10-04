@@ -1,11 +1,11 @@
 import { EVENTS } from "./constants.mjs";
 import { combatEnabled, includeGmContent } from "./config.mjs";
 import { canSend } from "./bridge.mjs";
+import { sendCombatEnded, sendCombatEvent } from "./campaign-combats.mjs";
 import { isCombatantShared, shareCombatant, snapshotCombat, summarizeCombatant } from "./combat-data.mjs";
-import { send } from "./transport.mjs";
 
 /**
- * Combat tracker events.
+ * Combat tracker events, sent to each campaign with characters in the fight.
  *
  * Every hook used here fires on all clients after the database write, so the bridge sees each
  * change exactly once whoever made it. combatStart, combatTurn and combatRound are deliberately
@@ -52,11 +52,13 @@ function active() {
 /* -------------------------------------------- */
 
 /**
+ * A new encounter usually has no combatants yet, so it reaches each campaign only once one of its
+ * characters joins.
  * @param {Combat} combat
  */
 function onCreateCombat(combat) {
   if ( !active() ) return;
-  send(EVENTS.COMBAT_CREATED, { combat: snapshotCombat(combat) });
+  sendCombatEvent(combat, EVENTS.COMBAT_CREATED, campaign => ({ combat: snapshotCombat(combat, campaign) }));
 }
 
 /**
@@ -67,7 +69,7 @@ function onUpdateCombat(combat, changed) {
   if ( !active() ) return;
   const changes = Object.keys(changed).filter(key => COMBAT_FIELDS.has(key));
   if ( !changes.length ) return;
-  send(EVENTS.COMBAT_UPDATED, { changes, combat: snapshotCombat(combat) });
+  sendCombatEvent(combat, EVENTS.COMBAT_UPDATED, campaign => ({ changes, combat: snapshotCombat(combat, campaign) }));
 }
 
 /**
@@ -76,7 +78,7 @@ function onUpdateCombat(combat, changed) {
  */
 function onDeleteCombat(combat) {
   if ( !active() ) return;
-  send(EVENTS.COMBAT_ENDED, { combat: snapshotCombat(combat) });
+  sendCombatEnded(combat);
 }
 
 /* -------------------------------------------- */
@@ -108,21 +110,22 @@ function onTurnChange(combat, prior, current) {
     direction = current.turn > priorTurn ? "forward" : "backward";
   }
 
-  const snapshot = snapshotCombat(combat);
-
   // Before the first round the tracker is still being set up, so reaching it is the start of the
   // fight. Detected here rather than through combatStart, which fires only on the starting client.
-  if ( (priorRound < 1) && (current.round >= 1) ) send(EVENTS.COMBAT_STARTED, { combat: snapshot });
+  if ( (priorRound < 1) && (current.round >= 1) ) {
+    sendCombatEvent(combat, EVENTS.COMBAT_STARTED, campaign => ({ combat: snapshotCombat(combat, campaign) }));
+  }
 
-  send(EVENTS.COMBAT_TURN, {
+  const previousCombatantId = isCombatantShared(combat.combatants.get(priorCombatantId)) ? priorCombatantId : null;
+  sendCombatEvent(combat, EVENTS.COMBAT_TURN, campaign => ({
     combatId: combat.id,
     round: current.round,
     newRound: roundChanged && (direction === "forward"),
     direction,
-    combatant: shareCombatant(combat.combatant),
-    previousCombatantId: isCombatantShared(combat.combatants.get(priorCombatantId)) ? priorCombatantId : null,
-    combat: snapshot
-  });
+    combatant: shareCombatant(combat.combatant, campaign),
+    previousCombatantId,
+    combat: snapshotCombat(combat, campaign)
+  }));
 }
 
 /* -------------------------------------------- */
@@ -134,7 +137,11 @@ function onTurnChange(combat, prior, current) {
  */
 function onCreateCombatant(combatant) {
   if ( !active() || !isCombatantShared(combatant) ) return;
-  send(EVENTS.COMBATANT_ADDED, { combatId: combatant.parent.id, combatant: summarizeCombatant(combatant) });
+  const combatId = combatant.parent.id;
+  sendCombatEvent(combatant.parent, EVENTS.COMBATANT_ADDED, campaign => ({
+    combatId,
+    combatant: summarizeCombatant(combatant, campaign)
+  }));
 }
 
 /**
@@ -145,17 +152,29 @@ function onUpdateCombatant(combatant, changed) {
   if ( !active() ) return;
   const changes = Object.keys(changed).filter(key => COMBATANT_FIELDS.has(key));
   if ( !changes.length ) return;
-  const combatId = combatant.parent.id;
+  const combat = combatant.parent;
+  const combatId = combat.id;
 
   // While hidden combatants are withheld, hiding or revealing one is, as far as the listener can
   // tell, the combatant leaving or joining the fight.
   if ( !includeGmContent() && ("hidden" in changed) ) {
-    if ( combatant.hidden ) send(EVENTS.COMBATANT_REMOVED, { combatId, combatantId: combatant.id });
-    else send(EVENTS.COMBATANT_ADDED, { combatId, combatant: summarizeCombatant(combatant) });
+    if ( combatant.hidden ) {
+      sendCombatEvent(combat, EVENTS.COMBATANT_REMOVED, () => ({ combatId, combatantId: combatant.id }));
+    }
+    else {
+      sendCombatEvent(combat, EVENTS.COMBATANT_ADDED, campaign => ({
+        combatId,
+        combatant: summarizeCombatant(combatant, campaign)
+      }));
+    }
     return;
   }
   if ( !isCombatantShared(combatant) ) return;
-  send(EVENTS.COMBATANT_UPDATED, { combatId, changes, combatant: summarizeCombatant(combatant) });
+  sendCombatEvent(combat, EVENTS.COMBATANT_UPDATED, campaign => ({
+    combatId,
+    changes,
+    combatant: summarizeCombatant(combatant, campaign)
+  }));
 }
 
 /**
@@ -163,5 +182,8 @@ function onUpdateCombatant(combatant, changed) {
  */
 function onDeleteCombatant(combatant) {
   if ( !active() || !isCombatantShared(combatant) ) return;
-  send(EVENTS.COMBATANT_REMOVED, { combatId: combatant.parent.id, combatantId: combatant.id });
+  const combatId = combatant.parent.id;
+  sendCombatEvent(combatant.parent, EVENTS.COMBATANT_REMOVED, () => ({ combatId, combatantId: combatant.id }), {
+    leaving: combatant.id
+  });
 }

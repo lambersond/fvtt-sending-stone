@@ -1,4 +1,4 @@
-import { CHAT_SCOPES, MODULE_ID, SETTINGS } from "./constants.mjs";
+import { CHAT_SCOPES, EVENTS_PATH, MODULE_ID, SETTINGS } from "./constants.mjs";
 
 /**
  * Typed accessors for this module's settings.
@@ -8,11 +8,18 @@ import { CHAT_SCOPES, MODULE_ID, SETTINGS } from "./constants.mjs";
  */
 
 /**
- * The configured listener URL, trimmed. An empty string means none is configured.
+ * Does a typed address start with a scheme, such as https://?
+ * @type {RegExp}
+ */
+const HAS_SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
+
+/**
+ * The destination events are posted to: the origin of the Sending Stone app, such as
+ * https://sending-stone.vercel.app. An empty string means none is configured.
  * @returns {string}
  */
-export function getListenerUrl() {
-  return String(game.settings.get(MODULE_ID, SETTINGS.LISTENER_URL) ?? "").trim();
+export function getDestination() {
+  return parseDestination(game.settings.get(MODULE_ID, SETTINGS.DESTINATION))?.origin ?? "";
 }
 
 /**
@@ -24,36 +31,67 @@ export function getSecret() {
 }
 
 /**
- * Parse a listener URL, accepting only http and https.
- * @param {string} value   The URL to parse.
- * @returns {URL|null}     The parsed URL, or null if it is missing or not a web address.
+ * Read a destination as typed. Only its origin matters: events always go to the same path under
+ * it, so any path typed is dropped. Without a scheme, https is assumed, or http for localhost.
+ * @param {string} value   The destination, such as "sending-stone.vercel.app" or
+ *                         "http://localhost:3000".
+ * @returns {URL|null}     The destination's origin, or null if it is not a web address.
  */
-export function parseListenerUrl(value) {
-  if ( !value ) return null;
+export function parseDestination(value) {
+  let address = String(value ?? "").trim();
+  if ( !address ) return null;
+  if ( !HAS_SCHEME.test(address) ) {
+    let probe;
+    try {
+      probe = new URL(`http://${address}`);
+    } catch {
+      return null;
+    }
+    address = `${isLoopback(probe.hostname) ? "http" : "https"}://${address}`;
+  }
+
   let url;
   try {
-    url = new URL(value);
+    url = new URL(address);
   } catch {
     return null;
   }
-  return ["http:", "https:"].includes(url.protocol) ? url : null;
+  if ( !["http:", "https:"].includes(url.protocol) || !url.hostname ) return null;
+  return new URL(url.origin);
 }
 
 /**
- * Will the browser refuse to post to this URL from the page Foundry is served on?
+ * The address events are posted to at a destination.
+ * @param {URL} destination   A parsed destination.
+ * @returns {string}
+ */
+export function eventsUrl(destination) {
+  return new URL(EVENTS_PATH, destination).href;
+}
+
+/**
+ * Is a host this computer itself? Browsers treat these as potentially trustworthy even over http.
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+function isLoopback(hostname) {
+  const host = hostname.replace(/^\[|\]$/g, "");
+  return (host === "localhost") || host.endsWith(".localhost") || (host === "::1")
+    || /^127(?:\.\d{1,3}){3}$/.test(host);
+}
+
+/**
+ * Will the browser refuse to post to this destination from the page Foundry is served on?
  *
  * A page served over https may not make plain http requests ("mixed content"), except to the
  * loopback addresses, which browsers treat as potentially trustworthy.
- * @param {URL} url   A parsed listener URL.
+ * @param {URL} url   A parsed destination.
  * @returns {boolean}
  */
 export function isMixedContent(url) {
   if ( globalThis.location?.protocol !== "https:" ) return false;
   if ( url.protocol !== "http:" ) return false;
-  const host = url.hostname.replace(/^\[|\]$/g, "");
-  const loopback = (host === "localhost") || host.endsWith(".localhost") || (host === "::1")
-    || /^127(?:\.\d{1,3}){3}$/.test(host);
-  return !loopback;
+  return !isLoopback(url.hostname);
 }
 
 /* -------------------------------------------- */
@@ -90,12 +128,4 @@ export function combatEnabled() {
  */
 export function includeGmContent() {
   return game.settings.get(MODULE_ID, SETTINGS.GM_CONTENT) === true;
-}
-
-/**
- * The actor ids of the connected characters.
- * @returns {Set<string>}
- */
-export function connectedIds() {
-  return new Set(game.settings.get(MODULE_ID, SETTINGS.CHARACTERS) ?? []);
 }
