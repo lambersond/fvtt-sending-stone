@@ -22,11 +22,13 @@ import { send } from "./transport.mjs";
 const told = new Map();
 
 /**
- * Forget what every campaign was told, before bridge.hello tells them all afresh.
+ * Forget what campaigns were told, before bridge.hello tells them afresh.
+ * @param {string} [campaignId]   The one campaign to forget for. Every campaign if omitted.
  * @returns {void}
  */
-export function forgetCombats() {
-  told.clear();
+export function forgetCombats(campaignId) {
+  if ( campaignId === undefined ) told.clear();
+  else for ( const campaigns of told.values() ) campaigns.delete(campaignId);
 }
 
 /**

@@ -21,7 +21,7 @@ Authorization: Bearer <shared secret>     (only when a secret is configured)
 
 | Your answer | What the module does |
 | --- | --- |
-| Any `2xx` | Delivered. The body is ignored; `204 No Content` is fine. |
+| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). Any other body is ignored. |
 | `408`, `425`, `429`, any `5xx`, no answer, or no answer within 10 s | Retried after 1 s, then again after 3 s, with the same envelope. Dropped after the third failure. |
 | Any other status, such as `400` or `401` | Dropped immediately. |
 
@@ -74,6 +74,12 @@ The request comes from the Gamemaster's **browser**, so the listener must handle
   instance when the Gamemaster reveals a blind roll, so you may receive an update for something
   you never saw created.
 - Deletions may name something you never saw. Ignore them.
+- **Missing a campaign's state? Ask for it.** Answer any event for the campaign with
+  `Content-Type: application/json` and `{"resend": "hello"}`, and the module sends that campaign
+  a fresh `bridge.hello`, at most once every 30 seconds. Ask when you have not applied a hello from
+  the envelope's `session`: for instance when you refused the campaign's hello because it was not
+  set up with you yet, or when you lost what you held. Answer a `bridge.hello` itself without
+  asking, or you will be sent another.
 
 ## Campaigns
 
@@ -325,6 +331,8 @@ hiding one as `combat.combatant.removed`.
 
 - Module 0.3.0 sends [`bridge.heartbeat`](#bridgeheartbeat). A listener that answers `2xx` to
   types it does not use needs no change.
+- Module 0.3.1 resends a campaign's `bridge.hello` when an answer asks for it with
+  `{"resend": "hello"}`. A listener that never asks needs no change.
 
 ## Changes from protocol 1
 

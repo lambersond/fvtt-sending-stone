@@ -111,3 +111,10 @@ export const EVENTS = Object.freeze({
  * @type {string}
  */
 export const STATUS_HOOK = "sendingStone.status";
+
+/**
+ * The name of the hook called when the listener asks for a campaign's full state again, answering
+ * an event for it with `{"resend": "hello"}`. Called with the campaign's id.
+ * @type {string}
+ */
+export const HELLO_WANTED_HOOK = "sendingStone.helloWanted";

@@ -1,4 +1,5 @@
-import { checkBridge } from "./bridge.mjs";
+import { checkBridge, resendHello } from "./bridge.mjs";
+import { HELLO_WANTED_HOOK } from "./constants.mjs";
 import { migrateConnectedCharacters } from "./campaigns.mjs";
 import { registerChatHooks } from "./chat.mjs";
 import { registerCombatHooks } from "./combat.mjs";
@@ -20,3 +21,4 @@ Hooks.once("ready", async () => {
   startHeartbeat();
 });
 Hooks.on("userConnected", checkBridge);
+Hooks.on(HELLO_WANTED_HOOK, resendHello);

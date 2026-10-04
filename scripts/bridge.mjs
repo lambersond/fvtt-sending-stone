@@ -40,11 +40,28 @@ export function canSend() {
 /* -------------------------------------------- */
 
 /**
+ * How long to wait before resending a campaign's state when the listener asks for it again, in
+ * milliseconds. Every answer while the first resend is on its way would otherwise ask again.
+ * @type {number}
+ */
+const RESEND_AFTER = 30_000;
+
+/**
+ * When each campaign's state was last resent at the listener's request, by campaign id.
+ * @type {Map<string, number>}
+ */
+const resent = new Map();
+
+/* -------------------------------------------- */
+
+/**
  * Send each campaign its full current state, so the listener can discard whatever it held for the
  * campaign and start afresh: its characters, and the combats they are in.
+ * @param {object} [options]
+ * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
  */
-export function announce() {
+export function announce({ campaignId }={}) {
   if ( !canSend() ) return;
   const module = game.modules.get(MODULE_ID);
   const shared = {
@@ -60,8 +77,9 @@ export function announce() {
     }
   };
 
-  forgetCombats();
+  forgetCombats(campaignId);
   for ( const campaign of getCampaigns() ) {
+    if ( (campaignId !== undefined) && (campaign.id !== campaignId) ) continue;
     const combats = combatEnabled() ? game.combats.filter(combat => involvesCampaign(combat, campaign)) : [];
     for ( const combat of combats ) noteCombatSent(combat.id, campaign.id);
     send(EVENTS.HELLO, {
@@ -83,4 +101,19 @@ export function checkBridge() {
   const bridge = isBridge();
   if ( bridge && !wasBridge ) announce();
   wasBridge = bridge;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Resend a campaign its full state because the listener asked for it, for instance because the
+ * campaign was set up there after its bridge.hello was refused.
+ * @param {string} campaignId
+ * @returns {void}
+ */
+export function resendHello(campaignId) {
+  const last = resent.get(campaignId) ?? -Infinity;
+  if ( Date.now() - last < RESEND_AFTER ) return;
+  resent.set(campaignId, Date.now());
+  announce({ campaignId });
 }
