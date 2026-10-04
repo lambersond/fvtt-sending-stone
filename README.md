@@ -29,15 +29,13 @@ in [PROTOCOL.md](PROTOCOL.md).
 ## Setup
 
 1. **Gamemaster, in the Sending Stone app:** under *Campaigns*, set up each campaign with its
-   title, your game's Forge address and a secret. Campaigns in one world share the module's
-   secret, so give them all the same one.
-2. **Gamemaster, in Foundry:** *Settings → Configure Settings → Sending Stone → Configure
-   Connection*. Enter the destination, the address of the Sending Stone app such as
-   `https://sending-stone.vercel.app`, and the secret. Events go to `/api/events` under it; you
-   don't type that part. Use **Test Connection** to check it before saving.
-3. **Gamemaster:** *Manage Campaigns*. Add each campaign with the same title as in the app, and
-   tick its player characters.
-4. **Gamemaster:** switch on **Send Chat Events** and/or **Send Combat Events**. Then share each
+   title, your game's Forge address and a secret.
+2. **Gamemaster, in Foundry:** *Settings → Configure Settings → Sending Stone → Manage
+   Campaigns*. Enter the **Sending Stone Address**, such as `https://sending-stone.vercel.app`.
+   Events go to `/api/events` under it; you don't type that part. Then add each campaign with the
+   same title and secret as in the app, and tick its player characters. **Test** checks a
+   campaign's connection before saving.
+3. **Gamemaster:** switch on **Send Chat Events** and/or **Send Combat Events**. Then share each
    campaign's invite link from the app; players open it and choose their character.
 
 While a Gamemaster has the game open, each campaign that has been sent nothing else for 30
@@ -45,16 +43,16 @@ seconds is sent a heartbeat, so the app can show players whether the game is con
 
 | Setting | Effect |
 | --- | --- |
-| Destination | The app events are posted to, and the shared secret sent as `Authorization: Bearer …`. |
-| Campaigns | Titled groups of player characters. Each event goes to the campaigns it involves. |
+| Manage Campaigns | The Sending Stone app's address, and each campaign: its title, its secret (sent as `Authorization: Bearer …` with its events) and its player characters. Each event goes to the campaigns it involves. |
 | Send Chat Events | Chat messages created, edited and deleted, and the log being cleared. |
 | Chat Messages to Send | Every message a campaign's players can read, or only those its characters spoke. |
 | Send Combat Events | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
 | Send Gamemaster-Only Information | Also send what only a Gamemaster can see. Off by default. |
 
-**The shared secret is stored only in the browser you enter it in.** World settings are sent to
-every connected user, so a secret stored there could be read by players. Enter it in each browser
-a Gamemaster runs the game from; the connection dialog shows which browser is currently sending.
+**Each campaign's secret is stored only in the browser you enter it in.** World settings are sent
+to every connected user, so a secret stored there could be read by players. Enter the secrets in
+each browser a Gamemaster runs the game from. A campaign without its own secret is sent the single
+secret from before campaigns had their own, if this browser has one.
 
 ### Campaigns
 
@@ -181,7 +179,6 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
-| `scripts/apps/connection-config.mjs` | Destination, secret and connection test dialog |
-| `scripts/apps/campaign-config.mjs` | Campaigns dialog |
+| `scripts/apps/campaign-config.mjs` | Manage Campaigns: the app's address, and each campaign's title, secret, characters and connection test |
 | `tools/echo-listener.mjs` | Stand-in listener for development |
 | `PROTOCOL.md` | Event envelope and payload reference |

@@ -167,11 +167,12 @@ export function sinceLastSent(campaignId) {
  * @param {object} envelope                 The envelope to post.
  * @param {object} [options]
  * @param {string} [options.destination]    The destination. Defaults to the configured one.
- * @param {string} [options.secret]         The shared secret. Defaults to this browser's.
+ * @param {string} [options.secret]         The secret. Defaults to the one this browser holds for
+ *                                          the envelope's campaign.
  * @returns {Promise<{status: number, elapsed: number}>}
  * @throws {DeliveryError}
  */
-export async function deliver(envelope, { destination=getDestination(), secret=getSecret() }={}) {
+export async function deliver(envelope, { destination=getDestination(), secret=getSecret(envelope.campaign?.id) }={}) {
   const parsed = parseDestination(destination);
   if ( !parsed ) {
     throw new DeliveryError(game.i18n.localize("SENDINGSTONE.Error.InvalidDestination"), { retryable: false });
