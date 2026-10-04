@@ -26,15 +26,17 @@ export const EVENTS_PATH = "/api/events";
  * @type {Readonly<Record<string, string>>}
  */
 export const SETTINGS = Object.freeze({
-  /** Setting menu key for the listener connection dialog. */
-  CONNECTION: "connection",
-
   /** World-scope destination: the origin of the app events are posted to. The key is from when
    *  this held a full listener URL; only the origin of what it holds is used. */
   DESTINATION: "listenerUrl",
 
-  /** Client-scope shared secret, sent as a bearer token. Client scope so that it never leaves the
-   *  Gamemaster's browser: world settings are readable by every connected user. */
+  /** Client-scope secret of each campaign, by campaign id, sent as a bearer token with its events.
+   *  Client scope so that it never leaves the Gamemaster's browser: world settings are readable
+   *  by every connected user. */
+  CAMPAIGN_SECRETS: "campaignSecrets",
+
+  /** Client-scope secret from before each campaign had its own. Sent for a campaign that has
+   *  none. */
   SECRET: "secret",
 
   /** World-scope switch for chat message events. */
@@ -106,8 +108,15 @@ export const EVENTS = Object.freeze({
 });
 
 /**
- * The name of the hook this module calls whenever delivery status changes, so that an open
- * connection dialog can refresh. Called with the status object.
+ * The name of the hook this module calls whenever delivery status changes. Called with the status
+ * object.
  * @type {string}
  */
 export const STATUS_HOOK = "sendingStone.status";
+
+/**
+ * The name of the hook called when the listener asks for a campaign's full state again, answering
+ * an event for it with `{"resend": "hello"}`. Called with the campaign's id.
+ * @type {string}
+ */
+export const HELLO_WANTED_HOOK = "sendingStone.helloWanted";

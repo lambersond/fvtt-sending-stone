@@ -1,15 +1,10 @@
 {
   "SENDINGSTONE": {
     "Settings": {
-      "Connection": {
-        "Name": "Destination",
-        "Label": "Configure Connection",
-        "Hint": "Set the Sending Stone app events are posted to and the shared secret it expects, and test the connection."
-      },
       "Campaigns": {
         "Name": "Campaigns",
         "Label": "Manage Campaigns",
-        "Hint": "Group player characters into campaigns, each with its own title. Events involving a campaign's characters are sent to that campaign, described for it alone."
+        "Hint": "The Sending Stone app's address, and each campaign: its title, secret and player characters."
       },
       "ChatEvents": {
         "Name": "Send Chat Events",
@@ -30,40 +25,13 @@
         "Hint": "Also send what only a Gamemaster can see: whispers no player can read, blind rolls, hidden combatants, the hit points of combatants outside a campaign and the armor class of attack targets. Leave this off if players can see what the destination receives."
       }
     },
-    "Connection": {
-      "Title": "Sending Stone: Connection",
-      "Hint": "Events are posted as JSON, one per request, from the active Gamemaster's browser. Nothing is sent while no Gamemaster is connected.",
-      "Destination": "Destination",
-      "DestinationHint": "The address of the Sending Stone app, such as https://sending-stone.vercel.app. Only the host is needed; the path events go to is added for you. The app must allow cross-origin requests from this Foundry server.",
-      "Endpoint": "Events are posted to {url}",
-      "EndpointNone": "Enter a destination to see where events are posted.",
-      "Secret": "Shared Secret",
-      "SecretHint": "The secret you gave your campaigns in the Sending Stone app; one secret serves every campaign in this world. Sent as a bearer token in the Authorization header. Stored only in this browser, so players cannot read it; enter it in each browser a Gamemaster runs the game from.",
-      "StatusLegend": "Status",
-      "Bridge": "Sending From",
-      "BridgeSelf": "This browser",
-      "BridgeOther": "{name}'s browser",
-      "BridgeNone": "No Gamemaster is connected, so nothing is being sent",
-      "Deliveries": "From This Browser",
-      "StatusIdle": "Nothing sent yet.",
-      "StatusOk": "Last delivered at {time}. {delivered} delivered, {dropped} dropped.",
-      "StatusError": "Failing since {time}: {error}. {delivered} delivered, {dropped} dropped.",
-      "Test": "Test Connection",
-      "Testing": "Sending a test event…",
-      "TestOk": "Delivered: the destination answered HTTP {status} in {elapsed} ms.",
-      "TestFailed": "Not delivered: {error}",
-      "HintNetwork": "Check that the destination is running and reachable from this computer, and that it answers the browser's CORS preflight (OPTIONS) request with Access-Control-Allow-Origin, and Access-Control-Allow-Headers covering Content-Type and Authorization.",
-      "HintMixedContent": "Foundry is served over https but the destination is plain http, which browsers block for any host other than localhost. Serve the destination over https.",
-      "HintAuth": "The destination rejected the request. Check the shared secret.",
-      "HintNotSetUp": "The destination has no campaign set up for this game. Set up each campaign in the Sending Stone app, with this game's address and the same secret, then test again.",
-      "Submit": "Save Changes",
-      "Saved": "Sending Stone connection saved."
-    },
     "Campaigns": {
       "Title": "Sending Stone: Campaigns",
-      "Hint": "Each campaign gets the events that involve its characters: messages their players can read or they spoke, and combats they are in. Set up each campaign in the Sending Stone app with the same title, so give each a different one. A character can be in more than one campaign.",
+      "Hint": "Set up each campaign in the Sending Stone app first, then give it the same title and secret here. A character can be in more than one campaign.",
+      "Destination": "Sending Stone Address",
       "CampaignTitle": "Campaign Title",
       "TitlePlaceholder": "Curse of Strahd",
+      "Secret": "Secret",
       "Untitled": "New Campaign",
       "Remove": "Remove Campaign",
       "InCampaign": "In Campaign",
@@ -79,14 +47,24 @@
       "Saved": "Sending Stone campaigns saved."
     },
     "Error": {
-      "InvalidDestination": "The destination must be a web address, such as https://sending-stone.vercel.app.",
-      "Network": "the destination could not be reached",
-      "Timeout": "the destination did not answer in time",
-      "Status": "the destination answered HTTP {status}"
+      "InvalidDestination": "The Sending Stone address must be a web address, such as https://sending-stone.vercel.app.",
+      "Network": "the app could not be reached",
+      "Timeout": "the app did not answer in time",
+      "Status": "the app answered HTTP {status}"
     },
     "Notify": {
-      "Failing": "Sending Stone cannot deliver events to the destination: {error}. Events are being dropped until it recovers.",
-      "Recovered": "Sending Stone is delivering events to the destination again."
+      "Failing": "Sending Stone cannot deliver events to the app: {error}. Events are being dropped until it recovers.",
+      "Recovered": "Sending Stone is delivering events to the app again."
+    },
+    "Test": {
+      "Test": "Test",
+      "Testing": "Sending a test event…",
+      "Ok": "Delivered: the app answered HTTP {status} in {elapsed} ms.",
+      "Failed": "Not delivered: {error}",
+      "HintNetwork": "Check that the address is right and the app is reachable from this computer, and that it answers the browser's CORS preflight (OPTIONS) request with Access-Control-Allow-Origin, and Access-Control-Allow-Headers covering Content-Type and Authorization.",
+      "HintMixedContent": "Foundry is served over https but the app's address is plain http, which browsers block for any host other than localhost. Use the app's https address.",
+      "HintAuth": "The app refused the secret. Enter the secret set for this campaign in the Sending Stone app.",
+      "HintNotSetUp": "The app has no campaign with this title for this game. Set it up in the Sending Stone app with this game's address and the same title, then test again."
     }
   }
 }

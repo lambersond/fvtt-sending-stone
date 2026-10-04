@@ -1,4 +1,4 @@
-import { MODULE_ID, PROTOCOL_VERSION, STATUS_HOOK } from "./constants.mjs";
+import { HELLO_WANTED_HOOK, MODULE_ID, PROTOCOL_VERSION, STATUS_HOOK } from "./constants.mjs";
 import { describeCampaign } from "./campaigns.mjs";
 import { eventsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 
@@ -167,11 +167,12 @@ export function sinceLastSent(campaignId) {
  * @param {object} envelope                 The envelope to post.
  * @param {object} [options]
  * @param {string} [options.destination]    The destination. Defaults to the configured one.
- * @param {string} [options.secret]         The shared secret. Defaults to this browser's.
+ * @param {string} [options.secret]         The secret. Defaults to the one this browser holds for
+ *                                          the envelope's campaign.
  * @returns {Promise<{status: number, elapsed: number}>}
  * @throws {DeliveryError}
  */
-export async function deliver(envelope, { destination=getDestination(), secret=getSecret() }={}) {
+export async function deliver(envelope, { destination=getDestination(), secret=getSecret(envelope.campaign?.id) }={}) {
   const parsed = parseDestination(destination);
   if ( !parsed ) {
     throw new DeliveryError(game.i18n.localize("SENDINGSTONE.Error.InvalidDestination"), { retryable: false });
@@ -208,7 +209,7 @@ export async function deliver(envelope, { destination=getDestination(), secret=g
   }
   const elapsed = Math.round(performance.now() - started);
 
-  if ( response.ok ) return { status: response.status, elapsed };
+  if ( response.ok ) return { status: response.status, elapsed, request: await readRequest(response) };
 
   // A listener that is overloaded or restarting may accept the same post later. One that
   // rejected it outright, a wrong secret for instance, will not.
@@ -217,6 +218,23 @@ export async function deliver(envelope, { destination=getDestination(), secret=g
     status: `${response.status} ${response.statusText}`.trim()
   });
   throw new DeliveryError(message, { retryable, status: response.status });
+}
+
+/**
+ * What the listener asked for in a successful answer, if anything. A listener that lacks a
+ * campaign's full state, such as one that refused its bridge.hello because the campaign was not
+ * set up yet, may answer an event for it with `{"resend": "hello"}`.
+ * @param {Response} response
+ * @returns {Promise<"hello"|null>}
+ */
+async function readRequest(response) {
+  if ( !response.headers?.get("content-type")?.includes("application/json") ) return null;
+  try {
+    const answer = await response.json();
+    return answer?.resend === "hello" ? "hello" : null;
+  } catch {
+    return null;
+  }
 }
 
 /* -------------------------------------------- */
@@ -254,8 +272,9 @@ async function drain() {
 async function deliverWithRetry(envelope) {
   for ( let attempt = 0; ; attempt++ ) {
     try {
-      await deliver(envelope);
+      const { request } = await deliver(envelope);
       recordSuccess();
+      if ( (request === "hello") && envelope.campaign ) Hooks.callAll(HELLO_WANTED_HOOK, envelope.campaign.id);
       return;
     } catch (err) {
       const retryable = (err instanceof DeliveryError) && err.retryable;

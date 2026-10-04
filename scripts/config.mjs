@@ -23,11 +23,22 @@ export function getDestination() {
 }
 
 /**
- * The shared secret stored in this browser. An empty string means none is configured.
+ * The secret stored in this browser for a campaign: its own, or else the one from before each
+ * campaign had its own. An empty string means none is configured.
+ * @param {string} [campaignId]
  * @returns {string}
  */
-export function getSecret() {
-  return String(game.settings.get(MODULE_ID, SETTINGS.SECRET) ?? "").trim();
+export function getSecret(campaignId) {
+  const own = campaignId ? getCampaignSecrets()[campaignId] : undefined;
+  return String(own || game.settings.get(MODULE_ID, SETTINGS.SECRET) || "").trim();
+}
+
+/**
+ * Every campaign's own secret stored in this browser, by campaign id.
+ * @returns {Record<string, string>}
+ */
+export function getCampaignSecrets() {
+  return { ...(game.settings.get(MODULE_ID, SETTINGS.CAMPAIGN_SECRETS) ?? {}) };
 }
 
 /**

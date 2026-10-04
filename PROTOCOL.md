@@ -14,14 +14,14 @@ fixed path under it:
 ```
 POST <destination>/api/events
 Content-Type: application/json
-Authorization: Bearer <shared secret>     (only when a secret is configured)
+Authorization: Bearer <the campaign's secret>     (only when one is configured)
 
 <envelope>
 ```
 
 | Your answer | What the module does |
 | --- | --- |
-| Any `2xx` | Delivered. The body is ignored; `204 No Content` is fine. |
+| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). Any other body is ignored. |
 | `408`, `425`, `429`, any `5xx`, no answer, or no answer within 10 s | Retried after 1 s, then again after 3 s, with the same envelope. Dropped after the third failure. |
 | Any other status, such as `400` or `401` | Dropped immediately. |
 
@@ -60,7 +60,7 @@ The request comes from the Gamemaster's **browser**, so the listener must handle
 | `type` | What happened. Listed below. |
 | `time` | When the event was raised, as an ISO 8601 timestamp. |
 | `world` | The Foundry world the event came from. |
-| `campaign` | The [campaign](#campaigns) the event is for: its `id`, which never changes, and its `title`, which the Gamemaster may change. `null` only on `bridge.ping`. |
+| `campaign` | The [campaign](#campaigns) the event is for: its `id`, which never changes, and its `title`, which the Gamemaster may change. On `bridge.ping`, the campaign tested, or `null` from modules before 0.4.0. |
 | `data` | The payload, which depends on `type`. |
 
 ### Keeping in step
@@ -74,6 +74,12 @@ The request comes from the Gamemaster's **browser**, so the listener must handle
   instance when the Gamemaster reveals a blind roll, so you may receive an update for something
   you never saw created.
 - Deletions may name something you never saw. Ignore them.
+- **Missing a campaign's state? Ask for it.** Answer any event for the campaign with
+  `Content-Type: application/json` and `{"resend": "hello"}`, and the module sends that campaign
+  a fresh `bridge.hello`, at most once every 30 seconds. Ask when you have not applied a hello from
+  the envelope's `session`: for instance when you refused the campaign's hello because it was not
+  set up with you yet, or when you lost what you held. Answer a `bridge.hello` itself without
+  asking, or you will be sent another.
 
 ## Campaigns
 
@@ -277,9 +283,12 @@ sign.
 
 ### `bridge.ping`
 
-`{ userId, name }` of the Gamemaster testing the connection. Sent by **Test Connection**, possibly
-to a destination that has not been saved, and from a browser that may not be the one sending
-events. It belongs to no campaign. Answer `2xx` and otherwise ignore it.
+`{ userId, name }` of the Gamemaster testing a campaign's connection. Sent by a campaign's
+**Test** button in Manage Campaigns, with the address, title and secret as typed, which may not
+have been saved, and from a browser that may not be the one sending events. It names the campaign
+tested: answer `2xx` if the secret is that campaign's, `404` if no campaign with its title is set
+up, and `401` for the wrong secret. Store nothing. Modules before 0.4.0 sent it with
+`campaign: null`, testing the one secret they had.
 
 ### Chat
 
@@ -325,6 +334,10 @@ hiding one as `combat.combatant.removed`.
 
 - Module 0.3.0 sends [`bridge.heartbeat`](#bridgeheartbeat). A listener that answers `2xx` to
   types it does not use needs no change.
+- Module 0.3.1 resends a campaign's `bridge.hello` when an answer asks for it with
+  `{"resend": "hello"}`. A listener that never asks needs no change.
+- Module 0.4.0 sends each campaign's events with that campaign's own secret, and `bridge.ping`
+  names the campaign being tested.
 
 ## Changes from protocol 1
 
@@ -340,5 +353,5 @@ hiding one as `combat.combatant.removed`.
 The listener will be able to act for a campaign's character: rolling a check, attacking, casting a
 spell, as if its player had done it in Foundry. Because a browser cannot accept incoming
 requests, that will need the Gamemaster's browser to hold a connection open to the listener
-rather than the listener calling Foundry. The shared secret and campaigns configured now are what
-that connection will use.
+rather than the listener calling Foundry. The campaigns and secrets configured now are what that
+connection will use.

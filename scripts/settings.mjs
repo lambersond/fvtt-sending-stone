@@ -1,7 +1,6 @@
 import { CHAT_SCOPES, MODULE_ID, SETTINGS } from "./constants.mjs";
 import { announce } from "./bridge.mjs";
 import CampaignConfig from "./apps/campaign-config.mjs";
-import ConnectionConfig from "./apps/connection-config.mjs";
 
 const { ArrayField, SchemaField, SetField, StringField } = foundry.data.fields;
 
@@ -14,17 +13,8 @@ export function registerSettings() {
   // several at once sends the listener one fresh state rather than one per setting.
   const reannounce = foundry.utils.debounce(announce, 250);
 
-  // Where events go, and how the bridge authenticates. Edited together in their own dialog, which
-  // can test the connection before saving. Only the destination's origin is kept.
-  game.settings.registerMenu(MODULE_ID, SETTINGS.CONNECTION, {
-    name: "SENDINGSTONE.Settings.Connection.Name",
-    label: "SENDINGSTONE.Settings.Connection.Label",
-    hint: "SENDINGSTONE.Settings.Connection.Hint",
-    icon: "fa-solid fa-tower-broadcast",
-    type: ConnectionConfig,
-    restricted: true
-  });
-
+  // Where events go, and each campaign's secret, are edited in Manage Campaigns, which can test a
+  // campaign's connection before saving. Only the destination's origin is kept.
   game.settings.register(MODULE_ID, SETTINGS.DESTINATION, {
     scope: "world",
     config: false,
@@ -34,7 +24,17 @@ export function registerSettings() {
   });
 
   // Client scope: world settings are sent to every connected user, and players must not be able to
-  // read the secret from their own browser.
+  // read a secret from their own browser. A new secret may make a refused campaign welcome, so
+  // every campaign is told afresh.
+  game.settings.register(MODULE_ID, SETTINGS.CAMPAIGN_SECRETS, {
+    scope: "client",
+    config: false,
+    type: Object,
+    default: {},
+    onChange: () => reannounce()
+  });
+
+  // The secret from before each campaign had its own, still sent for a campaign without one.
   game.settings.register(MODULE_ID, SETTINGS.SECRET, {
     scope: "client",
     config: false,

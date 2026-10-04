@@ -1,6 +1,15 @@
 <div class="sending-stone-campaigns-config">
     <p class="hint">{{localize "SENDINGSTONE.Campaigns.Hint"}}</p>
 
+    <div class="form-group">
+        <label for="sending-stone-destination">{{localize "SENDINGSTONE.Campaigns.Destination"}}</label>
+        <div class="form-fields">
+            <input type="text" id="sending-stone-destination" name="destination" value="{{destination}}"
+                   placeholder="https://sending-stone.vercel.app" spellcheck="false" autocomplete="off"
+                   inputmode="url">
+        </div>
+    </div>
+
     <div class="sending-stone-campaign-list">
         {{#each campaigns as |campaign|}}
         <fieldset class="sending-stone-campaign">
@@ -18,6 +27,22 @@
                             aria-label="{{localize "SENDINGSTONE.Campaigns.Remove"}}"></button>
                 </div>
             </div>
+
+            <div class="form-group">
+                <label for="sending-stone-secret-{{campaign.id}}">{{localize "SENDINGSTONE.Campaigns.Secret"}}</label>
+                <div class="form-fields">
+                    <input type="password" id="sending-stone-secret-{{campaign.id}}"
+                           name="campaigns.{{campaign.index}}.secret" value="{{campaign.secret}}"
+                           spellcheck="false" autocomplete="new-password">
+                    <button type="button" class="sending-stone-test" data-action="testCampaign"
+                            data-index="{{campaign.index}}">
+                        <i class="fa-solid fa-satellite-dish" inert></i>
+                        {{localize "SENDINGSTONE.Test.Test"}}
+                    </button>
+                </div>
+            </div>
+            <p class="sending-stone-test-result" data-test-result="{{campaign.index}}" role="status"
+               aria-live="polite"></p>
 
             {{#if @root.hasCharacters}}
             <table class="sending-stone-characters">
