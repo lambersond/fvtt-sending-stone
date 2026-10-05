@@ -30,8 +30,9 @@ const TIMEOUT = 10_000;
 const RETRY_DELAYS = [1_000, 3_000];
 
 /**
- * Events waiting to be posted, oldest first. The event being posted is not in here.
- * @type {object[]}
+ * Events waiting to be posted, oldest first. The event being posted is not in here. An entry is an
+ * envelope, or the events still being prepared for a place in the queue: see sendLater.
+ * @type {Array<object|{later: Promise<object[]>}>}
  */
 const queue = [];
 
@@ -141,8 +142,39 @@ export function buildEnvelope(type, data, { campaign=null, sequenced=true }={}) 
  * @returns {void}
  */
 export function send(type, data, campaign, { sequenced=true }={}) {
-  queue.push(buildEnvelope(type, data, { campaign, sequenced }));
+  enqueue(buildEnvelope(type, data, { campaign, sequenced }));
   lastSent.set(campaign.id, Date.now());
+}
+
+/**
+ * Queue events whose payloads take time to prepare, such as descriptions that must be enriched,
+ * holding their place in the queue: they are posted after everything queued before them and before
+ * anything queued after, however long they take. They are not part of the campaign's event stream,
+ * so they carry no sequence number.
+ * @param {string} type                     One of EVENTS.
+ * @param {() => Promise<object[]>} prepare Resolves to the payloads to post, in order; none to post
+ *                                          nothing. If it fails, nothing is posted.
+ * @param {Campaign} campaign               The campaign the events are for.
+ * @returns {void}
+ */
+export function sendLater(type, prepare, campaign) {
+  const later = prepare()
+    .then(payloads => payloads.map(data => buildEnvelope(type, data, { campaign, sequenced: false })))
+    .catch(err => {
+      console.warn(`${MODULE_ID} | Could not prepare ${type}`, err);
+      return [];
+    });
+  enqueue({ later });
+  lastSent.set(campaign.id, Date.now());
+}
+
+/**
+ * Add to the queue, dropping the oldest entry when it is full, and start working through it.
+ * @param {object} entry
+ * @returns {void}
+ */
+function enqueue(entry) {
+  queue.push(entry);
   if ( queue.length > MAX_QUEUE ) {
     queue.shift();
     status.dropped++;
@@ -250,14 +282,15 @@ async function drain() {
     while ( queue.length ) {
       // Taken off the queue before posting, so an overflow while it is in flight drops the
       // oldest waiting event rather than this one.
-      const envelope = queue.shift();
+      const entry = queue.shift();
+      const envelopes = entry.later ? await entry.later : [entry];
 
       // The destination may have been removed while events were waiting.
       if ( !getDestination() ) {
         queue.length = 0;
         break;
       }
-      await deliverWithRetry(envelope);
+      for ( const envelope of envelopes ) await deliverWithRetry(envelope);
     }
   } finally {
     draining = false;

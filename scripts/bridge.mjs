@@ -5,6 +5,7 @@ import { noteCharactersSent } from "./character-sync.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { roster } from "./characters.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
+import { noteTextsSent, sendTexts, SheetTexts } from "./sheet-texts.mjs";
 import { send } from "./transport.mjs";
 
 /**
@@ -57,7 +58,8 @@ const resent = new Map();
 
 /**
  * Send each campaign its full current state, so the listener can discard whatever it held for the
- * campaign and start afresh: its characters with their sheets, and the combats they are in.
+ * campaign and start afresh: its characters with their sheets, and the combats they are in. The
+ * sheets' descriptions go first, in character.texts.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -83,8 +85,11 @@ export function announce({ campaignId }={}) {
     if ( (campaignId !== undefined) && (campaign.id !== campaignId) ) continue;
     const combats = combatEnabled() ? game.combats.filter(combat => involvesCampaign(combat, campaign)) : [];
     for ( const combat of combats ) noteCombatSent(combat.id, campaign.id);
-    const characters = roster(campaign);
+    const texts = new SheetTexts();
+    const characters = roster(campaign, texts);
     noteCharactersSent(campaign, characters);
+    noteTextsSent(campaign, texts.sources.keys());
+    sendTexts(campaign, texts.sources);
     send(EVENTS.HELLO, {
       ...shared,
       characters,

@@ -2,6 +2,7 @@ import { EVENTS } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { summarizeCharacter } from "./characters.mjs";
+import { sendTexts, SheetTexts, takeUnsent } from "./sheet-texts.mjs";
 import { send } from "./transport.mjs";
 
 /**
@@ -9,9 +10,11 @@ import { send } from "./transport.mjs";
  * changes, as when it takes damage, levels up, equips armor or gains a condition, each campaign
  * it is in is sent `character.updated` with the character as it now stands, sheet included.
  *
- * A change to an actor's items or effects changes what its sheet shows, so those count too. A
- * burst of changes, such as a level up, is sent once it settles, and a change that leaves what a
- * campaign was told as it was is not sent at all.
+ * A change to an actor's items or effects changes what its sheet shows, so those count too, as
+ * does time passing in the game or a new round of combat, which runs effects down. A burst of
+ * changes, such as a level up, is sent once it settles, and a change that leaves what a campaign
+ * was told as it was is not sent at all. Any description the campaign has not been sent goes
+ * first, in character.texts.
  */
 
 /**
@@ -48,6 +51,10 @@ export function registerCharacterHooks() {
   ] ) {
     Hooks.on(hook, document => characterChanged(owningActor(document)));
   }
+  Hooks.on("updateWorldTime", () => effectsRunningDown());
+  Hooks.on("updateCombat", (combat, changes) => {
+    if ( ("round" in changes) || ("turn" in changes) ) effectsRunningDown();
+  });
 }
 
 /**
@@ -76,11 +83,13 @@ export function sendCharacter(actorId) {
   if ( !actor ) return;
   for ( const campaign of getCampaigns() ) {
     if ( !campaign.characters.has(actorId) ) continue;
-    const character = summarizeCharacter(actor);
+    const texts = new SheetTexts();
+    const character = summarizeCharacter(actor, texts);
     const json = JSON.stringify(character);
     const key = `${campaign.id}.${actorId}`;
     if ( told.get(key) === json ) continue;
     told.set(key, json);
+    sendTexts(campaign, takeUnsent(campaign, texts));
     send(EVENTS.CHARACTER_UPDATED, { character }, campaign);
   }
 }
@@ -101,6 +110,21 @@ function characterChanged(actor) {
     settling.delete(id);
     sendCharacter(id);
   }, SETTLE_AFTER));
+}
+
+/**
+ * Note that every campaign character with a temporary effect may have changed, since the time it
+ * has left is on its sheet.
+ * @returns {void}
+ */
+function effectsRunningDown() {
+  if ( !canSend() ) return;
+  const ids = new Set(getCampaigns().flatMap(campaign => Array.from(campaign.characters)));
+  for ( const id of ids ) {
+    const actor = game.actors.get(id);
+    const effects = Array.from(actor?.allApplicableEffects?.() ?? []);
+    if ( effects.some(effect => effect.isTemporary) ) characterChanged(actor);
+  }
 }
 
 /**
