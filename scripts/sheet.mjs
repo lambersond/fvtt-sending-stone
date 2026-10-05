@@ -1,4 +1,8 @@
 import { hitPoints } from "./characters.mjs";
+import { conditionsOf, effectSections } from "./sheet-effects.mjs";
+import { classesOf, featureSections } from "./sheet-features.mjs";
+import { SheetTexts } from "./sheet-texts.mjs";
+import { finite, localize } from "./sheet-values.mjs";
 
 /**
  * Character sheets: what a campaign's player sees of their own character in the listener, and
@@ -7,15 +11,19 @@ import { hitPoints } from "./characters.mjs";
  * Every number is the one dnd5e itself shows on its sheet, already including proficiency and
  * fixed bonuses. Bonuses that are dice, such as Bless or Guidance, are not in the totals: dnd5e
  * adds them only when it rolls.
+ *
+ * Descriptions are not in the sheet itself: it refers to each by hash, and they are sent apart.
+ * See sheet-texts.mjs.
  */
 
 /**
  * A campaign character's sheet, or null if its system doesn't model one the way dnd5e does.
  * Works with dnd5e 5.x and 6.x, which name some of the derived values differently.
  * @param {Actor} actor
+ * @param {SheetTexts} [texts]  Collects the descriptions the sheet refers to.
  * @returns {object|null}
  */
-export function characterSheet(actor) {
+export function characterSheet(actor, texts=new SheetTexts()) {
   const system = actor?.system;
   if ( !system?.abilities || !system.skills ) return null;
   const attributes = system.attributes ?? {};
@@ -35,7 +43,10 @@ export function characterSheet(actor) {
     abilities: Object.entries(system.abilities).map(([id, ability]) => describeAbility(id, ability)),
     skills: Object.entries(system.skills)
       .map(([id, skill]) => describeSkill(actor, id, skill))
-      .sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang))
+      .sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang)),
+    conditions: conditionsOf(actor, texts),
+    features: featureSections(actor, texts),
+    effects: effectSections(actor, texts)
   };
 }
 
@@ -100,18 +111,6 @@ function describeSkill(actor, id, skill) {
 /* -------------------------------------------- */
 
 /**
- * The character's classes, highest level first.
- * @param {Actor} actor
- * @returns {{name: string, levels: number|null, subclass: string|null}[]}
- */
-function classesOf(actor) {
-  const classes = actor.itemTypes?.class ?? [];
-  return classes
-    .map(item => ({ name: item.name, levels: finite(item.system?.levels), subclass: item.subclass?.name ?? null }))
-    .sort((a, b) => (b.levels ?? 0) - (a.levels ?? 0));
-}
-
-/**
  * The walking speed, which dnd5e 5 and 6 both work out as movement.speed, in its units.
  * @param {object} [movement]
  * @returns {{value: number, units: string|null}|null}
@@ -155,26 +154,10 @@ function nameOf(value) {
 }
 
 /**
- * @param {unknown} value
- * @returns {number|null}
- */
-function finite(value) {
-  return Number.isFinite(value) ? value : null;
-}
-
-/**
  * Is a proficiency term a plain number, rather than a die as under the proficiency dice rule?
  * @param {unknown} term
  * @returns {boolean}
  */
 function isNumeric(term) {
   return (term !== "") && (term !== null) && (term !== undefined) && Number.isFinite(Number(term));
-}
-
-/**
- * @param {string|undefined} key
- * @returns {string}
- */
-function localize(key) {
-  return key ? game.i18n.localize(key) : "";
 }

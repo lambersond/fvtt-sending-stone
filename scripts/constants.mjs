@@ -92,6 +92,10 @@ export const EVENTS = Object.freeze({
   /** One of a campaign's characters changed, such as taking damage or gaining a condition. */
   CHARACTER_UPDATED: "character.updated",
 
+  /** Descriptions that characters' sheets refer to by hash. Sent before the sheets that refer to
+   *  them, and only those the campaign has not been sent since its last hello. */
+  CHARACTER_TEXTS: "character.texts",
+
   CHAT_CREATED: "chat.message.created",
   CHAT_UPDATED: "chat.message.updated",
   CHAT_DELETED: "chat.message.deleted",

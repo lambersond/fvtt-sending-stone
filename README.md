@@ -42,9 +42,11 @@ While a Gamemaster has the game open, each campaign that has been sent nothing e
 seconds is sent a heartbeat, so the app can show players whether the game is connected.
 
 Each campaign's characters are sent with their sheets under D&D Fifth Edition: abilities, saves,
-skills, hit points, armor class and the like, as dnd5e shows them. When a character changes, such
-as taking damage or levelling up, its campaigns are sent it again, so players can see their
-character and roll from it in the app.
+skills, hit points, armor class and the like, as dnd5e shows them, along with their features,
+conditions and effects. When a character changes, such as taking damage, levelling up or gaining a
+condition, its campaigns are sent it again, so players can see their character and roll from it
+in the app. Descriptions, enriched as the player would see them in Foundry, are sent once and
+then only when one is new, since they are most of a sheet's size.
 
 | Setting | Effect |
 | --- | --- |
@@ -181,6 +183,10 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
 | `scripts/characters.mjs` | A campaign's characters and who owns them |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills and the like |
+| `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
+| `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player |
+| `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, hashed, and sent only when a campaign lacks them |
+| `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON |
 | `scripts/character-sync.mjs` | Sending a character again when it changes |
 | `scripts/chat.mjs` | Chat hooks |
 | `scripts/chat-data.mjs` | Chat message serialization and audience |

@@ -72,9 +72,10 @@ export function charactersSeenBy(userIds, campaign) {
 /**
  * Describe a character for the listener.
  * @param {Actor} actor
+ * @param {SheetTexts} [texts]  Collects the descriptions its sheet refers to.
  * @returns {object}
  */
-export function summarizeCharacter(actor) {
+export function summarizeCharacter(actor, texts) {
   return {
     id: actor.id,
     uuid: actor.uuid,
@@ -82,17 +83,18 @@ export function summarizeCharacter(actor) {
     img: actor.img,
     type: actor.type,
     owners: playerOwners(actor).map(user => ({ id: user.id, name: user.name })),
-    sheet: characterSheet(actor)
+    sheet: characterSheet(actor, texts)
   };
 }
 
 /**
  * Describe every character in a campaign for the listener.
  * @param {Campaign} campaign
+ * @param {SheetTexts} [texts]  Collects the descriptions their sheets refer to.
  * @returns {object[]}
  */
-export function roster(campaign) {
-  return campaignActors(campaign).map(summarizeCharacter);
+export function roster(campaign, texts) {
+  return campaignActors(campaign).map(actor => summarizeCharacter(actor, texts));
 }
 
 /**

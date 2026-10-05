@@ -80,6 +80,13 @@ The request comes from the Gamemaster's **browser**, so the listener must handle
   the envelope's `session`: for instance when you refused the campaign's hello because it was not
   set up with you yet, or when you lost what you held. Answer a `bridge.hello` itself without
   asking, or you will be sent another.
+- **Descriptions come first.** Sheets refer to their descriptions by hash, and the module sends
+  every description a campaign has not had since its last hello in
+  [`character.texts`](#charactertexts), before the `bridge.hello` or `character.updated` that
+  refers to it. So a sheet that refers to a description you don't have means one went missing:
+  answer that `bridge.hello` or `character.updated` with `{"resend": "hello"}`, the one time a
+  hello itself may ask. Don't ask on `character.texts`, which may arrive before its session's
+  hello.
 
 ## Campaigns
 
@@ -150,7 +157,10 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 {
   "img": "worlds/erebor/thorin.webp",
   "level": 5,
-  "classes": [{ "name": "Fighter", "levels": 4, "subclass": "Champion" }, { "name": "Rogue", "levels": 1, "subclass": null }],
+  "classes": [
+    { "id": "4kWt1v7QeXzEa2Nc", "identifier": "fighter", "name": "Fighter", "levels": 4, "subclass": "Champion", "hitDice": { "die": "d10", "value": 3, "max": 4 } },
+    { "id": "Hq2d0m1RkPzc8VyB", "identifier": "rogue", "name": "Rogue", "levels": 1, "subclass": null, "hitDice": { "die": "d8", "value": 1, "max": 1 } }
+  ],
   "species": "Dwarf",
   "background": "Soldier",
   "hp": { "value": 31, "max": 44, "temp": 0 },
@@ -164,6 +174,30 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
   ],
   "skills": [
     { "id": "ath", "label": "Athletics", "ability": "str", "total": 7, "passive": 17, "proficiency": 1, "mode": 0 }
+  ],
+  "conditions": [
+    { "id": "exhaustion", "name": "Exhaustion", "img": "systems/dnd5e/icons/svg/statuses/exhaustion.svg", "level": 2, "detail": null, "text": "0c41a7d2e9b3f5" },
+    { "id": "concentrating", "name": "Concentrating", "img": "systems/dnd5e/icons/svg/statuses/concentrating.svg", "level": null, "detail": "Bless", "text": null }
+  ],
+  "features": [
+    {
+      "id": "fighter", "label": "Fighter Features", "text": "1b7e04c2d9a8f3",
+      "features": [
+        {
+          "id": "kQ1bW7sYp3Xc0RtE", "name": "Second Wind", "img": "icons/magic/life/heart-cross-green.webp",
+          "kind": "Class Feature", "requirements": "Fighter 1", "activation": "1 Bonus Action", "passive": false,
+          "uses": { "value": 1, "max": 1, "recovery": "Short Rest, Long Rest" }, "text": "05d2e8a1c7b94f"
+        }
+      ]
+    }
+  ],
+  "effects": [
+    {
+      "id": "temporary", "label": "Temporary Effects",
+      "effects": [
+        { "id": "a8LkT3wPz0QcN5vB", "name": "Bless", "img": "icons/magic/control/buff-flight-wings-blue.webp", "source": "Bless", "duration": "9 Rounds", "disabled": false, "text": "3f9c0b2a7d1e64" }
+      ]
+    }
   ]
 }
 ```
@@ -171,7 +205,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | Field | Description |
 | --- | --- |
 | `img` | The portrait's path as Foundry stores it: relative to the game's address, or a full URL. |
-| `level`, `classes` | Character level, and each class with its levels and subclass, highest first. |
+| `level`, `classes` | Character level, and each class with its levels and subclass, highest first. A class's `identifier` is dnd5e's, such as `"fighter"`, and `hitDice` its `{ die, value, max }`: the size, how many are left and how many it has, or `null`. |
 | `species`, `background` | Their names, or `null`. |
 | `hp` | `{ value, max, temp }`, as on a [combatant](#combatant). |
 | `ac`, `proficiency`, `initiative` | Armor class, proficiency bonus, and initiative modifier. |
@@ -179,8 +213,30 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `abilities` | In dnd5e's order (Strength first). `check` and `save` are the modifiers for an ability check and a saving throw; `saveProficient`, whether proficient in the save. |
 | `skills` | Sorted by `label`. `total` is the check modifier, `passive` the passive score, and `proficiency` the multiplier: `0`, `0.5` (half, as from Jack of All Trades), `1`, or `2` (expertise). |
 | `checkMode`, `saveMode`, `mode` | Whether that roll is made with advantage (`1`) or disadvantage (`-1`) from the character's conditions and features, else `0`. A skill's combines its ability's, as dnd5e does. |
+| `conditions` | The character's statuses that the game names, by `name`: conditions such as Poisoned, and others such as Concentrating or Dead. `level` is Exhaustion's level, otherwise `null`; `detail`, for Concentrating, what the character is concentrating on. `text` is the rules for it. |
+| `features` | Grouped as dnd5e's Features tab groups them: a section for each class (with `id` its identifier), then `"species"`, `"background"` and `"other"`, each with its `label` and the `text` of the class, species or background. Empty sections are left out. |
+| `features[].features` | In the order the player keeps them in Foundry. `kind`, such as Class Feature; `requirements`, such as Fighter 1; `activation`, such as 1 Bonus Action; `passive` for a trait or anything with nothing to use; `uses`, if limited, as `{ value, max, recovery }`, with `value` the uses left and `recovery` when they come back, such as Short Rest, Long Rest or Recharge [5–6]. |
+| `effects` | Grouped as dnd5e's Effects tab groups them, by `id`: `"temporary"`, `"passive"`, `"inactive"` (turned off or expired) and `"suppressed"` (unavailable, as from an unequipped item). Empty groups are left out. Conditions are listed in `conditions` instead, except concentration under dnd5e 6. |
+| `effects[].effects` | `source` names what it comes from, such as the item that carries it or the spell another character cast; `duration` is the time it has left, such as `"9 Rounds"` or `"End of Source's Next Turn"`, or `null`; `disabled` whether it's turned off. An `id` is unique within the sheet. |
+| `text` | A [description](#descriptions)'s hash, or `null` if there is none. |
 
-Any number dnd5e doesn't provide is `null`. Labels are in the Gamemaster's language.
+Any number dnd5e doesn't provide is `null`. Labels are in the Gamemaster's language. The sheet
+shows what the character's player would see in Foundry: effects dnd5e hides from players, such as
+an unidentified item's, are left out, even though a Gamemaster's browser sends it.
+
+#### Descriptions
+
+A sheet refers to each description by `text`, a 14-character hexadecimal hash of where it comes
+from, and the description itself is sent in [`character.texts`](#charactertexts). It is HTML,
+enriched as the character's player sees it in Foundry: links to documents and rolls are already
+turned into HTML, and secret sections, which the player may see as the character's owner, are
+included. Images and links in it are relative to the game's address, like `img`. It is not
+sanitised: treat it as untrusted and sanitise it before showing it. A description longer than
+100,000 characters is cut short.
+
+The same hash always names the same description. A description with rolls in it is hashed with the
+character's level, proficiency and ability modifiers, since its rolls may show them, so it gets a
+new hash when they change.
 
 ### Chat message
 
@@ -318,13 +374,32 @@ the destination, the campaigns or any event setting changes.
 | `characters` | Every [character](#character) in the campaign. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 
+It follows the [`character.texts`](#charactertexts) with every description the characters' sheets
+refer to.
+
 ### `character.updated`
 
 `{ character }`: one of the campaign's [characters](#character), sheet included, as it now stands.
 Sent when it changes between `bridge.hello`s, such as taking damage, levelling up, equipping armor
 or gaining a condition: a change to the actor, its items or its effects. A burst of changes is
 sent once it settles, and nothing is sent if the character is unchanged from what the campaign
-was last told.
+was last told. Time passing in the game, or a new round or turn of combat, counts as a change for
+a character with a temporary effect, whose time left is on its sheet.
+
+Any description its sheet refers to that the campaign has not been sent since its last hello
+comes first, in [`character.texts`](#charactertexts).
+
+### `character.texts`
+
+`{ texts }`: [descriptions](#descriptions) that characters' sheets refer to, as an object of
+HTML by hash. Sent before the `bridge.hello` or `character.updated` whose sheets refer to them:
+with a hello, every description its sheets refer to; after that, each new one, once. Several may
+follow one another when there is too much for one post. Keep them for the campaign: the same hash
+always names the same description. A campaign's descriptions that none of its sheets refers to
+any more can be dropped on its next hello.
+
+`character.texts` is not part of the event stream, so its `sequence` is `null`. It may arrive
+before its session's `bridge.hello`: store it, and don't ask for a resend.
 
 ### `bridge.heartbeat`
 
@@ -393,6 +468,10 @@ hiding one as `combat.combatant.removed`.
   names the campaign being tested.
 - Module 0.5.0 adds each [character's sheet](#character-sheet) to the characters in
   `bridge.hello`, and sends [`character.updated`](#characterupdated) when one changes.
+- Module 0.6.0 adds `conditions`, `features` and `effects` to the sheet, and each class's `id`,
+  `identifier` and `hitDice`; sends their descriptions in
+  [`character.texts`](#charactertexts); and sends `character.updated` as temporary effects run
+  down. A listener that answers `2xx` to types it does not use needs no change.
 
 ## Changes from protocol 1
 
