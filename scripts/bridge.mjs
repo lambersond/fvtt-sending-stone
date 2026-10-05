@@ -1,6 +1,7 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { chatEnabled, chatScope, combatEnabled, getDestination, includeGmContent } from "./config.mjs";
 import { forgetCombats, noteCombatSent } from "./campaign-combats.mjs";
+import { noteCharactersSent } from "./character-sync.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { roster } from "./characters.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
@@ -56,7 +57,7 @@ const resent = new Map();
 
 /**
  * Send each campaign its full current state, so the listener can discard whatever it held for the
- * campaign and start afresh: its characters, and the combats they are in.
+ * campaign and start afresh: its characters with their sheets, and the combats they are in.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -82,9 +83,11 @@ export function announce({ campaignId }={}) {
     if ( (campaignId !== undefined) && (campaign.id !== campaignId) ) continue;
     const combats = combatEnabled() ? game.combats.filter(combat => involvesCampaign(combat, campaign)) : [];
     for ( const combat of combats ) noteCombatSent(combat.id, campaign.id);
+    const characters = roster(campaign);
+    noteCharactersSent(campaign, characters);
     send(EVENTS.HELLO, {
       ...shared,
-      characters: roster(campaign),
+      characters,
       combats: combats.map(combat => snapshotCombat(combat, campaign))
     }, campaign);
   }

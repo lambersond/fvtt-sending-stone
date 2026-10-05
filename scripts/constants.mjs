@@ -89,6 +89,9 @@ export const EVENTS = Object.freeze({
   /** The bridge is still connected. Sent to a campaign that has been sent nothing else lately. */
   HEARTBEAT: "bridge.heartbeat",
 
+  /** One of a campaign's characters changed, such as taking damage or gaining a condition. */
+  CHARACTER_UPDATED: "character.updated",
+
   CHAT_CREATED: "chat.message.created",
   CHAT_UPDATED: "chat.message.updated",
   CHAT_DELETED: "chat.message.deleted",

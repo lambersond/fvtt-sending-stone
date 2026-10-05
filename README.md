@@ -41,6 +41,11 @@ in [PROTOCOL.md](PROTOCOL.md).
 While a Gamemaster has the game open, each campaign that has been sent nothing else for 30
 seconds is sent a heartbeat, so the app can show players whether the game is connected.
 
+Each campaign's characters are sent with their sheets under D&D Fifth Edition: abilities, saves,
+skills, hit points, armor class and the like, as dnd5e shows them. When a character changes, such
+as taking damage or levelling up, its campaigns are sent it again, so players can see their
+character and roll from it in the app.
+
 | Setting | Effect |
 | --- | --- |
 | Manage Campaigns | The Sending Stone app's address, and each campaign: its title, its secret (sent as `Authorization: Bearer …` with its events) and its player characters. Each event goes to the campaigns it involves. |
@@ -111,6 +116,7 @@ With **Send Gamemaster-Only Information** off, the listener receives what player
 | A message made private after it was sent | The listener is told to delete it. |
 | Hidden combatants | No. Their turns are reported with no combatant. Revealing one reports it joining; hiding one reports it leaving. |
 | Hit points | The campaign's own characters only. |
+| Character sheets | The campaign's own characters only: what their players can already see in Foundry. |
 | Attack targets | Name only; armor class is withheld. |
 | Success or failure against a DC | Left out of roll summaries, so a hidden DC is not revealed. |
 
@@ -174,6 +180,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
 | `scripts/characters.mjs` | A campaign's characters and who owns them |
+| `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills and the like |
+| `scripts/character-sync.mjs` | Sending a character again when it changes |
 | `scripts/chat.mjs` | Chat hooks |
 | `scripts/chat-data.mjs` | Chat message serialization and audience |
 | `scripts/combat.mjs` | Combat hooks |
