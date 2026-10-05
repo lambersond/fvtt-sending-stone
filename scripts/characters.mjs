@@ -1,3 +1,5 @@
+import { characterSheet } from "./sheet.mjs";
+
 /**
  * Player characters, as campaigns see them.
  *
@@ -79,7 +81,8 @@ export function summarizeCharacter(actor) {
     name: actor.name,
     img: actor.img,
     type: actor.type,
-    owners: playerOwners(actor).map(user => ({ id: user.id, name: user.name }))
+    owners: playerOwners(actor).map(user => ({ id: user.id, name: user.name })),
+    sheet: characterSheet(actor)
   };
 }
 

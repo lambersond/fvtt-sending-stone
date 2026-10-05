@@ -97,6 +97,7 @@ characters.
 | A chat message | Each campaign one of whose characters said it, or whose characters' players can read it. A public message reaches every campaign with characters. |
 | `chat.cleared` | Every campaign. |
 | A combat event | Each campaign with a character in the combat. |
+| `character.updated` | Each campaign the character is in. |
 
 A campaign hears about a combat while any of its characters are in it. When the first of them
 joins, the combat arrives as **`combat.created` with its full snapshot**, which may already be
@@ -131,11 +132,55 @@ Use `characters` to route a message to the right player's device.
   "name": "Thorin",
   "img": "thorin.webp",
   "type": "character",
-  "owners": [{ "id": "alice", "name": "Alice" }]
+  "owners": [{ "id": "alice", "name": "Alice" }],
+  "sheet": { "…": "see Character sheet" }
 }
 ```
 
-`owners` lists players only, never Gamemasters, and may be empty.
+`owners` lists players only, never Gamemasters, and may be empty. `sheet` is the character's
+[sheet](#character-sheet) under dnd5e, or `null` under another system.
+
+### Character sheet
+
+What the character's player sees of them, and rolls from: every modifier is the one dnd5e shows on
+its own sheet, already including proficiency and fixed bonuses. Bonuses that are dice, such as
+Bless or Guidance, are not included; dnd5e adds those only when it rolls.
+
+```json
+{
+  "img": "worlds/erebor/thorin.webp",
+  "level": 5,
+  "classes": [{ "name": "Fighter", "levels": 4, "subclass": "Champion" }, { "name": "Rogue", "levels": 1, "subclass": null }],
+  "species": "Dwarf",
+  "background": "Soldier",
+  "hp": { "value": 31, "max": 44, "temp": 0 },
+  "ac": 18,
+  "proficiency": 3,
+  "initiative": 2,
+  "speed": { "value": 25, "units": "ft" },
+  "inspiration": false,
+  "abilities": [
+    { "id": "str", "label": "Strength", "abbreviation": "STR", "score": 18, "mod": 4, "check": 4, "save": 7, "saveProficient": true, "checkMode": 0, "saveMode": 0 }
+  ],
+  "skills": [
+    { "id": "ath", "label": "Athletics", "ability": "str", "total": 7, "passive": 17, "proficiency": 1, "mode": 0 }
+  ]
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `img` | The portrait's path as Foundry stores it: relative to the game's address, or a full URL. |
+| `level`, `classes` | Character level, and each class with its levels and subclass, highest first. |
+| `species`, `background` | Their names, or `null`. |
+| `hp` | `{ value, max, temp }`, as on a [combatant](#combatant). |
+| `ac`, `proficiency`, `initiative` | Armor class, proficiency bonus, and initiative modifier. |
+| `speed` | Walking speed: `{ value, units }`, such as `"ft"`. |
+| `abilities` | In dnd5e's order (Strength first). `check` and `save` are the modifiers for an ability check and a saving throw; `saveProficient`, whether proficient in the save. |
+| `skills` | Sorted by `label`. `total` is the check modifier, `passive` the passive score, and `proficiency` the multiplier: `0`, `0.5` (half, as from Jack of All Trades), `1`, or `2` (expertise). |
+| `checkMode`, `saveMode`, `mode` | Whether that roll is made with advantage (`1`) or disadvantage (`-1`) from the character's conditions and features, else `0`. A skill's combines its ability's, as dnd5e does. |
+
+Any number dnd5e doesn't provide is `null`. Labels are in the Gamemaster's language.
 
 ### Chat message
 
@@ -273,6 +318,14 @@ the destination, the campaigns or any event setting changes.
 | `characters` | Every [character](#character) in the campaign. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 
+### `character.updated`
+
+`{ character }`: one of the campaign's [characters](#character), sheet included, as it now stands.
+Sent when it changes between `bridge.hello`s, such as taking damage, levelling up, equipping armor
+or gaining a condition: a change to the actor, its items or its effects. A burst of changes is
+sent once it settles, and nothing is sent if the character is unchanged from what the campaign
+was last told.
+
 ### `bridge.heartbeat`
 
 `{}`. The bridge is still connected. Sent to a campaign that has been sent no other event for 30
@@ -338,6 +391,8 @@ hiding one as `combat.combatant.removed`.
   `{"resend": "hello"}`. A listener that never asks needs no change.
 - Module 0.4.0 sends each campaign's events with that campaign's own secret, and `bridge.ping`
   names the campaign being tested.
+- Module 0.5.0 adds each [character's sheet](#character-sheet) to the characters in
+  `bridge.hello`, and sends [`character.updated`](#characterupdated) when one changes.
 
 ## Changes from protocol 1
 

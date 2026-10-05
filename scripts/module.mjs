@@ -1,4 +1,5 @@
 import { checkBridge, resendHello } from "./bridge.mjs";
+import { registerCharacterHooks } from "./character-sync.mjs";
 import { HELLO_WANTED_HOOK } from "./constants.mjs";
 import { migrateConnectedCharacters } from "./campaigns.mjs";
 import { registerChatHooks } from "./chat.mjs";
@@ -10,6 +11,7 @@ Hooks.once("init", () => {
   registerSettings();
   registerChatHooks();
   registerCombatHooks();
+  registerCharacterHooks();
 });
 
 // Every client registers the hooks, but only the active Gamemaster's posts anything. That role can
