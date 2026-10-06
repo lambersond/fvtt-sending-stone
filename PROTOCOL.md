@@ -198,7 +198,52 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
         { "id": "a8LkT3wPz0QcN5vB", "name": "Bless", "img": "icons/magic/control/buff-flight-wings-blue.webp", "source": "Bless", "duration": "9 Rounds", "disabled": false, "text": "3f9c0b2a7d1e64" }
       ]
     }
-  ]
+  ],
+  "inventory": {
+    "sections": [
+      {
+        "id": "weapons", "label": "Weapons",
+        "items": [
+          {
+            "id": "Lw3sQ9nE2vB7kTzD", "name": "Warhammer", "img": "icons/weapons/hammers/hammer-war-rounding.webp", "type": "weapon",
+            "quantity": 1, "weight": { "value": 5, "units": "lb" }, "price": "15 GP", "equipped": true,
+            "attunement": null, "attuned": false, "uses": null, "rarity": null, "properties": ["Versatile"], "identified": true, "text": "2c8e1f4b6a0d93"
+          }
+        ]
+      }
+    ],
+    "containers": [
+      { "id": "Pq7RtY2wX9mK4bVc", "name": "Backpack", "type": "container", "quantity": 1, "capacity": { "value": 12.5, "max": 30, "units": "lb" }, "contents": [], "text": null }
+    ],
+    "currency": [{ "id": "gp", "label": "Gold", "abbreviation": "GP", "value": 41 }],
+    "encumbrance": { "value": 62.5, "max": 270, "units": "lb", "encumbered": null, "heavilyEncumbered": null },
+    "attunement": { "value": 1, "max": 3 }
+  },
+  "spellcasting": { "ability": "Intelligence", "dc": 14, "attack": 6, "classes": [{ "name": "Wizard", "ability": "Intelligence", "dc": 14, "attack": 6 }] },
+  "spells": [
+    {
+      "id": "spell1", "label": "1st Level", "slots": { "value": 3, "max": 4 },
+      "spells": [
+        {
+          "id": "Sh3lD8vX0qWc5ZpM", "name": "Shield", "img": "icons/magic/defensive/shield-barrier-blue.webp", "level": 1,
+          "school": "Abjuration", "components": "V, S", "materials": null, "concentration": false, "ritual": false,
+          "activation": "1 Reaction", "range": "Self", "duration": "1 Round", "target": null, "prepared": 1, "uses": null, "text": "6d2a9c4e0b7f18"
+        }
+      ]
+    }
+  ],
+  "traits": [
+    { "id": "senses", "label": "Senses", "values": ["Darkvision 60 ft"] },
+    { "id": "languages", "label": "Languages", "values": ["Common", "Dwarvish"] }
+  ],
+  "deathSaves": { "success": 0, "failure": 0 },
+  "details": {
+    "about": [{ "id": "alignment", "label": "Alignment", "value": "Lawful Good" }],
+    "personality": [{ "id": "ideal", "label": "Ideals", "value": "Greater good." }],
+    "appearance": "Broad-shouldered, with a braided beard.",
+    "xp": { "value": 6500, "max": 14000 },
+    "biography": "7a1c3e5f9b2d40"
+  }
 }
 ```
 
@@ -218,6 +263,19 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `features[].features` | In the order the player keeps them in Foundry. `kind`, such as Class Feature; `requirements`, such as Fighter 1; `activation`, such as 1 Bonus Action; `passive` for a trait or anything with nothing to use; `uses`, if limited, as `{ value, max, recovery }`, with `value` the uses left and `recovery` when they come back, such as Short Rest, Long Rest or Recharge [5–6]. |
 | `effects` | Grouped as dnd5e's Effects tab groups them, by `id`: `"temporary"`, `"passive"`, `"inactive"` (turned off or expired) and `"suppressed"` (unavailable, as from an unequipped item). Empty groups are left out. Conditions are listed in `conditions` instead, except concentration under dnd5e 6. |
 | `effects[].effects` | `source` names what it comes from, such as the item that carries it or the spell another character cast; `duration` is the time it has left, such as `"9 Rounds"` or `"End of Source's Next Turn"`, or `null`; `disabled` whether it's turned off. An `id` is unique within the sheet. |
+| `inventory.sections` | Items by type, in dnd5e's order: weapons, equipment, consumables, tools, loot. Only items in no container; empty sections are left out. |
+| `inventory.sections[].items` | In the order the player keeps them in Foundry. `weight` is the item's and its quantity's together, in its `units`, or `null` for none; `price` dnd5e's label for it, such as `"15 GP"`; `equipped` whether it is, or `null` for a type that never is; `attunement` whether it is `"required"` or `"optional"`, with `attuned`; `uses` as on a feature; `rarity` and `properties` dnd5e's labels. |
+| `inventory.containers` | Each container the character holds, in no other container, as an item with `capacity`, `{ value, max, units }` by count or weight, `null` without a limit, and `contents`: the items in it, containers among them with their own contents. |
+| `identified` | `false` for an item not identified yet, which shows as dnd5e shows it to players: its unidentified name and description, and no price, rarity, uses, properties or attunement. An unidentified container whose contents are secret has `capacity` and `contents` `null`. |
+| `inventory.currency` | Each currency, in dnd5e's order, with its `label`, `abbreviation` and `value`. |
+| `inventory.encumbrance` | `{ value, max, units, encumbered, heavilyEncumbered }`: what the character carries of the most it can, and, under the variant encumbrance rule, where being encumbered and heavily encumbered begin, otherwise `null`. `null` when encumbrance isn't tracked. |
+| `inventory.attunement` | `{ value, max }`: items attuned, and how many may be. |
+| `spellcasting` | `{ ability, dc, attack, classes }`: the spellcasting ability, spell save DC and spell attack bonus, and each spellcasting class's. `null` for a character with no spells and no spellcasting class. |
+| `spells` | Sections of the spellbook as dnd5e builds them, in its order: at will, innate, ritual, cantrips (`"spell0"`), pact magic, then each spell level (`"spell1"` and so on), with `slots`, `{ value, max }`, for those that use them, then spells cast from items (`"item"`). A section with slots is listed even with no spells in it, as dnd5e lists it. |
+| `spells[].spells` | `school`, `components` (such as `"V, S, M"`), `materials`, `activation`, `range`, `duration` (such as `"Concentration, up to 1 Minute"`, as dnd5e's spell cards put it) and `target` are dnd5e's labels; `concentration` and `ritual` say whether; `prepared` is `0` unprepared, `1` prepared or `2` always prepared, or `null` for a spell that isn't prepared, such as a cantrip; `uses` as on a feature. |
+| `traits` | Each trait with values, `{ id, label, values }`, in order: size, senses, speeds, languages, then dnd5e's traits, such as armor and tool proficiencies and damage resistances and immunities, with whatever the Gamemaster typed in among them. |
+| `deathSaves` | `{ success, failure }`, or `null`. |
+| `details` | `about`, `{ id, label, value }` for alignment, age and the like that are filled in; `personality`, likewise, for personality traits, ideals, bonds and flaws; `appearance`; `xp`, `{ value, max }`, `max` being `null` at the highest level; and `biography`, a description's hash. |
 | `text` | A [description](#descriptions)'s hash, or `null` if there is none. |
 
 Any number dnd5e doesn't provide is `null`. Labels are in the Gamemaster's language. The sheet
@@ -472,6 +530,9 @@ hiding one as `combat.combatant.removed`.
   `identifier` and `hitDice`; sends their descriptions in
   [`character.texts`](#charactertexts); and sends `character.updated` as temporary effects run
   down. A listener that answers `2xx` to types it does not use needs no change.
+- Module 0.7.0 adds `inventory`, `spellcasting`, `spells`, `traits`, `deathSaves` and `details` to
+  the sheet, with the descriptions of its items and spells and its biography in
+  `character.texts`.
 
 ## Changes from protocol 1
 
