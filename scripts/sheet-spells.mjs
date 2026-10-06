@@ -132,14 +132,19 @@ function describeSpell(spell, texts) {
 }
 
 /**
- * The spell slots a section uses: how many are left, of how many.
+ * The spell slots a section uses: how many are left, of how many, and the level a spell is cast
+ * at with one, which for Pact Magic is its slots' level. A pool without slots may have no level.
  * @param {Actor} actor
  * @param {string} key      Such as "spell3" or "pact".
- * @returns {{value: number, max: number}}
+ * @returns {{value: number, max: number, level: number|null}}
  */
 function slotsOf(actor, key) {
   const slots = actor.system?.spells?.[key] ?? {};
-  return { value: finite(slots.value) ?? 0, max: finite(slots.override) ?? finite(slots.max) ?? 0 };
+  return {
+    value: finite(slots.value) ?? 0,
+    max: finite(slots.override) ?? finite(slots.max) ?? 0,
+    level: finite(slots.level) || null
+  };
 }
 
 /**
