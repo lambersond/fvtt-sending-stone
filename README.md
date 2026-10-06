@@ -43,8 +43,9 @@ seconds is sent a heartbeat, so the app can show players whether the game is con
 
 Each campaign's characters are sent with their sheets under D&D Fifth Edition: abilities, saves,
 skills, hit points, armor class and the like, as dnd5e shows them, along with their features,
-conditions and effects, inventory, spells, traits and biography. When a character changes, such as taking damage, levelling up or gaining a
-condition, its campaigns are sent it again, so players can see their character and roll from it
+conditions and effects, inventory, spells, traits and biography, and their actions, as Tidy 5e's
+Actions tab lists them, with each one's bonus to hit, saving throw and damage. When a character
+changes, such as taking damage, levelling up or gaining a condition, its campaigns are sent it again, so players can see their character and roll from it
 in the app. Descriptions, enriched as the player would see them in Foundry, are sent once and
 then only when one is new, since they are most of a sheet's size.
 
@@ -188,6 +189,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
 | `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits and death saves |
+| `scripts/sheet-actions.mjs` | A character's actions, listed and sectioned as Tidy 5e's Actions tab lists them |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, hashed, and sent only when a campaign lacks them |
 | `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON |
 | `scripts/character-sync.mjs` | Sending a character again when it changes |
