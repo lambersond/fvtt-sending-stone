@@ -243,7 +243,20 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
     "appearance": "Broad-shouldered, with a braided beard.",
     "xp": { "value": 6500, "max": 14000 },
     "biography": "7a1c3e5f9b2d40"
-  }
+  },
+  "actions": [
+    {
+      "id": "action", "label": "Actions",
+      "actions": [
+        {
+          "id": "hR4cT7mWp2qLs9vB", "name": "Warhammer", "img": "icons/weapons/hammers/hammer-war.webp", "type": "weapon",
+          "activation": "Action", "range": "reach 5 ft", "target": "1 Creature", "toHit": 7, "save": null,
+          "damage": [{ "formula": "1d8 + 4", "type": "Bludgeoning", "healing": false }],
+          "uses": null, "level": null, "concentration": false, "identified": true, "text": "1b9d3f5a7c2e48"
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -276,6 +289,8 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `traits` | Each trait with values, `{ id, label, values }`, in order: size, senses, speeds, languages, then dnd5e's traits, such as armor and tool proficiencies and damage resistances and immunities, with whatever the Gamemaster typed in among them. |
 | `deathSaves` | `{ success, failure }`, or `null`. |
 | `details` | `about`, `{ id, label, value }` for alignment, age and the like that are filled in; `personality`, likewise, for personality traits, ideals, bonds and flaws; `appearance`; `xp`, `{ value, max }`, `max` being `null` at the highest level; and `biography`, a description's hash. |
+| `actions` | What the character can do in a fight, listed as Tidy 5e's Actions tab lists it by default: equipped weapons; equipped equipment and consumables used in a fight, not over minutes or more; spells that can be cast now and deal damage, are cast as a bonus action or reaction, last a minute or a round, or apply effects; and features that are activated. An item a player added to Tidy 5e's list, or took off it, is listed or not as they chose. Sections are by the first activity's activation, in Tidy 5e's order: `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"`, `"special"`, `"other"` for any other, then any the player named in Tidy 5e, whose `id` and `label` are its name. Empty sections are left out. |
+| `actions[].actions` | Items, in the order the player keeps them. `activation`, `range` (for a weapon, its reach or range, such as `"reach 5 ft or range 20/60 ft"`) and `target` are dnd5e's labels; `toHit` the attack's bonus to hit, without any dice in it, as dnd5e's sheets show it; `save`, `{ ability, dc }`, the saving throw it calls for, `ability` being `"DC"` when the target chooses among several; `damage` its damage or healing as dnd5e labels it, each part `{ formula, type, healing }` with the ability modifier in the formula, from its attack, or else the first activity that has any; `uses` as on a feature, the first activity's when the item has none; `level` a spell's, `0` for a cantrip, otherwise `null`. An item not identified yet has no `toHit`, `save`, `damage` or `uses`. |
 | `text` | A [description](#descriptions)'s hash, or `null` if there is none. |
 
 Any number dnd5e doesn't provide is `null`. Labels are in the Gamemaster's language. The sheet
@@ -533,6 +548,7 @@ hiding one as `combat.combatant.removed`.
 - Module 0.7.0 adds `inventory`, `spellcasting`, `spells`, `traits`, `deathSaves` and `details` to
   the sheet, with the descriptions of its items and spells and its biography in
   `character.texts`.
+- Module 0.8.0 adds `actions` to the sheet.
 
 ## Changes from protocol 1
 

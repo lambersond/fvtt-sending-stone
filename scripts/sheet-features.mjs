@@ -117,12 +117,21 @@ function describeFeature(item, texts) {
  * @returns {{value: number, max: number, recovery: string|null}|null}
  */
 export function usesOf(item) {
-  const uses = item.system?.uses;
+  return limitedUses(item.system?.uses, item.labels);
+}
+
+/**
+ * Limited uses, of an item or one of its activities, which dnd5e keeps alike.
+ * @param {object} [uses]       Such as an item's system.uses.
+ * @param {object} [labels]     Its labels, which name a recharge, such as "Recharge [5+]".
+ * @returns {{value: number, max: number, recovery: string|null}|null}
+ */
+export function limitedUses(uses, labels) {
   const max = finite(uses?.max);
   if ( !max ) return null;
   const value = finite(uses.value) ?? Math.max(max - (finite(uses.spent) ?? 0), 0);
   const periods = (uses.recovery ?? []).map(recovery => {
-    if ( recovery.period === "recharge" ) return item.labels?.recharge ?? null;
+    if ( recovery.period === "recharge" ) return labels?.recharge ?? null;
     return localize(CONFIG.DND5E?.limitedUsePeriods?.[recovery.period]?.label) || null;
   }).filter(Boolean);
   return { value, max, recovery: periods.length ? listFormat(periods) : null };

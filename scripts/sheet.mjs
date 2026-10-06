@@ -1,4 +1,5 @@
 import { hitPoints } from "./characters.mjs";
+import { actionSections } from "./sheet-actions.mjs";
 import { deathSavesOf, detailsOf, traitsOf } from "./sheet-details.mjs";
 import { conditionsOf, effectSections } from "./sheet-effects.mjs";
 import { classesOf, featureSections } from "./sheet-features.mjs";
@@ -55,7 +56,8 @@ export function characterSheet(actor, texts=new SheetTexts()) {
     spells: spellbookOf(actor, texts),
     traits: traitsOf(actor),
     deathSaves: deathSavesOf(actor),
-    details: detailsOf(actor, texts)
+    details: detailsOf(actor, texts),
+    actions: actionSections(actor, texts)
   };
 }
 
