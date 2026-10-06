@@ -227,7 +227,8 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
         {
           "id": "Sh3lD8vX0qWc5ZpM", "name": "Shield", "img": "icons/magic/defensive/shield-barrier-blue.webp", "level": 1,
           "school": "Abjuration", "components": "V, S", "materials": null, "concentration": false, "ritual": false,
-          "activation": "1 Reaction", "range": "Self", "duration": "1 Round", "target": null, "prepared": 1, "uses": null, "text": "6d2a9c4e0b7f18"
+          "activation": "1 Reaction", "range": "Self", "duration": "1 Round", "target": null, "prepared": 1, "uses": null, "castFrom": null,
+          "text": "6d2a9c4e0b7f18"
         }
       ]
     }
@@ -252,7 +253,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
           "id": "hR4cT7mWp2qLs9vB", "name": "Warhammer", "img": "icons/weapons/hammers/hammer-war.webp", "type": "weapon",
           "activation": "Action", "range": "reach 5 ft", "target": "1 Creature", "toHit": 7, "save": null,
           "damage": [{ "formula": "1d8 + 4", "type": "Bludgeoning", "healing": false }],
-          "uses": null, "level": null, "concentration": false, "identified": true, "text": "1b9d3f5a7c2e48"
+          "uses": null, "level": null, "castFrom": null, "concentration": false, "identified": true, "text": "1b9d3f5a7c2e48"
         }
       ]
     }
@@ -285,12 +286,12 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `inventory.attunement` | `{ value, max }`: items attuned, and how many may be. |
 | `spellcasting` | `{ ability, dc, attack, classes }`: the spellcasting ability, spell save DC and spell attack bonus, and each spellcasting class's. `null` for a character with no spells and no spellcasting class. |
 | `spells` | Sections of the spellbook as dnd5e builds them, in its order: at will, innate, ritual, cantrips (`"spell0"`), pact magic, then each spell level (`"spell1"` and so on), with `slots`, `{ value, max, level }`, for those that use them, then spells cast from items (`"item"`). A slot's `level` is the level a spell is cast at with it, which for pact magic is the pact slots' level, or `null` for pact magic without slots. Module 0.8.0 and earlier leave it out. A section with slots is listed even with no spells in it, as dnd5e lists it. |
-| `spells[].spells` | `school`, `components` (such as `"V, S, M"`), `materials`, `activation`, `range`, `duration` (such as `"Concentration, up to 1 Minute"`, as dnd5e's spell cards put it) and `target` are dnd5e's labels; `concentration` and `ritual` say whether; `prepared` is `0` unprepared, `1` prepared or `2` always prepared, or `null` for a spell that isn't prepared, such as a cantrip; `uses` as on a feature. |
+| `spells[].spells` | `school`, `components` (such as `"V, S, M"`), `materials`, `activation`, `range`, `duration` (such as `"Concentration, up to 1 Minute"`, as dnd5e's spell cards put it) and `target` are dnd5e's labels; `concentration` and `ritual` say whether; `prepared` is `0` unprepared, `1` prepared or `2` always prepared, or `null` for a spell that isn't prepared, such as a cantrip; `uses` as on a feature; `castFrom`, `{ id, name }`, the item the spell is cast from with one of its Cast activities, such as a wand, or `null` for a spell of the character's own. |
 | `traits` | Each trait with values, `{ id, label, values }`, in order: size, senses, speeds, languages, then dnd5e's traits, such as armor and tool proficiencies and damage resistances and immunities, with whatever the Gamemaster typed in among them. |
 | `deathSaves` | `{ success, failure }`, or `null`. |
 | `details` | `about`, `{ id, label, value }` for alignment, age and the like that are filled in; `personality`, likewise, for personality traits, ideals, bonds and flaws; `appearance`; `xp`, `{ value, max }`, `max` being `null` at the highest level; and `biography`, a description's hash. |
 | `actions` | What the character can do in a fight, listed as Tidy 5e's Actions tab lists it by default: equipped weapons; equipped equipment and consumables used in a fight, not over minutes or more; spells that can be cast now and deal damage, are cast as a bonus action or reaction, last a minute or a round, or apply effects; and features that are activated. An item a player added to Tidy 5e's list, or took off it, is listed or not as they chose. Sections are by the first activity's activation, in Tidy 5e's order: `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"`, `"special"`, `"other"` for any other, then any the player named in Tidy 5e, whose `id` and `label` are its name. Empty sections are left out. |
-| `actions[].actions` | Items, in the order the player keeps them. `activation`, `range` (for a weapon, its reach or range, such as `"reach 5 ft or range 20/60 ft"`) and `target` are dnd5e's labels; `toHit` the attack's bonus to hit, without any dice in it, as dnd5e's sheets show it; `save`, `{ ability, dc }`, the saving throw it calls for, `ability` being `"DC"` when the target chooses among several; `damage` its damage or healing as dnd5e labels it, each part `{ formula, type, healing }` with the ability modifier in the formula, from its attack, or else the first activity that has any; `uses` as on a feature, the first activity's when the item has none; `level` a spell's, `0` for a cantrip, otherwise `null`. An item not identified yet has no `toHit`, `save`, `damage` or `uses`. |
+| `actions[].actions` | Items, in the order the player keeps them. `activation`, `range` (for a weapon, its reach or range, such as `"reach 5 ft or range 20/60 ft"`) and `target` are dnd5e's labels; `toHit` the attack's bonus to hit, without any dice in it, as dnd5e's sheets show it; `save`, `{ ability, dc }`, the saving throw it calls for, `ability` being `"DC"` when the target chooses among several; `damage` its damage or healing as dnd5e labels it, each part `{ formula, type, healing }` with the ability modifier in the formula, from its attack, or else the first activity that has any; `uses` as on a feature, the first activity's when the item has none; `level` a spell's, `0` for a cantrip, otherwise `null`; `castFrom` as on a spell, `null` for anything but a spell. An item not identified yet has no `toHit`, `save`, `damage` or `uses`. |
 | `text` | A [description](#descriptions)'s hash, or `null` if there is none. |
 
 Any number dnd5e doesn't provide is `null`. Labels are in the Gamemaster's language. The sheet
@@ -550,6 +551,7 @@ hiding one as `combat.combatant.removed`.
   `character.texts`.
 - Module 0.8.0 adds `actions` to the sheet.
 - Module 0.8.1 adds `level` to the spellbook's `slots`.
+- Module 0.8.2 adds `castFrom` to spells and actions: the item a spell is cast from.
 
 ## Changes from protocol 1
 

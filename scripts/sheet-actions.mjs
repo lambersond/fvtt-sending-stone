@@ -1,4 +1,5 @@
 import { limitedUses, usesOf } from "./sheet-features.mjs";
+import { castFrom } from "./sheet-spells.mjs";
 import { finite, localize } from "./sheet-values.mjs";
 
 /**
@@ -162,6 +163,7 @@ function describeAction(item, texts) {
     damage: identified ? damageOf(damaging) : [],
     uses: identified ? (usesOf(item) ?? limitedUses(first?.uses, first?.labels)) : null,
     level: (item.type === "spell") ? (finite(system.level) ?? 0) : null,
+    castFrom: (item.type === "spell") ? castFrom(item) : null,
     concentration: (system.properties?.has?.("concentration") ?? false) || (first?.duration?.concentration === true),
     identified,
     text: texts.add({
