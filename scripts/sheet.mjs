@@ -2,11 +2,12 @@ import { hitPoints } from "./characters.mjs";
 import { actionSections } from "./sheet-actions.mjs";
 import { deathSavesOf, detailsOf, traitsOf } from "./sheet-details.mjs";
 import { conditionsOf, effectSections } from "./sheet-effects.mjs";
+import { favoritesOf } from "./sheet-favorites.mjs";
 import { classesOf, featureSections } from "./sheet-features.mjs";
 import { inventoryOf } from "./sheet-inventory.mjs";
 import { spellbookOf, spellcastingOf } from "./sheet-spells.mjs";
 import { SheetTexts } from "./sheet-texts.mjs";
-import { finite, localize } from "./sheet-values.mjs";
+import { combinedMode, finite, localize, rollMode } from "./sheet-values.mjs";
 
 /**
  * Character sheets: what a campaign's player sees of their own character in the listener, and
@@ -57,7 +58,8 @@ export function characterSheet(actor, texts=new SheetTexts()) {
     traits: traitsOf(actor),
     deathSaves: deathSavesOf(actor),
     details: detailsOf(actor, texts),
-    actions: actionSections(actor, texts)
+    actions: actionSections(actor, texts),
+    favorites: favoritesOf(actor)
   };
 }
 
@@ -129,28 +131,6 @@ function describeSkill(actor, id, skill) {
 function speedOf(movement) {
   const value = finite(movement?.speed) ?? finite(movement?.walk) ?? finite(movement?.speeds?.walk);
   return value === null ? null : { value, units: movement.units ?? null };
-}
-
-/**
- * Whether a roll is made with advantage (1), disadvantage (-1) or neither (0), combining several
- * sources the way dnd5e does: any advantage and any disadvantage cancel out.
- * @param {Actor} actor
- * @param {string[]} keyPaths   Paths to each source's roll mode in the actor's system data.
- * @returns {number}
- */
-function combinedMode(actor, keyPaths) {
-  const field = globalThis.dnd5e?.dataModels?.fields?.AdvantageModeField;
-  if ( field?.combineFields ) return rollMode(field.combineFields(actor.system, keyPaths)?.mode);
-  const modes = keyPaths.map(path => rollMode(foundry.utils.getProperty(actor.system, path)));
-  return Math.sign(modes.reduce((sum, mode) => sum + mode, 0));
-}
-
-/**
- * @param {unknown} mode
- * @returns {number}  -1, 0 or 1.
- */
-function rollMode(mode) {
-  return [-1, 0, 1].includes(mode) ? mode : 0;
 }
 
 /**

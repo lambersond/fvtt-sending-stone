@@ -99,7 +99,7 @@ export function effectSections(actor, texts) {
  * @param {ActiveEffect} effect
  * @returns {boolean}
  */
-function hiddenFromPlayer(effect) {
+export function hiddenFromPlayer(effect) {
   if ( effect.system?.isConcealed ) return true;
   if ( effect.dependentOrigin?.active === false ) return true;
   const item = (effect.parent?.documentName === "Item") ? effect.parent : null;
@@ -125,10 +125,8 @@ function categoryOf(effect) {
  * @returns {object}
  */
 function describeEffect(effect, texts) {
-  const parent = effect.parent;
   return {
-    // An item's effect has an id only unique among that item's.
-    id: (parent?.documentName === "Item") ? `${parent.id}.${effect.id}` : effect.id,
+    id: effectIdOf(effect),
     name: effect.name,
     img: effect.img ?? null,
     source: sourceOf(effect),
@@ -136,6 +134,17 @@ function describeEffect(effect, texts) {
     disabled: effect.disabled === true,
     text: texts.add({ html: effect.description, relativeTo: effect })
   };
+}
+
+/**
+ * An effect's id in the sheet: its own on the character, or for one on an item, whose id is only
+ * unique among that item's effects, the item's and its own.
+ * @param {ActiveEffect} effect
+ * @returns {string}
+ */
+export function effectIdOf(effect) {
+  const parent = effect.parent;
+  return (parent?.documentName === "Item") ? `${parent.id}.${effect.id}` : effect.id;
 }
 
 /**

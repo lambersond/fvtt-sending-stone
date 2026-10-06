@@ -174,6 +174,27 @@ function describeAction(item, texts) {
 }
 
 /**
+ * One of an item's activities on its own, as a player made it a favorite: how it's activated, its
+ * range and target, its bonus to hit, the saving throw it calls for, its damage or healing, and its
+ * uses. An item not identified yet keeps them to itself, as for an action.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {object}
+ */
+export function describeActivity(item, activity) {
+  const identified = item.system?.identified !== false;
+  return {
+    activation: activity.labels?.activation || null,
+    range: rangeOf(item, activity),
+    target: activity.labels?.target || null,
+    toHit: identified ? toHitOf(activity) : null,
+    save: identified ? saveOf(activity) : null,
+    damage: identified ? damageOf(activity) : [],
+    uses: identified ? limitedUses(activity.uses, activity.labels) : null
+  };
+}
+
+/**
  * Where an action reaches, as dnd5e's sheet puts it: for a weapon, its reach or range, such as
  * "reach 5 ft" or "range 20/60 ft"; otherwise its activity's range, such as "30 ft" or "Self".
  * @param {Item} item
@@ -243,7 +264,7 @@ function damageOf(activity) {
  * @param {Item} item
  * @returns {Activity[]}
  */
-function visibleActivities(item) {
+export function visibleActivities(item) {
   return Array.from(item.system?.activities ?? []).filter(activity => ("isHidden" in activity)
     ? !activity.isHidden
     : (activity.canUse !== false));
