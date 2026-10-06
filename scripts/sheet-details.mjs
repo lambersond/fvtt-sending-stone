@@ -174,7 +174,7 @@ function toolsOf(tools) {
  * @param {string} trait
  * @returns {string}
  */
-function traitLabel(key, trait) {
+export function traitLabel(key, trait) {
   try {
     return globalThis.dnd5e?.documents?.Trait?.keyLabel?.(key, { trait }) ?? key;
   } catch {

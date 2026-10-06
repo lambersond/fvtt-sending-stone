@@ -1,4 +1,5 @@
 import { limitedUses, usesOf } from "./sheet-features.mjs";
+import { castFrom } from "./sheet-spells.mjs";
 import { finite, localize } from "./sheet-values.mjs";
 
 /**
@@ -162,12 +163,34 @@ function describeAction(item, texts) {
     damage: identified ? damageOf(damaging) : [],
     uses: identified ? (usesOf(item) ?? limitedUses(first?.uses, first?.labels)) : null,
     level: (item.type === "spell") ? (finite(system.level) ?? 0) : null,
+    castFrom: (item.type === "spell") ? castFrom(item) : null,
     concentration: (system.properties?.has?.("concentration") ?? false) || (first?.duration?.concentration === true),
     identified,
     text: texts.add({
       html: identified ? system.description?.value : system.unidentified?.description,
       relativeTo: item
     })
+  };
+}
+
+/**
+ * One of an item's activities on its own, as a player made it a favorite: how it's activated, its
+ * range and target, its bonus to hit, the saving throw it calls for, its damage or healing, and its
+ * uses. An item not identified yet keeps them to itself, as for an action.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {object}
+ */
+export function describeActivity(item, activity) {
+  const identified = item.system?.identified !== false;
+  return {
+    activation: activity.labels?.activation || null,
+    range: rangeOf(item, activity),
+    target: activity.labels?.target || null,
+    toHit: identified ? toHitOf(activity) : null,
+    save: identified ? saveOf(activity) : null,
+    damage: identified ? damageOf(activity) : [],
+    uses: identified ? limitedUses(activity.uses, activity.labels) : null
   };
 }
 
@@ -241,7 +264,7 @@ function damageOf(activity) {
  * @param {Item} item
  * @returns {Activity[]}
  */
-function visibleActivities(item) {
+export function visibleActivities(item) {
   return Array.from(item.system?.activities ?? []).filter(activity => ("isHidden" in activity)
     ? !activity.isHidden
     : (activity.canUse !== false));

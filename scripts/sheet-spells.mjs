@@ -127,8 +127,20 @@ function describeSpell(spell, texts) {
     // cantrip or one cast at will.
     prepared: (canPrepare && (level > 0)) ? (finite(system.prepared) ?? 0) : null,
     uses: usesOf(spell),
+    castFrom: castFrom(spell),
     text: texts.add({ html: system.description?.value, relativeTo: spell })
   };
+}
+
+/**
+ * The item a spell is cast from, with one of its Cast activities, such as a wand or a hat that casts
+ * Disguise Self; null for a spell of the character's own.
+ * @param {Item} spell
+ * @returns {{id: string, name: string}|null}
+ */
+export function castFrom(spell) {
+  const item = spell.system?.linkedActivity?.item;
+  return item ? { id: item.id, name: item.name } : null;
 }
 
 /**
