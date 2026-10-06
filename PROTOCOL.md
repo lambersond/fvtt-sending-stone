@@ -222,7 +222,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
   "spellcasting": { "ability": "Intelligence", "dc": 14, "attack": 6, "classes": [{ "name": "Wizard", "ability": "Intelligence", "dc": 14, "attack": 6 }] },
   "spells": [
     {
-      "id": "spell1", "label": "1st Level", "slots": { "value": 3, "max": 4 },
+      "id": "spell1", "label": "1st Level", "slots": { "value": 3, "max": 4, "level": 1 },
       "spells": [
         {
           "id": "Sh3lD8vX0qWc5ZpM", "name": "Shield", "img": "icons/magic/defensive/shield-barrier-blue.webp", "level": 1,
@@ -284,7 +284,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `inventory.encumbrance` | `{ value, max, units, encumbered, heavilyEncumbered }`: what the character carries of the most it can, and, under the variant encumbrance rule, where being encumbered and heavily encumbered begin, otherwise `null`. `null` when encumbrance isn't tracked. |
 | `inventory.attunement` | `{ value, max }`: items attuned, and how many may be. |
 | `spellcasting` | `{ ability, dc, attack, classes }`: the spellcasting ability, spell save DC and spell attack bonus, and each spellcasting class's. `null` for a character with no spells and no spellcasting class. |
-| `spells` | Sections of the spellbook as dnd5e builds them, in its order: at will, innate, ritual, cantrips (`"spell0"`), pact magic, then each spell level (`"spell1"` and so on), with `slots`, `{ value, max }`, for those that use them, then spells cast from items (`"item"`). A section with slots is listed even with no spells in it, as dnd5e lists it. |
+| `spells` | Sections of the spellbook as dnd5e builds them, in its order: at will, innate, ritual, cantrips (`"spell0"`), pact magic, then each spell level (`"spell1"` and so on), with `slots`, `{ value, max, level }`, for those that use them, then spells cast from items (`"item"`). A slot's `level` is the level a spell is cast at with it, which for pact magic is the pact slots' level, or `null` for pact magic without slots. Module 0.8.0 and earlier leave it out. A section with slots is listed even with no spells in it, as dnd5e lists it. |
 | `spells[].spells` | `school`, `components` (such as `"V, S, M"`), `materials`, `activation`, `range`, `duration` (such as `"Concentration, up to 1 Minute"`, as dnd5e's spell cards put it) and `target` are dnd5e's labels; `concentration` and `ritual` say whether; `prepared` is `0` unprepared, `1` prepared or `2` always prepared, or `null` for a spell that isn't prepared, such as a cantrip; `uses` as on a feature. |
 | `traits` | Each trait with values, `{ id, label, values }`, in order: size, senses, speeds, languages, then dnd5e's traits, such as armor and tool proficiencies and damage resistances and immunities, with whatever the Gamemaster typed in among them. |
 | `deathSaves` | `{ success, failure }`, or `null`. |
@@ -549,6 +549,7 @@ hiding one as `combat.combatant.removed`.
   the sheet, with the descriptions of its items and spells and its biography in
   `character.texts`.
 - Module 0.8.0 adds `actions` to the sheet.
+- Module 0.8.1 adds `level` to the spellbook's `slots`.
 
 ## Changes from protocol 1
 
