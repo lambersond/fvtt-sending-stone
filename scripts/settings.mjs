@@ -118,8 +118,8 @@ export function registerSettings() {
     onChange: () => reannounce()
   });
 
-  // Only worth showing where Midi-QOL is: without it, attacks always take dnd5e's own way. Whether
-  // attacks can be made here changes what each campaign is told.
+  // Only worth showing where Midi-QOL is: without it, attacks and spells always take dnd5e's own
+  // way. Whether they can be made here changes what each campaign is told.
   game.settings.register(MODULE_ID, SETTINGS.MIDI_INTEGRATION, {
     name: "SENDINGSTONE.Settings.MidiIntegration.Name",
     hint: "SENDINGSTONE.Settings.MidiIntegration.Hint",

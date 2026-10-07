@@ -98,31 +98,80 @@ export function checkCommand(command) {
 }
 
 /**
- * Why a fetched attack, or its damage, isn't one to make, if it isn't. An attack names the item
- * and activity it's made with, and the combatant it's made at, if any, and has its d20s and any
- * dice the player added; its damage names the attack it follows and has the dice that attack's
- * damage throws, if any, which are checked against them when it's made.
+ * Why a fetched attack, use or damage isn't one to make, if it isn't. An attack names the item and
+ * activity it's made with, and the combatant it's made at, if any, and has its d20s and any dice
+ * the player added; it may name the spell slot, ammunition and attack mode it's made with. A use
+ * names the item and activity, the combatants it's used at, and the spell slot, if any, and has no
+ * dice. Damage names the use it follows and has the dice that use's damage throws, if any, which
+ * are checked against them when it's made, and the kind of damage chosen for each of its rolls.
  * @param {object} command
  * @returns {string|null}
  */
 function checkAttackCommand(command) {
-  const isId = value => (typeof value === "string") && (value.length > 0) && (value.length <= 64);
   const { dice } = command;
   if ( command.kind === "damage" ) {
     if ( !isId(command.use) ) return "use";
     if ( !Array.isArray(dice) || (dice.length > 20) || !dice.every(isRolled) ) return "dice";
+    const { types } = command;
+    if ( (types !== undefined) && (types !== null)
+      && (!Array.isArray(types) || (types.length > 20) || !types.every(type => (type === null) || isKey(type))) ) {
+      return "types";
+    }
     return null;
   }
   if ( !isId(command.item) || !isId(command.activity) ) return "item";
-  const { target } = command;
-  if ( (target !== null) && (target !== undefined) && (!isId(target?.combatId) || !isId(target?.combatantId)) ) {
-    return "target";
+  if ( !isOptional(command.slot, isKey) ) return "slot";
+  if ( command.kind === "use" ) {
+    const { targets } = command;
+    if ( !Array.isArray(targets) || (targets.length > 20) || !targets.every(isTarget) ) return "target";
+    return null;
   }
+  const { target } = command;
+  if ( (target !== null) && (target !== undefined) && !isTarget(target) ) return "target";
+  if ( !isOptional(command.ammunition, isId) ) return "ammo";
+  if ( !isOptional(command.attackMode, isKey) ) return "attack-mode";
   if ( ![-1, 0, 1].includes(command.mode) || (typeof command.explicit !== "boolean") ) return "mode";
   const { extras } = command;
   if ( !Array.isArray(extras) || (extras.length > 10) || !extras.every(isExtra) ) return "extras";
   if ( !Array.isArray(dice) || !dice.length || (dice.length > 11) || !dice.every(isRolled) ) return "dice";
   return null;
+}
+
+/**
+ * Is this the id of a document, as the app sends it?
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isId(value) {
+  return (typeof value === "string") && (value.length > 0) && (value.length <= 64);
+}
+
+/**
+ * Is this a key dnd5e names something by, such as a spell slot's or a damage type's?
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isKey(value) {
+  return (typeof value === "string") && /^[A-Za-z][\w-]{0,31}$/.test(value);
+}
+
+/**
+ * Is this left out, or else valid?
+ * @param {unknown} value
+ * @param {(value: unknown) => boolean} valid
+ * @returns {boolean}
+ */
+function isOptional(value, valid) {
+  return (value === undefined) || (value === null) || valid(value);
+}
+
+/**
+ * Is this a combatant a player picked, in a combat?
+ * @param {unknown} target
+ * @returns {boolean}
+ */
+function isTarget(target) {
+  return isId(target?.combatId) && isId(target?.combatantId);
 }
 
 /**

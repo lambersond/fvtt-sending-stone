@@ -25,8 +25,8 @@
         "Hint": "Also send what only a Gamemaster can see: whispers no player can read, blind rolls, hidden combatants, the hit points of combatants outside a campaign and the armor class of attack targets. Leave this off if players can see what the destination receives."
       },
       "MidiIntegration": {
-        "Name": "Make Players' Attacks Through Midi-QOL",
-        "Hint": "Players' attacks from Sending Stone go through Midi-QOL's workflow, as if they had attacked in Foundry: Midi checks the hit and applies the damage, as you have it set up. Off: while Midi-QOL handles items' uses, players' attacks stay in the app."
+        "Name": "Make Players' Attacks and Spells Through Midi-QOL",
+        "Hint": "Players' attacks, spells and features from Sending Stone go through Midi-QOL's workflow, as if they had used them in Foundry: Midi checks the hit, rolls the targets' saving throws, and applies the damage, healing and effects, as you have it set up. Off: while Midi-QOL handles items' uses, players' attacks, spells and features stay in the app."
       }
     },
     "Campaigns": {
@@ -56,12 +56,12 @@
         "system": "they need the D&D Fifth Edition system.",
         "self-test": "this version of Foundry, or a module, rolls dice differently than Sending Stone expects. The browser's console says what went wrong."
       },
-      "Attacks": "Let Players Attack from Sending Stone",
-      "AttacksHint": "Weapon and spell attacks its players make in the Sending Stone app are made here too, at the target they pick. The item is used as in Foundry, spending ammunition, uses and spell slots, and the damage is rolled on the same use, all with the dice they rolled. With Midi-QOL, Midi checks the hit and applies the damage. Needs Let Players Roll from Sending Stone.",
-      "AttacksUnavailable": "Players' attacks from Sending Stone can't be made in this game: {reason}",
+      "Attacks": "Let Players Attack and Cast from Sending Stone",
+      "AttacksHint": "Attacks its players make in the Sending Stone app, and the spells and features they use there, such as Fireball, Cure Wounds or Second Wind, are made here too, at the targets they pick, with the spell slot, ammunition and attack mode they choose. The item is used as in Foundry, spending ammunition, uses and spell slots, and its damage or healing is rolled on the same use, all with the dice they rolled. Without Midi-QOL, you roll the targets' saving throws and apply the damage from the cards, as in Foundry; with it, Midi does. Needs Let Players Roll from Sending Stone.",
+      "AttacksUnavailable": "Players' attacks and spells from Sending Stone can't be made in this game: {reason}",
       "AttacksReason": {
         "self-test": "this version of Foundry, or a module, rolls damage differently than Sending Stone expects. The browser's console says what went wrong.",
-        "midi-off": "Midi-QOL handles items' uses here, and Make Players' Attacks Through Midi-QOL is off in the module's settings."
+        "midi-off": "Midi-QOL handles items' uses here, and Make Players' Attacks and Spells Through Midi-QOL is off in the module's settings."
       }
     },
     "Error": {

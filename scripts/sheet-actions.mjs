@@ -23,6 +23,9 @@ const SECTIONS = ["action", "bonus", "reaction", "legendary", "mythic", "lair", 
 /** Activations that take too long to be used in a fight. */
 const SLOW = ["minute", "hour", "day", "none"];
 
+/** The kinds of activity a player can use from the app other than an attack. */
+const USES = new Set(["save", "damage", "heal", "utility"]);
+
 /* -------------------------------------------- */
 
 /**
@@ -161,6 +164,10 @@ function describeAction(item, texts) {
     toHit: identified ? toHitOf(attack) : null,
     // The attack the bonus is for, so the app can have it made here.
     attackId: identified ? (attack?.id ?? null) : null,
+    // What else it's used through, such as a save or healing, so the app can have it used here.
+    activity: identified ? useOf(item, activities, attack ? undefined : damaging) : null,
+    attackModes: (identified && attack) ? attackModesOf(item) : null,
+    ammunition: (identified && attack) ? ammunitionOf(item) : null,
     save: identified ? saveOf(save) : null,
     damage: identified ? damageOf(damaging) : [],
     uses: identified ? (usesOf(item) ?? limitedUses(first?.uses, first?.labels)) : null,
@@ -191,10 +198,102 @@ export function describeActivity(item, activity) {
     target: activity.labels?.target || null,
     toHit: identified ? toHitOf(activity) : null,
     attackId: (identified && (activity.type === "attack")) ? activity.id : null,
+    activity: (identified && USES.has(activity.type)) ? describeUse(item, activity) : null,
+    attackModes: (identified && (activity.type === "attack")) ? attackModesOf(item) : null,
+    ammunition: (identified && (activity.type === "attack")) ? ammunitionOf(item) : null,
     save: identified ? saveOf(activity) : null,
     damage: identified ? damageOf(activity) : [],
     uses: identified ? limitedUses(activity.uses, activity.labels) : null
   };
+}
+
+/**
+ * The activity an action is used through in the game other than by attacking: the one its damage
+ * or healing comes from, or else its first save, damage, healing or utility activity.
+ * @param {Item} item
+ * @param {Activity[]} activities   Those its player sees.
+ * @param {Activity} [damaging]       The one its damage comes from, when it isn't an attack.
+ * @returns {object|null}
+ */
+function useOf(item, activities, damaging) {
+  const activity = USES.has(damaging?.type) ? damaging : activities.find(each => USES.has(each.type));
+  return activity ? describeUse(item, activity) : null;
+}
+
+/**
+ * An activity a player can use from the app, by its id, with whom it's used at: its user alone, an
+ * area, or a number of targets, and of what kind, such as allies or enemies.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {{id: string, type: string, targets: {self: boolean, area: boolean, count: number|null,
+ *   perLevel: number|null, affects: string|null}}}
+ */
+function describeUse(item, activity) {
+  const target = activity.target ?? {};
+  const affects = target.affects?.type || null;
+  const area = Boolean(target.template?.type);
+  const count = finite(target.affects?.count);
+  return {
+    id: activity.id,
+    type: activity.type,
+    targets: {
+      self: (affects === "self") || (!area && !affects && (activity.range?.units === "self")),
+      area,
+      count: (count > 0) ? count : null,
+      perLevel: (count > 0) ? countPerLevel(item, activity, count) : null,
+      affects
+    }
+  };
+}
+
+/**
+ * How many more targets a spell takes for each level it's cast above its own, as Bless or Hold
+ * Person do: its number of targets is a formula of the spell's scaling. Null for none.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @param {number} count   How many it takes at its own level.
+ * @returns {number|null}
+ */
+function countPerLevel(item, activity, count) {
+  if ( (item.type !== "spell") || !((finite(item.system?.level) ?? 0) > 0) ) return null;
+  // The formula as typed: the activity's own, or the spell's, which it takes unless it overrides it.
+  const typed = activity.target?.override
+    ? activity._source?.target?.affects?.count
+    : (item.system._source?.target?.affects?.count ?? activity._source?.target?.affects?.count);
+  if ( (typeof typed !== "string") || !/[^\d\s.]/.test(typed) ) return null;
+  try {
+    const scaling = (finite(item.flags?.dnd5e?.scaling) ?? 0) + 1;
+    const scaled = item.clone({ "flags.dnd5e.scaling": scaling }, { keepId: true });
+    const more = (finite(scaled.system.activities?.get(activity.id)?.target?.affects?.count) ?? count) - count;
+    return (more > 0) ? more : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The ways a weapon attacks, when there's more than one, such as one- or two-handed, or thrown.
+ * @param {Item} item
+ * @returns {{value: string, label: string}[]|null}
+ */
+function attackModesOf(item) {
+  const modes = Array.from(item.system?.attackModes ?? []).filter(mode => mode.value);
+  if ( modes.length < 2 ) return null;
+  return modes.map(({ value, label }) => ({ value, label: localize(label) || value }));
+}
+
+/**
+ * The ammunition a weapon fires, with how much of each is left.
+ * @param {Item} item
+ * @returns {{id: string, name: string, quantity: number}[]|null}
+ */
+function ammunitionOf(item) {
+  if ( !item.system?.properties?.has?.("amm") ) return null;
+  return Array.from(item.system.ammunitionOptions ?? []).map(option => ({
+    id: option.value,
+    name: option.item?.name ?? option.label,
+    quantity: finite(option.item?.system?.quantity) ?? 0
+  }));
 }
 
 /**

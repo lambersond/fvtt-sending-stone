@@ -17,9 +17,9 @@ import { MODULE_ID, SETTINGS } from "./constants.mjs";
  * @property {Set<string>} characters The actor ids of its characters.
  * @property {boolean} rolls          Do its players' rolls in the app get made here, with their
  *                                    dice? Off until the Gamemaster turns it on.
- * @property {boolean} attacks        Do its players' attacks in the app get made here too, using
- *                                    the item as in Foundry? Off until the Gamemaster turns it on,
- *                                    and only with `rolls`.
+ * @property {boolean} attacks        Do its players' attacks, spells and features in the app get
+ *                                    made here too, using the item as in Foundry? Off until the
+ *                                    Gamemaster turns it on, and only with `rolls`.
  */
 
 /**

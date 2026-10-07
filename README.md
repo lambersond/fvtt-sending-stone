@@ -9,9 +9,9 @@ and the item, activity and targets involved. Chat and combat events work under a
 
 It also works the other way, for a campaign whose Gamemaster lets it: checks, saving throws,
 initiative and death saving throws a player rolls in the app are made in Foundry with the dice they
-rolled, as if they had rolled them there, and so can their weapon and spell attacks and their
-damage, through Midi-QOL's workflow where it's in use. See [Players' rolls](#players-rolls) and
-[Players' attacks](#players-attacks).
+rolled, as if they had rolled them there, and so can their attacks, spells and features and their
+damage or healing, through Midi-QOL's workflow where it's in use. See
+[Players' rolls](#players-rolls) and [Players' attacks and spells](#players-attacks-and-spells).
 
 ## How it works
 
@@ -55,12 +55,12 @@ then only when one is new, since they are most of a sheet's size.
 
 | Setting | Effect |
 | --- | --- |
-| Manage Campaigns | The Sending Stone app's address, and each campaign: its title, its secret (sent as `Authorization: Bearer …` with its events), its player characters, and whether its players' rolls, and attacks, in the app are made here. Each event goes to the campaigns it involves. |
+| Manage Campaigns | The Sending Stone app's address, and each campaign: its title, its secret (sent as `Authorization: Bearer …` with its events), its player characters, and whether its players' rolls, and attacks and spells, in the app are made here. Each event goes to the campaigns it involves. |
 | Send Chat Events | Chat messages created, edited and deleted, and the log being cleared. |
 | Chat Messages to Send | Every message a campaign's players can read, or only those its characters spoke. |
 | Send Combat Events | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
 | Send Gamemaster-Only Information | Also send what only a Gamemaster can see. Off by default. |
-| Make Players' Attacks Through Midi-QOL | Shown while Midi-QOL is active. On by default: players' attacks from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
+| Make Players' Attacks and Spells Through Midi-QOL | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
 
 **Each campaign's secret is stored only in the browser you enter it in.** World settings are sent
 to every connected user, so a secret stored there could be read by players. Enter the secrets in
@@ -110,30 +110,39 @@ The app's address must be able to answer the module's fetches of players' rolls,
 Sending Stone app, or a listener that says it can, is asked for; see
 [PROTOCOL.md](PROTOCOL.md#rolls-from-the-app).
 
-### Players' attacks
+### Players' attacks and spells
 
-Tick **Let Players Attack from Sending Stone** too, and the campaign's players can attack from the
-app: they pick their target from the combat and tap the attack, then roll its damage once the game
-has made the attack. The item is used as in Foundry, spending its ammunition, uses or spell slot;
-the attack is made with the d20s they rolled, at their target; and its damage is rolled on the same
-use with their dice, critical hit's dice included. The app shows whether the attack hit only where
-the game shows players.
+Tick **Let Players Attack and Cast from Sending Stone** too, and the campaign's players can attack,
+cast their spells and use their features from the app: Fireball, Sacred Flame, Magic Missile, Cure
+Wounds, Second Wind, Bless, Shield or Action Surge. They pick their targets from the combat, and
+the spell slot, ammunition or attack mode, and tap it; then the app rolls its damage or healing,
+with their dice, once the game has made the use, asking first for the kind of damage where it
+offers a choice, as Chromatic Orb does. The item is used as in Foundry, spending its ammunition,
+uses or spell slot; an attack is made with the d20s they rolled, at their target; and the damage
+or healing is rolled on the same use, critical hit's dice included. The app shows whether an
+attack hit only where the game shows players.
 
 - **Without Midi-QOL**, dnd5e's own cards are posted, as the character's player: the use's card,
-  naming the target, the attack and the damage, linked to it. You apply the damage from the card,
-  as usual.
-- **With Midi-QOL**, the attack goes through Midi's workflow, as if the player had attacked in
-  Foundry: Midi checks the hit and applies the damage as you have it set up. The card is yours,
-  spoken as the character, since Midi asks a card's author to confirm and apply. While the attack
-  is rolled, your targets are the player's target, then they're put back. With **Make Players'
-  Attacks Through Midi-QOL** off, attacks stay in the app.
-- **Nothing asks you, where it can be helped.** Area attacks, a choice of damage types, Midi's
-  Active Defence, a used reaction or bonus action Midi enforces, and an activity set to always
-  show Midi's dialogs are refused in the app with a reason. Midi may still ask you what it would
-  in Foundry, such as a target's reaction, an optional bonus or confirming ammunition; the player
-  is told it took too long, then that it was made once you answer.
-- **Spells** are cast with their own level's slot, or the first one left at a higher level, as
-  dnd5e's dialog picks it. Choosing the level, area and save spells, and healing come later.
+  naming the targets, the attack and the damage, linked to it. You roll the targets' saving throws
+  and apply the damage, healing and effects from the cards, as usual. Self-only features, such as
+  Second Wind, name their user.
+- **With Midi-QOL**, the use goes through Midi's workflow, as if the player had used it in
+  Foundry: Midi checks the hit, rolls the targets' saving throws and applies the damage, healing
+  and effects as you have it set up. The card is yours, spoken as the character, since Midi asks
+  a card's author to confirm and apply. While it's made, your targets are the player's targets,
+  then they're put back. With **Make Players' Attacks and Spells Through Midi-QOL** off, attacks
+  and spells stay in the app.
+- **Areas are picked, not placed.** No template is placed for an area spell: its targets are the
+  combatants the player ticked in the app.
+- **Spell slots.** A spell is cast with the slot the player chose, from those dnd5e's usage dialog
+  offers, or else with its own level's, or the first one left at a higher level, as the dialog
+  picks it. Upcast spells scale their damage and number of targets as in Foundry.
+- **Nothing asks you, where it can be helped.** Area attacks, summoning, transforming and other
+  activities dnd5e asks about, Midi's Active Defence, a used reaction or bonus action Midi
+  enforces, and an activity set to always show Midi's dialogs or to ask which effects to apply are
+  refused in the app with a reason. Midi may still ask you what it would in Foundry, such as a
+  target's reaction, an optional bonus or confirming ammunition or damage; the player is told it
+  took too long, then that it was made once you answer.
 - **Dice So Nice** doesn't animate a Midi attack while your tab is hidden, which would hold Midi's
   workflow until you came back.
 
@@ -196,8 +205,8 @@ Gamemaster-only information switched on.
   up to 500 events are held; past that the oldest are dropped.
 - **Duplicates are possible.** If the listener received a post but its answer was lost, the post
   is retried with the same envelope `id`. Listeners should ignore an `id` they have already seen.
-- **Players' attacks with Midi-QOL set your targets** while each is rolled, one at a time, then
-  put them back.
+- **Players' attacks and spells with Midi-QOL set your targets** while each is made, one at a
+  time, then put them back.
 - **Only dice are wrapped, and only for players' rolls.** On a Gamemaster's browser under D&D Fifth
   Edition, Foundry's `Roll#evaluate` and `DiceTerm#_roll` are wrapped, through libWrapper when it's
   active, so that a roll made for a player from the app takes their dice. Every other roll is left alone. No core
@@ -263,10 +272,10 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
-| `scripts/commands.mjs` | Fetching players' rolls and attacks from the app, one campaign at a time, and reporting what became of each |
+| `scripts/commands.mjs` | Fetching players' rolls, attacks and spells from the app, one campaign at a time, and reporting what became of each |
 | `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card |
-| `scripts/command-attacks.mjs` | Making a player's attack and its damage, through dnd5e's cards or Midi-QOL's workflow |
+| `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, and the self-test that it works |
-| `scripts/apps/campaign-config.mjs` | Manage Campaigns: the app's address, and each campaign's title, secret, characters, players' rolls and attacks, and connection test |
+| `scripts/apps/campaign-config.mjs` | Manage Campaigns: the app's address, and each campaign's title, secret, characters, players' rolls, attacks and spells, and connection test |
 | `tools/echo-listener.mjs` | Stand-in listener for development |
 | `PROTOCOL.md` | Event envelope and payload reference |

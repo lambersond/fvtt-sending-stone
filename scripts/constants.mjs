@@ -138,12 +138,13 @@ export const EVENTS = Object.freeze({
 export const ROLL_KINDS = Object.freeze(["skill", "tool", "ability", "save", "death", "initiative"]);
 
 /**
- * The rolls of an attack a player can have made here from the app, with the dice they rolled
- * there: the attack, made by using the item as in Foundry, then its damage, on the same use.
- * Offered only for a campaign whose Gamemaster lets its players attack from the app.
+ * What a player can have made here from the app by using an item, as in Foundry: an attack, with the
+ * dice they rolled there; the use of a spell or feature, such as one that calls for a saving throw
+ * or heals; then the damage or healing of either, on the same use, with their dice. Offered only
+ * for a campaign whose Gamemaster lets its players attack and cast from the app.
  * @type {readonly string[]}
  */
-export const ATTACK_KINDS = Object.freeze(["attack", "damage"]);
+export const ATTACK_KINDS = Object.freeze(["attack", "use", "damage"]);
 
 /**
  * The roll option naming the player's roll a roll is made for, so that its dice can be the ones
