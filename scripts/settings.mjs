@@ -59,7 +59,8 @@ export function registerSettings() {
       id: new StringField({ blank: false }),
       title: new StringField({ blank: false }),
       characters: new ArrayField(new StringField({ blank: false })),
-      rolls: new BooleanField({ initial: false })
+      rolls: new BooleanField({ initial: false }),
+      attacks: new BooleanField({ initial: false })
     })),
     default: [],
     onChange: () => reannounce()
@@ -114,6 +115,18 @@ export function registerSettings() {
     config: true,
     type: Boolean,
     default: false,
+    onChange: () => reannounce()
+  });
+
+  // Only worth showing where Midi-QOL is: without it, attacks always take dnd5e's own way. Whether
+  // attacks can be made here changes what each campaign is told.
+  game.settings.register(MODULE_ID, SETTINGS.MIDI_INTEGRATION, {
+    name: "SENDINGSTONE.Settings.MidiIntegration.Name",
+    hint: "SENDINGSTONE.Settings.MidiIntegration.Hint",
+    scope: "world",
+    config: game.modules.get("midi-qol")?.active === true,
+    type: Boolean,
+    default: true,
     onChange: () => reannounce()
   });
 }

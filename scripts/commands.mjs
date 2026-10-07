@@ -1,13 +1,15 @@
-import { EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_KINDS } from "./constants.mjs";
+import { ATTACK_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_KINDS } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
-import { runRollCommand } from "./command-rolls.mjs";
+import { attacksUnavailable, runAttackCommand, runDamageCommand } from "./command-attacks.mjs";
+import { failedResult, runRollCommand } from "./command-rolls.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { currentSession, send } from "./transport.mjs";
 
 /**
- * Fetching what players ask the game to do from the Sending Stone app: for now, their rolls.
+ * Fetching what players ask the game to do from the Sending Stone app: their rolls, and their
+ * attacks.
  *
  * The app can't reach the Gamemaster's browser, so the bridge fetches from it instead, for each
  * campaign that lets its players roll from the app. While a player has their table open, the app
@@ -83,14 +85,16 @@ const queues = new Map();
 
 /**
  * What a campaign tells the app of its players' rolls in its hello: whether they're made here,
- * which, and if not, why not.
+ * which, and if not, why not. Attacks and their damage are among them when the Gamemaster lets
+ * the campaign's players attack from the app too, and they can be made here.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null}}
  */
 export function rollFeatures(campaign) {
   if ( !campaign.rolls ) return { enabled: false, kinds: [], reason: "off" };
   if ( !diceStatus.ready ) return { enabled: false, kinds: [], reason: diceStatus.reason };
-  return { enabled: true, kinds: [...ROLL_KINDS], reason: null };
+  const attacks = campaign.attacks && !attacksUnavailable();
+  return { enabled: true, kinds: [...ROLL_KINDS, ...(attacks ? ATTACK_KINDS : [])], reason: null };
 }
 
 /**
@@ -295,27 +299,49 @@ function take(command, campaign) {
 
 /**
  * Make a command, and tell the app what became of it. One that takes too long is reported as such,
- * and the character's next roll goes ahead.
+ * and the character's next roll goes ahead; if it's made after all, as once the Gamemaster has
+ * answered what a module asked them, the app is told so too.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {Promise<void>}
  */
 async function make(command, campaign) {
-  const failed = (reason, error=null) => ({
-    id: command.id, status: "failed", reason, error, messageId: null, visible: false, rolls: []
-  });
   let timer;
+  const watchdog = new AbortController();
   const timeout = new Promise(resolve => {
-    timer = setTimeout(() => resolve(failed("timeout")), WATCHDOG);
+    timer = setTimeout(() => {
+      watchdog.abort();
+      resolve(failedResult(command, "timeout"));
+    }, WATCHDOG);
   });
-  const running = runRollCommand(command, campaign).catch(err => {
+  const running = runCommand(command, campaign, watchdog.signal).catch(err => {
     console.error(`${MODULE_ID} | Could not make a roll from Sending Stone`, err);
-    return failed("error", err instanceof Error ? err.message : String(err));
+    return failedResult(command, "error", err instanceof Error ? err.message : String(err));
   });
   try {
     const result = await Promise.race([running, timeout]);
     send(EVENTS.COMMAND_RESULT, result, campaign, { sequenced: false });
+    if ( watchdog.signal.aborted ) {
+      void running.then(late => {
+        if ( late.status === "done" ) send(EVENTS.COMMAND_RESULT, late, campaign, { sequenced: false });
+      });
+    }
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Make a command of whichever kind it is.
+ * @param {object} command
+ * @param {Campaign} campaign
+ * @param {AbortSignal} signal   Aborted once the app has been told the command took too long.
+ * @returns {Promise<CommandResult>}
+ */
+function runCommand(command, campaign, signal) {
+  switch ( command.kind ) {
+    case "attack": return runAttackCommand(command, campaign, { signal });
+    case "damage": return runDamageCommand(command, campaign);
+    default: return runRollCommand(command, campaign);
   }
 }

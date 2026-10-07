@@ -56,6 +56,18 @@
                 {{/if}}
             </div>
 
+            <div class="form-group sending-stone-attacks">
+                <label for="sending-stone-attacks-{{campaign.id}}">{{localize "SENDINGSTONE.Campaigns.Attacks"}}</label>
+                <div class="form-fields">
+                    <input type="checkbox" id="sending-stone-attacks-{{campaign.id}}"
+                           name="campaigns.{{campaign.index}}.attacks" {{#if campaign.attacks}}checked{{/if}}>
+                </div>
+                <p class="hint">{{localize "SENDINGSTONE.Campaigns.AttacksHint"}}</p>
+                {{#if @root.attacksUnavailable}}
+                <p class="hint sending-stone-warning">{{@root.attacksUnavailable}}</p>
+                {{/if}}
+            </div>
+
             {{#if @root.hasCharacters}}
             <table class="sending-stone-characters">
                 <thead>
