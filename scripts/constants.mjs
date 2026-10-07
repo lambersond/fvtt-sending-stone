@@ -58,10 +58,15 @@ export const SETTINGS = Object.freeze({
   /** World-scope switch for sending information only a Gamemaster can see. */
   GM_CONTENT: "gmContent",
 
+  /** World-scope switch for making players' attacks from the app through Midi-QOL's workflow.
+   *  Shown only while Midi-QOL is active. */
+  MIDI_INTEGRATION: "midiIntegration",
+
   /** Setting menu key for the campaigns dialog. */
   CAMPAIGNS_MENU: "campaignsMenu",
 
-  /** World-scope list of campaigns: {id, title, characters}, characters being actor ids. */
+  /** World-scope list of campaigns: {id, title, characters, rolls, attacks}, characters being
+   *  actor ids. */
   CAMPAIGNS: "campaigns",
 
   /** World-scope set of the actor ids of connected characters, from before campaigns. Read once,
@@ -133,11 +138,25 @@ export const EVENTS = Object.freeze({
 export const ROLL_KINDS = Object.freeze(["skill", "tool", "ability", "save", "death", "initiative"]);
 
 /**
+ * The rolls of an attack a player can have made here from the app, with the dice they rolled
+ * there: the attack, made by using the item as in Foundry, then its damage, on the same use.
+ * Offered only for a campaign whose Gamemaster lets its players attack from the app.
+ * @type {readonly string[]}
+ */
+export const ATTACK_KINDS = Object.freeze(["attack", "damage"]);
+
+/**
  * The roll option naming the player's roll a roll is made for, so that its dice can be the ones
  * the player rolled.
  * @type {string}
  */
 export const ROLL_TAG = "sendingStone";
+
+/**
+ * The dice a player can roll in the app.
+ * @type {ReadonlySet<number>}
+ */
+export const DIE_FACES = Object.freeze(new Set([4, 6, 8, 10, 12, 20, 100]));
 
 /**
  * The name of the hook this module calls whenever delivery status changes. Called with the status

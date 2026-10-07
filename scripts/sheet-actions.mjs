@@ -159,6 +159,8 @@ function describeAction(item, texts) {
     range: rangeOf(item, attack ?? first),
     target: first?.labels?.target || item.labels?.target || null,
     toHit: identified ? toHitOf(attack) : null,
+    // The attack the bonus is for, so the app can have it made here.
+    attackId: identified ? (attack?.id ?? null) : null,
     save: identified ? saveOf(save) : null,
     damage: identified ? damageOf(damaging) : [],
     uses: identified ? (usesOf(item) ?? limitedUses(first?.uses, first?.labels)) : null,
@@ -188,6 +190,7 @@ export function describeActivity(item, activity) {
     range: rangeOf(item, activity),
     target: activity.labels?.target || null,
     toHit: identified ? toHitOf(activity) : null,
+    attackId: (identified && (activity.type === "attack")) ? activity.id : null,
     save: identified ? saveOf(activity) : null,
     damage: identified ? damageOf(activity) : [],
     uses: identified ? limitedUses(activity.uses, activity.labels) : null

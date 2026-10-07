@@ -1,4 +1,4 @@
-import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
+import { DIE_FACES, MODULE_ID, ROLL_TAG } from "./constants.mjs";
 
 /**
  * Making a player's roll here with the dice they rolled in the Sending Stone app.
@@ -85,10 +85,12 @@ let served = 0;
 
 /**
  * Whether players' rolls can be made here: only under D&D Fifth Edition, and once the self-test
- * has shown that this Foundry and its modules roll dice as expected.
- * @type {{ready: boolean, reason: string|null, error: string|null}}
+ * has shown that this Foundry and its modules roll dice as expected. Their attacks also need their
+ * damage rolled as expected, which the self-test checks apart.
+ * @type {{ready: boolean, reason: string|null, error: string|null, attacks: boolean,
+ *   attacksError: string|null}}
  */
-export const diceStatus = { ready: false, reason: "pending", error: null };
+export const diceStatus = { ready: false, reason: "pending", error: null, attacks: false, attacksError: null };
 
 /* -------------------------------------------- */
 
@@ -163,16 +165,23 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
 }
 
 /**
- * Before dnd5e builds a tagged roll: roll it as the player chose, if they chose, as dnd5e's roll
- * dialog would; and add what they added, as the dialog's situational bonus. It goes first, after
- * the d20, so that the player's dice for it aren't taken by a bonus of the same dice, such as
- * Bless's d4, which Foundry rolls.
+ * Before dnd5e builds a roll for a player's roll: tag it, if only its process is, and roll it as
+ * the player chose, if they chose, as dnd5e's roll dialog would; and add what they added, as the
+ * dialog's situational bonus. That goes first, after the d20, so that the player's dice for it
+ * aren't taken by a bonus of the same dice, such as Bless's d4, which Foundry rolls. Damage is
+ * rolled as it is: nothing is added to it, which would take a critical hit's extra dice and be
+ * added once for each of its parts.
  * @param {object} process   The roll process's configuration.
  * @param {object} config    The roll's configuration.
+ * @param {number} index     The roll's place among the process's rolls.
  */
-function onBuildRollConfig(process, config) {
-  const plan = planFor(config?.options?.[ROLL_TAG]);
-  if ( !plan ) return;
+function onBuildRollConfig(process, config, index) {
+  const tag = tagOf(process, config, index);
+  const plan = planFor(tag);
+  if ( !plan || !config ) return;
+  config.options ??= {};
+  config.options[ROLL_TAG] = tag;
+  if ( process?.hookNames?.includes("damage") ) return;
   const { mode, explicit, extras } = plan.command;
   if ( explicit ) config.options.advantageMode = mode;
   const situational = extrasFormula(extras);
@@ -184,6 +193,26 @@ function onBuildRollConfig(process, config) {
 }
 
 /**
+ * The player's roll a roll being built is for, if any: as tagged on the roll itself, as checks and
+ * dnd5e's attacks are; or on its process, as damage is, whose rolls dnd5e makes up itself; or on
+ * the Midi-QOL workflow it's rolled in, for the attack Midi rolls once the item is used.
+ * @param {object} process   The roll process's configuration.
+ * @param {object} config    The roll's configuration.
+ * @param {number} index     The roll's place among the process's rolls.
+ * @returns {string|undefined}
+ */
+function tagOf(process, config, index) {
+  const own = config?.options?.[ROLL_TAG];
+  if ( typeof own === "string" ) return own;
+  if ( typeof process?.[ROLL_TAG] === "string" ) return process[ROLL_TAG];
+  if ( (index === 0) && process?.hookNames?.includes("attack") ) {
+    const midi = process.workflow?.workflowOptions?.[ROLL_TAG] ?? process.midiOptions?.workflowOptions?.[ROLL_TAG];
+    if ( typeof midi === "string" ) return midi;
+  }
+  return undefined;
+}
+
+/**
  * Once dnd5e has built a tagged roll, keep how the player chose to roll it, whatever changed it
  * since, as a module granting advantage might.
  * @param {Roll[]} rolls
@@ -191,7 +220,7 @@ function onBuildRollConfig(process, config) {
 function onRollConfiguration(rolls) {
   for ( const roll of rolls ?? [] ) {
     const plan = planFor(roll.options?.[ROLL_TAG]);
-    if ( !plan?.command.explicit ) continue;
+    if ( !plan?.command.explicit || (plan.command.kind === "damage") ) continue;
     const { mode } = plan.command;
     if ( roll.options.advantageMode === mode ) continue;
     roll.options.advantageMode = mode;
@@ -211,6 +240,50 @@ export function extrasFormula(extras=[]) {
     if ( index === 0 ) return (term.sign < 0) ? `-${text}` : text;
     return `${(term.sign < 0) ? "-" : "+"} ${text}`;
   }).join(" ");
+}
+
+/**
+ * The dice a roll will throw, before it's rolled, for a player to roll them in the app: each die
+ * term's faces and number, in order. A roll can't be planned when one of its dice can't be known
+ * beforehand: dice inside parentheses or a function, a number of dice still to be worked out, or a
+ * die a player can't roll, such as a d3. Foundry then rolls all of them.
+ * @param {Roll} roll   Built, not yet evaluated.
+ * @returns {{plannable: boolean, dice: {faces: number, number: number}[]}}
+ */
+export function plannedDice(roll) {
+  const { DiceTerm } = foundry.dice.terms;
+  const dice = [];
+  for ( const term of roll.terms ) {
+    if ( term instanceof DiceTerm ) {
+      const { faces, number } = term;
+      if ( !Number.isInteger(number) || (number < 0) || (number > 40) || !DIE_FACES.has(faces) ) {
+        return { plannable: false, dice: [] };
+      }
+      if ( number > 0 ) dice.push({ faces, number });
+    }
+    else if ( /d\d/i.test(term.formula ?? term.expression ?? "") ) return { plannable: false, dice: [] };
+  }
+  return { plannable: true, dice };
+}
+
+/**
+ * The rolls dnd5e makes of a damage roll's configuration, as it makes them without its dialog,
+ * built but not rolled: with the world's rules for critical hits, which dnd5e's damage rolls
+ * apply, and those of modules that change them, such as Midi-QOL's.
+ * @param {object} process   A damage roll's configuration, as an activity's `getDamageConfig`
+ *                           gives it, with whether it's a critical hit's.
+ * @returns {Roll[]}
+ */
+export function damageRollsFor(process) {
+  const { DamageRoll } = CONFIG.Dice;
+  const config = { ...process, critical: { ...(process.critical ?? {}) } };
+  config.critical.multiplyNumeric ??= game.settings.get("dnd5e", "criticalDamageModifiers");
+  config.critical.powerfulCritical ??= game.settings.get("dnd5e", "criticalDamageMaxDice");
+  return (config.rolls ?? []).map(rollConfig => {
+    const options = { ...(rollConfig.options ?? {}) };
+    options.isCritical ??= config.isCritical;
+    return DamageRoll.fromConfig({ ...rollConfig, options }, config);
+  });
 }
 
 /* -------------------------------------------- */
@@ -304,9 +377,61 @@ export async function selfTest() {
     Object.assign(diceStatus, { ready: true, reason: null, error: null });
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    Object.assign(diceStatus, { ready: false, reason: "self-test", error });
+    Object.assign(diceStatus, { ready: false, reason: "self-test", error, attacks: false });
     console.warn(`${MODULE_ID} | Players' rolls from Sending Stone can't be made in this game: ${error}`, err);
+    return;
   }
+
+  try {
+    await attackSelfTest();
+    Object.assign(diceStatus, { attacks: true, attacksError: null });
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    Object.assign(diceStatus, { attacks: false, attacksError: error });
+    console.warn(`${MODULE_ID} | Players' attacks from Sending Stone can't be made in this game: ${error}`, err);
+  }
+}
+
+/**
+ * Check that a player's dice reach an attack's damage: each part of it, which dnd5e rolls apart,
+ * takes its own dice, in order; and a critical hit's damage takes every die planned for it,
+ * however this world and its modules roll critical damage. What a module then does to a die, as
+ * Midi-QOL's critical rules can maximize it, is its own.
+ * @returns {Promise<void>}
+ */
+async function attackSelfTest() {
+  if ( !CONFIG.Dice?.DamageRoll ) throw new Error("dnd5e has no damage rolls");
+  const id = `self-test-${foundry.utils.randomID()}`;
+  const [slashing, fire] = damageRollsFor({
+    rolls: [
+      { parts: ["1d8", "2"], data: {}, options: { type: "slashing", [ROLL_TAG]: id } },
+      { parts: ["2d6"], data: {}, options: { type: "fire", [ROLL_TAG]: id } }
+    ],
+    isCritical: false
+  });
+  const dice = [{ faces: 8, results: [5] }, { faces: 6, results: [2, 4] }];
+  await withPlan({ id, kind: "damage", dice }, async plan => {
+    await slashing.evaluate();
+    check((plan.remaining(8) === 0) && (plan.remaining(6) === 2), "the first part didn't take its own dice");
+    await fire.evaluate();
+    check(plan.remaining(6) === 0, "the second part didn't take its own dice");
+  });
+
+  const critId = `self-test-${foundry.utils.randomID()}`;
+  const [critical] = damageRollsFor({
+    rolls: [{ parts: ["1d8", "1d6", "2"], data: {}, options: { type: "slashing", [ROLL_TAG]: critId } }],
+    isCritical: true
+  });
+  const planned = plannedDice(critical);
+  check(planned.plannable, `a critical hit's damage, ${critical.formula}, can't be planned`);
+  const critDice = planned.dice.map(({ faces, number }) => ({
+    faces, results: Array.from({ length: number }, (_, i) => (i % faces) + 1)
+  }));
+  await withPlan({ id: critId, kind: "damage", dice: critDice }, async plan => {
+    await critical.evaluate();
+    const left = critDice.filter(({ faces }) => plan.remaining(faces) > 0);
+    check(!left.length, `a critical hit's damage, ${critical.formula}, left the player's dice unused`);
+  });
 }
 
 /**

@@ -1,4 +1,4 @@
-import { MODULE_ID, ROLL_KINDS, ROLL_TAG } from "./constants.mjs";
+import { ATTACK_KINDS, DIE_FACES, MODULE_ID, ROLL_KINDS, ROLL_TAG } from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { diceStatus, withPlan } from "./dice-plan.mjs";
@@ -13,19 +13,13 @@ import { diceStatus, withPlan } from "./dice-plan.mjs";
  * make it blind, as Midi-QOL can; the player is then told only that it was made.
  * @type {string}
  */
-const PUBLIC = "public";
+export const PUBLIC = "public";
 
 /**
  * The rolls of something on the sheet: a skill, tool or ability, by its key.
  * @type {Set<string>}
  */
 const KEYED = new Set(["skill", "tool", "ability", "save"]);
-
-/**
- * The dice a player can roll.
- * @type {Set<number>}
- */
-const DIE_FACES = new Set([4, 6, 8, 10, 12, 20, 100]);
 
 /**
  * What became of a player's roll, as the app is told.
@@ -37,7 +31,22 @@ const DIE_FACES = new Set([4, 6, 8, 10, 12, 20, 100]);
  * @property {string|null} messageId    The chat message the roll made.
  * @property {boolean} visible          May its player see the roll? Not one made blind.
  * @property {object[]} rolls           The roll as made, when its player may see it.
+ * @property {object|null} [attack]     For an attack: whether it was a critical hit or a fumble, and
+ *                                      whether it hit its target, when its player may know.
+ * @property {object|null} [damage]     For an attack: the dice its damage will throw, for its player
+ *                                      to roll; null when no damage follows.
  */
+
+/**
+ * What the app is told of a command that wasn't made.
+ * @param {object} command
+ * @param {string} reason         Why not, such as "not-dying".
+ * @param {string|null} [error]   What went wrong, for an error.
+ * @returns {CommandResult}
+ */
+export function failedResult(command, reason, error=null) {
+  return { id: command.id, status: "failed", reason, error, messageId: null, visible: false, rolls: [] };
+}
 
 /* -------------------------------------------- */
 
@@ -49,9 +58,7 @@ const DIE_FACES = new Set([4, 6, 8, 10, 12, 20, 100]);
  * @returns {Promise<CommandResult>}
  */
 export async function runRollCommand(command, campaign) {
-  const failed = (reason, error=null) => ({
-    id: command.id, status: "failed", reason, error, messageId: null, visible: false, rolls: []
-  });
+  const failed = (reason, error=null) => failedResult(command, reason, error);
   if ( !campaign.rolls || !diceStatus.ready ) return failed("off");
   const invalid = checkCommand(command);
   if ( invalid ) return failed("invalid", invalid);
@@ -79,11 +86,40 @@ export async function runRollCommand(command, campaign) {
  * @returns {string|null}
  */
 export function checkCommand(command) {
+  if ( ATTACK_KINDS.includes(command.kind) ) return checkAttackCommand(command);
   if ( !ROLL_KINDS.includes(command.kind) ) return "kind";
   if ( KEYED.has(command.kind) !== (typeof command.key === "string") ) return "key";
   if ( (command.kind === "initiative") !== (typeof command.combatId === "string") ) return "combat";
   if ( ![-1, 0, 1].includes(command.mode) || (typeof command.explicit !== "boolean") ) return "mode";
   const { extras, dice } = command;
+  if ( !Array.isArray(extras) || (extras.length > 10) || !extras.every(isExtra) ) return "extras";
+  if ( !Array.isArray(dice) || !dice.length || (dice.length > 11) || !dice.every(isRolled) ) return "dice";
+  return null;
+}
+
+/**
+ * Why a fetched attack, or its damage, isn't one to make, if it isn't. An attack names the item
+ * and activity it's made with, and the combatant it's made at, if any, and has its d20s and any
+ * dice the player added; its damage names the attack it follows and has the dice that attack's
+ * damage throws, if any, which are checked against them when it's made.
+ * @param {object} command
+ * @returns {string|null}
+ */
+function checkAttackCommand(command) {
+  const isId = value => (typeof value === "string") && (value.length > 0) && (value.length <= 64);
+  const { dice } = command;
+  if ( command.kind === "damage" ) {
+    if ( !isId(command.use) ) return "use";
+    if ( !Array.isArray(dice) || (dice.length > 20) || !dice.every(isRolled) ) return "dice";
+    return null;
+  }
+  if ( !isId(command.item) || !isId(command.activity) ) return "item";
+  const { target } = command;
+  if ( (target !== null) && (target !== undefined) && (!isId(target?.combatId) || !isId(target?.combatantId)) ) {
+    return "target";
+  }
+  if ( ![-1, 0, 1].includes(command.mode) || (typeof command.explicit !== "boolean") ) return "mode";
+  const { extras } = command;
   if ( !Array.isArray(extras) || (extras.length > 10) || !extras.every(isExtra) ) return "extras";
   if ( !Array.isArray(dice) || !dice.length || (dice.length > 11) || !dice.every(isRolled) ) return "dice";
   return null;
@@ -105,7 +141,7 @@ function isExtra(term) {
  * @param {object} rolled
  * @returns {boolean}
  */
-function isRolled(rolled) {
+export function isRolled(rolled) {
   const { faces, results } = rolled ?? {};
   return DIE_FACES.has(faces) && Array.isArray(results) && (results.length >= 1) && (results.length <= 40)
     && results.every(value => Number.isInteger(value) && (value >= 1) && (value <= faces));
@@ -234,7 +270,7 @@ async function rollInitiative(command, actor, { author, flags }) {
  * @param {Actor} actor
  * @returns {User}
  */
-function authorFor(actor) {
+export function authorFor(actor) {
   const assigned = game.users.find(user => !user.isGM && (user.character?.id === actor.id));
   if ( assigned ) return assigned;
   const owners = playerOwners(actor);
@@ -256,8 +292,20 @@ function messageOf(rolls) {
  * @param {string} commandId
  * @returns {ChatMessage|null}
  */
-function findMessage(commandId) {
+export function findMessage(commandId) {
   return game.messages.contents.findLast(message => message.flags?.[MODULE_ID]?.request === commandId) ?? null;
+}
+
+/**
+ * May a character's player see a message?
+ * @param {ChatMessage} message
+ * @param {Actor} actor
+ * @param {Campaign} campaign
+ * @returns {boolean}
+ */
+export function visibleTo(message, actor, campaign) {
+  const audience = chatAudience(message, campaign);
+  return audience.public || audience.characters.includes(actor.id);
 }
 
 /**
@@ -266,11 +314,14 @@ function findMessage(commandId) {
  * @param {ChatMessage} message
  * @param {Actor} actor
  * @param {Campaign} campaign
+ * @param {object} [options]
+ * @param {Roll[]} [options.rolls]   The rolls made, when they aren't the message's own, as
+ *                                   Midi-QOL's card is written after its rolls.
+ * @param {object} [options.extra]   What else the app is told, as of an attack.
  * @returns {CommandResult}
  */
-function describeResult(command, message, actor, campaign) {
-  const audience = chatAudience(message, campaign);
-  const visible = audience.public || audience.characters.includes(actor.id);
+export function describeResult(command, message, actor, campaign, { rolls=message.rolls, extra={} }={}) {
+  const visible = visibleTo(message, actor, campaign);
   return {
     id: command.id,
     status: "done",
@@ -278,7 +329,8 @@ function describeResult(command, message, actor, campaign) {
     error: null,
     messageId: message.id,
     visible,
-    rolls: visible ? message.rolls.map(summarizeRoll) : []
+    rolls: visible ? rolls.map(summarizeRoll) : [],
+    ...extra
   };
 }
 
@@ -290,7 +342,8 @@ function describeResult(command, message, actor, campaign) {
  * @param {HTMLElement} html
  */
 export function markAppRoll(message, html) {
-  if ( !message.flags?.[MODULE_ID]?.request || !(html instanceof HTMLElement) ) return;
+  const flags = message.flags?.[MODULE_ID];
+  if ( !(flags?.request || flags?.use) || !(html instanceof HTMLElement) ) return;
   const header = html.querySelector(".message-header .message-metadata") ?? html.querySelector(".message-header");
   if ( !header || header.querySelector(".sending-stone-badge") ) return;
   const badge = document.createElement("span");

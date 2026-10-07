@@ -23,6 +23,10 @@
       "GmContent": {
         "Name": "Send Gamemaster-Only Information",
         "Hint": "Also send what only a Gamemaster can see: whispers no player can read, blind rolls, hidden combatants, the hit points of combatants outside a campaign and the armor class of attack targets. Leave this off if players can see what the destination receives."
+      },
+      "MidiIntegration": {
+        "Name": "Make Players' Attacks Through Midi-QOL",
+        "Hint": "Players' attacks from Sending Stone go through Midi-QOL's workflow, as if they had attacked in Foundry: Midi checks the hit and applies the damage, as you have it set up. Off: while Midi-QOL handles items' uses, players' attacks stay in the app."
       }
     },
     "Campaigns": {
@@ -51,6 +55,13 @@
       "RollsReason": {
         "system": "they need the D&D Fifth Edition system.",
         "self-test": "this version of Foundry, or a module, rolls dice differently than Sending Stone expects. The browser's console says what went wrong."
+      },
+      "Attacks": "Let Players Attack from Sending Stone",
+      "AttacksHint": "Weapon and spell attacks its players make in the Sending Stone app are made here too, at the target they pick. The item is used as in Foundry, spending ammunition, uses and spell slots, and the damage is rolled on the same use, all with the dice they rolled. With Midi-QOL, Midi checks the hit and applies the damage. Needs Let Players Roll from Sending Stone.",
+      "AttacksUnavailable": "Players' attacks from Sending Stone can't be made in this game: {reason}",
+      "AttacksReason": {
+        "self-test": "this version of Foundry, or a module, rolls damage differently than Sending Stone expects. The browser's console says what went wrong.",
+        "midi-off": "Midi-QOL handles items' uses here, and Make Players' Attacks Through Midi-QOL is off in the module's settings."
       }
     },
     "Error": {

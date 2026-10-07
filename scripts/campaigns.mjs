@@ -17,6 +17,9 @@ import { MODULE_ID, SETTINGS } from "./constants.mjs";
  * @property {Set<string>} characters The actor ids of its characters.
  * @property {boolean} rolls          Do its players' rolls in the app get made here, with their
  *                                    dice? Off until the Gamemaster turns it on.
+ * @property {boolean} attacks        Do its players' attacks in the app get made here too, using
+ *                                    the item as in Foundry? Off until the Gamemaster turns it on,
+ *                                    and only with `rolls`.
  */
 
 /**
@@ -25,8 +28,8 @@ import { MODULE_ID, SETTINGS } from "./constants.mjs";
  */
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
-  return stored.map(({ id, title, characters, rolls }) => {
-    return { id, title, characters: new Set(characters), rolls: rolls === true };
+  return stored.map(({ id, title, characters, rolls, attacks }) => {
+    return { id, title, characters: new Set(characters), rolls: rolls === true, attacks: attacks === true };
   });
 }
 
