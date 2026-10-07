@@ -133,7 +133,7 @@ function readFlag(roll, property) {
  * @param {Roll} roll
  * @returns {object}
  */
-function summarizeRoll(roll) {
+export function summarizeRoll(roll) {
   const summary = {
     class: roll.constructor.name,
     formula: roll.formula,

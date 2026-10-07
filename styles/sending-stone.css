@@ -79,3 +79,18 @@
 #sending-stone-campaigns .sending-stone-test-result[data-state="error"] {
   color: var(--color-level-error, #6e0000);
 }
+
+#sending-stone-campaigns .sending-stone-warning {
+  color: var(--color-level-warning, #8a4f00);
+}
+
+/* Chat ------------------------------------------------------------------- */
+
+/* Marks a roll a player made from the Sending Stone app. */
+.chat-message .sending-stone-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-end: 0.25rem;
+  opacity: 0.75;
+  font-size: var(--font-size-11, 0.75rem);
+}

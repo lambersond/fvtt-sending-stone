@@ -44,7 +44,14 @@
       "Submit": "Save Changes",
       "TitleRequired": "Every campaign needs a title.",
       "TitleTaken": "Each campaign needs a different title.",
-      "Saved": "Sending Stone campaigns saved."
+      "Saved": "Sending Stone campaigns saved.",
+      "Rolls": "Let Players Roll from Sending Stone",
+      "RollsHint": "Checks, saving throws, initiative and death saving throws its players roll in the Sending Stone app are made here too, with the dice they rolled, as if they had rolled them in Foundry.",
+      "RollsUnavailable": "Players' rolls from Sending Stone can't be made in this game: {reason}",
+      "RollsReason": {
+        "system": "they need the D&D Fifth Edition system.",
+        "self-test": "this version of Foundry, or a module, rolls dice differently than Sending Stone expects. The browser's console says what went wrong."
+      }
     },
     "Error": {
       "InvalidDestination": "The Sending Stone address must be a web address, such as https://sending-stone.vercel.app.",
@@ -65,6 +72,9 @@
       "HintMixedContent": "Foundry is served over https but the app's address is plain http, which browsers block for any host other than localhost. Use the app's https address.",
       "HintAuth": "The app refused the secret. Enter the secret set for this campaign in the Sending Stone app.",
       "HintNotSetUp": "The app has no campaign with this title for this game. Set it up in the Sending Stone app with this game's address and the same title, then test again."
+    },
+    "Roll": {
+      "Badge": "Rolled on Sending Stone"
     }
   }
 }
