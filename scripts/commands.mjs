@@ -2,14 +2,14 @@ import { ATTACK_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_KINDS } from ".
 import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
-import { attacksUnavailable, runAttackCommand, runDamageCommand } from "./command-attacks.mjs";
+import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, runRollCommand } from "./command-rolls.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { currentSession, send } from "./transport.mjs";
 
 /**
- * Fetching what players ask the game to do from the Sending Stone app: their rolls, and their
- * attacks.
+ * Fetching what players ask the game to do from the Sending Stone app: their rolls, their attacks,
+ * and their spells and features.
  *
  * The app can't reach the Gamemaster's browser, so the bridge fetches from it instead, for each
  * campaign that lets its players roll from the app. While a player has their table open, the app
@@ -85,8 +85,9 @@ const queues = new Map();
 
 /**
  * What a campaign tells the app of its players' rolls in its hello: whether they're made here,
- * which, and if not, why not. Attacks and their damage are among them when the Gamemaster lets
- * the campaign's players attack from the app too, and they can be made here.
+ * which, and if not, why not. Attacks, the uses of spells and features, and their damage are among
+ * them when the Gamemaster lets the campaign's players attack and cast from the app too, and they
+ * can be made here.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null}}
  */
@@ -340,7 +341,8 @@ async function make(command, campaign) {
  */
 function runCommand(command, campaign, signal) {
   switch ( command.kind ) {
-    case "attack": return runAttackCommand(command, campaign, { signal });
+    case "attack":
+    case "use": return runUseCommand(command, campaign, { signal });
     case "damage": return runDamageCommand(command, campaign);
     default: return runRollCommand(command, campaign);
   }

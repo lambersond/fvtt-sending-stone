@@ -168,9 +168,10 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
  * Before dnd5e builds a roll for a player's roll: tag it, if only its process is, and roll it as
  * the player chose, if they chose, as dnd5e's roll dialog would; and add what they added, as the
  * dialog's situational bonus. That goes first, after the d20, so that the player's dice for it
- * aren't taken by a bonus of the same dice, such as Bless's d4, which Foundry rolls. Damage is
- * rolled as it is: nothing is added to it, which would take a critical hit's extra dice and be
- * added once for each of its parts.
+ * aren't taken by a bonus of the same dice, such as Bless's d4, which Foundry rolls. Only a d20 roll
+ * is changed so. Damage is rolled as it is, but as the kind of damage the player chose, where it
+ * offers a choice: anything added to it would take a critical hit's extra dice, and be added once
+ * for each of its parts.
  * @param {object} process   The roll process's configuration.
  * @param {object} config    The roll's configuration.
  * @param {number} index     The roll's place among the process's rolls.
@@ -181,7 +182,13 @@ function onBuildRollConfig(process, config, index) {
   if ( !plan || !config ) return;
   config.options ??= {};
   config.options[ROLL_TAG] = tag;
-  if ( process?.hookNames?.includes("damage") ) return;
+  const hookNames = process?.hookNames ?? [];
+  if ( hookNames.includes("damage") ) {
+    const type = plan.command.types?.[index];
+    if ( (typeof type === "string") && config.options.types?.includes(type) ) config.options.type = type;
+    return;
+  }
+  if ( !hookNames.includes("d20Test") ) return;
   const { mode, explicit, extras } = plan.command;
   if ( explicit ) config.options.advantageMode = mode;
   const situational = extrasFormula(extras);
@@ -190,6 +197,17 @@ function onBuildRollConfig(process, config, index) {
     config.data ??= {};
     config.data.situational = situational;
   }
+}
+
+/**
+ * Before a player's damage is rolled, roll it without dnd5e's damage dialog, whatever asked for it,
+ * as Midi-QOL does for a choice of damage types: the player chose, in the app.
+ * @param {object} process   The roll process's configuration.
+ * @param {object} dialog    The roll dialog's configuration.
+ */
+function onPreRoll(process, dialog) {
+  if ( !process?.hookNames?.includes("damage") || !dialog ) return;
+  if ( planFor(process[ROLL_TAG]) ) dialog.configure = false;
 }
 
 /**
@@ -313,6 +331,7 @@ export function installDicePlans() {
     wrap(foundry.dice.terms.DiceTerm.prototype, "_roll", plannedRoll);
     wrap(foundry.dice.Roll.prototype, "evaluate", taggedEvaluate);
   }
+  Hooks.on("dnd5e.preRoll", onPreRoll);
   Hooks.on("dnd5e.postBuildRollConfig", onBuildRollConfig);
   Hooks.on("dnd5e.postRollConfiguration", onRollConfiguration);
 }

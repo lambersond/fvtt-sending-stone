@@ -1,7 +1,7 @@
 import { EVENTS, MODULE_ID, SETTINGS } from "../constants.mjs";
 import { getCampaigns } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
-import { attacksUnavailable } from "../command-attacks.mjs";
+import { attacksUnavailable } from "../command-uses.mjs";
 import { getSecret, isMixedContent, parseDestination } from "../config.mjs";
 import { diceStatus } from "../dice-plan.mjs";
 import { buildEnvelope, deliver, DeliveryError } from "../transport.mjs";
@@ -12,8 +12,8 @@ const { FormDataExtended } = foundry.applications.ux;
 /**
  * A Gamemaster-only dialog for where events go and the campaigns they go to: the Sending Stone
  * app's address, and each campaign's title, secret and player characters, and whether its players'
- * rolls and attacks in the app are made here. A campaign's connection can be tested as typed. Campaigns can be
- * added and removed freely; nothing is saved until the form is submitted.
+ * rolls, attacks and spells in the app are made here. A campaign's connection can be tested as typed.
+ * Campaigns can be added and removed freely; nothing is saved until the form is submitted.
  * @extends ApplicationV2
  * @mixes HandlebarsApplication
  */
@@ -83,7 +83,7 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
       : game.i18n.format("SENDINGSTONE.Campaigns.RollsUnavailable", {
         reason: game.i18n.localize(`SENDINGSTONE.Campaigns.RollsReason.${diceStatus.reason}`)
       });
-    // Why players' attacks can't be made here, when their rolls can.
+    // Why players' attacks and spells can't be made here, when their rolls can.
     const attacksReason = rollsUnavailable ? null : attacksUnavailable();
     const attacksUnavailableText = attacksReason && (attacksReason !== "pending")
       ? game.i18n.format("SENDINGSTONE.Campaigns.AttacksUnavailable", {
