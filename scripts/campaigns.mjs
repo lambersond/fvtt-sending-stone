@@ -15,6 +15,8 @@ import { MODULE_ID, SETTINGS } from "./constants.mjs";
  * @property {string} id              Generated when the campaign is created; never changes.
  * @property {string} title           Set by the Gamemaster, and how players find the campaign.
  * @property {Set<string>} characters The actor ids of its characters.
+ * @property {boolean} rolls          Do its players' rolls in the app get made here, with their
+ *                                    dice? Off until the Gamemaster turns it on.
  */
 
 /**
@@ -23,7 +25,9 @@ import { MODULE_ID, SETTINGS } from "./constants.mjs";
  */
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
-  return stored.map(({ id, title, characters }) => ({ id, title, characters: new Set(characters) }));
+  return stored.map(({ id, title, characters, rolls }) => {
+    return { id, title, characters: new Set(characters), rolls: rolls === true };
+  });
 }
 
 /**

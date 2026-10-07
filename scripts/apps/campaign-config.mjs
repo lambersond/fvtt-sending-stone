@@ -2,6 +2,7 @@ import { EVENTS, MODULE_ID, SETTINGS } from "../constants.mjs";
 import { getCampaigns } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
 import { getSecret, isMixedContent, parseDestination } from "../config.mjs";
+import { diceStatus } from "../dice-plan.mjs";
 import { buildEnvelope, deliver, DeliveryError } from "../transport.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -9,9 +10,9 @@ const { FormDataExtended } = foundry.applications.ux;
 
 /**
  * A Gamemaster-only dialog for where events go and the campaigns they go to: the Sending Stone
- * app's address, and each campaign's title, secret and player characters. A campaign's connection
- * can be tested as typed. Campaigns can be added and removed freely; nothing is saved until the
- * form is submitted.
+ * app's address, and each campaign's title, secret and player characters, and whether its players'
+ * rolls in the app are made here. A campaign's connection can be tested as typed. Campaigns can be
+ * added and removed freely; nothing is saved until the form is submitted.
  * @extends ApplicationV2
  * @mixes HandlebarsApplication
  */
@@ -58,7 +59,7 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
 
   /**
    * The campaigns as being edited, each with the secret this browser holds for it.
-   * @type {{id: string, title: string, secret: string, characters: Set<string>}[]}
+   * @type {{id: string, title: string, secret: string, characters: Set<string>, rolls: boolean}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({ ...campaign, secret: getSecret(campaign.id) }));
 
@@ -75,13 +76,20 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
       img: actor.img,
       owners: playerOwners(actor).map(user => user.name).join(", ") || none
     }));
+    // Why players' rolls can't be made here, once that's known.
+    const rollsUnavailable = (diceStatus.ready || (diceStatus.reason === "pending")) ? null
+      : game.i18n.format("SENDINGSTONE.Campaigns.RollsUnavailable", {
+        reason: game.i18n.localize(`SENDINGSTONE.Campaigns.RollsReason.${diceStatus.reason}`)
+      });
     return {
       destination: this.#destination,
+      rollsUnavailable,
       campaigns: this.#campaigns.map((campaign, index) => ({
         index,
         id: campaign.id,
         title: campaign.title,
         secret: campaign.secret,
+        rolls: campaign.rolls,
         legend: campaign.title || game.i18n.localize("SENDINGSTONE.Campaigns.Untitled"),
         // The campaign's own characters first, then the rest, each by name.
         characters: actors
@@ -126,7 +134,9 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
    */
   static async #onAddCampaign() {
     this.#keepEdits();
-    this.#campaigns.push({ id: foundry.utils.randomID(), title: "", secret: "", characters: new Set() });
+    this.#campaigns.push({
+      id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), rolls: false
+    });
     await this.render();
     this.element.querySelector(".sending-stone-campaign:last-of-type input[type=text]")?.focus();
   }
@@ -234,7 +244,8 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
     await game.settings.set(MODULE_ID, SETTINGS.CAMPAIGNS, campaigns.map(campaign => ({
       id: campaign.id,
       title: campaign.title,
-      characters: Array.from(campaign.characters)
+      characters: Array.from(campaign.characters),
+      rolls: campaign.rolls
     })));
     ui.notifications.info("SENDINGSTONE.Campaigns.Saved", { localize: true });
     if ( parsed && isMixedContent(parsed) ) {
@@ -246,7 +257,7 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
    * Read the campaigns from the form's flat data, in the order they are listed. Characters that no
    * longer exist drop out.
    * @param {object} data   Flat form data, keyed by field name.
-   * @returns {{id: string, title: string, secret: string, characters: Set<string>}[]}
+   * @returns {{id: string, title: string, secret: string, characters: Set<string>, rolls: boolean}[]}
    */
   static #readCampaigns(data) {
     const { campaigns = {} } = foundry.utils.expandObject(data);
@@ -258,7 +269,8 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
         secret: String(campaign.secret ?? "").trim(),
         characters: new Set(Object.entries(campaign.characters ?? {})
           .filter(([id, checked]) => (checked === true) && game.actors.has(id))
-          .map(([id]) => id))
+          .map(([id]) => id)),
+        rolls: campaign.rolls === true
       }));
   }
 }

@@ -1,4 +1,6 @@
-import { HELLO_WANTED_HOOK, MODULE_ID, PROTOCOL_VERSION, STATUS_HOOK } from "./constants.mjs";
+import {
+  EVENTS, HELLO_WANTED_HOOK, LISTENER_FEATURES_HOOK, MODULE_ID, PROTOCOL_VERSION, STATUS_HOOK
+} from "./constants.mjs";
 import { describeCampaign } from "./campaigns.mjs";
 import { eventsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 
@@ -48,6 +50,12 @@ let draining = false;
  * @type {string|null}
  */
 let session = null;
+
+/**
+ * The events whose answers say what the listener does beyond taking events.
+ * @type {Set<string>}
+ */
+const ANNOUNCING = new Set([EVENTS.HELLO, EVENTS.HEARTBEAT]);
 
 /**
  * The sequence number of the last envelope built in this session, for each campaign. Each
@@ -111,7 +119,7 @@ export class DeliveryError extends Error {
  * @returns {object}
  */
 export function buildEnvelope(type, data, { campaign=null, sequenced=true }={}) {
-  session ??= foundry.utils.randomID(16);
+  const sessionId = currentSession();
   let sequence = null;
   if ( sequenced ) {
     const key = campaign?.id ?? "";
@@ -121,7 +129,7 @@ export function buildEnvelope(type, data, { campaign=null, sequenced=true }={}) 
   return {
     protocol: PROTOCOL_VERSION,
     id: foundry.utils.randomID(16),
-    session,
+    session: sessionId,
     sequence,
     type,
     time: new Date().toISOString(),
@@ -129,6 +137,15 @@ export function buildEnvelope(type, data, { campaign=null, sequenced=true }={}) 
     campaign: campaign ? describeCampaign(campaign) : null,
     data
   };
+}
+
+/**
+ * This page load's session, as every envelope names it.
+ * @returns {string}
+ */
+export function currentSession() {
+  session ??= foundry.utils.randomID(16);
+  return session;
 }
 
 /**
@@ -241,7 +258,7 @@ export async function deliver(envelope, { destination=getDestination(), secret=g
   }
   const elapsed = Math.round(performance.now() - started);
 
-  if ( response.ok ) return { status: response.status, elapsed, request: await readRequest(response) };
+  if ( response.ok ) return { status: response.status, elapsed, answer: await readAnswer(response) };
 
   // A listener that is overloaded or restarting may accept the same post later. One that
   // rejected it outright, a wrong secret for instance, will not.
@@ -253,19 +270,25 @@ export async function deliver(envelope, { destination=getDestination(), secret=g
 }
 
 /**
- * What the listener asked for in a successful answer, if anything. A listener that lacks a
- * campaign's full state, such as one that refused its bridge.hello because the campaign was not
- * set up yet, may answer an event for it with `{"resend": "hello"}`.
+ * What the listener said in a successful answer, if anything. A listener that lacks a campaign's
+ * full state, such as one that refused its bridge.hello because the campaign was not set up yet,
+ * may answer an event for it with `{"resend": "hello"}`; and one that does more than take events
+ * says so in `features`, such as `{"features": {"commands": true}}`.
  * @param {Response} response
- * @returns {Promise<"hello"|null>}
+ * @returns {Promise<{resend: "hello"|null, features: object|null}>}
  */
-async function readRequest(response) {
-  if ( !response.headers?.get("content-type")?.includes("application/json") ) return null;
+async function readAnswer(response) {
+  const nothing = { resend: null, features: null };
+  if ( !response.headers?.get("content-type")?.includes("application/json") ) return nothing;
   try {
     const answer = await response.json();
-    return answer?.resend === "hello" ? "hello" : null;
+    const features = answer?.features;
+    return {
+      resend: answer?.resend === "hello" ? "hello" : null,
+      features: (features && (typeof features === "object") && !Array.isArray(features)) ? features : null
+    };
   } catch {
-    return null;
+    return nothing;
   }
 }
 
@@ -305,9 +328,15 @@ async function drain() {
 async function deliverWithRetry(envelope) {
   for ( let attempt = 0; ; attempt++ ) {
     try {
-      const { request } = await deliver(envelope);
+      const { answer } = await deliver(envelope);
       recordSuccess();
-      if ( (request === "hello") && envelope.campaign ) Hooks.callAll(HELLO_WANTED_HOOK, envelope.campaign.id);
+      const campaignId = envelope.campaign?.id;
+      if ( campaignId && (answer.resend === "hello") ) Hooks.callAll(HELLO_WANTED_HOOK, campaignId);
+      // A listener that says nothing of what more it does, as one before Sending Stone's commands,
+      // does nothing more.
+      if ( campaignId && ANNOUNCING.has(envelope.type) ) {
+        Hooks.callAll(LISTENER_FEATURES_HOOK, campaignId, answer.features);
+      }
       return;
     } catch (err) {
       const retryable = (err instanceof DeliveryError) && err.retryable;

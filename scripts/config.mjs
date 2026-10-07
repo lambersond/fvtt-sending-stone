@@ -1,4 +1,4 @@
-import { CHAT_SCOPES, EVENTS_PATH, MODULE_ID, SETTINGS } from "./constants.mjs";
+import { CHAT_SCOPES, COMMANDS_PATH, EVENTS_PATH, MODULE_ID, SETTINGS } from "./constants.mjs";
 
 /**
  * Typed accessors for this module's settings.
@@ -78,6 +78,15 @@ export function parseDestination(value) {
  */
 export function eventsUrl(destination) {
   return new URL(EVENTS_PATH, destination).href;
+}
+
+/**
+ * The address players' commands, such as their rolls, are fetched from at a destination.
+ * @param {URL} destination   A parsed destination.
+ * @returns {string}
+ */
+export function commandsUrl(destination) {
+  return new URL(COMMANDS_PATH, destination).href;
 }
 
 /**

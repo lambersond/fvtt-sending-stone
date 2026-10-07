@@ -3,6 +3,7 @@ import { chatEnabled, chatScope, combatEnabled, getDestination, includeGmContent
 import { forgetCombats, noteCombatSent } from "./campaign-combats.mjs";
 import { noteCharactersSent } from "./character-sync.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { roster } from "./characters.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
 import { noteTextsSent, sendTexts, SheetTexts } from "./sheet-texts.mjs";
@@ -59,7 +60,9 @@ const resent = new Map();
 /**
  * Send each campaign its full current state, so the listener can discard whatever it held for the
  * campaign and start afresh: its characters with their sheets, and the combats they are in. The
- * sheets' descriptions go first, in character.texts.
+ * sheets' descriptions go first, in character.texts. Each says whether its players' rolls in the
+ * app are made here; and fetching them starts afresh, so a campaign whose fetch was refused is
+ * tried again.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -92,22 +95,25 @@ export function announce({ campaignId }={}) {
     sendTexts(campaign, texts.sources);
     send(EVENTS.HELLO, {
       ...shared,
+      features: { rolls: rollFeatures(campaign) },
       characters,
       combats: combats.map(combat => snapshotCombat(combat, campaign))
     }, campaign);
   }
+  syncPollers({ retry: true });
 }
 
 /* -------------------------------------------- */
 
 /**
  * Announce when this client takes over as the bridge: on load, or when the Gamemaster who held
- * the role disconnects.
+ * the role disconnects. A client that is no longer the bridge stops fetching players' rolls.
  * @returns {void}
  */
 export function checkBridge() {
   const bridge = isBridge();
   if ( bridge && !wasBridge ) announce();
+  if ( !bridge && wasBridge ) stopPollers();
   wasBridge = bridge;
 }
 

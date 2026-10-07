@@ -44,6 +44,18 @@
             <p class="sending-stone-test-result" data-test-result="{{campaign.index}}" role="status"
                aria-live="polite"></p>
 
+            <div class="form-group">
+                <label for="sending-stone-rolls-{{campaign.id}}">{{localize "SENDINGSTONE.Campaigns.Rolls"}}</label>
+                <div class="form-fields">
+                    <input type="checkbox" id="sending-stone-rolls-{{campaign.id}}"
+                           name="campaigns.{{campaign.index}}.rolls" {{#if campaign.rolls}}checked{{/if}}>
+                </div>
+                <p class="hint">{{localize "SENDINGSTONE.Campaigns.RollsHint"}}</p>
+                {{#if @root.rollsUnavailable}}
+                <p class="hint sending-stone-warning">{{@root.rollsUnavailable}}</p>
+                {{/if}}
+            </div>
+
             {{#if @root.hasCharacters}}
             <table class="sending-stone-characters">
                 <thead>

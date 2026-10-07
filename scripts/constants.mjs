@@ -22,6 +22,13 @@ export const PROTOCOL_VERSION = 2;
 export const EVENTS_PATH = "/api/events";
 
 /**
+ * Where what players ask the game to do, such as their rolls, is fetched, under the destination.
+ * Fetched only from an app that says it has them, in its answer to a hello or heartbeat.
+ * @type {string}
+ */
+export const COMMANDS_PATH = "/api/bridge/commands";
+
+/**
  * Keys for the settings and setting menus this module registers.
  * @type {Readonly<Record<string, string>>}
  */
@@ -111,8 +118,26 @@ export const EVENTS = Object.freeze({
 
   COMBATANT_ADDED: "combat.combatant.added",
   COMBATANT_UPDATED: "combat.combatant.updated",
-  COMBATANT_REMOVED: "combat.combatant.removed"
+  COMBATANT_REMOVED: "combat.combatant.removed",
+
+  /** What became of a command fetched from the app, such as a player's roll. Not part of the event
+   *  stream. */
+  COMMAND_RESULT: "command.result"
 });
+
+/**
+ * The rolls a player can have made here from the app, with the dice they rolled there: a skill
+ * check, a tool check, an ability check, a saving throw, a death saving throw, or initiative.
+ * @type {readonly string[]}
+ */
+export const ROLL_KINDS = Object.freeze(["skill", "tool", "ability", "save", "death", "initiative"]);
+
+/**
+ * The roll option naming the player's roll a roll is made for, so that its dice can be the ones
+ * the player rolled.
+ * @type {string}
+ */
+export const ROLL_TAG = "sendingStone";
 
 /**
  * The name of the hook this module calls whenever delivery status changes. Called with the status
@@ -127,3 +152,11 @@ export const STATUS_HOOK = "sendingStone.status";
  * @type {string}
  */
 export const HELLO_WANTED_HOOK = "sendingStone.helloWanted";
+
+/**
+ * The name of the hook called with what the listener does beyond taking events, as it answers a
+ * campaign's hello or heartbeat: such as `{commands: true}`, or null when it says nothing. Called
+ * with the campaign's id and that.
+ * @type {string}
+ */
+export const LISTENER_FEATURES_HOOK = "sendingStone.listenerFeatures";

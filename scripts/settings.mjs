@@ -2,7 +2,7 @@ import { CHAT_SCOPES, MODULE_ID, SETTINGS } from "./constants.mjs";
 import { announce } from "./bridge.mjs";
 import CampaignConfig from "./apps/campaign-config.mjs";
 
-const { ArrayField, SchemaField, SetField, StringField } = foundry.data.fields;
+const { ArrayField, BooleanField, SchemaField, SetField, StringField } = foundry.data.fields;
 
 /**
  * Register this module's settings and setting menus.
@@ -58,7 +58,8 @@ export function registerSettings() {
     type: new ArrayField(new SchemaField({
       id: new StringField({ blank: false }),
       title: new StringField({ blank: false }),
-      characters: new ArrayField(new StringField({ blank: false }))
+      characters: new ArrayField(new StringField({ blank: false })),
+      rolls: new BooleanField({ initial: false })
     })),
     default: [],
     onChange: () => reannounce()

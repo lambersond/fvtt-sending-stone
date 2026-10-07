@@ -21,7 +21,7 @@ Authorization: Bearer <the campaign's secret>     (only when one is configured)
 
 | Your answer | What the module does |
 | --- | --- |
-| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). Any other body is ignored. |
+| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). In answer to a `bridge.hello` or `bridge.heartbeat`, `{"features": {"commands": true}}` says the listener has players' rolls for the module to fetch; see [Rolls from the app](#rolls-from-the-app). Both may be in one body. Anything else is ignored. |
 | `408`, `425`, `429`, any `5xx`, no answer, or no answer within 10 s | Retried after 1 s, then again after 3 s, with the same envelope. Dropped after the third failure. |
 | Any other status, such as `400` or `401` | Dropped immediately. |
 
@@ -56,7 +56,7 @@ The request comes from the Gamemaster's **browser**, so the listener must handle
 | `protocol` | The protocol version, `2`. |
 | `id` | Unique to this event, and unchanged across retries. **Ignore an `id` you have already processed.** |
 | `session` | One page load of the sending browser. Changes when the Gamemaster reloads, or another Gamemaster's browser takes over sending. |
-| `sequence` | Counts up by exactly 1 per event within a session and campaign. A gap means that campaign missed events. `null` on `bridge.ping` and `bridge.heartbeat`, which are outside the event stream. |
+| `sequence` | Counts up by exactly 1 per event within a session and campaign. A gap means that campaign missed events. `null` on `bridge.ping`, `bridge.heartbeat` and `command.result`, which are outside the event stream. |
 | `type` | What happened. Listed below. |
 | `time` | When the event was raised, as an ISO 8601 timestamp. |
 | `world` | The Foundry world the event came from. |
@@ -460,6 +460,7 @@ the destination, the campaigns or any event setting changes.
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
+| `features` | `{ rolls: { enabled, kinds, reason } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes, and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected. See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 
@@ -506,6 +507,22 @@ have been saved, and from a browser that may not be the one sending events. It n
 tested: answer `2xx` if the secret is that campaign's, `404` if no campaign with its title is set
 up, and `401` for the wrong secret. Store nothing. Modules before 0.4.0 sent it with
 `campaign: null`, testing the one secret they had.
+
+### `command.result`
+
+What became of a player's roll fetched from the listener; see
+[Rolls from the app](#rolls-from-the-app). Not part of the event stream, so its `sequence` is
+`null`. It follows the chat events of the message the roll made.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The roll's `id`, as fetched. |
+| `status` | `"done"`, or `"failed"` when it wasn't made. |
+| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. `null` when done. |
+| `error` | What went wrong, for `"invalid"` and `"error"`; otherwise `null`. |
+| `messageId` | The chat message the roll made. |
+| `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check. |
+| `rolls` | The [rolls](#chat-message) as made, Foundry's total and every die, when `visible`; otherwise empty. |
 
 ### Chat
 
@@ -568,6 +585,10 @@ hiding one as `combat.combatant.removed`.
 - Module 0.8.1 adds `level` to the spellbook's `slots`.
 - Module 0.8.2 adds `castFrom` to spells and actions: the item a spell is cast from.
 - Module 0.9.0 adds `favorites` to the sheet.
+- Module 0.10.0 makes players' [rolls from the app](#rolls-from-the-app) in the game, for a
+  campaign whose Gamemaster lets it: `features` in `bridge.hello`, the fetch from
+  `/api/bridge/commands` and [`command.result`](#commandresult). A listener that never answers
+  with `features` is never fetched from, and needs no change.
 
 ## Changes from protocol 1
 
@@ -578,10 +599,84 @@ hiding one as `combat.combatant.removed`.
 - `characters.updated` is no longer sent: a change to the campaigns sends `bridge.hello` instead.
 - `combat.created` and `combat.ended` also mark a campaign's characters joining or leaving a fight.
 
-## Coming next
+## Rolls from the app
 
-The listener will be able to act for a campaign's character: rolling a check, attacking, casting a
-spell, as if its player had done it in Foundry. Because a browser cannot accept incoming
-requests, that will need the Gamemaster's browser to hold a connection open to the listener
-rather than the listener calling Foundry. The campaigns and secrets configured now are what that
-connection will use.
+A player can roll a check in the app and have it made in the game, with the dice they rolled, as
+if they had rolled it in Foundry: dnd5e makes the roll, so its card, critical hits, Dice So Nice
+and modules such as Midi-QOL behave as they always do. The Gamemaster turns it on for each
+campaign, with **Let Players Roll from Sending Stone** in Manage Campaigns. It is made for:
+
+| `kind` | The roll | Names |
+| --- | --- | --- |
+| `skill` | A skill check, such as Perception. | `key`: dnd5e's skill key, such as `"prc"`. |
+| `tool` | A tool check. | `key`: dnd5e's tool key, such as `"thief"`. |
+| `ability` | An ability check. | `key`: the ability, such as `"str"`. |
+| `save` | A saving throw. | `key`: the ability. |
+| `death` | A death saving throw, while the character is dying. | |
+| `initiative` | Initiative, while the character has none in the combat the Gamemaster has up. | `combatId` |
+
+### Fetching rolls
+
+A browser can't take incoming requests, so the module fetches players' rolls from the listener.
+It does so only once the listener has answered a campaign's `bridge.hello` or `bridge.heartbeat`
+with `{"features": {"commands": true}}`, and only for a campaign whose rolls are `enabled`, from
+the bridge alone. Each campaign is fetched for in turn, one fetch after another:
+
+```
+POST <destination>/api/bridge/commands
+Content-Type: application/json
+Authorization: Bearer <the campaign's secret>
+
+{ "protocol": 2, "session": "NXUK8rWJac7xwtdn", "campaign": { "id": "k3jd8s7aQ1pZ0vXe", "title": "Curse of Strahd" } }
+```
+
+Answer it as an event, CORS included, with the campaign's waiting rolls:
+
+```json
+{ "commands": [ { "id": "r1", "actorId": "aB3…", "kind": "skill", "key": "prc", "mode": 1, "explicit": true,
+  "extras": [ { "sign": 1, "count": 1, "sides": 4 } ],
+  "dice": [ { "faces": 20, "results": [17, 3] }, { "faces": 4, "results": [2] } ] } ], "wait": 10000 }
+```
+
+| Field | Meaning |
+| --- | --- |
+| `commands` | The rolls to make, oldest first; may be empty. |
+| `wait` | How long to wait before fetching again, in milliseconds. Absent or `0`: fetch again at once. |
+
+Hold a fetch open, for up to 30 seconds, while a roll may come, so that it reaches the game at
+once; and otherwise answer at once with a `wait`. The module gives a fetch up after 35 seconds.
+After a failed fetch it waits 2 seconds, then twice as long after each failure in a row, up to a
+minute. A `401`, `403` or `404` stops fetching for the campaign until the settings change or the
+listener asks for a hello.
+
+**Hand each roll over once.** One whose answer is lost is lost: never a roll made twice. The
+module also makes a roll only once, however often it's handed over, and a character's rolls in
+the order they came.
+
+| Roll field | Meaning |
+| --- | --- |
+| `id` | Unique to the roll. |
+| `actorId` | The campaign's character it is for. |
+| `kind`, `key`, `combatId` | What is rolled, as above. |
+| `mode` | `-1`, `0` or `1`: rolled with disadvantage, normally, or with advantage. |
+| `explicit` | Did the player choose how, as in dnd5e's roll dialog? Then the game rolls it that way. Otherwise it rolls as the character's sheet has it, which is where the app's `mode` came from. |
+| `extras` | What the player added, each `{ sign, count, sides }` or `{ sign, flat }`: such as `+1d4` for Bless. At most 10. Made as the roll's situational bonus. |
+| `dice` | Every die thrown, in order: the d20s, one or two (`mode` not `0`), then each added term's dice. Each `{ faces, results }`, every result one of the die's faces. |
+
+### Making a roll
+
+The module makes the roll as dnd5e's roll dialog would, without it, as the character's player
+(the user whose character it is, or else its only player), shown to everyone. Each die the roll
+throws takes the next value the player rolled for a die of its faces: their d20s, then their added
+dice. Only a die's first roll is the player's: a reroll, such as a Halfling's of a 1, or a die the
+player didn't roll, such as Elven Accuracy's third d20 or a Bless the game applies, is Foundry's.
+Foundry's total is the roll's total. The roll's message is flagged
+`flags["sending-stone"].request` with the roll's `id`, and marked on its card.
+
+It then sends [`command.result`](#commandresult). A roll made blind, as Midi-QOL can make a
+player's check, is reported as made, with `visible: false` and no rolls, so that the app tells
+its player no more than Foundry would.
+
+Before offering rolls, the module checks, as the game loads, that the player's dice reach a roll
+made for them and only that roll. If they don't, its hellos say `"self-test"`, and Manage
+Campaigns says why.

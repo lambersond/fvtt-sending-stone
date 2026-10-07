@@ -7,6 +7,15 @@
     "minimum": "14",
     "verified": "14.365"
   },
+  "relationships": {
+    "recommends": [
+      {
+        "id": "lib-wrapper",
+        "type": "module",
+        "reason": "Players' rolls from Sending Stone wrap Foundry's dice; libWrapper keeps that in step with other modules that do."
+      }
+    ]
+  },
   "authors": [
     {
       "name": "David Lamberson",

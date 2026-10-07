@@ -7,8 +7,9 @@ posted as JSON, campaign by campaign, so players can follow their game as it hap
 It is built for D&D Fifth Edition (dnd5e 5.3.x): roll messages carry the kind of roll, advantage,
 and the item, activity and targets involved. Chat and combat events work under any system.
 
-This is the outbound half. Later, the listener will also be able to act *for* a campaign's
-character (rolling a check, attacking, casting a spell) as if its player had done it in Foundry.
+It also works the other way, for a campaign whose Gamemaster lets it: checks, saving throws,
+initiative and death saving throws a player rolls in the app are made in Foundry with the dice they
+rolled, as if they had rolled them there. See [Players' rolls](#players-rolls).
 
 ## How it works
 
@@ -52,7 +53,7 @@ then only when one is new, since they are most of a sheet's size.
 
 | Setting | Effect |
 | --- | --- |
-| Manage Campaigns | The Sending Stone app's address, and each campaign: its title, its secret (sent as `Authorization: Bearer …` with its events) and its player characters. Each event goes to the campaigns it involves. |
+| Manage Campaigns | The Sending Stone app's address, and each campaign: its title, its secret (sent as `Authorization: Bearer …` with its events), its player characters, and whether its players' rolls in the app are made here. Each event goes to the campaigns it involves. |
 | Send Chat Events | Chat messages created, edited and deleted, and the log being cleared. |
 | Chat Messages to Send | Every message a campaign's players can read, or only those its characters spoke. |
 | Send Combat Events | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
@@ -77,6 +78,34 @@ involves its characters, described for it alone:
 
 Worlds set up before campaigns keep working: the connected characters chosen then are moved into a
 campaign titled after the world the first time a Gamemaster loads it.
+
+### Players' rolls
+
+Tick **Let Players Roll from Sending Stone** for a campaign in Manage Campaigns, and its players'
+skill, tool and ability checks, saving throws, initiative and death saving throws in the app are
+made in Foundry too, with the dice they rolled there: the d20s, and any dice they added, such as
+a d4 for Bless. dnd5e makes each roll, without its dialog, as the character's player, so its card,
+critical hits, death saving throws, the combat tracker, Dice So Nice and Midi-QOL all behave as if
+they had rolled in Foundry. Each card is marked as rolled on Sending Stone.
+
+- **Under D&D Fifth Edition only.** The Gamemaster's browser makes the rolls, so a Gamemaster must
+  have the game open, as for everything else.
+- **How it's rolled.** A tap in the app rolls as the character's sheet has it, so Foundry decides
+  advantage. Choosing advantage, disadvantage or extra dice in the app is the player's say, as in
+  dnd5e's roll dialog.
+- **Foundry's dice where the player rolled none.** A Halfling's reroll of a 1, Elven Accuracy's
+  third d20, or a bonus the game applies, such as Bless as an effect, is rolled by Foundry.
+  Foundry's total stands, and is what the player is shown.
+- **What the player is told.** The app shows each roll's total in the game, unless the roll was
+  made blind, as Midi-QOL can make a player's check: then only that it was made.
+- **A self-test** checks, as the game loads, that the player's dice reach the roll made for them
+  and no other. If it fails, as it might with a module that rolls dice its own way, players' rolls
+  stay in the app, and Manage Campaigns says why.
+- **libWrapper** is recommended: with it, the dice are wrapped alongside other modules' wrappers.
+
+The app's address must be able to answer the module's fetches of players' rolls, which only the
+Sending Stone app, or a listener that says it can, is asked for; see
+[PROTOCOL.md](PROTOCOL.md#rolls-from-the-app).
 
 ### The listener must allow cross-origin requests
 
@@ -137,8 +166,10 @@ Gamemaster-only information switched on.
   up to 500 events are held; past that the oldest are dropped.
 - **Duplicates are possible.** If the listener received a post but its answer was lost, the post
   is retried with the same envelope `id`. Listeners should ignore an `id` they have already seen.
-- **Nothing is patched.** The module registers settings and hooks; it overrides no core or
-  system class.
+- **Only dice are wrapped, and only for players' rolls.** On a Gamemaster's browser under D&D Fifth
+  Edition, Foundry's `Roll#evaluate` and `DiceTerm#_roll` are wrapped, through libWrapper when it's
+  active, so that a roll made for a player from the app takes their dice. Every other roll is left alone. No core
+  or system class is otherwise overridden.
 
 ## Installation
 
@@ -200,6 +231,9 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
-| `scripts/apps/campaign-config.mjs` | Manage Campaigns: the app's address, and each campaign's title, secret, characters and connection test |
+| `scripts/commands.mjs` | Fetching players' rolls from the app, one campaign at a time, and reporting what became of each |
+| `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card |
+| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, and the self-test that it works |
+| `scripts/apps/campaign-config.mjs` | Manage Campaigns: the app's address, and each campaign's title, secret, characters, players' rolls and connection test |
 | `tools/echo-listener.mjs` | Stand-in listener for development |
 | `PROTOCOL.md` | Event envelope and payload reference |
