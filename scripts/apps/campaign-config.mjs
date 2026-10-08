@@ -11,8 +11,9 @@ const { FormDataExtended } = foundry.applications.ux;
 
 /**
  * A Gamemaster-only dialog for where events go and the campaigns they go to: the Sending Stone
- * app's address, and each campaign's title, secret and player characters, and whether its players'
- * rolls, attacks and spells in the app are made here. A campaign's connection can be tested as typed.
+ * app's address, and each campaign's title, secret and player characters, whether its players'
+ * rolls, attacks and spells in the app are made here, and whether they're asked there for the saving
+ * throws the game asks of them. A campaign's connection can be tested as typed.
  * Campaigns can be added and removed freely; nothing is saved until the form is submitted.
  * @extends ApplicationV2
  * @mixes HandlebarsApplication
@@ -61,7 +62,7 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
   /**
    * The campaigns as being edited, each with the secret this browser holds for it.
    * @type {{id: string, title: string, secret: string, characters: Set<string>, rolls: boolean,
-   *   attacks: boolean}[]}
+   *   attacks: boolean, prompts: boolean}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({ ...campaign, secret: getSecret(campaign.id) }));
 
@@ -100,6 +101,7 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
         secret: campaign.secret,
         rolls: campaign.rolls,
         attacks: campaign.attacks,
+        prompts: campaign.prompts,
         legend: campaign.title || game.i18n.localize("SENDINGSTONE.Campaigns.Untitled"),
         // The campaign's own characters first, then the rest, each by name.
         characters: actors
@@ -145,7 +147,8 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
   static async #onAddCampaign() {
     this.#keepEdits();
     this.#campaigns.push({
-      id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), rolls: false, attacks: false
+      id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), rolls: false, attacks: false,
+      prompts: false
     });
     await this.render();
     this.element.querySelector(".sending-stone-campaign:last-of-type input[type=text]")?.focus();
@@ -256,7 +259,8 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
       title: campaign.title,
       characters: Array.from(campaign.characters),
       rolls: campaign.rolls,
-      attacks: campaign.attacks
+      attacks: campaign.attacks,
+      prompts: campaign.prompts
     })));
     ui.notifications.info("SENDINGSTONE.Campaigns.Saved", { localize: true });
     if ( parsed && isMixedContent(parsed) ) {
@@ -269,7 +273,7 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
    * longer exist drop out.
    * @param {object} data   Flat form data, keyed by field name.
    * @returns {{id: string, title: string, secret: string, characters: Set<string>, rolls: boolean,
-   *   attacks: boolean}[]}
+   *   attacks: boolean, prompts: boolean}[]}
    */
   static #readCampaigns(data) {
     const { campaigns = {} } = foundry.utils.expandObject(data);
@@ -283,7 +287,8 @@ export default class CampaignConfig extends HandlebarsApplicationMixin(Applicati
           .filter(([id, checked]) => (checked === true) && game.actors.has(id))
           .map(([id]) => id)),
         rolls: campaign.rolls === true,
-        attacks: campaign.attacks === true
+        attacks: campaign.attacks === true,
+        prompts: campaign.prompts === true
       }));
   }
 }

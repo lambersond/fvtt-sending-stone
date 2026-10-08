@@ -47,8 +47,9 @@ seconds is sent a heartbeat, so the app can show players whether the game is con
 Each campaign's characters are sent with their sheets under D&D Fifth Edition: abilities, saves,
 skills, hit points, armor class and the like, as dnd5e shows them, along with their features,
 conditions and effects, inventory, spells, traits and biography, and their actions, as Tidy 5e's
-Actions tab lists them, with each one's bonus to hit, saving throw and damage, and their
-favorites, as dnd5e's sheet shows them. When a character
+Actions tab lists them, with each one's bonus to hit, saving throw and damage, as are the spells,
+features and inventory items that roll anything, and their favorites, as dnd5e's sheet shows them.
+When a character
 changes, such as taking damage, levelling up or gaining a condition, its campaigns are sent it again, so players can see their character and roll from it
 in the app. Descriptions, enriched as the player would see them in Foundry, are sent once and
 then only when one is new, since they are most of a sheet's size.
@@ -61,6 +62,7 @@ then only when one is new, since they are most of a sheet's size.
 | Send Combat Events | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
 | Send Gamemaster-Only Information | Also send what only a Gamemaster can see. Off by default. |
 | Make Players' Attacks and Spells Through Midi-QOL | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
+| Allow Targets You Aren't Viewing | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 
 **Each campaign's secret is stored only in the browser you enter it in.** World settings are sent
 to every connected user, so a secret stored there could be read by players. Enter the secrets in
@@ -114,7 +116,8 @@ Sending Stone app, or a listener that says it can, is asked for; see
 
 Tick **Let Players Attack and Cast from Sending Stone** too, and the campaign's players can attack,
 cast their spells and use their features from the app: Fireball, Sacred Flame, Magic Missile, Cure
-Wounds, Second Wind, Bless, Shield or Action Surge. They pick their targets from the combat, and
+Wounds, Second Wind, Bless, Shield or Action Surge, from their actions, spells, features, inventory
+or favorites, wherever the app lists them. They pick their targets from the combat, and
 the spell slot, ammunition or attack mode, and tap it; then the app rolls its damage or healing,
 with their dice, once the game has made the use, asking first for the kind of damage where it
 offers a choice, as Chromatic Orb does. The item is used as in Foundry, spending its ammunition,
@@ -132,11 +135,20 @@ attack hit only where the game shows players.
   a card's author to confirm and apply. While it's made, your targets are the player's targets,
   then they're put back. With **Make Players' Attacks and Spells Through Midi-QOL** off, attacks
   and spells stay in the app.
+- **Targets you aren't viewing.** Midi can only target tokens your screen shows, on the level and
+  scene you're viewing, so a use at any other is refused, and its player is told you aren't
+  viewing their target. With **Allow Targets You Aren't Viewing** on, it's made anyway: the card
+  names every target, Midi does what it does for those your screen shows, and you apply the rest
+  from the card.
 - **Areas are picked, not placed.** No template is placed for an area spell: its targets are the
   combatants the player ticked in the app.
 - **Spell slots.** A spell is cast with the slot the player chose, from those dnd5e's usage dialog
   offers, or else with its own level's, or the first one left at a higher level, as the dialog
   picks it. Upcast spells scale their damage and number of targets as in Foundry.
+- **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
+  highest, or add more of its first die, or make that die another size, as a versatile weapon or
+  Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
+  critical hit's extra dice included.
 - **Nothing asks you, where it can be helped.** Area attacks, summoning, transforming and other
   activities dnd5e asks about, Midi's Active Defence, a used reaction or bonus action Midi
   enforces, and an activity set to always show Midi's dialogs or to ask which effects to apply are
@@ -145,6 +157,29 @@ attack hit only where the game shows players.
   took too long, then that it was made once you answer.
 - **Dice So Nice** doesn't animate a Midi attack while your tab is hidden, which would hold Midi's
   workflow until you came back.
+
+### Saves the game asks for
+
+Tick **Prompt Players for Saves & Concentration** too, and the campaign's players are asked in the
+app for the saving throws the game asks of their characters, wherever Foundry waits for a player to
+click one on a chat card. The app shows the request on every tab of the character, and the player
+rolls it there; the game makes it with their dice, as if they had clicked the card's button, so
+the card shows whether they saved.
+
+- **What asks.** dnd5e's concentration check after a concentrating character takes damage; a spell
+  or feature that calls for a saving throw, at each character it targets; and a saving throw or
+  concentration check you request in chat from an enricher, such as `[[/save dex 15]]`'s request
+  link, at every character whose player can read it.
+- **Only what the player could click.** A card whispered to you alone asks no one. The DC, and
+  whether they saved, are shown in the app only where dnd5e's Challenge Visibility would show the
+  player on the card.
+- **A failed concentration check ends concentration**, which the player can't do from the app.
+- **With Midi-QOL**, saves Midi rolls itself, as its Auto Check Saves has it, and its own
+  concentration checks stay Midi's, and no one is asked; with its Concentration Check at "chat
+  only", dnd5e's card is posted, and the player is asked. Midi ends concentration after a failed
+  check, as you have it set up.
+- **Ten minutes.** A request waits ten minutes, or until its card is deleted or the save is rolled
+  from it in Foundry.
 
 ### The listener must allow cross-origin requests
 
@@ -264,6 +299,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed and sectioned as Tidy 5e's Actions tab lists them |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites |
+| `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and the activity it's used through |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, hashed, and sent only when a campaign lacks them |
 | `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON |
 | `scripts/character-sync.mjs` | Sending a character again when it changes |

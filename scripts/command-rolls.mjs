@@ -2,10 +2,12 @@ import { ATTACK_KINDS, DIE_FACES, MODULE_ID, ROLL_KINDS, ROLL_TAG } from "./cons
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { diceStatus, withPlan } from "./dice-plan.mjs";
+import { findPrompt, outcomeOf } from "./prompts.mjs";
 
 /**
  * Making a player's roll from the Sending Stone app: a check, saving throw, death saving throw or
- * initiative, through dnd5e, as if the player had rolled it in Foundry, with the dice they rolled.
+ * initiative, through dnd5e, as if the player had rolled it in Foundry, with the dice they rolled;
+ * and a saving throw the game asked them for, on the card that asked.
  */
 
 /**
@@ -35,6 +37,8 @@ const KEYED = new Set(["skill", "tool", "ability", "save"]);
  *                                      whether it hit its target, when its player may know.
  * @property {object|null} [damage]     For an attack: the dice its damage will throw, for its player
  *                                      to roll; null when no damage follows.
+ * @property {string|null} [outcome]    For a save the game asked for: "success" or "failure", where
+ *                                      its player may know.
  */
 
 /**
@@ -66,17 +70,27 @@ export async function runRollCommand(command, campaign) {
   if ( !actor || !campaign.characters.has(actor.id) ) return failed("unknown");
   const refusal = checkRoll(command, actor);
   if ( refusal ) return failed(refusal);
+  let prompt = null;
+  if ( command.prompt ) {
+    const found = findPrompt(command.prompt, actor, campaign);
+    if ( found.refusal ) return failed("prompt", found.refusal);
+    if ( !found.prompt.abilities.includes(command.key) ) return failed("prompt", "ability");
+    prompt = found.prompt;
+  }
 
-  let message;
+  let made;
   try {
-    message = await withPlan(command, () => makeRoll(command, actor));
+    made = await withPlan(command, () => (prompt ? answerPrompt(command, actor, prompt) : makeRoll(command, actor)));
   } catch (err) {
     console.error(`${MODULE_ID} | Could not make ${actor.name}'s roll from Sending Stone`, err);
     return failed("error", err instanceof Error ? err.message : String(err));
   }
+  const message = prompt ? made?.message : made;
   // A roll a module called off, as dnd5e's hooks allow, made nothing.
   if ( !message ) return failed("cancelled");
-  return describeResult(command, message, actor, campaign);
+  const result = describeResult(command, message, actor, campaign);
+  if ( prompt ) result.outcome = result.visible ? made.outcome : null;
+  return result;
 }
 
 /**
@@ -91,10 +105,20 @@ export function checkCommand(command) {
   if ( KEYED.has(command.kind) !== (typeof command.key === "string") ) return "key";
   if ( (command.kind === "initiative") !== (typeof command.combatId === "string") ) return "combat";
   if ( ![-1, 0, 1].includes(command.mode) || (typeof command.explicit !== "boolean") ) return "mode";
+  if ( !isOptional(command.prompt, isPromptId) || (command.prompt && (command.kind !== "save")) ) return "prompt";
   const { extras, dice } = command;
   if ( !Array.isArray(extras) || (extras.length > 10) || !extras.every(isExtra) ) return "extras";
   if ( !Array.isArray(dice) || !dice.length || (dice.length > 11) || !dice.every(isRolled) ) return "dice";
   return null;
+}
+
+/**
+ * Is this a prompt's id, as the app sends it: a card's id and a character's, joined by "-"?
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isPromptId(value) {
+  return (typeof value === "string") && /^[A-Za-z0-9]{1,64}-[A-Za-z0-9]{1,64}$/.test(value);
 }
 
 /**
@@ -265,6 +289,37 @@ async function makeRoll(command, actor) {
     case "initiative": return rollInitiative(command, actor, { author, flags });
     default: return null;
   }
+}
+
+/**
+ * Answer a saving throw the game asked a character for, through dnd5e, without its dialog, as the
+ * player's own: on the card that asked, as if they had clicked it there, against its DC. A
+ * concentration check is rolled as one; failed, it ends the character's concentration, which the
+ * player can't from the app, unless Midi-QOL is there to, as it does after a failed check when its
+ * Gamemaster has it remove concentration.
+ * @param {object} command
+ * @param {Actor} actor
+ * @param {RollPrompt} prompt
+ * @returns {Promise<{message: ChatMessage|null, outcome: string|null}>}
+ */
+async function answerPrompt(command, actor, prompt) {
+  const author = authorFor(actor);
+  const flags = { [MODULE_ID]: { request: command.id }, dnd5e: { originatingMessage: prompt.messageId } };
+  const config = {
+    ability: command.key,
+    ...(Number.isFinite(prompt.dc) && { target: prompt.dc }),
+    rolls: [{ options: { [ROLL_TAG]: command.id } }]
+  };
+  const dialog = { configure: false };
+  const message = { rollMode: PUBLIC, data: { author: author.id, flags } };
+  const concentration = prompt.type === "concentration";
+  const rolls = concentration
+    ? await actor.rollConcentration(config, dialog, message)
+    : await actor.rollSavingThrow(config, dialog, message);
+  const made = Array.isArray(rolls) ? rolls : [rolls].filter(Boolean);
+  const failed = made[0]?.isFailure === true;
+  if ( concentration && failed && (game.modules.get("midi-qol")?.active !== true) ) await actor.endConcentration();
+  return { message: messageOf(made), outcome: outcomeOf(prompt, made) };
 }
 
 /**

@@ -2,7 +2,9 @@ import { MODULE_ID, ROLL_TAG, SETTINGS } from "./constants.mjs";
 import {
   authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
-import { damageRollsFor, diceStatus, plannedDice, withPlan } from "./dice-plan.mjs";
+import {
+  damageRollsFor, diceForEach, diceStatus, modifiedDice, plannedDice, readModifiers, withPlan
+} from "./dice-plan.mjs";
 
 /**
  * Making a player's attack, spell or feature from the Sending Stone app: using the item as in
@@ -102,7 +104,7 @@ export function attacksUnavailable() {
  * use of one a workflow?
  * @returns {boolean}
  */
-function midiActivities() {
+export function midiActivities() {
   if ( game.modules.get("midi-qol")?.active !== true ) return false;
   try {
     return game.settings.get("midi-qol", "ReplaceDefaultActivities") !== false;
@@ -117,6 +119,15 @@ function midiActivities() {
  */
 function midiIntegration() {
   return game.settings.get(MODULE_ID, SETTINGS.MIDI_INTEGRATION) !== false;
+}
+
+/**
+ * Does the Gamemaster let a Midi-QOL use be made at targets their canvas doesn't draw, such as on
+ * another level, leaving those to be applied from its card?
+ * @returns {boolean}
+ */
+function offCanvasTargets() {
+  return game.settings.get(MODULE_ID, SETTINGS.OFF_CANVAS_TARGETS) === true;
 }
 
 /**
@@ -619,8 +630,9 @@ function midiQueued(run) {
  * Why Midi-QOL would stop to ask the Gamemaster something about this use, or not make it, if it
  * would: Active Defence, which has an attack's target roll instead; an activity that always opens
  * Midi's dialogs, asks which of its effects to apply, or prompts for its roll; a target that can't
- * be targeted, or none where one is needed; or a reaction or bonus action already used this round,
- * where they're enforced.
+ * be targeted; a target the Gamemaster's canvas doesn't draw, unless they allow it; none Midi can
+ * target where one is needed; or a reaction or bonus action already used this round, where they're
+ * enforced.
  * @param {object} use   What `prepareUse` found.
  * @param {Actor} actor
  * @returns {string|null}
@@ -636,12 +648,13 @@ function midiRefusal({ activity, targets, attack }, actor) {
   const prompts = (activity.type === "utility") && activity.roll?.formula && activity.roll?.prompt;
   if ( always || properties.chooseEffects || prompts ) return "midi-dialog";
 
-  for ( const target of targets ) {
-    const token = target.token.object;
-    if ( !token ) return "scene";
-    if ( MidiQOL.isTargetable && !MidiQOL.isTargetable(token) ) return "target";
+  // Midi targets only tokens the Gamemaster's canvas draws: those on the level and scene they view.
+  const drawn = targets.filter(target => target.token.object);
+  if ( (drawn.length < targets.length) && !offCanvasTargets() ) return "scene";
+  for ( const target of drawn ) {
+    if ( MidiQOL.isTargetable && !MidiQOL.isTargetable(target.token.object) ) return "target";
   }
-  if ( !targets.length && midiNeedsTargets(activity, actor, settings) ) return "target";
+  if ( !drawn.length && midiNeedsTargets(activity, actor, settings) ) return targets.length ? "scene" : "target";
 
   if ( actor.inCombat ) {
     const enforced = setting => (settings[setting] === "all") || (settings[setting] === actor.type);
@@ -696,8 +709,11 @@ function rollsDamage(activity) {
  */
 async function midiUseNow(command, campaign, actor, use) {
   const { activity, usage, prepared, attackMode, ammunition, attack } = use;
-  const tokens = use.targets.map(target => target.token.object);
+  // Midi works on the targets the Gamemaster's canvas draws; any other, where they allow it, is
+  // only named on the card, for them to apply what it does.
+  const tokens = use.targets.map(target => target.token.object).filter(Boolean);
   const targets = use.targets.map(targetDescriptor);
+  const offCanvas = tokens.length < use.targets.length;
   if ( attack && ammunition ) await fireAmmunition(activity, ammunition);
   // Midi sets the Gamemaster's targets to the workflow's, and takes theirs for an area, or where it
   // has none.
@@ -732,11 +748,18 @@ async function midiUseNow(command, campaign, actor, use) {
 
     let card = null;
     let workflow = null;
+    // Midi names the workflow's targets on the card, which can't hold one the canvas lacks; the card
+    // names every target, for the Gamemaster to apply what Midi can't.
+    const nameAll = (used, message) => {
+      if ( message?.data?.flags?.[MODULE_ID]?.use !== command.id ) return;
+      foundry.utils.setProperty(message.data, "flags.dnd5e.targets", targets);
+    };
+    if ( offCanvas ) Hooks.on("dnd5e.preCreateUsageMessage", nameAll);
     const state = await withPlan(command, async () => {
       const results = await activity.use(midiUsage, { configure: false }, {
         rollMode: PUBLIC,
         data: { flags: { [MODULE_ID]: { use: command.id } } }
-      });
+      }).finally(() => Hooks.off("dnd5e.preCreateUsageMessage", nameAll));
       card = results?.message ?? null;
       if ( !card ) return "aborted";
       workflow = midiUsage.workflow ?? globalThis.MidiQOL.Workflow.getWorkflow(card.uuid);
@@ -875,7 +898,8 @@ export function previewDamage(activity, { attackMode, ammunition, isCritical=fal
       formula: roll.formula,
       type: damageLabel(roll.options.type),
       types: typeChoices(roll.options.types),
-      dice: plannable ? planned[index].dice : []
+      dice: plannable ? planned[index].dice : [],
+      perDie: diceForEach({ ...process, isCritical }, index)
     }))
   };
 }
@@ -903,7 +927,7 @@ function typeChoices(types) {
 
 /**
  * Roll a player's damage or healing, with their dice, on the use it follows: once, only with the
- * dice the use said it would throw, and as the kinds of damage they chose.
+ * dice the use said it would throw, changed as they chose, and as the kinds of damage they chose.
  * @param {object} command      The player's damage, as fetched from the app.
  * @param {Campaign} campaign
  * @returns {Promise<CommandResult>}
@@ -921,7 +945,10 @@ export async function runDamageCommand(command, campaign) {
   if ( card.getAssociatedActor?.()?.id !== actor.id ) return failedResult(command, "unknown");
   if ( flags.damage ) return failedResult(command, "damaged");
   if ( !stored.preview ) return failedResult(command, "not-waiting");
-  if ( !matchesPreview(command.dice, stored.preview) ) return failedResult(command, "invalid", "dice");
+  const modifiers = readModifiers(command.modifiers);
+  if ( modifiers === null ) return failedResult(command, "invalid", "modifiers");
+  const expected = modifiedDice(stored.preview, modifiers);
+  if ( !expected || !matchesDice(command.dice, expected) ) return failedResult(command, "invalid", "dice");
   if ( !offersTypes(command.types, stored.preview) ) return failedResult(command, "type");
 
   const rolls = (stored.path === "midi")
@@ -935,14 +962,13 @@ export async function runDamageCommand(command, campaign) {
 }
 
 /**
- * Are these the dice a use's damage throws, as its preview has them: the same dice, in order? None,
- * for damage that can't be planned or has no dice.
+ * Are these the dice a use's damage throws, as planned: the same dice, in order? None, for damage
+ * that can't be planned or has no dice.
  * @param {object[]} dice
- * @param {object} preview
+ * @param {{faces: number, number: number}[]} planned
  * @returns {boolean}
  */
-function matchesPreview(dice, preview) {
-  const planned = preview.plannable ? preview.rolls.flatMap(roll => roll.dice) : [];
+function matchesDice(dice, planned) {
   if ( dice.length !== planned.length ) return false;
   return dice.every((die, index) => (die.faces === planned[index].faces) && (die.results.length === planned[index].number));
 }

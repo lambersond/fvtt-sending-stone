@@ -1,4 +1,4 @@
-import { DIE_FACES, MODULE_ID, ROLL_TAG } from "./constants.mjs";
+import { DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from "./constants.mjs";
 
 /**
  * Making a player's roll here with the dice they rolled in the Sending Stone app.
@@ -86,11 +86,14 @@ let served = 0;
 /**
  * Whether players' rolls can be made here: only under D&D Fifth Edition, and once the self-test
  * has shown that this Foundry and its modules roll dice as expected. Their attacks also need their
- * damage rolled as expected, which the self-test checks apart.
+ * damage rolled as expected, and the damage they change in the app, more dice, another die or
+ * every die at its highest, changed as expected, which the self-test checks apart.
  * @type {{ready: boolean, reason: string|null, error: string|null, attacks: boolean,
- *   attacksError: string|null}}
+ *   attacksError: string|null, modifiers: boolean, modifiersError: string|null}}
  */
-export const diceStatus = { ready: false, reason: "pending", error: null, attacks: false, attacksError: null };
+export const diceStatus = {
+  ready: false, reason: "pending", error: null, attacks: false, attacksError: null, modifiers: false, modifiersError: null
+};
 
 /* -------------------------------------------- */
 
@@ -161,7 +164,9 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
   for ( const term of this.terms ) {
     if ( term instanceof DiceTerm ) termPlans.set(term, plan);
   }
-  return wrapped({ ...options, allowInteractive: false }, ...rest);
+  // Damage the player chose at its highest has every die at its highest, Foundry's own too.
+  const maximize = (plan.command.kind === "damage") && (plan.command.modifiers?.maximize === true);
+  return wrapped({ ...options, allowInteractive: false, ...(maximize && { maximize: true }) }, ...rest);
 }
 
 /**
@@ -232,13 +237,18 @@ function tagOf(process, config, index) {
 
 /**
  * Once dnd5e has built a tagged roll, keep how the player chose to roll it, whatever changed it
- * since, as a module granting advantage might.
+ * since, as a module granting advantage might; and change the first of a player's damage rolls as
+ * they chose in the app.
  * @param {Roll[]} rolls
  */
 function onRollConfiguration(rolls) {
-  for ( const roll of rolls ?? [] ) {
+  for ( const [index, roll] of (rolls ?? []).entries() ) {
     const plan = planFor(roll.options?.[ROLL_TAG]);
-    if ( !plan?.command.explicit || (plan.command.kind === "damage") ) continue;
+    if ( plan?.command.kind === "damage" ) {
+      if ( index === 0 ) reshapeDamage(roll, plan.command.modifiers);
+      continue;
+    }
+    if ( !plan?.command.explicit ) continue;
     const { mode } = plan.command;
     if ( roll.options.advantageMode === mode ) continue;
     roll.options.advantageMode = mode;
@@ -282,6 +292,89 @@ export function plannedDice(roll) {
     else if ( /d\d/i.test(term.formula ?? term.expression ?? "") ) return { plannable: false, dice: [] };
   }
   return { plannable: true, dice };
+}
+
+/**
+ * How many dice a damage roll throws for each die of its own, as this world rolls a critical hit's
+ * damage: one, but on a critical hit, such as two, or one where its dice are maximized instead. A
+ * player who adds a die to damage in the app throws that many more.
+ * @param {object} process   A damage roll's configuration, with whether it's a critical hit's.
+ * @param {number} index     The roll's place among its rolls.
+ * @returns {number}
+ */
+export function diceForEach(process, index) {
+  const config = process.rolls?.[index];
+  if ( !process.isCritical || !config ) return 1;
+  const thrown = parts => {
+    const [roll] = damageRollsFor({ ...process, rolls: [{ ...config, parts }] });
+    return plannedDice(roll).dice[0]?.number ?? 0;
+  };
+  return Math.max(thrown(["2d6"]) - thrown(["1d6"]), 1);
+}
+
+/**
+ * The dice damage throws, as its preview has them, changed as its player chose in the app: more of
+ * its first roll's first die, as many more as `perDie` says for each, or that die another size.
+ * @param {{plannable: boolean, rolls: {dice: object[], perDie?: number}[]}} preview
+ * @param {{extra?: number, faces?: number}} [modifiers]
+ * @returns {{faces: number, number: number}[]|null}   None for damage that can't be planned; null
+ *   when there's no such die to change.
+ */
+export function modifiedDice(preview, modifiers) {
+  const planned = preview.plannable ? preview.rolls.flatMap(roll => roll.dice) : [];
+  if ( !reshapes(modifiers) || !preview.plannable ) return planned;
+  const [first] = preview.rolls;
+  if ( !first?.dice?.length ) return null;
+  const [die, ...rest] = planned;
+  const number = die.number + ((modifiers.extra ?? 0) * (first.perDie ?? 1));
+  return [{ faces: modifiers.faces ?? die.faces, number }, ...rest];
+}
+
+/**
+ * Change the first of a player's damage rolls, built but not yet rolled, as they chose in the app:
+ * more of its first die, or another size of it; then make a critical hit's dice again, as this
+ * world makes them.
+ * @param {Roll} roll
+ * @param {{extra?: number, faces?: number}} [modifiers]
+ */
+export function reshapeDamage(roll, modifiers) {
+  if ( !reshapes(modifiers) ) return;
+  const { DiceTerm } = foundry.dice.terms;
+  const term = roll.terms.find(each => (each instanceof DiceTerm) && Number.isInteger(each.number) && (each.number > 0));
+  if ( !term ) return;
+  if ( modifiers.faces ) term.faces = modifiers.faces;
+  if ( modifiers.extra ) {
+    term.options.baseNumber = (term.options.baseNumber ?? term.number) + modifiers.extra;
+    term.number = term.options.baseNumber;
+  }
+  if ( typeof roll.configureDamage === "function" ) roll.configureDamage();
+  else roll.resetFormula();
+}
+
+/**
+ * The changes a player chose for their damage in the app, as read: more of its first die, up to
+ * 40, that die another size, and every die at its highest. Nothing for none; null for what can't be
+ * read.
+ * @param {unknown} modifiers
+ * @returns {{extra: number, faces: number|undefined, maximize: boolean}|undefined|null}
+ */
+export function readModifiers(modifiers) {
+  if ( (modifiers === undefined) || (modifiers === null) ) return undefined;
+  if ( typeof modifiers !== "object" ) return null;
+  const { extra=0, faces, maximize=false } = modifiers;
+  if ( !Number.isInteger(extra) || (extra < 0) || (extra > 40) ) return null;
+  if ( (faces !== undefined) && !DAMAGE_FACES.has(faces) ) return null;
+  if ( typeof maximize !== "boolean" ) return null;
+  return { extra, faces, maximize };
+}
+
+/**
+ * Do these change damage's dice: more of them, or another size?
+ * @param {{extra?: number, faces?: number}} [modifiers]
+ * @returns {boolean}
+ */
+function reshapes(modifiers) {
+  return ((modifiers?.extra ?? 0) > 0) || (modifiers?.faces !== undefined);
 }
 
 /**
@@ -406,8 +499,18 @@ export async function selfTest() {
     Object.assign(diceStatus, { attacks: true, attacksError: null });
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    Object.assign(diceStatus, { attacks: false, attacksError: error });
+    Object.assign(diceStatus, { attacks: false, attacksError: error, modifiers: false });
     console.warn(`${MODULE_ID} | Players' attacks from Sending Stone can't be made in this game: ${error}`, err);
+    return;
+  }
+
+  try {
+    await modifiersSelfTest();
+    Object.assign(diceStatus, { modifiers: true, modifiersError: null });
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    Object.assign(diceStatus, { modifiers: false, modifiersError: error });
+    console.warn(`${MODULE_ID} | Players can't change their damage from Sending Stone in this game: ${error}`, err);
   }
 }
 
@@ -451,6 +554,45 @@ async function attackSelfTest() {
     const left = critDice.filter(({ faces }) => plan.remaining(faces) > 0);
     check(!left.length, `a critical hit's damage, ${critical.formula}, left the player's dice unused`);
   });
+}
+
+/**
+ * Check that damage a player changes in the app is changed as expected: a critical hit's with a die
+ * more, made a d10, throws the dice its changed preview says, however this world and its modules
+ * roll critical damage, and takes every one of the player's dice; and damage at its highest has
+ * every die at its highest.
+ * @returns {Promise<void>}
+ */
+async function modifiersSelfTest() {
+  const id = `self-test-${foundry.utils.randomID()}`;
+  const process = {
+    rolls: [{ parts: ["1d8", "2"], data: {}, options: { type: "slashing", [ROLL_TAG]: id } }],
+    isCritical: true
+  };
+  const preview = {
+    plannable: true,
+    rolls: damageRollsFor(process).map((roll, index) => ({ dice: plannedDice(roll).dice, perDie: diceForEach(process, index) }))
+  };
+  const modifiers = { extra: 1, faces: 10 };
+  const expected = modifiedDice(preview, modifiers);
+  const [roll] = damageRollsFor(process);
+  reshapeDamage(roll, modifiers);
+  const thrown = plannedDice(roll);
+  check(thrown.plannable && (JSON.stringify(thrown.dice) === JSON.stringify(expected)),
+    `a critical hit's damage with a d10 more threw ${roll.formula}, not ${JSON.stringify(expected)}`);
+  const dice = expected.map(({ faces, number }) => ({
+    faces, results: Array.from({ length: number }, (_, i) => (i % faces) + 1)
+  }));
+  await withPlan({ id, kind: "damage", dice, modifiers }, async plan => {
+    await roll.evaluate();
+    check(dice.every(({ faces }) => plan.remaining(faces) === 0), `${roll.formula} left the player's dice unused`);
+  });
+
+  const highest = `self-test-${foundry.utils.randomID()}`;
+  const [max] = damageRollsFor({ rolls: [{ parts: ["2d6", "1"], data: {}, options: { [ROLL_TAG]: highest } }] });
+  await withPlan({ id: highest, kind: "damage", dice: [{ faces: 6, results: [6, 6] }], modifiers: { maximize: true } },
+    () => max.evaluate());
+  check(max.total === 13, `damage at its highest, 2d6 + 1, came to ${max.total}`);
 }
 
 /**

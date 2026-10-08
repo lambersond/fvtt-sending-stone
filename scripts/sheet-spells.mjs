@@ -1,4 +1,5 @@
 import { usesOf } from "./sheet-features.mjs";
+import { rollsIfAny } from "./sheet-rolls.mjs";
 import { finite, localize } from "./sheet-values.mjs";
 
 /**
@@ -128,6 +129,8 @@ function describeSpell(spell, texts) {
     prepared: (canPrepare && (level > 0)) ? (finite(system.prepared) ?? 0) : null,
     uses: usesOf(spell),
     castFrom: castFrom(spell),
+    // What it rolls, so it's cast or rolled from the Spells tab as from Actions.
+    ...rollsIfAny(spell),
     text: texts.add({ html: system.description?.value, relativeTo: spell })
   };
 }

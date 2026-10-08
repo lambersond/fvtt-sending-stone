@@ -62,11 +62,16 @@ export const SETTINGS = Object.freeze({
    *  Shown only while Midi-QOL is active. */
   MIDI_INTEGRATION: "midiIntegration",
 
+  /** World-scope switch for letting players' attacks and spells through Midi-QOL be made at
+   *  targets the Gamemaster's canvas doesn't show, such as on another level. Shown only while
+   *  Midi-QOL is active. */
+  OFF_CANVAS_TARGETS: "offCanvasTargets",
+
   /** Setting menu key for the campaigns dialog. */
   CAMPAIGNS_MENU: "campaignsMenu",
 
-  /** World-scope list of campaigns: {id, title, characters, rolls, attacks}, characters being
-   *  actor ids. */
+  /** World-scope list of campaigns: {id, title, characters, rolls, attacks, prompts}, characters
+   *  being actor ids. */
   CAMPAIGNS: "campaigns",
 
   /** World-scope set of the actor ids of connected characters, from before campaigns. Read once,
@@ -125,6 +130,14 @@ export const EVENTS = Object.freeze({
   COMBATANT_UPDATED: "combat.combatant.updated",
   COMBATANT_REMOVED: "combat.combatant.removed",
 
+  /** The game asks one of a campaign's characters for a saving throw that its player rolls, such
+   *  as a concentration check: on a chat card, where Foundry waits for the player's click. */
+  PROMPT_OPENED: "roll.prompt.opened",
+
+  /** A saving throw the game asked for no longer waits on its player: they rolled it, here or from
+   *  the app, its card was deleted, or it was left too long. */
+  PROMPT_CLOSED: "roll.prompt.closed",
+
   /** What became of a command fetched from the app, such as a player's roll. Not part of the event
    *  stream. */
   COMMAND_RESULT: "command.result"
@@ -158,6 +171,13 @@ export const ROLL_TAG = "sendingStone";
  * @type {ReadonlySet<number>}
  */
 export const DIE_FACES = Object.freeze(new Set([4, 6, 8, 10, 12, 20, 100]));
+
+/**
+ * The dice a player can make a die of damage in the app, such as a versatile weapon's d10 for its
+ * d8.
+ * @type {ReadonlySet<number>}
+ */
+export const DAMAGE_FACES = Object.freeze(new Set([4, 6, 8, 10, 12]));
 
 /**
  * The name of the hook this module calls whenever delivery status changes. Called with the status

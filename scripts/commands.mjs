@@ -5,6 +5,7 @@ import { commandsUrl, getDestination, getSecret, parseDestination } from "./conf
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, runRollCommand } from "./command-rolls.mjs";
 import { diceStatus } from "./dice-plan.mjs";
+import { prompting } from "./prompts.mjs";
 import { currentSession, send } from "./transport.mjs";
 
 /**
@@ -87,15 +88,24 @@ const queues = new Map();
  * What a campaign tells the app of its players' rolls in its hello: whether they're made here,
  * which, and if not, why not. Attacks, the uses of spells and features, and their damage are among
  * them when the Gamemaster lets the campaign's players attack and cast from the app too, and they
- * can be made here.
+ * can be made here; and then whether players may change their damage in the app, as the self-test
+ * found. And whether its players are asked in the app for the saves the game asks of them.
  * @param {Campaign} campaign
- * @returns {{enabled: boolean, kinds: string[], reason: string|null}}
+ * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
+ *   prompts: boolean}}
  */
 export function rollFeatures(campaign) {
-  if ( !campaign.rolls ) return { enabled: false, kinds: [], reason: "off" };
-  if ( !diceStatus.ready ) return { enabled: false, kinds: [], reason: diceStatus.reason };
+  const off = { enabled: false, kinds: [], modifiers: false, prompts: false };
+  if ( !campaign.rolls ) return { ...off, reason: "off" };
+  if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
   const attacks = campaign.attacks && !attacksUnavailable();
-  return { enabled: true, kinds: [...ROLL_KINDS, ...(attacks ? ATTACK_KINDS : [])], reason: null };
+  return {
+    enabled: true,
+    kinds: [...ROLL_KINDS, ...(attacks ? ATTACK_KINDS : [])],
+    reason: null,
+    modifiers: attacks && diceStatus.modifiers,
+    prompts: prompting(campaign)
+  };
 }
 
 /**
@@ -207,7 +217,10 @@ class Poller {
         failures++;
         continue;
       }
-      for ( const command of answer.commands ) take(command, campaign);
+      // The Gamemaster may have changed the campaign while the fetch was held open: its commands are
+      // made as it now is.
+      const current = getCampaigns().find(({ id }) => id === this.campaignId) ?? campaign;
+      for ( const command of answer.commands ) take(command, current);
       if ( answer.wait > 0 ) await this.#pause(Math.min(answer.wait, MAX_WAIT));
     }
     this.stop();

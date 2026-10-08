@@ -6,6 +6,7 @@ import { getCampaigns } from "./campaigns.mjs";
 import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { roster } from "./characters.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
+import { openPrompts } from "./prompts.mjs";
 import { noteTextsSent, sendTexts, SheetTexts } from "./sheet-texts.mjs";
 import { send } from "./transport.mjs";
 
@@ -59,10 +60,10 @@ const resent = new Map();
 
 /**
  * Send each campaign its full current state, so the listener can discard whatever it held for the
- * campaign and start afresh: its characters with their sheets, and the combats they are in. The
- * sheets' descriptions go first, in character.texts. Each says whether its players' rolls in the
- * app are made here; and fetching them starts afresh, so a campaign whose fetch was refused is
- * tried again.
+ * campaign and start afresh: its characters with their sheets, the combats they are in, and the
+ * saves the game is asking its players for. The sheets' descriptions go first, in character.texts.
+ * Each says whether its players' rolls in the app are made here; and fetching them starts afresh,
+ * so a campaign whose fetch was refused is tried again.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -97,7 +98,8 @@ export function announce({ campaignId }={}) {
       ...shared,
       features: { rolls: rollFeatures(campaign) },
       characters,
-      combats: combats.map(combat => snapshotCombat(combat, campaign))
+      combats: combats.map(combat => snapshotCombat(combat, campaign)),
+      prompts: openPrompts(campaign)
     }, campaign);
   }
   syncPollers({ retry: true });

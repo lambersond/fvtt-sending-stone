@@ -1,4 +1,5 @@
-import { describeActivity, visibleActivities } from "./sheet-actions.mjs";
+import { describeActivity } from "./sheet-actions.mjs";
+import { visibleActivities } from "./sheet-rolls.mjs";
 import { traitLabel } from "./sheet-details.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
 import { limitedUses } from "./sheet-features.mjs";
