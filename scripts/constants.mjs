@@ -165,6 +165,13 @@ export const ROLL_TAG = "sendingStone";
 export const DIE_FACES = Object.freeze(new Set([4, 6, 8, 10, 12, 20, 100]));
 
 /**
+ * The dice a player can make a die of damage in the app, such as a versatile weapon's d10 for its
+ * d8.
+ * @type {ReadonlySet<number>}
+ */
+export const DAMAGE_FACES = Object.freeze(new Set([4, 6, 8, 10, 12]));
+
+/**
  * The name of the hook this module calls whenever delivery status changes. Called with the status
  * object.
  * @type {string}

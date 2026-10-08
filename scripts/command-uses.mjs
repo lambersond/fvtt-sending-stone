@@ -2,7 +2,9 @@ import { MODULE_ID, ROLL_TAG, SETTINGS } from "./constants.mjs";
 import {
   authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
-import { damageRollsFor, diceStatus, plannedDice, withPlan } from "./dice-plan.mjs";
+import {
+  damageRollsFor, diceForEach, diceStatus, modifiedDice, plannedDice, readModifiers, withPlan
+} from "./dice-plan.mjs";
 
 /**
  * Making a player's attack, spell or feature from the Sending Stone app: using the item as in
@@ -896,7 +898,8 @@ export function previewDamage(activity, { attackMode, ammunition, isCritical=fal
       formula: roll.formula,
       type: damageLabel(roll.options.type),
       types: typeChoices(roll.options.types),
-      dice: plannable ? planned[index].dice : []
+      dice: plannable ? planned[index].dice : [],
+      perDie: diceForEach({ ...process, isCritical }, index)
     }))
   };
 }
@@ -924,7 +927,7 @@ function typeChoices(types) {
 
 /**
  * Roll a player's damage or healing, with their dice, on the use it follows: once, only with the
- * dice the use said it would throw, and as the kinds of damage they chose.
+ * dice the use said it would throw, changed as they chose, and as the kinds of damage they chose.
  * @param {object} command      The player's damage, as fetched from the app.
  * @param {Campaign} campaign
  * @returns {Promise<CommandResult>}
@@ -942,7 +945,10 @@ export async function runDamageCommand(command, campaign) {
   if ( card.getAssociatedActor?.()?.id !== actor.id ) return failedResult(command, "unknown");
   if ( flags.damage ) return failedResult(command, "damaged");
   if ( !stored.preview ) return failedResult(command, "not-waiting");
-  if ( !matchesPreview(command.dice, stored.preview) ) return failedResult(command, "invalid", "dice");
+  const modifiers = readModifiers(command.modifiers);
+  if ( modifiers === null ) return failedResult(command, "invalid", "modifiers");
+  const expected = modifiedDice(stored.preview, modifiers);
+  if ( !expected || !matchesDice(command.dice, expected) ) return failedResult(command, "invalid", "dice");
   if ( !offersTypes(command.types, stored.preview) ) return failedResult(command, "type");
 
   const rolls = (stored.path === "midi")
@@ -956,14 +962,13 @@ export async function runDamageCommand(command, campaign) {
 }
 
 /**
- * Are these the dice a use's damage throws, as its preview has them: the same dice, in order? None,
- * for damage that can't be planned or has no dice.
+ * Are these the dice a use's damage throws, as planned: the same dice, in order? None, for damage
+ * that can't be planned or has no dice.
  * @param {object[]} dice
- * @param {object} preview
+ * @param {{faces: number, number: number}[]} planned
  * @returns {boolean}
  */
-function matchesPreview(dice, preview) {
-  const planned = preview.plannable ? preview.rolls.flatMap(roll => roll.dice) : [];
+function matchesDice(dice, planned) {
   if ( dice.length !== planned.length ) return false;
   return dice.every((die, index) => (die.faces === planned[index].faces) && (die.results.length === planned[index].number));
 }

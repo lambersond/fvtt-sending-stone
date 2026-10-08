@@ -470,7 +470,7 @@ the destination, the campaigns or any event setting changes.
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected. See [Rolls from the app](#rolls-from-the-app). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks. See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 
@@ -619,7 +619,9 @@ hiding one as `combat.combatant.removed`.
   inventory items, and a feature's `range`, `target` and `concentration`, and an inventory item's
   `activation`, `range`, `target` and `concentration`, where they roll or are used through
   anything; attacks and uses may name any of them. A use at a target on a level or scene the
-  Gamemaster isn't viewing is made through Midi-QOL where they allow it.
+  Gamemaster isn't viewing is made through Midi-QOL where they allow it. Damage may be
+  [changed](#attacks) with `modifiers`, as the hello's `modifiers` says, and the damage preview's
+  rolls say their `perDie`.
 
 ## Changes from protocol 1
 
@@ -737,6 +739,7 @@ roll it, its damage, on the same use, with their dice. It takes two rolls, an `a
 | `use` | The `id` of the attack, or [use](#spells-and-features), it follows. |
 | `dice` | The dice the attack's `command.result` said its damage throws, in order, each `{ faces, results }`. None when it said they can't be planned, or there are none. |
 | `types` | Optional: for each of the damage's rolls, by its place among them, the kind of damage chosen, as one of that roll's `types`' `key`, or `null`. A roll with no choice made is rolled as the kind last rolled, as dnd5e does. |
+| `modifiers` | Optional, where the hello says `modifiers`: `{ extra, faces, maximize }`, how the player changed the damage in the app, each optional. `extra` more of its first roll's first die, up to 40, as many more as that roll's `perDie` for each; `faces` that die another size, `4`, `6`, `8`, `10` or `12`, as a versatile weapon's or Toll the Dead's; `maximize` every die at its highest, the game's own too. `dice` are then the changed ones. |
 
 **The attack.** The module uses the activity as dnd5e's usage dialog would, without it: with the
 spell slot, ammunition and attack mode the player chose, or else the dialog's own: the spell's own
@@ -771,7 +774,7 @@ the Gamemaster, as it would in Foundry, such as a target's reaction; an attack m
 | Field | Meaning |
 | --- | --- |
 | `attack` | `{ critical, fumble, outcome }`, when `visible`. `outcome` is `"hit"` or `"miss"` at its target, given only where the game shows players whether an attack hit: dnd5e's *Attack Roll Visibility* not *None*; Midi's *Auto Check Hits* showing hits to all, and not whispered as the Gamemaster's own rolls are when private. Otherwise `null`. A target under total cover is missed. The target's armor class is never sent. |
-| `damage` | The dice the attack's damage will throw, for its player to roll: `{ critical, plannable, healing, rolls: [{ formula, type, types, dice: [{ faces, number }] }] }`, as dnd5e will make up its rolls, with a critical hit's dice. `plannable` is `false` when a die can't be known beforehand, such as a d3: the game then rolls all of them. `healing` is `true` for healing. A roll's `types`, `[{ key, label }]`, are the kinds of damage its roller chooses among, as Chromatic Orb's, or `null` for none. `null` when no damage follows, as when Midi's workflow ends at a miss. |
+| `damage` | The dice the attack's damage will throw, for its player to roll: `{ critical, plannable, healing, rolls: [{ formula, type, types, dice: [{ faces, number }], perDie }] }`, as dnd5e will make up its rolls, with a critical hit's dice. A roll's `perDie` is how many dice it throws for each die of its own: `1`, or on a critical hit as many as this world's rules make of each, such as `2`; module 0.13.0. `plannable` is `false` when a die can't be known beforehand, such as a d3: the game then rolls all of them. `healing` is `true` for healing. A roll's `types`, `[{ key, label }]`, are the kinds of damage its roller chooses among, as Chromatic Orb's, or `null` for none. `null` when no damage follows, as when Midi's workflow ends at a miss. |
 
 **The damage** is rolled on the attack's use: on dnd5e's cards, a damage roll linked to the use's
 card; with Midi, into the workflow waiting for it, which then applies it. Its dice must be the
@@ -782,8 +785,19 @@ and keeps what its damage needs, so that it can be rolled after the game is relo
 a Midi workflow, which lives only in the Gamemaster's browser. Dice the game adds, such as Midi's
 bonus damage, are Foundry's.
 
+**Changed damage.** Where the hello says `modifiers`, a player may change their damage as dnd5e's
+damage dialog would let them: more of its first roll's first die, as a spell cast higher has; that
+die another size, as a versatile weapon or Toll the Dead has; or every die at its highest. The
+first die is changed before it's rolled, and a critical hit's dice made again, as this world makes
+them, so the player throws `perDie` more dice for each they add; dice that aren't those changed
+ones are refused (`"invalid"`, `"dice"`), as are changes the module can't read (`"invalid"`,
+`"modifiers"`). Damage at its highest is rolled so, every die at its highest, Foundry's own too.
+
 Players' attacks are offered once the self-test has also checked that the player's dice reach an
 attack's damage. If they don't, attacks and uses stay in the app, and Manage Campaigns says why.
+The self-test then checks that a critical hit's damage with a die more, made another size, throws
+the dice it should, and that damage at its highest is; if not, the hello says `modifiers` is
+`false`, and players' damage is rolled as it is.
 
 ### Spells and features
 

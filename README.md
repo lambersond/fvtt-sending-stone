@@ -145,6 +145,10 @@ attack hit only where the game shows players.
 - **Spell slots.** A spell is cast with the slot the player chose, from those dnd5e's usage dialog
   offers, or else with its own level's, or the first one left at a higher level, as the dialog
   picks it. Upcast spells scale their damage and number of targets as in Foundry.
+- **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
+  highest, or add more of its first die, or make that die another size, as a versatile weapon or
+  Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
+  critical hit's extra dice included.
 - **Nothing asks you, where it can be helped.** Area attacks, summoning, transforming and other
   activities dnd5e asks about, Midi's Active Defence, a used reaction or bonus action Midi
   enforces, and an activity set to always show Midi's dialogs or to ask which effects to apply are
