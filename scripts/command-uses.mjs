@@ -104,7 +104,7 @@ export function attacksUnavailable() {
  * use of one a workflow?
  * @returns {boolean}
  */
-function midiActivities() {
+export function midiActivities() {
   if ( game.modules.get("midi-qol")?.active !== true ) return false;
   try {
     return game.settings.get("midi-qol", "ReplaceDefaultActivities") !== false;

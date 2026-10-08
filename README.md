@@ -158,6 +158,29 @@ attack hit only where the game shows players.
 - **Dice So Nice** doesn't animate a Midi attack while your tab is hidden, which would hold Midi's
   workflow until you came back.
 
+### Saves the game asks for
+
+Tick **Prompt Players for Saves & Concentration** too, and the campaign's players are asked in the
+app for the saving throws the game asks of their characters, wherever Foundry waits for a player to
+click one on a chat card. The app shows the request on every tab of the character, and the player
+rolls it there; the game makes it with their dice, as if they had clicked the card's button, so
+the card shows whether they saved.
+
+- **What asks.** dnd5e's concentration check after a concentrating character takes damage; a spell
+  or feature that calls for a saving throw, at each character it targets; and a saving throw or
+  concentration check you request in chat from an enricher, such as `[[/save dex 15]]`'s request
+  link, at every character whose player can read it.
+- **Only what the player could click.** A card whispered to you alone asks no one. The DC, and
+  whether they saved, are shown in the app only where dnd5e's Challenge Visibility would show the
+  player on the card.
+- **A failed concentration check ends concentration**, which the player can't do from the app.
+- **With Midi-QOL**, saves Midi rolls itself, as its Auto Check Saves has it, and its own
+  concentration checks stay Midi's, and no one is asked; with its Concentration Check at "chat
+  only", dnd5e's card is posted, and the player is asked. Midi ends concentration after a failed
+  check, as you have it set up.
+- **Ten minutes.** A request waits ten minutes, or until its card is deleted or the save is rolled
+  from it in Foundry.
+
 ### The listener must allow cross-origin requests
 
 The post comes from the Gamemaster's browser, not the Foundry server, so the browser enforces

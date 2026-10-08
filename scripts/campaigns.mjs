@@ -20,6 +20,10 @@ import { MODULE_ID, SETTINGS } from "./constants.mjs";
  * @property {boolean} attacks        Do its players' attacks, spells and features in the app get
  *                                    made here too, using the item as in Foundry? Off until the
  *                                    Gamemaster turns it on, and only with `rolls`.
+ * @property {boolean} prompts        Are its players asked in the app for the saving throws the game
+ *                                    asks of their characters, such as concentration checks, to roll
+ *                                    them there? Off until the Gamemaster turns it on, and only with
+ *                                    `rolls`.
  */
 
 /**
@@ -28,9 +32,14 @@ import { MODULE_ID, SETTINGS } from "./constants.mjs";
  */
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
-  return stored.map(({ id, title, characters, rolls, attacks }) => {
-    return { id, title, characters: new Set(characters), rolls: rolls === true, attacks: attacks === true };
-  });
+  return stored.map(({ id, title, characters, rolls, attacks, prompts }) => ({
+    id,
+    title,
+    characters: new Set(characters),
+    rolls: rolls === true,
+    attacks: attacks === true,
+    prompts: prompts === true
+  }));
 }
 
 /**

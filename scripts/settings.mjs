@@ -60,7 +60,8 @@ export function registerSettings() {
       title: new StringField({ blank: false }),
       characters: new ArrayField(new StringField({ blank: false })),
       rolls: new BooleanField({ initial: false }),
-      attacks: new BooleanField({ initial: false })
+      attacks: new BooleanField({ initial: false }),
+      prompts: new BooleanField({ initial: false })
     })),
     default: [],
     onChange: () => reannounce()

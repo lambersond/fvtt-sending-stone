@@ -60,6 +60,8 @@
         "system": "they need the D&D Fifth Edition system.",
         "self-test": "this version of Foundry, or a module, rolls dice differently than Sending Stone expects. The browser's console says what went wrong."
       },
+      "Prompts": "Prompt Players for Saves & Concentration",
+      "PromptsHint": "When the game asks one of its characters for a saving throw that Foundry waits on its player to click, their player is asked in the Sending Stone app instead, and their roll there is made here, on the card that asked, with their dice: a concentration check after damage, a save that a spell or feature targeting them calls for, and a save you request in chat. They see the DC, and whether they saved, only where dnd5e's Challenge Visibility would show them. A failed concentration check ends their concentration. Where Midi-QOL rolls saves or concentration checks itself, it still does. Needs Let Players Roll from Sending Stone.",
       "Attacks": "Let Players Attack and Cast from Sending Stone",
       "AttacksHint": "Attacks its players make in the Sending Stone app, and the spells and features they use there, such as Fireball, Cure Wounds or Second Wind, are made here too, at the targets they pick, with the spell slot, ammunition and attack mode they choose. The item is used as in Foundry, spending ammunition, uses and spell slots, and its damage or healing is rolled on the same use, all with the dice they rolled. Without Midi-QOL, you roll the targets' saving throws and apply the damage from the cards, as in Foundry; with it, Midi does. Needs Let Players Roll from Sending Stone.",
       "AttacksUnavailable": "Players' attacks and spells from Sending Stone can't be made in this game: {reason}",

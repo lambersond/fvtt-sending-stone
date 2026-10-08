@@ -470,9 +470,10 @@ the destination, the campaigns or any event setting changes.
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks. See [Rolls from the app](#rolls-from-the-app). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, prompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks; and `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters. See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
+| `prompts` | Every [prompt](#prompts) open for the campaign's players, read afresh from the chat log: any the campaign was told of that isn't among them has closed. Empty while its players aren't asked for their saves. |
 
 It follows the [`character.texts`](#charactertexts) with every description the characters' sheets
 refer to.
@@ -528,14 +529,15 @@ What became of a player's roll, attack or use fetched from the listener; see
 | --- | --- |
 | `id` | The roll's `id`, as fetched. |
 | `status` | `"done"`, or `"failed"` when it wasn't made. |
-| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). `null` when done. |
-| `error` | What went wrong, for `"invalid"` and `"error"`, and what dnd5e said for `"consume"`; otherwise `null`. |
+| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). `null` when done. |
+| `error` | What went wrong, for `"invalid"` and `"error"`, what dnd5e said for `"consume"`, and why for `"prompt"`; otherwise `null`. |
 | `messageId` | The chat message the roll made. |
 | `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check. |
 | `rolls` | The [rolls](#chat-message) as made, Foundry's total and every die, when `visible`; otherwise empty. |
 | `attack` | For an attack: `{ critical, fumble, outcome }`, when `visible`; see [Attacks](#attacks). |
 | `use` | For a use: `{ type }`, the kind of activity used; see [Spells and features](#spells-and-features). |
 | `damage` | For an attack or a use: the dice its damage or healing will throw, or `null`; see [Attacks](#attacks). |
+| `outcome` | For a save answering a prompt: `"success"` or `"failure"`, where its player may see whether they saved, as the card would show them; otherwise `null`. |
 
 A roll made after the module reported its `"timeout"`, as once the Gamemaster has answered what a
 module asked them, is reported again when it's made, `"done"`.
@@ -580,6 +582,29 @@ Sent only while **Send Combat Events** is on. Every payload naming a combat carr
 While hidden combatants are withheld, revealing one is sent as `combat.combatant.added`, and
 hiding one as `combat.combatant.removed`.
 
+### Prompts
+
+Sent only for a campaign whose players are asked for their saves; see
+[Saves the game asks for](#saves-the-game-asks-for).
+
+| Type | Payload |
+| --- | --- |
+| `roll.prompt.opened` | `{ prompt }`: the game asks one of the campaign's characters for a saving throw. |
+| `roll.prompt.closed` | `{ id, reason }`: a prompt no longer waits on its player. `reason` is `"answered"` (rolled from the app), `"rolled"` (rolled from its card in Foundry), `"gone"` (its card was deleted) or `"expired"` (left ten minutes). |
+
+A prompt:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The card's id and the character's, joined by `-`. |
+| `actorId` | The character asked. |
+| `messageId` | The chat card that asks. |
+| `type` | `"save"`, or `"concentration"` for a concentration check. |
+| `abilities` | The abilities it may be rolled with, such as `["dex"]`, or `["str", "dex"]` for a choice; one for a concentration check. |
+| `dc` | The DC, where dnd5e's *Challenge Visibility* lets the character's player see it on the card; otherwise `null`. |
+| `label` | What asks: the spell or feature whose card it is, or what the character is concentrating on; or `null`. |
+| `openedAt`, `expiresAt` | When its card was posted, and when it stops waiting, ten minutes later. |
+
 ## Additions within protocol 2
 
 - Module 0.3.0 sends [`bridge.heartbeat`](#bridgeheartbeat). A listener that answers `2xx` to
@@ -621,7 +646,11 @@ hiding one as `combat.combatant.removed`.
   anything; attacks and uses may name any of them. A use at a target on a level or scene the
   Gamemaster isn't viewing is made through Midi-QOL where they allow it. Damage may be
   [changed](#attacks) with `modifiers`, as the hello's `modifiers` says, and the damage preview's
-  rolls say their `perDie`.
+  rolls say their `perDie`. Players may be asked for the [saves the game asks](#saves-the-game-asks-for)
+  of their characters: `prompts` in the hello's `features` and in the hello,
+  [`roll.prompt.opened` and `roll.prompt.closed`](#prompts), a save's `prompt`, and `outcome` and
+  the reason `"prompt"` in `command.result`. A listener that answers `2xx` to types it does not use
+  needs no change.
 
 ## Changes from protocol 1
 
@@ -644,7 +673,7 @@ campaign, with **Let Players Roll from Sending Stone** in Manage Campaigns. It i
 | `skill` | A skill check, such as Perception. | `key`: dnd5e's skill key, such as `"prc"`. |
 | `tool` | A tool check. | `key`: dnd5e's tool key, such as `"thief"`. |
 | `ability` | An ability check. | `key`: the ability, such as `"str"`. |
-| `save` | A saving throw. | `key`: the ability. |
+| `save` | A saving throw. | `key`: the ability; `prompt`, the [prompt](#saves-the-game-asks-for) it answers, if any. |
 | `death` | A death saving throw, while the character is dying. | |
 | `initiative` | Initiative, while the character has none in the combat the Gamemaster has up. | `combatId` |
 
@@ -838,3 +867,42 @@ formula (`"midi-dialog"`).
 | --- | --- |
 | `use` | `{ type }`: the kind of activity used, `"save"`, `"damage"`, `"heal"` or `"utility"`. |
 | `damage` | The dice its damage or healing will throw, as for an attack, never a critical hit's; or `null` when none follows, as for Bless, or where Midi rolled it itself. |
+
+### Saves the game asks for
+
+With **Prompt Players for Saves & Concentration** also ticked for the campaign, its players are
+asked in the app for the saving throws the game asks of their characters, where Foundry waits for
+a player to click a button on a chat card:
+
+- **dnd5e's concentration check.** After a concentrating character takes damage, dnd5e posts a
+  card asking for one, whispered to the character's owners. That character is asked.
+- **A save's card.** A spell or feature that calls for a saving throw posts its card with a button
+  for it. Each of the campaign's characters it targets is asked.
+- **A request in chat.** A Gamemaster posts a saving throw or concentration check from a `/save`
+  or `/concentration` enricher's request link. Each of the campaign's characters whose player can
+  read it is asked: every one, unless it's whispered.
+
+A card its character's player can't read asks no one. Where Midi-QOL rolls the saves itself, as
+its *Auto Check Saves* has it, or posts and rolls its own concentration card, it still does, and
+no one is asked; with its *Concentration Check* at "chat only", it posts dnd5e's card, and the
+player is asked.
+
+Each is sent as [`roll.prompt.opened`](#prompts). It stays open for up to ten minutes: until its
+character rolls the save from its card, or the card is deleted. [`roll.prompt.closed`](#prompts)
+says when it closes. The player answers it with a `save` naming it:
+
+| Roll field | Meaning |
+| --- | --- |
+| `kind` | `"save"`. |
+| `key` | One of the prompt's `abilities`. |
+| `prompt` | The prompt's `id`. |
+
+Its other fields are a save's. The module makes it as dnd5e does from the card's button: a saving
+throw, or a concentration check, against the card's DC, as the character's player, linked to the
+card (`flags.dnd5e.originatingMessage`), so the card shows whether they saved. A failed
+concentration check ends the character's concentration, which the player can't from the app; with
+Midi-QOL, Midi ends it, where its Gamemaster has it remove concentration. Refused as `"prompt"`,
+with why in `error`: `"off"` (the campaign doesn't ask its players now), `"character"` (another
+character's), `"gone"` (its card is gone, or asks no save of the character), `"expired"`,
+`"answered"` (the character has rolled it), or `"ability"` (one the prompt doesn't offer).
+`command.result` adds `outcome`.

@@ -8,6 +8,7 @@ import { registerChatHooks } from "./chat.mjs";
 import { registerCombatHooks } from "./combat.mjs";
 import { installDicePlans, selfTest } from "./dice-plan.mjs";
 import { startHeartbeat } from "./heartbeat.mjs";
+import { registerPromptHooks } from "./prompts.mjs";
 import { registerSettings } from "./settings.mjs";
 
 Hooks.once("init", () => {
@@ -15,6 +16,7 @@ Hooks.once("init", () => {
   registerChatHooks();
   registerCombatHooks();
   registerCharacterHooks();
+  registerPromptHooks();
 });
 
 // Every client registers the hooks, but only the active Gamemaster's posts anything. That role can
