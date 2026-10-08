@@ -1,4 +1,7 @@
 import { limitedUses, usesOf } from "./sheet-features.mjs";
+import {
+  ammunitionOf, attackModesOf, damageOf, describeUse, rangeOf, rollsOf, saveOf, toHitOf, USES, visibleActivities
+} from "./sheet-rolls.mjs";
 import { castFrom } from "./sheet-spells.mjs";
 import { finite, localize } from "./sheet-values.mjs";
 
@@ -22,9 +25,6 @@ const SECTIONS = ["action", "bonus", "reaction", "legendary", "mythic", "lair", 
 
 /** Activations that take too long to be used in a fight. */
 const SLOW = ["minute", "hour", "day", "none"];
-
-/** The kinds of activity a player can use from the app other than an attack. */
-const USES = new Set(["save", "damage", "heal", "utility"]);
 
 /* -------------------------------------------- */
 
@@ -150,9 +150,6 @@ function describeAction(item, texts) {
   const activities = visibleActivities(item);
   const [first] = activities;
   const attack = activities.find(activity => activity.type === "attack");
-  const save = activities.find(activity => activity.type === "save");
-  // The damage that goes with the attack, or else the first there is: a save's, or healing.
-  const damaging = attack ?? activities.find(activity => activity.labels?.damage?.length);
   return {
     id: item.id,
     name: item.name,
@@ -161,15 +158,7 @@ function describeAction(item, texts) {
     activation: first?.labels?.activation || item.labels?.activation || null,
     range: rangeOf(item, attack ?? first),
     target: first?.labels?.target || item.labels?.target || null,
-    toHit: identified ? toHitOf(attack) : null,
-    // The attack the bonus is for, so the app can have it made here.
-    attackId: identified ? (attack?.id ?? null) : null,
-    // What else it's used through, such as a save or healing, so the app can have it used here.
-    activity: identified ? useOf(item, activities, attack ? undefined : damaging) : null,
-    attackModes: (identified && attack) ? attackModesOf(item) : null,
-    ammunition: (identified && attack) ? ammunitionOf(item) : null,
-    save: identified ? saveOf(save) : null,
-    damage: identified ? damageOf(damaging) : [],
+    ...rollsOf(item),
     uses: identified ? (usesOf(item) ?? limitedUses(first?.uses, first?.labels)) : null,
     level: (item.type === "spell") ? (finite(system.level) ?? 0) : null,
     castFrom: (item.type === "spell") ? castFrom(item) : null,
@@ -207,170 +196,7 @@ export function describeActivity(item, activity) {
   };
 }
 
-/**
- * The activity an action is used through in the game other than by attacking: the one its damage
- * or healing comes from, or else its first save, damage, healing or utility activity.
- * @param {Item} item
- * @param {Activity[]} activities   Those its player sees.
- * @param {Activity} [damaging]       The one its damage comes from, when it isn't an attack.
- * @returns {object|null}
- */
-function useOf(item, activities, damaging) {
-  const activity = USES.has(damaging?.type) ? damaging : activities.find(each => USES.has(each.type));
-  return activity ? describeUse(item, activity) : null;
-}
-
-/**
- * An activity a player can use from the app, by its id, with whom it's used at: its user alone, an
- * area, or a number of targets, and of what kind, such as allies or enemies.
- * @param {Item} item
- * @param {Activity} activity
- * @returns {{id: string, type: string, targets: {self: boolean, area: boolean, count: number|null,
- *   perLevel: number|null, affects: string|null}}}
- */
-function describeUse(item, activity) {
-  const target = activity.target ?? {};
-  const affects = target.affects?.type || null;
-  const area = Boolean(target.template?.type);
-  const count = finite(target.affects?.count);
-  return {
-    id: activity.id,
-    type: activity.type,
-    targets: {
-      self: (affects === "self") || (!area && !affects && (activity.range?.units === "self")),
-      area,
-      count: (count > 0) ? count : null,
-      perLevel: (count > 0) ? countPerLevel(item, activity, count) : null,
-      affects
-    }
-  };
-}
-
-/**
- * How many more targets a spell takes for each level it's cast above its own, as Bless or Hold
- * Person do: its number of targets is a formula of the spell's scaling. Null for none.
- * @param {Item} item
- * @param {Activity} activity
- * @param {number} count   How many it takes at its own level.
- * @returns {number|null}
- */
-function countPerLevel(item, activity, count) {
-  if ( (item.type !== "spell") || !((finite(item.system?.level) ?? 0) > 0) ) return null;
-  // The formula as typed: the activity's own, or the spell's, which it takes unless it overrides it.
-  const typed = activity.target?.override
-    ? activity._source?.target?.affects?.count
-    : (item.system._source?.target?.affects?.count ?? activity._source?.target?.affects?.count);
-  if ( (typeof typed !== "string") || !/[^\d\s.]/.test(typed) ) return null;
-  try {
-    const scaling = (finite(item.flags?.dnd5e?.scaling) ?? 0) + 1;
-    const scaled = item.clone({ "flags.dnd5e.scaling": scaling }, { keepId: true });
-    const more = (finite(scaled.system.activities?.get(activity.id)?.target?.affects?.count) ?? count) - count;
-    return (more > 0) ? more : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The ways a weapon attacks, when there's more than one, such as one- or two-handed, or thrown.
- * @param {Item} item
- * @returns {{value: string, label: string}[]|null}
- */
-function attackModesOf(item) {
-  const modes = Array.from(item.system?.attackModes ?? []).filter(mode => mode.value);
-  if ( modes.length < 2 ) return null;
-  return modes.map(({ value, label }) => ({ value, label: localize(label) || value }));
-}
-
-/**
- * The ammunition a weapon fires, with how much of each is left.
- * @param {Item} item
- * @returns {{id: string, name: string, quantity: number}[]|null}
- */
-function ammunitionOf(item) {
-  if ( !item.system?.properties?.has?.("amm") ) return null;
-  return Array.from(item.system.ammunitionOptions ?? []).map(option => ({
-    id: option.value,
-    name: option.item?.name ?? option.label,
-    quantity: finite(option.item?.system?.quantity) ?? 0
-  }));
-}
-
-/**
- * Where an action reaches, as dnd5e's sheet puts it: for a weapon, its reach or range, such as
- * "reach 5 ft" or "range 20/60 ft"; otherwise its activity's range, such as "30 ft" or "Self".
- * @param {Item} item
- * @param {Activity} [activity]
- * @returns {string|null}
- */
-function rangeOf(item, activity) {
-  try {
-    const label = activity?.getRangeLabel?.();
-    if ( label ) return label;
-  } catch {
-    // Fall back on the labels.
-  }
-  return activity?.labels?.range || item.labels?.range || null;
-}
-
-/**
- * An attack's bonus to hit, as a number. Bonuses that are dice, such as +1d4, are left out, as
- * dnd5e's sheets leave them out of the number they show.
- * @param {Activity} [attack]
- * @returns {number|null}
- */
-function toHitOf(attack) {
-  const value = Number.parseInt(attack?.labels?.modifier);
-  return Number.isFinite(value) ? value : null;
-}
-
-/**
- * The saving throw an activity calls for: the ability's abbreviation, or "DC" when the target
- * chooses between several, and the DC.
- * @param {Activity} [activity]
- * @returns {{ability: string, dc: number|null}|null}
- */
-function saveOf(activity) {
-  if ( !activity?.save ) return null;
-  const abilities = Array.from(activity.save.ability ?? []);
-  if ( !abilities.length ) return null;
-  const ability = (abilities.length === 1)
-    ? (localize(CONFIG.DND5E?.abilities?.[abilities[0]]?.abbreviation) || abilities[0])
-    : localize("DND5E.AbbreviationDC");
-  return { ability, dc: finite(activity.save.dc?.value) };
-}
-
-/**
- * An activity's damage or healing, in parts as dnd5e labels them, each with its formula, such as
- * "1d8 + 4", and its kind.
- * @param {Activity} [activity]
- * @returns {{formula: string, type: string|null, healing: boolean}[]}
- */
-function damageOf(activity) {
-  const healingTypes = CONFIG.DND5E?.healingTypes ?? {};
-  return Array.from(activity?.labels?.damage ?? []).flatMap(part => {
-    const formula = String(part.formula ?? "").trim();
-    if ( !formula ) return [];
-    let type = localize(CONFIG.DND5E?.damageTypes?.[part.damageType]?.label ?? healingTypes[part.damageType]?.label) || null;
-    // A part of several kinds has none of its own; its label names them after the formula.
-    if ( !type && part.label?.startsWith(formula) ) type = part.label.slice(formula.length).trim() || null;
-    return [{ formula, type, healing: part.damageType in healingTypes }];
-  });
-}
-
 /* -------------------------------------------- */
-
-/**
- * An item's activities that its player can see and use, in their order. dnd5e 6 hides those that
- * don't apply; dnd5e 5 says they can't be used.
- * @param {Item} item
- * @returns {Activity[]}
- */
-export function visibleActivities(item) {
-  return Array.from(item.system?.activities ?? []).filter(activity => ("isHidden" in activity)
-    ? !activity.isHidden
-    : (activity.canUse !== false));
-}
 
 /**
  * An item's first activity that its player can see.

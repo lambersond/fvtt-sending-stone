@@ -1,4 +1,5 @@
 import { usesOf } from "./sheet-features.mjs";
+import { rollsIfAny, usageOf } from "./sheet-rolls.mjs";
 import { finite, localize } from "./sheet-values.mjs";
 
 /**
@@ -108,11 +109,24 @@ function describeItem(item, texts) {
     rarity: identified ? rarityOf(system) : null,
     properties: identified ? Array.from(item.labels?.properties ?? [], property => property.label).filter(Boolean) : [],
     identified,
+    // What it rolls, and how it's used, so it's used or rolled from Inventory as from Actions.
+    ...usableFields(item),
     text: texts.add({
       html: identified ? system.description?.value : system.unidentified?.description,
       relativeTo: item
     })
   };
+}
+
+/**
+ * What an item rolls, and how it's used, as an action has them; nothing where it rolls nothing,
+ * or isn't identified yet.
+ * @param {Item} item
+ * @returns {object}
+ */
+function usableFields(item) {
+  const rolls = rollsIfAny(item);
+  return rolls ? { ...usageOf(item), ...rolls } : {};
 }
 
 /**

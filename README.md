@@ -47,8 +47,9 @@ seconds is sent a heartbeat, so the app can show players whether the game is con
 Each campaign's characters are sent with their sheets under D&D Fifth Edition: abilities, saves,
 skills, hit points, armor class and the like, as dnd5e shows them, along with their features,
 conditions and effects, inventory, spells, traits and biography, and their actions, as Tidy 5e's
-Actions tab lists them, with each one's bonus to hit, saving throw and damage, and their
-favorites, as dnd5e's sheet shows them. When a character
+Actions tab lists them, with each one's bonus to hit, saving throw and damage, as are the spells,
+features and inventory items that roll anything, and their favorites, as dnd5e's sheet shows them.
+When a character
 changes, such as taking damage, levelling up or gaining a condition, its campaigns are sent it again, so players can see their character and roll from it
 in the app. Descriptions, enriched as the player would see them in Foundry, are sent once and
 then only when one is new, since they are most of a sheet's size.
@@ -115,7 +116,8 @@ Sending Stone app, or a listener that says it can, is asked for; see
 
 Tick **Let Players Attack and Cast from Sending Stone** too, and the campaign's players can attack,
 cast their spells and use their features from the app: Fireball, Sacred Flame, Magic Missile, Cure
-Wounds, Second Wind, Bless, Shield or Action Surge. They pick their targets from the combat, and
+Wounds, Second Wind, Bless, Shield or Action Surge, from their actions, spells, features, inventory
+or favorites, wherever the app lists them. They pick their targets from the combat, and
 the spell slot, ammunition or attack mode, and tap it; then the app rolls its damage or healing,
 with their dice, once the game has made the use, asking first for the kind of damage where it
 offers a choice, as Chromatic Orb does. The item is used as in Foundry, spending its ammunition,
@@ -270,6 +272,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed and sectioned as Tidy 5e's Actions tab lists them |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites |
+| `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and the activity it's used through |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, hashed, and sent only when a campaign lacks them |
 | `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON |
 | `scripts/character-sync.mjs` | Sending a character again when it changes |
