@@ -145,6 +145,12 @@ attack hit only where the game shows players.
 - **Spell slots.** A spell is cast with the slot the player chose, from those dnd5e's usage dialog
   offers, or else with its own level's, or the first one left at a higher level, as the dialog
   picks it. Upcast spells scale their damage and number of targets as in Foundry.
+- **Items with several activities.** Each of an item's activities can be used, as Foundry's
+  activity dialog offers them: Hex's curse and its Bonus Hex Damage, Channel Divinity's choices, an
+  unarmed strike's grapple. The app shows an item as its first activity, which for a spell is how
+  it's cast, with the rest beneath it. An activity used after a spell is cast without spending a
+  slot, such as Spirit Guardians' save each turn, is used at the level the player picks, slots left
+  or not, as dnd5e uses it.
 - **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
   Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
@@ -299,7 +305,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed and sectioned as Tidy 5e's Actions tab lists them |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites |
-| `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and the activity it's used through |
+| `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, hashed, and sent only when a campaign lacks them |
 | `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON |
 | `scripts/character-sync.mjs` | Sending a character again when it changes |

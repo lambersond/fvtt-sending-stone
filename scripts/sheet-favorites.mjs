@@ -1,9 +1,7 @@
-import { describeActivity } from "./sheet-actions.mjs";
-import { visibleActivities } from "./sheet-rolls.mjs";
+import { describeActivity, visibleActivities } from "./sheet-rolls.mjs";
 import { traitLabel } from "./sheet-details.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
-import { limitedUses } from "./sheet-features.mjs";
-import { combinedMode, finite, localize } from "./sheet-values.mjs";
+import { combinedMode, finite, limitedUses, localize } from "./sheet-values.mjs";
 
 /**
  * A character's favorites, as dnd5e's sheet shows them under Favorites, and Tidy 5e in its own:

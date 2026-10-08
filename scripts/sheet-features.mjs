@@ -1,4 +1,4 @@
-import { finite, localize } from "./sheet-values.mjs";
+import { finite, limitedUses, localize } from "./sheet-values.mjs";
 import { rollsIfAny, usageOf } from "./sheet-rolls.mjs";
 
 /**
@@ -135,23 +135,6 @@ export function usesOf(item) {
   return limitedUses(item.system?.uses, item.labels);
 }
 
-/**
- * Limited uses, of an item or one of its activities, which dnd5e keeps alike.
- * @param {object} [uses]       Such as an item's system.uses.
- * @param {object} [labels]     Its labels, which name a recharge, such as "Recharge [5+]".
- * @returns {{value: number, max: number, recovery: string|null}|null}
- */
-export function limitedUses(uses, labels) {
-  const max = finite(uses?.max);
-  if ( !max ) return null;
-  const value = finite(uses.value) ?? Math.max(max - (finite(uses.spent) ?? 0), 0);
-  const periods = (uses.recovery ?? []).map(recovery => {
-    if ( recovery.period === "recharge" ) return labels?.recharge ?? null;
-    return localize(CONFIG.DND5E?.limitedUsePeriods?.[recovery.period]?.label) || null;
-  }).filter(Boolean);
-  return { value, max, recovery: periods.length ? listFormat(periods) : null };
-}
-
 /* -------------------------------------------- */
 
 /**
@@ -161,17 +144,4 @@ export function limitedUses(uses, labels) {
  */
 function isItem(value) {
   return value?.documentName === "Item";
-}
-
-/**
- * Join words as a list in the game's language, such as "Short Rest, Long Rest".
- * @param {string[]} words
- * @returns {string}
- */
-function listFormat(words) {
-  try {
-    return new Intl.ListFormat(game.i18n.lang, { style: "narrow" }).format(words);
-  } catch {
-    return words.join(", ");
-  }
 }

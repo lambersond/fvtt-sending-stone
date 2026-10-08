@@ -1,10 +1,14 @@
-import { finite, localize } from "./sheet-values.mjs";
+import { finite, limitedUses, localize } from "./sheet-values.mjs";
 
 /**
  * What an item rolls, or is used through, as the sheet tells the app: its bonus to hit and the
  * attack it's for, the saving throw it calls for, its damage or healing, and the activity it's
  * otherwise used through. Actions carry them, and so do the spells, features and inventory items
  * that have any, so that the app can roll them, or have them made in the game, from any tab.
+ *
+ * An item's own are its first activity's, in dnd5e's order: for a spell, how it's cast. An item
+ * with more than one activity, such as Hex, with its Bonus Hex Damage, or a weapon that also
+ * grapples, lists each of them besides, so that the app can roll or use each.
  */
 
 /** The kinds of activity a player can use from the app other than an attack. */
@@ -24,62 +28,73 @@ export function visibleActivities(item) {
     : (activity.canUse !== false));
 }
 
+/** What an activity rolls, when it rolls nothing, or isn't to be told. */
+const NO_ROLLS = Object.freeze({
+  toHit: null, attackId: null, activity: null, attackModes: null, ammunition: null, save: null, damage: []
+});
+
 /**
- * What an item rolls: its attack's bonus to hit and the attack's id, the activity it's otherwise
- * used through, such as a save or healing, its attack's modes and ammunition, the saving throw it
- * calls for, and its damage or healing, from its attack, or else the first activity that has any.
- * An item not identified yet keeps them to itself.
+ * What an item rolls, as its first activity does: an attack's bonus to hit and the attack's id,
+ * with its modes and ammunition, or else the activity it's used through, such as a save or
+ * healing; the saving throw it calls for; and its damage or healing. An item with more than one
+ * activity lists each, as `describeActivity` describes it, with its id, name and kind. An item not
+ * identified yet keeps them all to itself.
  * @param {Item} item
  * @returns {{toHit: number|null, attackId: string|null, activity: object|null,
- *   attackModes: object[]|null, ammunition: object[]|null, save: object|null, damage: object[]}}
+ *   attackModes: object[]|null, ammunition: object[]|null, save: object|null, damage: object[],
+ *   consumesSlot?: false, activities?: object[]}}
  */
 export function rollsOf(item) {
-  if ( item.system?.identified === false ) {
-    return { toHit: null, attackId: null, activity: null, attackModes: null, ammunition: null, save: null, damage: [] };
-  }
+  if ( item.system?.identified === false ) return { ...NO_ROLLS, damage: [] };
   const activities = visibleActivities(item);
-  const attack = activities.find(activity => activity.type === "attack");
-  const save = activities.find(activity => activity.type === "save");
-  // The damage that goes with the attack, or else the first there is: a save's, or healing.
-  const damaging = attack ?? activities.find(activity => activity.labels?.damage?.length);
   return {
-    toHit: toHitOf(attack),
-    // The attack the bonus is for, so the app can have it made here.
-    attackId: attack?.id ?? null,
-    // What else it's used through, such as a save or healing, so the app can have it used here.
-    activity: useOf(item, activities, attack ? undefined : damaging),
-    attackModes: attack ? attackModesOf(item) : null,
-    ammunition: attack ? ammunitionOf(item) : null,
-    save: saveOf(save),
-    damage: damageOf(damaging)
+    ...activityRolls(item, activities[0]),
+    ...((activities.length > 1) && { activities: activities.map(activity => activityEntry(item, activity)) })
   };
 }
 
 /**
- * What a spell, feature or inventory item rolls, where it rolls or is used through anything; the
- * app takes one with none as nothing to roll.
+ * What a spell, feature or inventory item rolls, where it, or any of its activities, rolls or is
+ * used through anything; the app takes one with none as nothing to roll.
  * @param {Item} item
  * @returns {object|null}   As `rollsOf`, or null.
  */
 export function rollsIfAny(item) {
   const rolls = rollsOf(item);
-  const any = (rolls.toHit !== null) || rolls.attackId || rolls.activity || rolls.save || rolls.damage.length;
-  return any ? rolls : null;
+  return (rollsAnything(rolls) || rolls.activities?.some(rollsAnything)) ? rolls : null;
+}
+
+/**
+ * One of an item's activities on its own, as a player made it a favorite, and as an item with more
+ * than one lists each: how it's activated, its range and target, its bonus to hit, the saving
+ * throw it calls for, its damage or healing, and its uses. An item not identified yet keeps them
+ * to itself.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {object}
+ */
+export function describeActivity(item, activity) {
+  const identified = item.system?.identified !== false;
+  return {
+    activation: activity.labels?.activation || null,
+    range: rangeOf(item, activity),
+    target: activity.labels?.target || null,
+    ...(identified ? activityRolls(item, activity) : { ...NO_ROLLS, damage: [] }),
+    uses: identified ? limitedUses(activity.uses, activity.labels) : null
+  };
 }
 
 /**
  * How an item is used, as an action's is: its activation, range and target, as its first activity
- * and its attack label them, and whether it takes concentration.
+ * labels them, and whether it takes concentration.
  * @param {Item} item
  * @returns {{activation: string|null, range: string|null, target: string|null, concentration: boolean}}
  */
 export function usageOf(item) {
-  const activities = visibleActivities(item);
-  const [first] = activities;
-  const attack = activities.find(activity => activity.type === "attack");
+  const [first] = visibleActivities(item);
   return {
     activation: first?.labels?.activation || item.labels?.activation || null,
-    range: rangeOf(item, attack ?? first),
+    range: rangeOf(item, first),
     target: first?.labels?.target || item.labels?.target || null,
     concentration: (item.system?.properties?.has?.("concentration") ?? false)
       || (first?.duration?.concentration === true)
@@ -89,16 +104,68 @@ export function usageOf(item) {
 /* -------------------------------------------- */
 
 /**
- * The activity an item is used through in the game other than by attacking: the one its damage
- * or healing comes from, or else its first save, damage, healing or utility activity.
+ * What an activity rolls, or is used through: an attack's bonus to hit, by the attack's id, with
+ * its weapon's attack modes and ammunition; or else the activity itself, such as a save or
+ * healing; the saving throw it calls for; and its damage or healing. A spell's activity that
+ * spends no spell slot, as one used after the spell is cast does, such as Hex's Bonus Hex Damage,
+ * says so.
  * @param {Item} item
- * @param {Activity[]} activities   Those its player sees.
- * @param {Activity} [damaging]       The one its damage comes from, when it isn't an attack.
- * @returns {object|null}
+ * @param {Activity} [activity]
+ * @returns {object}
  */
-function useOf(item, activities, damaging) {
-  const activity = USES.has(damaging?.type) ? damaging : activities.find(each => USES.has(each.type));
-  return activity ? describeUse(item, activity) : null;
+function activityRolls(item, activity) {
+  if ( !activity ) return { ...NO_ROLLS, damage: [] };
+  const attack = activity.type === "attack";
+  return {
+    toHit: attack ? toHitOf(activity) : null,
+    // The attack the bonus is for, so the app can have it made here.
+    attackId: attack ? activity.id : null,
+    // What else it's used through, such as a save or healing, so the app can have it used here.
+    activity: USES.has(activity.type) ? describeUse(item, activity) : null,
+    attackModes: attack ? attackModesOf(item) : null,
+    ammunition: attack ? ammunitionOf(item) : null,
+    save: saveOf(activity),
+    damage: damageOf(activity),
+    ...(spendsNoSlot(item, activity) && { consumesSlot: false })
+  };
+}
+
+/**
+ * One of an item's activities, as an item with more than one lists it: its id, its name, such as
+ * "Bonus Hex Damage", or else its kind's, such as "Attack", its kind, and what it does.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {object}
+ */
+function activityEntry(item, activity) {
+  return {
+    id: activity.id,
+    name: activity.name || localize(activity.metadata?.title) || activity.type,
+    type: activity.type,
+    ...describeActivity(item, activity)
+  };
+}
+
+/**
+ * Does anything roll, or is anything used through, as `activityRolls` tells it?
+ * @param {object} rolls
+ * @returns {boolean}
+ */
+function rollsAnything(rolls) {
+  return (rolls.toHit !== null) || Boolean(rolls.attackId || rolls.activity || rolls.save || rolls.damage?.length);
+}
+
+/**
+ * Is this one of a spell's activities that's used without spending a spell slot, as one used after
+ * the spell is cast is, such as Spirit Guardians' save each turn? dnd5e still asks the level it's
+ * used at, which its damage may scale with.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+function spendsNoSlot(item, activity) {
+  return (item.type === "spell") && ((finite(item.system?.level) ?? 0) > 0)
+    && (activity.consumption?.spellSlot === false);
 }
 
 /**
