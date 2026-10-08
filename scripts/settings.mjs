@@ -129,4 +129,15 @@ export function registerSettings() {
     default: true,
     onChange: () => reannounce()
   });
+
+  // Midi-QOL targets only tokens the Gamemaster's canvas draws: those on the level and scene they
+  // view. Whether a player's use at another is made anyway is checked as it's made.
+  game.settings.register(MODULE_ID, SETTINGS.OFF_CANVAS_TARGETS, {
+    name: "SENDINGSTONE.Settings.OffCanvasTargets.Name",
+    hint: "SENDINGSTONE.Settings.OffCanvasTargets.Hint",
+    scope: "world",
+    config: game.modules.get("midi-qol")?.active === true,
+    type: Boolean,
+    default: false
+  });
 }

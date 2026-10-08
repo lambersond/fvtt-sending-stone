@@ -62,6 +62,11 @@ export const SETTINGS = Object.freeze({
    *  Shown only while Midi-QOL is active. */
   MIDI_INTEGRATION: "midiIntegration",
 
+  /** World-scope switch for letting players' attacks and spells through Midi-QOL be made at
+   *  targets the Gamemaster's canvas doesn't show, such as on another level. Shown only while
+   *  Midi-QOL is active. */
+  OFF_CANVAS_TARGETS: "offCanvasTargets",
+
   /** Setting menu key for the campaigns dialog. */
   CAMPAIGNS_MENU: "campaignsMenu",
 

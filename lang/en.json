@@ -27,6 +27,10 @@
       "MidiIntegration": {
         "Name": "Make Players' Attacks and Spells Through Midi-QOL",
         "Hint": "Players' attacks, spells and features from Sending Stone go through Midi-QOL's workflow, as if they had used them in Foundry: Midi checks the hit, rolls the targets' saving throws, and applies the damage, healing and effects, as you have it set up. Off: while Midi-QOL handles items' uses, players' attacks, spells and features stay in the app."
+      },
+      "OffCanvasTargets": {
+        "Name": "Allow Targets You Aren't Viewing",
+        "Hint": "A player's attack, spell or feature through Midi-QOL is made even at a target on a level or scene you aren't viewing. Its card names every target, but Midi can only check hits, roll saving throws and apply damage, healing and effects for tokens your screen shows; apply the rest from the card. Off: such a use is refused, and its player is told you aren't viewing their target."
       }
     },
     "Campaigns": {

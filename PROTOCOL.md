@@ -744,8 +744,12 @@ dialog doesn't offer, or with none left (`"slot"`); ammunition that isn't the we
 up (`"ammo"`); an attack mode that isn't the weapon's (`"mode"`); Midi's Active Defence; a reaction
 or bonus action Midi enforces that's been used; an activity that always opens Midi's roll, consume
 or damage dialog, or has Midi ask which effects to apply; and a target Midi can't target, or no
-target where Midi needs one. What's left may ask the Gamemaster, as it would in Foundry, such as a
-target's reaction; an attack made after its `"timeout"` is reported again.
+target where Midi needs one. Midi targets only tokens the Gamemaster's canvas draws, on the level
+and scene they're viewing: any other is refused (`"scene"`), unless the Gamemaster turns on
+**Allow Targets You Aren't Viewing**. Then the use is made; Midi works only on the targets it can
+see, and the card names every target, for the Gamemaster to apply the rest. What's left may ask
+the Gamemaster, as it would in Foundry, such as a target's reaction; an attack made after its
+`"timeout"` is reported again.
 
 `command.result` for an attack adds:
 

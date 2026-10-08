@@ -61,6 +61,7 @@ then only when one is new, since they are most of a sheet's size.
 | Send Combat Events | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
 | Send Gamemaster-Only Information | Also send what only a Gamemaster can see. Off by default. |
 | Make Players' Attacks and Spells Through Midi-QOL | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
+| Allow Targets You Aren't Viewing | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 
 **Each campaign's secret is stored only in the browser you enter it in.** World settings are sent
 to every connected user, so a secret stored there could be read by players. Enter the secrets in
@@ -132,6 +133,11 @@ attack hit only where the game shows players.
   a card's author to confirm and apply. While it's made, your targets are the player's targets,
   then they're put back. With **Make Players' Attacks and Spells Through Midi-QOL** off, attacks
   and spells stay in the app.
+- **Targets you aren't viewing.** Midi can only target tokens your screen shows, on the level and
+  scene you're viewing, so a use at any other is refused, and its player is told you aren't
+  viewing their target. With **Allow Targets You Aren't Viewing** on, it's made anyway: the card
+  names every target, Midi does what it does for those your screen shows, and you apply the rest
+  from the card.
 - **Areas are picked, not placed.** No template is placed for an area spell: its targets are the
   combatants the player ticked in the app.
 - **Spell slots.** A spell is cast with the slot the player chose, from those dnd5e's usage dialog
