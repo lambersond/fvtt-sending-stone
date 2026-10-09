@@ -14,6 +14,12 @@ import { finite, limitedUses, localize } from "./sheet-values.mjs";
 /** The kinds of activity a player can use from the app other than an attack. */
 export const USES = new Set(["save", "damage", "heal", "utility"]);
 
+/** The activations Midi-QOL counts as using a reaction, besides dnd5e's own. */
+export const REACTIONS = new Set(["reaction", "reactiondamage", "reactionmanual", "reactionpreattack"]);
+
+/** The kinds of action the Actions tab has a section for, in Tidy 5e's order. */
+export const ACTION_KINDS = ["action", "bonus", "reaction", "legendary", "mythic", "lair", "crew", "special"];
+
 /* -------------------------------------------- */
 
 /**
@@ -39,17 +45,24 @@ const NO_ROLLS = Object.freeze({
  * healing; the saving throw it calls for; and its damage or healing. An item with more than one
  * activity lists each, as `describeActivity` describes it, with its id, name and kind. An item not
  * identified yet keeps them all to itself.
+ *
+ * An action lists only some of an item's activities, those activated as its section of the
+ * Actions tab has it, and rolls as the first of them; it lists them even when there's one, where
+ * the item is listed in other sections too, so that the item can be put together again.
  * @param {Item} item
+ * @param {Activity[]} [activities]   Those to list; all its player can see, by default.
+ * @param {object} [options]
+ * @param {boolean} [options.list]    List them even when there's only one.
  * @returns {{toHit: number|null, attackId: string|null, activity: object|null,
  *   attackModes: object[]|null, ammunition: object[]|null, save: object|null, damage: object[],
- *   consumesSlot?: false, activities?: object[]}}
+ *   consumesSlot?: false, cast?: object, activities?: object[]}}
  */
-export function rollsOf(item) {
+export function rollsOf(item, activities=visibleActivities(item), { list=false }={}) {
   if ( item.system?.identified === false ) return { ...NO_ROLLS, damage: [] };
-  const activities = visibleActivities(item);
   return {
     ...activityRolls(item, activities[0]),
-    ...((activities.length > 1) && { activities: activities.map(activity => activityEntry(item, activity)) })
+    ...(((activities.length > 1) || (list && activities.length))
+      && { activities: activities.map(activity => activityEntry(item, activity)) })
   };
 }
 
@@ -75,12 +88,14 @@ export function rollsIfAny(item) {
  */
 export function describeActivity(item, activity) {
   const identified = item.system?.identified !== false;
+  const rolls = identified ? activityRolls(item, activity) : { ...NO_ROLLS, damage: [] };
   return {
     activation: activity.labels?.activation || null,
+    activationType: activationTypeOf(activity),
     range: rangeOf(item, activity),
     target: activity.labels?.target || null,
-    ...(identified ? activityRolls(item, activity) : { ...NO_ROLLS, damage: [] }),
-    uses: identified ? limitedUses(activity.uses, activity.labels) : null
+    ...rolls,
+    uses: identified ? activityUses(item, activity) : null
   };
 }
 
@@ -115,6 +130,7 @@ export function usageOf(item) {
  */
 function activityRolls(item, activity) {
   if ( !activity ) return { ...NO_ROLLS, damage: [] };
+  if ( activity.type === "cast" ) return castRolls(item, activity);
   const attack = activity.type === "attack";
   return {
     toHit: attack ? toHitOf(activity) : null,
@@ -140,10 +156,169 @@ function activityRolls(item, activity) {
 function activityEntry(item, activity) {
   return {
     id: activity.id,
-    name: activity.name || localize(activity.metadata?.title) || activity.type,
+    name: activityName(activity),
     type: activity.type,
     ...describeActivity(item, activity)
   };
+}
+
+/**
+ * An activity's name, such as "Bonus Hex Damage", or else its kind's, such as "Attack". A Cast
+ * activity is named for its spell.
+ * @param {Activity} activity
+ * @returns {string}
+ */
+export function activityName(activity) {
+  return activity.name || localize(activity.metadata?.title) || activity.type;
+}
+
+/**
+ * The kind of action an activity is activated with, such as "action", "bonus" or "reaction", as the
+ * Actions tab heads its sections, where it takes just one of them; null for any other, such as two
+ * actions, a Legendary Action that costs two, or a minute. Midi-QOL's kinds of reaction are
+ * reactions.
+ * @param {Activity} [activity]
+ * @returns {string|null}
+ */
+export function activationTypeOf(activity) {
+  const { type, value } = activity?.activation ?? {};
+  const kind = REACTIONS.has(type) ? "reaction" : type;
+  if ( !ACTION_KINDS.includes(kind) ) return null;
+  return ([undefined, null, ""].includes(value) || (Number(value) === 1)) ? kind : null;
+}
+
+/**
+ * Are an item's own labels, such as its activation and range, this activity's? dnd5e gives an
+ * item the labels of its first activity with an activation that can be used, and a spell has its
+ * own, its first activity's.
+ * @param {Item} item
+ * @param {Activity} [activity]
+ * @returns {boolean}
+ */
+export function ownLabels(item, activity) {
+  if ( !activity ) return true;
+  if ( item.type === "spell" ) return activity.id === visibleActivities(item)[0]?.id;
+  const labelled = Array.from(item.system?.activities ?? [])
+    .find(other => other.activation?.type && (other.canUse !== false));
+  return activity.id === labelled?.id;
+}
+
+/**
+ * An activity's uses, or for a Cast activity, those casting its spell spends, such as the item's
+ * charges, as dnd5e's sheet shows them by the spell.
+ * @param {Item} item
+ * @param {Activity} [activity]
+ * @returns {{value: number, max: number, recovery: string|null}|null}
+ */
+export function activityUses(item, activity) {
+  if ( !activity ) return null;
+  return ((activity.type === "cast") && castCost(item, activity)?.uses) || limitedUses(activity.uses, activity.labels);
+}
+
+/* -------------------------------------------- */
+
+/**
+ * The spell a Cast activity casts, as dnd5e keeps a copy of it on the actor, and the activity of
+ * that spell casting it from the item uses: the spell's first its player can see, as dnd5e would
+ * use it. Nothing while the item can't cast it, such as one that needs attuning and isn't, or
+ * dnd5e hasn't made the spell's copy yet.
+ * @param {Activity} cast
+ * @returns {{spell: Item, lead: Activity}|null}
+ */
+export function castSpellOf(cast) {
+  if ( (cast?.type !== "cast") || !cast.canUse ) return null;
+  const spell = cast.cachedSpell;
+  const [lead] = spell ? visibleActivities(spell) : [];
+  return lead ? { spell, lead } : null;
+}
+
+/**
+ * What a Cast activity rolls, or is used through: its spell's, as the spell's own activity has
+ * them, but by the Cast activity's id, through which the app has it cast from the item; and how
+ * it's cast: the level it's cast at, whether it takes concentration, and how many of the item's
+ * uses it spends, and whether there are that many left.
+ * @param {Item} item
+ * @param {Activity} cast
+ * @returns {object}
+ */
+function castRolls(item, cast) {
+  const found = castSpellOf(cast);
+  if ( !found ) return { ...NO_ROLLS, damage: [] };
+  const { spell, lead } = found;
+  // Cast from the item, a spell's activity spends no slot; there's no level to choose.
+  const { consumesSlot, ...rolls } = activityRolls(spell, lead);
+  if ( !rollsAnything(rolls) ) return { ...NO_ROLLS, damage: [] };
+  const cost = castCost(item, cast);
+  return {
+    ...rolls,
+    attackId: rolls.attackId && cast.id,
+    activity: rolls.activity && { ...rolls.activity, id: cast.id, targets: { ...rolls.activity.targets, perLevel: null } },
+    cast: {
+      level: Math.max(finite(spell.system?.level) ?? 0, finite(cast.spell?.level) ?? 0),
+      concentration: (spell.system?.properties?.has?.("concentration") ?? false)
+        || (lead.duration?.concentration === true),
+      charges: cost?.amount ?? null,
+      short: cost?.short ?? false
+    }
+  };
+}
+
+/**
+ * What casting a spell from an item spends, as its Cast activity has it: so many of the item's
+ * uses, or another item's, or the activity's own; the first of them, and those uses, and whether
+ * any of them hasn't that many left. A spell cast above its own level spends more, where its cost
+ * scales with the level, as dnd5e scales it. Nothing where it spends no uses, only a number that's a
+ * formula, or where its spell's activity spends nothing, as one used after the spell is cast does,
+ * for which dnd5e spends nothing of the item's either.
+ * @param {Item} item
+ * @param {Activity} cast
+ * @returns {{amount: number, uses: {value: number, max: number, recovery: string|null},
+ *   short: boolean}|null}
+ */
+export function castCost(item, cast) {
+  const found = castSpellOf(cast);
+  if ( !found || (found.lead.consumption?.spellSlot === false) ) return null;
+  const base = finite(found.spell.system?.level) ?? 0;
+  // dnd5e casts a leveled spell from the item at its Cast activity's level, and scales its cost by
+  // how far above the spell's own that is.
+  const above = (base > 0) ? Math.max((finite(cast.spell?.level) ?? base) - base, 0) : 0;
+  const costs = (cast.consumption?.targets ?? []).flatMap(target => {
+    const uses = (target.type === "itemUses") ? usesOfItem(item, target.target)
+      : (target.type === "activityUses") ? limitedUses(cast.uses, cast.labels) : undefined;
+    if ( uses === undefined ) return [];
+    const amount = scaledCost(target, above);
+    return ((amount !== null) && (amount > 0) && uses) ? [{ amount, uses }] : [];
+  });
+  if ( !costs.length ) return null;
+  return { ...costs[0], short: costs.some(({ amount, uses }) => uses.value < amount) };
+}
+
+/**
+ * The uses of an item a Cast activity spends: its own, or the other item it names.
+ * @param {Item} item
+ * @param {string} [id]
+ * @returns {{value: number, max: number, recovery: string|null}|null}
+ */
+function usesOfItem(item, id) {
+  const source = id ? item.actor?.items?.get(id) : item;
+  return limitedUses(source?.system?.uses, source?.labels);
+}
+
+/**
+ * How much a consumption target spends, as a whole number, its scaling by amount for a spell cast
+ * that many levels higher added, as dnd5e's resolveCost adds it; null for a formula.
+ * @param {object} target
+ * @param {number} above
+ * @returns {number|null}
+ */
+function scaledCost(target, above) {
+  const amount = Number(target.value);
+  if ( !Number.isInteger(amount) ) return null;
+  if ( !above || (target.scaling?.mode !== "amount") ) return amount;
+  const formula = target.scaling.formula;
+  if ( !formula ) return amount + ((amount > 0) ? above : 0);
+  const step = Number(formula);
+  return Number.isInteger(step) ? amount + (step * above) : null;
 }
 
 /**
@@ -258,7 +433,8 @@ export function rangeOf(item, activity) {
   } catch {
     // Fall back on the labels.
   }
-  return activity?.labels?.range || item.labels?.range || null;
+  // dnd5e gives the item one activity's labels, which aren't another activity's.
+  return activity?.labels?.range || (ownLabels(item, activity) && item.labels?.range) || null;
 }
 
 /**

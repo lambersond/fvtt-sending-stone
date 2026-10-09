@@ -1,7 +1,10 @@
 import { usesOf } from "./sheet-features.mjs";
-import { rangeOf, rollsOf, visibleActivities } from "./sheet-rolls.mjs";
+import {
+  ACTION_KINDS, activationTypeOf, activityName, activityUses, castSpellOf, ownLabels, rangeOf, REACTIONS,
+  rollsOf, visibleActivities
+} from "./sheet-rolls.mjs";
 import { castFrom } from "./sheet-spells.mjs";
-import { finite, limitedUses, localize } from "./sheet-values.mjs";
+import { finite, localize } from "./sheet-values.mjs";
 
 /**
  * What a character can do in a fight, listed as Tidy 5e's Actions tab lists it, by default:
@@ -10,19 +13,29 @@ import { finite, limitedUses, localize } from "./sheet-values.mjs";
  * apply effects; and features that are activated. A player who uses Tidy 5e can add an item to
  * the list, take one off it, or give one a section of its own, and that holds here too.
  *
- * Each action is grouped by how its first activity is activated, and carries what dnd5e works out
- * for that activity as it prepares the character: its bonus to hit, the saving throw it calls for,
- * and its damage or healing, ability modifier included. One with more than one activity lists each.
+ * An item is listed in each section for how its activities are activated, such as a staff that
+ * strikes as an action and casts a spell as a reaction, under Actions and under Reactions; there it
+ * carries what dnd5e works out for the first of those activities as it prepares the character: its
+ * bonus to hit, the saving throw it calls for, and its damage or healing, ability modifier
+ * included; and lists each of them, where there's more than one. An activity used after another,
+ * with no activation of its own, such as Hex's Bonus Hex Damage, goes with the item's first. The
+ * spells an item casts are cast from the item: the copies dnd5e keeps of them aren't listed.
  */
 
 /** Tidy 5e's flags. */
 const TIDY = "tidy5e-sheet";
 
 /** The sections, in Tidy 5e's order. Actions activated any other way go under Other. */
-const SECTIONS = ["action", "bonus", "reaction", "legendary", "mythic", "lair", "crew", "special"];
+const SECTIONS = ACTION_KINDS;
 
 /** Activations that take too long to be used in a fight. */
 const SLOW = ["minute", "hour", "day", "none"];
+
+/**
+ * Activations of an activity used along with another, such as damage done when a curse's target is
+ * hit, rather than by an action of its own.
+ */
+const FOLLOWING = ["", "none", "special"];
 
 /* -------------------------------------------- */
 
@@ -35,16 +48,59 @@ const SLOW = ["minute", "hour", "day", "none"];
 export function actionSections(actor, texts) {
   const sections = new Map(SECTIONS.map(id => [id, { id, label: sectionLabel(id), actions: [] }]));
   const items = Array.from(actor.items ?? [])
-    .filter(item => (item.isHidden !== true) && inActionList(item))
+    .filter(item => (item.isHidden !== true) && !castCopy(item))
     .sort((a, b) => ((a.sort ?? 0) - (b.sort ?? 0)) || a.name.localeCompare(b.name, game.i18n.lang));
   for ( const item of items ) {
-    const custom = tidyFlag(item, "actionSection");
-    const named = (typeof custom === "string") ? custom.trim() : "";
-    const id = named || sectionOf(firstActivity(item));
-    if ( !sections.has(id) ) sections.set(id, { id, label: named ? localize(named) : sectionLabel(id), actions: [] });
-    sections.get(id).actions.push(describeAction(item, texts));
+    const rows = rowsOf(item);
+    for ( const { id, named, activities } of rows ) {
+      if ( !sections.has(id) ) sections.set(id, { id, label: named ? localize(id) : sectionLabel(id), actions: [] });
+      sections.get(id).actions.push(describeAction(item, texts, activities, { split: rows.length > 1 }));
+    }
   }
   return Array.from(sections.values()).filter(section => section.actions.length);
+}
+
+/**
+ * The rows an item is listed in, each a section and the activities in it, the first of which the
+ * row rolls as: one in each section for how its activities are activated, an activity with none
+ * of its own going with its first. An item the player gave a section of its own, or one not
+ * identified yet, has one row, all of it. An item that Tidy 5e's rules leave off the list has rows
+ * only for the spells it casts, which are cast from nowhere else.
+ * @param {Item} item
+ * @returns {{id: string, named: boolean, activities: Activity[]}[]}
+ */
+function rowsOf(item) {
+  const activities = visibleActivities(item);
+  const listed = inActionList(item);
+  const custom = tidyFlag(item, "actionSection");
+  const named = (typeof custom === "string") ? custom.trim() : "";
+  if ( item.system?.identified === false ) {
+    return listed ? [{ id: named || sectionOf(activities[0]), named: Boolean(named), activities }] : [];
+  }
+  if ( listed && !activities.length ) return [{ id: named || sectionOf(), named: Boolean(named), activities }];
+  // Tidy 5e's choice to leave it off holds for its spells too.
+  const casts = (tidyFlag(item, "action-filter-override") === false) ? []
+    : activities.filter(activity => castSpellOf(activity));
+  const shown = listed ? activities : casts;
+  if ( named ) return shown.length ? [{ id: named, named: true, activities: shown }] : [];
+  const rows = new Map();
+  for ( const activity of shown ) {
+    const own = FOLLOWING.includes(activity.activation?.type ?? "") && (activity !== shown[0]) ? null : sectionOf(activity);
+    const id = own ?? sectionOf(shown[0]);
+    if ( !rows.has(id) ) rows.set(id, { id, named: false, activities: [] });
+    rows.get(id).activities.push(activity);
+  }
+  return Array.from(rows.values());
+}
+
+/**
+ * Is this the copy of a spell dnd5e keeps for an item that casts it, such as a wand's? The item's
+ * row casts it.
+ * @param {Item} item
+ * @returns {boolean}
+ */
+function castCopy(item) {
+  return (item.type === "spell") && Boolean(item.getFlag?.("dnd5e", "cachedFor") ?? item.flags?.dnd5e?.cachedFor);
 }
 
 /* -------------------------------------------- */
@@ -72,7 +128,7 @@ function inActionList(item) {
 /**
  * Is a spell one to list: one the character can cast now, that deals damage, is cast as a bonus
  * action or a reaction, lasts a minute or a round, or applies effects? A cantrip can always be
- * cast, unless it's cast from an item the character must be attuned to and isn't.
+ * cast.
  * @param {Item} spell
  * @param {Activity} [first]    Its first activity.
  * @returns {boolean}
@@ -80,10 +136,7 @@ function inActionList(item) {
 function spellInList(spell, first) {
   const system = spell.system ?? {};
   const cantrip = (finite(system.level) ?? 0) === 0;
-  const source = system.linkedActivity?.item;
-  const sourceUsable = Boolean(source) && ((source.system?.attunement !== "required") || (source.system?.attuned === true));
-  if ( !cantrip && !(canCast(spell) || sourceUsable) ) return false;
-  if ( source && cantrip && !sourceUsable ) return false;
+  if ( !cantrip && !canCast(spell) ) return false;
 
   const type = first?.activation?.type;
   if ( (type === "bonus") || (type === "reaction") ) return true;
@@ -95,7 +148,7 @@ function spellInList(spell, first) {
 
 /**
  * Can a spell above cantrip level be cast now, by how it's cast: prepared, or always prepared,
- * at will or innately without limit, with uses left, or from an item.
+ * at will or innately without limit, or with uses left.
  * @param {Item} spell
  * @returns {boolean}
  */
@@ -106,8 +159,7 @@ function canCast(spell) {
   const limited = (system.hasLimitedUses ?? (finite(system.uses?.max) > 0)) && ((system.uses?.recovery?.length ?? 0) > 0);
   if ( (system.canPrepare ?? false) && [1, 2].includes(system.prepared) ) return true;
   if ( ["atwill", "innate"].includes(method) && !limited ) return true;
-  if ( limited && ((finite(system.uses?.value) ?? 0) > 0) ) return true;
-  return Boolean(system.linkedActivity?.item);
+  return limited && ((finite(system.uses?.value) ?? 0) > 0);
 }
 
 /**
@@ -136,36 +188,68 @@ function usedInAFight(activity) {
 /* -------------------------------------------- */
 
 /**
- * An action, as its first activity has it: how it's activated, its range and target, its bonus to
- * hit, the saving throw it calls for, its damage or healing; and its uses, and each of its
- * activities, where it has more than one. An item not identified yet keeps them to itself.
+ * An action: an item as one section of the Actions tab lists it, rolling as the first of the
+ * activities it lists there: how that's activated, its range and target, its bonus to hit, the
+ * saving throw it calls for, its damage or healing; and the item's uses, and each of those
+ * activities, where there's more than one, or where the item is listed in other sections too. One
+ * that isn't the item's first activity is named, such as a staff's Silvery Barbs under Reactions.
+ * An item not identified yet keeps them to itself.
  * @param {Item} item
  * @param {SheetTexts} texts
+ * @param {Activity[]} [activities]   Those it lists; all the item's, by default.
+ * @param {object} [options]
+ * @param {boolean} [options.split]   Whether the item is listed in other sections too.
  * @returns {object}
  */
-function describeAction(item, texts) {
+function describeAction(item, texts, activities=visibleActivities(item), { split=false }={}) {
   const system = item.system ?? {};
   const identified = system.identified !== false;
-  const first = firstActivity(item);
+  const lead = activities[0];
+  const first = visibleActivities(item)[0];
+  // dnd5e gives the item one activity's labels, which aren't another activity's.
+  const labels = ownLabels(item, lead) ? (item.labels ?? {}) : {};
+  const rolls = rollsOf(item, activities, { list: split });
+  const spell = rolls.cast ? castSpellOf(lead)?.spell : null;
   return {
     id: item.id,
     name: item.name,
     img: item.img ?? null,
     type: item.type,
-    activation: first?.labels?.activation || item.labels?.activation || null,
-    range: rangeOf(item, first),
-    target: first?.labels?.target || item.labels?.target || null,
-    ...rollsOf(item),
-    uses: identified ? (usesOf(item) ?? limitedUses(first?.uses, first?.labels)) : null,
+    ...((identified && lead && (lead !== first)) && { activityName: activityName(lead) }),
+    activation: lead?.labels?.activation || labels.activation || null,
+    activationType: activationTypeOf(lead),
+    range: rangeOf(item, lead),
+    target: lead?.labels?.target || labels.target || null,
+    ...rolls,
+    // A spell cast from the item opens to the spell's description.
+    ...(spell && { cast: { ...rolls.cast, text: texts.add({ html: spell.system?.description?.value, relativeTo: spell }) } }),
+    // The item's, or else those of the activity it's listed for.
+    uses: identified ? (usesOf(item) ?? activityUses(item, lead)) : null,
     level: (item.type === "spell") ? (finite(system.level) ?? 0) : null,
     castFrom: (item.type === "spell") ? castFrom(item) : null,
-    concentration: (system.properties?.has?.("concentration") ?? false) || (first?.duration?.concentration === true),
+    concentration: rolls.cast?.concentration ?? ((system.properties?.has?.("concentration") ?? false)
+      || (lead?.duration?.concentration === true)),
     identified,
+    ...(consumable(item) && { consumable: true }),
     text: texts.add({
       html: identified ? system.description?.value : system.unidentified?.description,
       relativeTo: item
     })
   };
+}
+
+/**
+ * Is an item one of the consumables: one dnd5e's inventory has among them, such as a potion, a
+ * scroll or a wand, or another with uses that never come back, such as a necklace's beads? Spells
+ * and features aren't, and an item not identified yet doesn't say.
+ * @param {Item} item
+ * @returns {boolean}
+ */
+function consumable(item) {
+  if ( ["spell", "feat"].includes(item.type) || (item.system?.identified === false) ) return false;
+  if ( item.type === "consumable" ) return true;
+  const uses = item.system?.uses;
+  return ((finite(uses?.max) ?? 0) > 0) && !(uses.recovery?.length > 0);
 }
 
 /* -------------------------------------------- */
@@ -185,7 +269,8 @@ function firstActivity(item) {
  * @returns {string}
  */
 function sectionOf(activity) {
-  const type = activity?.activation?.type;
+  let type = activity?.activation?.type;
+  if ( REACTIONS.has(type) ) type = "reaction";
   return SECTIONS.includes(type) ? type : "other";
 }
 

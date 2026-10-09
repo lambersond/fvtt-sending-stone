@@ -151,6 +151,12 @@ attack hit only where the game shows players.
   it's cast, with the rest beneath it. An activity used after a spell is cast without spending a
   slot, such as Spirit Guardians' save each turn, is used at the level the player picks, slots left
   or not, as dnd5e uses it.
+- **Spells cast from items.** A staff's, a wand's or a scroll's spells, cast with its Cast
+  activities, are cast from the item, spending its charges, or using up the scroll, rather than a
+  spell slot, as Foundry casts them. The app lists the item under each kind of action it has: a
+  staff that strikes as an action and casts Silvery Barbs as a reaction is under Actions and under
+  Reactions. Casting one above its level for more charges, as a wand may, and a spell's activities
+  after its first, are left to Foundry.
 - **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
   Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
@@ -303,7 +309,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
 | `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits and death saves |
-| `scripts/sheet-actions.mjs` | A character's actions, listed and sectioned as Tidy 5e's Actions tab lists them |
+| `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites |
 | `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, hashed, and sent only when a campaign lacks them |

@@ -125,8 +125,8 @@ function describeSpell(spell, texts) {
     duration: labels.concentrationDuration || labels.duration || null,
     target: labels.target || null,
     // 0 unprepared, 1 prepared, 2 always prepared; null for a spell that isn't prepared, such as a
-    // cantrip or one cast at will.
-    prepared: (canPrepare && (level > 0)) ? (finite(system.prepared) ?? 0) : null,
+    // cantrip, one cast at will, or one cast from an item, as dnd5e's sheet has it.
+    prepared: (canPrepare && (level > 0) && !system.linkedActivity) ? (finite(system.prepared) ?? 0) : null,
     uses: usesOf(spell),
     castFrom: castFrom(spell),
     // What it rolls, so it's cast or rolled from the Spells tab as from Actions.

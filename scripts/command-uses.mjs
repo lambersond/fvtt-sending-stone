@@ -5,6 +5,7 @@ import {
 import {
   damageRollsFor, diceForEach, diceStatus, modifiedDice, plannedDice, readModifiers, withPlan
 } from "./dice-plan.mjs";
+import { castSpellOf } from "./sheet-rolls.mjs";
 
 /**
  * Making a player's attack, spell or feature from the Sending Stone app: using the item as in
@@ -17,6 +18,10 @@ import {
  * saving throws and, once the damage is rolled, applies it, as the Gamemaster has it set up.
  * Otherwise dnd5e's own cards are posted, for the Gamemaster to apply what they show. What would
  * open a dialog on the Gamemaster's screen is refused beforehand, where it can be known.
+ *
+ * A spell an item casts, such as a staff's Silvery Barbs, is cast from the item by its Cast
+ * activity: through the activity of the copy of the spell dnd5e keeps for it, as dnd5e's Cast
+ * activity would cast it, which spends the item's uses rather than a spell slot.
  */
 
 /**
@@ -193,11 +198,23 @@ function commandRefusal(command, campaign) {
  */
 async function prepareUse(command, actor) {
   const attack = command.kind === "attack";
-  const item = actor.items.get(command.item);
-  if ( !item || (item.system?.identified === false) || (item.system?.quantity === 0) ) return { refusal: "item" };
-  const activity = item.system.activities?.get(command.activity);
+  const named = actor.items.get(command.item);
+  if ( !named || (named.system?.identified === false) || (named.system?.quantity === 0) ) return { refusal: "item" };
+  // A spell cast from the item is cast through its copy's activity, as dnd5e's Cast activity casts it.
+  const cast = named.system.activities?.get(command.activity);
+  const linked = (cast?.type === "cast") ? castSpellOf(cast) : null;
+  if ( (cast?.type === "cast") && !linked ) return { refusal: "activity" };
+  const item = linked?.spell ?? named;
+  const activity = linked?.lead ?? cast;
+  if ( !castable(item) ) return { refusal: "item" };
   const usable = attack ? (activity?.type === "attack") : USES.has(activity?.type);
   if ( !usable || !activity.canUse ) return { refusal: "activity" };
+  // As dnd5e's Cast activity lets other modules know, or stop it, before anything is worked out:
+  // what they change of how it's used holds.
+  const usage = {};
+  if ( linked && (Hooks.call("dnd5e.preUseLinkedSpell", cast, usage, { configure: false }, {}) === false) ) {
+    return { refusal: "cancelled" };
+  }
   // An area attack is made at whoever is in its template, placed by hand.
   if ( attack && activity.target?.template?.type ) return { refusal: "area" };
 
@@ -216,11 +233,11 @@ async function prepareUse(command, actor) {
   // As many as it takes at the level it's cast at, as a spell may take more for each level higher.
   if ( !attack && (targets.length > mostTargets(scaledActivity(activity, slot))) ) return { refusal: "target" };
 
-  const usage = {
-    create: { measuredTemplate: false },
+  Object.assign(usage, {
+    create: { ...usage.create, measuredTemplate: false },
     subsequentActions: false,
-    ...(slot ? { spell: { slot } } : {})
-  };
+    ...(slot ? { spell: { ...usage.spell, slot } } : {})
+  });
   // What using it would spend, worked out without spending it: anything it can't spend is said
   // here, rather than on the Gamemaster's screen.
   const prepared = activity._prepareUsageConfig(usage);
@@ -231,7 +248,31 @@ async function prepareUse(command, actor) {
     return { refusal: "consume", error: err instanceof Error ? err.message : String(err) };
   }
 
-  return { attack, item, activity, targets, usage, prepared, attackMode: weapon.attackMode, ammunition: weapon.ammunition };
+  return {
+    attack, item, activity, targets, usage, prepared, attackMode: weapon.attackMode, ammunition: weapon.ammunition,
+    cast: linked ? cast : null
+  };
+}
+
+/**
+ * Can an item be cast: anything but a spell an item casts, which can be cast while the item's Cast
+ * activity can be used, attuned to, if it must be, as dnd5e lists it in the spellbook only then.
+ * @param {Item} item
+ * @returns {boolean}
+ */
+function castable(item) {
+  if ( !(item.getFlag?.("dnd5e", "cachedFor") ?? item.flags?.dnd5e?.cachedFor) ) return true;
+  return item.system?.linkedActivity?.canUse !== false;
+}
+
+/**
+ * Let other modules know a spell was cast from an item, as dnd5e's Cast activity does once it's
+ * cast.
+ * @param {object} use          What `prepareUse` found.
+ * @param {object} [results]    What using the spell's activity came to.
+ */
+function castFromItem(use, results) {
+  if ( use.cast && results ) Hooks.callAll("dnd5e.postUseLinkedSpell", use.cast, use.usage, results);
 }
 
 /**
@@ -437,6 +478,7 @@ async function dnd5eAttack(command, campaign, actor, use) {
     rollMode: PUBLIC,
     data: { author: author.id, flags: { dnd5e: { targets }, [MODULE_ID]: { use: command.id } } }
   });
+  castFromItem(use, results);
   const card = results?.message;
   if ( !card ) return failedResult(command, "cancelled");
 
@@ -490,6 +532,7 @@ async function dnd5eUse(command, campaign, actor, use) {
     rollMode: PUBLIC,
     data: { author: author.id, flags: { dnd5e: { targets }, [MODULE_ID]: { use: command.id } } }
   });
+  castFromItem(use, results);
   const card = results?.message;
   if ( !card ) return failedResult(command, "cancelled");
 
@@ -760,6 +803,7 @@ async function midiUseNow(command, campaign, actor, use) {
         rollMode: PUBLIC,
         data: { flags: { [MODULE_ID]: { use: command.id } } }
       }).finally(() => Hooks.off("dnd5e.preCreateUsageMessage", nameAll));
+      castFromItem(use, results);
       card = results?.message ?? null;
       if ( !card ) return "aborted";
       workflow = midiUsage.workflow ?? globalThis.MidiQOL.Workflow.getWorkflow(card.uuid);
