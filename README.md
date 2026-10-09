@@ -8,9 +8,10 @@ It is built for D&D Fifth Edition (dnd5e 5.3.x): roll messages carry the kind of
 and the item, activity and targets involved. Chat and combat events work under any system.
 
 It also works the other way, for a campaign whose Gamemaster lets it: checks, saving throws,
-initiative and death saving throws a player rolls in the app are made in Foundry with the dice they
-rolled, as if they had rolled them there, and so can their attacks, spells and features and their
-damage or healing, through Midi-QOL's workflow where it's in use. See
+initiative, death saving throws, hit dice and features' own rolls a player rolls in the app are
+made in Foundry with the dice they rolled, as if they had rolled them there, and so can their
+attacks, spells and features and their damage or healing, through Midi-QOL's workflow where it's in
+use. See
 [Players' rolls](#players-rolls) and [Players' attacks and spells](#players-attacks-and-spells).
 
 ## How it works
@@ -89,7 +90,7 @@ campaign titled after the world the first time a Gamemaster loads it.
 Tick **Let Players Roll from Sending Stone** for a campaign in Manage Campaigns, and its players'
 skill, tool and ability checks, saving throws, initiative and death saving throws in the app are
 made in Foundry too, with the dice they rolled there: the d20s, and any dice they added, such as
-a d4 for Bless. dnd5e makes each roll, without its dialog, as the character's player, so its card,
+a d4 for Bless. So are the hit dice they spend, and a feature's own roll, such as a d4 of luck. dnd5e makes each roll, without its dialog, as the character's player, so its card,
 critical hits, death saving throws, the combat tracker, Dice So Nice and Midi-QOL all behave as if
 they had rolled in Foundry. Each card is marked as rolled on Sending Stone.
 
@@ -103,6 +104,10 @@ they had rolled in Foundry. Each card is marked as rolled on Sending Stone.
   Foundry's total stands, and is what the player is shown.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
+- **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
+  modifier, at least 1, or 0 under the 2014 rules. dnd5e's roll keeps the die where a player's die
+  can't reach it, so it's written the other way round, coming to the same total. A hit die the
+  character hasn't left is refused in the app, rather than said on your screen.
 - **A self-test** checks, as the game loads, that the player's dice reach the roll made for them
   and no other. If it fails, as it might with a module that rolls dice its own way, players' rolls
   stay in the app, and Manage Campaigns says why.
@@ -140,8 +145,9 @@ attack hit only where the game shows players.
   viewing their target. With **Allow Targets You Aren't Viewing** on, it's made anyway: the card
   names every target, Midi does what it does for those your screen shows, and you apply the rest
   from the card.
-- **Areas are picked, not placed.** No template is placed for an area spell: its targets are the
-  combatants the player ticked in the app.
+- **Areas are picked, not placed.** No template is placed for an area spell or attack, such as a
+  breath weapon's cone: its targets are the combatants the player ticked in the app. An area
+  attack is one roll, and the app shows whether it hit each target, where the game shows players.
 - **Spell slots.** A spell is cast with the slot the player chose, from those dnd5e's usage dialog
   offers, or else with its own level's, or the first one left at a higher level, as the dialog
   picks it. Upcast spells scale their damage and number of targets as in Foundry.
@@ -161,8 +167,8 @@ attack hit only where the game shows players.
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
   Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
   critical hit's extra dice included.
-- **Nothing asks you, where it can be helped.** Area attacks, summoning, transforming and other
-  activities dnd5e asks about, Midi's Active Defence, a used reaction or bonus action Midi
+- **Nothing asks you, where it can be helped.** Area attacks Midi targets itself around their
+  user, summoning, transforming and other activities dnd5e asks about, Midi's Active Defence, a used reaction or bonus action Midi
   enforces, and an activity set to always show Midi's dialogs or to ask which effects to apply are
   refused in the app with a reason. Midi may still ask you what it would in Foundry, such as a
   target's reaction, an optional bonus or confirming ammunition or damage; the player is told it

@@ -86,24 +86,27 @@ const queues = new Map();
 
 /**
  * What a campaign tells the app of its players' rolls in its hello: whether they're made here,
- * which, and if not, why not. Attacks, the uses of spells and features, and their damage are among
- * them when the Gamemaster lets the campaign's players attack and cast from the app too, and they
- * can be made here; and then whether players may change their damage in the app, as the self-test
- * found. And whether its players are asked in the app for the saves the game asks of them.
+ * which, and if not, why not. A hit die is among them once the self-test has shown it takes the
+ * player's die. Attacks, the uses of spells and features, and their damage are among them when the
+ * Gamemaster lets the campaign's players attack and cast from the app too, and they can be made
+ * here; and then whether players may change their damage in the app, as the self-test found, and
+ * that an area attack is made at the targets they pick. And whether its players are asked in the
+ * app for the saves the game asks of them.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
- *   prompts: boolean}}
+ *   areaAttacks: boolean, prompts: boolean}}
  */
 export function rollFeatures(campaign) {
-  const off = { enabled: false, kinds: [], modifiers: false, prompts: false };
+  const off = { enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
   const attacks = campaign.attacks && !attacksUnavailable();
   return {
     enabled: true,
-    kinds: [...ROLL_KINDS, ...(attacks ? ATTACK_KINDS : [])],
+    kinds: [...ROLL_KINDS.filter(kind => (kind !== "hitDie") || diceStatus.hitDice), ...(attacks ? ATTACK_KINDS : [])],
     reason: null,
     modifiers: attacks && diceStatus.modifiers,
+    areaAttacks: attacks,
     prompts: prompting(campaign)
   };
 }
