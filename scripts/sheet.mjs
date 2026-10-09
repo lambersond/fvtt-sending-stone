@@ -35,6 +35,7 @@ export function characterSheet(actor, texts=new SheetTexts()) {
   const details = system.details ?? {};
   return {
     img: actor.img ?? null,
+    rules: rulesOf(),
     level: finite(details.level),
     classes: classesOf(actor),
     species: nameOf(details.race ?? details.species),
@@ -64,6 +65,20 @@ export function characterSheet(actor, texts=new SheetTexts()) {
 }
 
 /* -------------------------------------------- */
+
+/**
+ * The rules the world is played by, as dnd5e's setting has them: "modern", the 2024 rules, or
+ * "legacy", the 2014 rules, under which a hit die can heal nothing. Null where that can't be read.
+ * @returns {"modern"|"legacy"|null}
+ */
+function rulesOf() {
+  try {
+    const rules = game.settings.get("dnd5e", "rulesVersion");
+    return ["modern", "legacy"].includes(rules) ? rules : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * An ability: its score and modifier, and the modifiers for its check and its saving throw.

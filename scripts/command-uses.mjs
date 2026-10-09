@@ -3,7 +3,7 @@ import {
   authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
 import {
-  damageRollsFor, diceForEach, diceStatus, modifiedDice, plannedDice, readModifiers, withPlan
+  damageRollsFor, diceForEach, diceStatus, matchesDice, modifiedDice, plannedDice, readModifiers, withPlan
 } from "./dice-plan.mjs";
 import { castSpellOf } from "./sheet-rolls.mjs";
 
@@ -215,8 +215,9 @@ async function prepareUse(command, actor) {
   if ( linked && (Hooks.call("dnd5e.preUseLinkedSpell", cast, usage, { configure: false }, {}) === false) ) {
     return { refusal: "cancelled" };
   }
-  // An area attack is made at whoever is in its template, placed by hand.
-  if ( attack && activity.target?.template?.type ) return { refusal: "area" };
+  // An area attack is made at those the player picked in its area, rather than a template's.
+  const area = Boolean(activity.target?.template?.type);
+  if ( attack && !area && (command.targets !== undefined) && (command.targets !== null) ) return { refusal: "target" };
 
   const slot = slotFor(command, activity);
   if ( slot === false ) return { refusal: "slot" };
@@ -224,14 +225,16 @@ async function prepareUse(command, actor) {
   if ( weapon.refusal ) return weapon;
 
   const targets = [];
-  for ( const picked of (attack ? [command.target] : (command.targets ?? [])) ) {
+  for ( const picked of ((attack && !command.targets) ? [command.target] : (command.targets ?? [])) ) {
     if ( !picked ) continue;
     const target = targetOf(picked);
     if ( !target || targets.some(other => other.token.id === target.token.id) ) return { refusal: "target" };
-    targets.push(target);
+    targets.push({ ...target, picked: { combatId: picked.combatId, combatantId: picked.combatantId } });
   }
   // As many as it takes at the level it's cast at, as a spell may take more for each level higher.
-  if ( !attack && (targets.length > mostTargets(scaledActivity(activity, slot))) ) return { refusal: "target" };
+  if ( (!attack || area) && (targets.length > mostTargets(scaledActivity(activity, slot))) ) {
+    return { refusal: "target" };
+  }
 
   Object.assign(usage, {
     create: { ...usage.create, measuredTemplate: false },
@@ -249,7 +252,7 @@ async function prepareUse(command, actor) {
   }
 
   return {
-    attack, item, activity, targets, usage, prepared, attackMode: weapon.attackMode, ammunition: weapon.ammunition,
+    attack, area, item, activity, targets, usage, prepared, attackMode: weapon.attackMode, ammunition: weapon.ammunition,
     cast: linked ? cast : null
   };
 }
@@ -483,8 +486,14 @@ async function dnd5eAttack(command, campaign, actor, use) {
   if ( !card ) return failedResult(command, "cancelled");
 
   const rolls = await withPlan(command, () => activity.rollAttack(
-    // The target's armor class, or none, rather than the Gamemaster's own target's.
-    { attackMode, ammunition, target: targets[0]?.ac ?? null, rolls: [{ options: { [ROLL_TAG]: command.id } }] },
+    {
+      attackMode,
+      ammunition,
+      // The target's armor class, or none, rather than the Gamemaster's own target's; none for an
+      // area's targets, as dnd5e gives none for more than one.
+      target: (targets.length === 1) ? targets[0].ac : null,
+      rolls: [{ options: { [ROLL_TAG]: command.id } }]
+    },
     { configure: false },
     {
       rollMode: PUBLIC,
@@ -505,12 +514,12 @@ async function dnd5eAttack(command, campaign, actor, use) {
     path: "dnd5e", type: "attack", attackMode: attackMode ?? null, ammunition: ammo?.id ?? null, critical, targets,
     preview
   });
-  // As dnd5e shows players on the card whether an attack hit, if the world lets it.
+  // As dnd5e shows players on the card whether an attack hit each target, if the world lets it.
   const shown = targets.length && (game.settings.get("dnd5e", "attackRollVisibility") !== "none");
   return attackResult(command, message, actor, campaign, rolls, {
     critical,
     fumble: roll.isFumble === true,
-    outcome: shown ? outcomeOf(roll, targets[0]) : null
+    ...hits(use, (target, index) => (shown ? outcomeOf(roll, targets[index]) : null))
   }, preview);
 }
 
@@ -541,6 +550,22 @@ async function dnd5eUse(command, campaign, actor, use) {
     path: "dnd5e", type: activity.type, attackMode: null, ammunition: null, critical: false, targets, preview
   });
   return useResult(command, card, actor, campaign, activity, preview);
+}
+
+/**
+ * Whether an attack hit, as the app is told: at its target, if it has one; and for an area attack,
+ * at each target in the order the player picked them, there being no one outcome for several.
+ * @param {object} use                                What `prepareUse` found.
+ * @param {(target: object, index: number) => ("hit"|"miss"|null)} outcome   A target's, or null
+ *   where its player isn't to know.
+ * @returns {{outcome: string|null, targets?: object[]}}
+ */
+function hits(use, outcome) {
+  const targets = use.targets.map((target, index) => ({ ...target.picked, outcome: outcome(target, index) }));
+  return {
+    outcome: (targets.length === 1) ? targets[0].outcome : null,
+    ...(use.area && { targets })
+  };
 }
 
 /**
@@ -609,7 +634,8 @@ async function storeUse(card, use) {
  * @param {Actor} actor
  * @param {Campaign} campaign
  * @param {Roll[]} rolls
- * @param {object} attack          Whether it was a critical hit or a fumble, and hit.
+ * @param {object} attack          Whether it was a critical hit or a fumble, and hit its target, or
+ *                                 each of an area's.
  * @param {object|null} damage     What `previewDamage` gave.
  * @returns {CommandResult}
  */
@@ -671,20 +697,21 @@ function midiQueued(run) {
 
 /**
  * Why Midi-QOL would stop to ask the Gamemaster something about this use, or not make it, if it
- * would: Active Defence, which has an attack's target roll instead; an activity that always opens
- * Midi's dialogs, asks which of its effects to apply, or prompts for its roll; a target that can't
- * be targeted; a target the Gamemaster's canvas doesn't draw, unless they allow it; none Midi can
- * target where one is needed; or a reaction or bonus action already used this round, where they're
- * enforced.
+ * would: Active Defence, which has an attack's target roll instead; an area attack whose targets
+ * Midi picks itself; an activity that always opens Midi's dialogs, asks which of its effects to
+ * apply, or prompts for its roll; a target that can't be targeted; a target the Gamemaster's canvas
+ * doesn't draw, unless they allow it; none Midi can target where one is needed; or a reaction or
+ * bonus action already used this round, where they're enforced.
  * @param {object} use   What `prepareUse` found.
  * @param {Actor} actor
  * @returns {string|null}
  */
-function midiRefusal({ activity, targets, attack }, actor) {
+function midiRefusal({ activity, targets, attack, area }, actor) {
   const MidiQOL = globalThis.MidiQOL;
   if ( !MidiQOL?.Workflow ) return "midi";
   const settings = MidiQOL.configSettings?.() ?? {};
   if ( attack && MidiQOL.checkRule?.("activeDefence") ) return "active-defence";
+  if ( attack && area && midiPicksTargets(activity, settings) ) return "area";
   const properties = activity.midiProperties ?? {};
   const always = (properties.forceRollDialog === "always") || (properties.forceConsumeDialog === "always")
     || ((properties.forceDamageDialog === "always") && rollsDamage(activity));
@@ -712,6 +739,22 @@ function midiRefusal({ activity, targets, attack }, actor) {
     }
   }
   return null;
+}
+
+/**
+ * Does Midi-QOL pick an area's targets itself, as it uses the activity, in place of the player's:
+ * an area around its user, which Midi places and targets those in, unless it's told not to target
+ * them, or one with no template, whose user's surroundings it targets.
+ * @param {Activity} activity
+ * @param {object} settings   Midi's settings.
+ * @returns {boolean}
+ */
+function midiPicksTargets(activity, settings) {
+  const type = activity.target?.template?.type;
+  if ( type === "emanationNoTemplate" ) return true;
+  const placed = ["self", undefined].includes(activity.range?.units) && ["radius", "squareRadius"].includes(type);
+  const action = activity.midiProperties?.autoTargetAction;
+  return placed && (((!action || (action === "default")) ? (settings.autoTarget ?? "none") : action) !== "none");
 }
 
 /**
@@ -826,16 +869,20 @@ async function midiUseNow(command, campaign, actor, use) {
     });
     if ( !attack ) return useResult(command, card, actor, campaign, activity, preview);
 
-    // As Midi shows players whether an attack hit.
+    // As Midi shows players whether an attack hit each target: only those the Gamemaster's canvas
+    // draws, which Midi checks.
     const settings = globalThis.MidiQOL.configSettings?.() ?? {};
-    const [token] = tokens;
-    const shown = token && (settings.autoCheckHit === "all") && !workflow.whisperAttackCard;
-    const hit = !!token && (workflow.hitTargets?.has(token) || workflow.hitTargetsEC?.has(token));
+    const shown = (tokens.length > 0) && (settings.autoCheckHit === "all") && !workflow.whisperAttackCard;
+    const outcome = target => {
+      const token = target.token.object;
+      if ( !shown || !token ) return null;
+      return (workflow.hitTargets?.has(token) || workflow.hitTargetsEC?.has(token)) ? "hit" : "miss";
+    };
     // Midi writes its card after its rolls, so they're taken from the workflow.
     return attackResult(command, card, actor, campaign, [workflow.attackRoll], {
       critical,
       fumble: workflow.isFumble === true,
-      outcome: shown ? (hit ? "hit" : "miss") : null
+      ...hits(use, outcome)
     }, preview);
   } finally {
     setTargets(saved);
@@ -1003,18 +1050,6 @@ export async function runDamageCommand(command, campaign) {
   await card.setFlag(MODULE_ID, "damage", command.id);
   // Midi-QOL rolls damage onto its card; dnd5e posts it on its own.
   return describeResult(command, rolls[0].parent ?? card, actor, campaign, { rolls });
-}
-
-/**
- * Are these the dice a use's damage throws, as planned: the same dice, in order? None, for damage
- * that can't be planned or has no dice.
- * @param {object[]} dice
- * @param {{faces: number, number: number}[]} planned
- * @returns {boolean}
- */
-function matchesDice(dice, planned) {
-  if ( dice.length !== planned.length ) return false;
-  return dice.every((die, index) => (die.faces === planned[index].faces) && (die.results.length === planned[index].number));
 }
 
 /**

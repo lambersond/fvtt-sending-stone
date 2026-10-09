@@ -78,9 +78,10 @@ export function spellbookOf(actor, texts) {
       : (spell.system?.level || 0);
     let key = config?.getSpellSlotKey?.(level) ?? method;
 
-    // Spells cast from items, such as a wand's.
-    if ( spell.getFlag?.("dnd5e", "cachedFor") ) {
-      if ( !spell.system.linkedActivity?.displayInSpellbook ) continue;
+    // Spells cast from items, such as a wand's: every one, whether dnd5e's sheet lists it or not,
+    // and whether the item can cast it now or not, but none of an item hidden or not identified.
+    if ( castCopy(spell) ) {
+      if ( hiddenCopy(spell) ) continue;
       key = "item";
       register(key);
     }
@@ -109,6 +110,7 @@ function describeSpell(spell, texts) {
   const labels = spell.labels ?? {};
   const level = finite(system.level) ?? 0;
   const canPrepare = system.canPrepare ?? (system.method === "spell");
+  const from = castFrom(spell);
   return {
     id: spell.id,
     name: spell.name,
@@ -128,22 +130,54 @@ function describeSpell(spell, texts) {
     // cantrip, one cast at will, or one cast from an item, as dnd5e's sheet has it.
     prepared: (canPrepare && (level > 0) && !system.linkedActivity) ? (finite(system.prepared) ?? 0) : null,
     uses: usesOf(spell),
-    castFrom: castFrom(spell),
-    // What it rolls, so it's cast or rolled from the Spells tab as from Actions.
-    ...rollsIfAny(spell),
+    castFrom: from,
+    // What it rolls, so it's cast or rolled from the Spells tab as from Actions; nothing for one its
+    // item can't cast now.
+    ...((from?.usable !== false) && rollsIfAny(spell)),
     text: texts.add({ html: system.description?.value, relativeTo: spell })
   };
 }
 
 /**
  * The item a spell is cast from, with one of its Cast activities, such as a wand or a hat that casts
- * Disguise Self; null for a spell of the character's own.
+ * Disguise Self; null for a spell of the character's own. One the item can't cast now says so, and
+ * whether that's for want of attuning to it, as dnd5e has it.
  * @param {Item} spell
- * @returns {{id: string, name: string}|null}
+ * @returns {{id: string, name: string, usable?: false, attune?: boolean}|null}
  */
 export function castFrom(spell) {
+  const linked = spell.system?.linkedActivity;
+  const item = linked?.item;
+  if ( !item ) return null;
+  if ( linked.canUse !== false ) return { id: item.id, name: item.name };
+  return {
+    id: item.id,
+    name: item.name,
+    usable: false,
+    attune: (linked.visibility?.requireAttunement === true) && (item.system?.attuned !== true)
+  };
+}
+
+/**
+ * Is this the copy of a spell dnd5e keeps for an item that casts it, such as a wand's?
+ * @param {Item} spell
+ * @returns {boolean}
+ */
+export function castCopy(spell) {
+  return (spell.type === "spell") && Boolean(spell.getFlag?.("dnd5e", "cachedFor") ?? spell.flags?.dnd5e?.cachedFor);
+}
+
+/**
+ * Is this the copy of a spell an item casts, of an item gone, hidden from the character's sheet, as
+ * dnd5e 6 hides some, or not identified yet? Its spells are left out with it, giving nothing away.
+ * @param {Item} spell
+ * @returns {boolean}
+ */
+export function hiddenCopy(spell) {
+  if ( !castCopy(spell) ) return false;
   const item = spell.system?.linkedActivity?.item;
-  return item ? { id: item.id, name: item.name } : null;
+  return !item || (item.system?.identified === false) || (item.isHidden === true)
+    || (item.actor?.hiddenItems?.has?.(item.id) === true);
 }
 
 /**

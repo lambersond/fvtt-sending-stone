@@ -1,3 +1,4 @@
+import { formulaRoll } from "./dice-plan.mjs";
 import { finite, limitedUses, localize } from "./sheet-values.mjs";
 
 /**
@@ -41,10 +42,10 @@ const NO_ROLLS = Object.freeze({
 
 /**
  * What an item rolls, as its first activity does: an attack's bonus to hit and the attack's id,
- * with its modes and ammunition, or else the activity it's used through, such as a save or
- * healing; the saving throw it calls for; and its damage or healing. An item with more than one
- * activity lists each, as `describeActivity` describes it, with its id, name and kind. An item not
- * identified yet keeps them all to itself.
+ * with its modes and ammunition, and its area, if any, or else the activity it's used through, such
+ * as a save or healing; the saving throw it calls for; its damage or healing; and a utility's own
+ * roll, if it has one. An item with more than one activity lists each, as `describeActivity`
+ * describes it, with its id, name and kind. An item not identified yet keeps them all to itself.
  *
  * An action lists only some of an item's activities, those activated as its section of the
  * Actions tab has it, and rolls as the first of them; it lists them even when there's one, where
@@ -55,7 +56,8 @@ const NO_ROLLS = Object.freeze({
  * @param {boolean} [options.list]    List them even when there's only one.
  * @returns {{toHit: number|null, attackId: string|null, activity: object|null,
  *   attackModes: object[]|null, ammunition: object[]|null, save: object|null, damage: object[],
- *   consumesSlot?: false, cast?: object, activities?: object[]}}
+ *   attackArea?: object, rollFormula?: object, consumesSlot?: false, cast?: object,
+ *   activities?: object[]}}
  */
 export function rollsOf(item, activities=visibleActivities(item), { list=false }={}) {
   if ( item.system?.identified === false ) return { ...NO_ROLLS, damage: [] };
@@ -120,10 +122,10 @@ export function usageOf(item) {
 
 /**
  * What an activity rolls, or is used through: an attack's bonus to hit, by the attack's id, with
- * its weapon's attack modes and ammunition; or else the activity itself, such as a save or
- * healing; the saving throw it calls for; and its damage or healing. A spell's activity that
- * spends no spell slot, as one used after the spell is cast does, such as Hex's Bonus Hex Damage,
- * says so.
+ * its weapon's attack modes and ammunition, and whom it's made at, for one at an area; or else the
+ * activity itself, such as a save or healing; the saving throw it calls for; its damage or
+ * healing; and a utility's own roll, such as a d4 of luck. A spell's activity that spends no spell
+ * slot, as one used after the spell is cast does, such as Hex's Bonus Hex Damage, says so.
  * @param {Item} item
  * @param {Activity} [activity]
  * @returns {object}
@@ -132,6 +134,8 @@ function activityRolls(item, activity) {
   if ( !activity ) return { ...NO_ROLLS, damage: [] };
   if ( activity.type === "cast" ) return castRolls(item, activity);
   const attack = activity.type === "attack";
+  const area = attack ? attackAreaOf(item, activity) : null;
+  const roll = formulaRoll(activity);
   return {
     toHit: attack ? toHitOf(activity) : null,
     // The attack the bonus is for, so the app can have it made here.
@@ -142,6 +146,9 @@ function activityRolls(item, activity) {
     ammunition: attack ? ammunitionOf(item) : null,
     save: saveOf(activity),
     damage: damageOf(activity),
+    ...(area && { attackArea: area }),
+    // With the character's numbers in it, so the app can roll its dice and have it made here.
+    ...(roll && { rollFormula: { formula: roll.formula, name: activity.roll.name || null } }),
     ...(spendsNoSlot(item, activity) && { consumesSlot: false })
   };
 }
@@ -253,6 +260,7 @@ function castRolls(item, cast) {
     ...rolls,
     attackId: rolls.attackId && cast.id,
     activity: rolls.activity && { ...rolls.activity, id: cast.id, targets: { ...rolls.activity.targets, perLevel: null } },
+    ...(rolls.attackArea && { attackArea: { ...rolls.attackArea, perLevel: null } }),
     cast: {
       level: Math.max(finite(spell.system?.level) ?? 0, finite(cast.spell?.level) ?? 0),
       concentration: (spell.system?.properties?.has?.("concentration") ?? false)
@@ -367,6 +375,20 @@ export function describeUse(item, activity) {
       affects
     }
   };
+}
+
+/**
+ * Whom an attack at an area, such as a breath weapon's cone, is made at, as a use's targets are
+ * told: as many as it takes, or any number, and more for each level a spell is cast above its own.
+ * Null for an attack at one target.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {{count: number|null, perLevel: number|null, affects: string|null}|null}
+ */
+function attackAreaOf(item, activity) {
+  if ( !activity.target?.template?.type ) return null;
+  const { count, perLevel, affects } = describeUse(item, activity).targets;
+  return { count, perLevel, affects };
 }
 
 /**

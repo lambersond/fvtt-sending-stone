@@ -145,10 +145,14 @@ export const EVENTS = Object.freeze({
 
 /**
  * The rolls a player can have made here from the app, with the dice they rolled there: a skill
- * check, a tool check, an ability check, a saving throw, a death saving throw, or initiative.
+ * check, a tool check, an ability check, a saving throw, a death saving throw, or initiative; a hit
+ * die spent, offered once the self-test has checked it; or a utility's own roll, such as a d4 of
+ * luck.
  * @type {readonly string[]}
  */
-export const ROLL_KINDS = Object.freeze(["skill", "tool", "ability", "save", "death", "initiative"]);
+export const ROLL_KINDS = Object.freeze([
+  "skill", "tool", "ability", "save", "death", "initiative", "hitDie", "formula"
+]);
 
 /**
  * What a player can have made here from the app by using an item, as in Foundry: an attack, with the

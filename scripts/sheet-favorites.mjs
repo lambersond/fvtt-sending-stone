@@ -1,5 +1,6 @@
 import { castSpellOf, describeActivity, visibleActivities } from "./sheet-rolls.mjs";
 import { traitLabel } from "./sheet-details.mjs";
+import { castFrom, hiddenCopy } from "./sheet-spells.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
 import { combinedMode, finite, limitedUses, localize } from "./sheet-values.mjs";
 
@@ -65,12 +66,15 @@ function itemFavorite(actor, { item, activity, effect }) {
 /**
  * One of an item's activities made a favorite, such as a staff's Cast Fireball: what it does, as
  * an action is described, since the sheet lists each item's actions by one of its activities.
+ * One of a spell an item casts, while the item can't cast it, as dnd5e's sheet doesn't list it then,
+ * is left out: it would do nothing.
  * @param {Actor} actor
  * @param {{item?: Item, activity?: Activity}} found
  * @returns {object|null}
  */
 function activityFavorite(actor, { item, activity }, texts) {
   if ( !item || !activity || hidden(actor, item) ) return null;
+  if ( castFrom(item)?.usable === false ) return null;
   if ( !visibleActivities(item).includes(activity) ) return null;
   const described = describeActivity(item, activity);
   // One that casts a spell from the item opens to the spell's description.
@@ -206,22 +210,11 @@ function resolve(actor, uuid) {
 }
 
 /**
- * Is an item hidden from the character's sheet, as dnd5e 6 hides some?
+ * Is an item hidden from the character's sheet, as dnd5e 6 hides some, or a spell cast from one?
  * @param {Actor} actor
  * @param {Item} item
  * @returns {boolean}
  */
 function hidden(actor, item) {
-  return (item.isHidden === true) || (actor.hiddenItems?.has?.(item.id) === true) || unlistedCopy(item);
-}
-
-/**
- * Is this the copy of a spell dnd5e keeps for an item that casts it, which the spellbook doesn't
- * list, as dnd5e's doesn't while the item can't cast it? The item casts it, from the Actions tab.
- * @param {Item} item
- * @returns {boolean}
- */
-function unlistedCopy(item) {
-  if ( !(item.getFlag?.("dnd5e", "cachedFor") ?? item.flags?.dnd5e?.cachedFor) ) return false;
-  return item.system?.linkedActivity?.displayInSpellbook !== true;
+  return (item.isHidden === true) || (actor.hiddenItems?.has?.(item.id) === true) || hiddenCopy(item);
 }

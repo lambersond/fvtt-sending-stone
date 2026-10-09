@@ -37,6 +37,12 @@ class DicePlan {
      * @type {boolean}
      */
     this.ended = false;
+
+    /**
+     * Why the roll was called off here, if it was: "dice", where the player's dice can't be used.
+     * @type {string|null}
+     */
+    this.refusal = null;
   }
 
   /**
@@ -85,14 +91,17 @@ let served = 0;
 
 /**
  * Whether players' rolls can be made here: only under D&D Fifth Edition, and once the self-test
- * has shown that this Foundry and its modules roll dice as expected. Their attacks also need their
- * damage rolled as expected, and the damage they change in the app, more dice, another die or
- * every die at its highest, changed as expected, which the self-test checks apart.
- * @type {{ready: boolean, reason: string|null, error: string|null, attacks: boolean,
- *   attacksError: string|null, modifiers: boolean, modifiersError: string|null}}
+ * has shown that this Foundry and its modules roll dice as expected. Their hit dice also need
+ * dnd5e's hit die roll to take their die, their attacks their damage rolled as expected, and the
+ * damage they change in the app, more dice, another die or every die at its highest, changed as
+ * expected, which the self-test checks apart.
+ * @type {{ready: boolean, reason: string|null, error: string|null, hitDice: boolean,
+ *   hitDiceError: string|null, attacks: boolean, attacksError: string|null, modifiers: boolean,
+ *   modifiersError: string|null}}
  */
 export const diceStatus = {
-  ready: false, reason: "pending", error: null, attacks: false, attacksError: null, modifiers: false, modifiersError: null
+  ready: false, reason: "pending", error: null, hitDice: false, hitDiceError: null, attacks: false, attacksError: null,
+  modifiers: false, modifiersError: null
 };
 
 /* -------------------------------------------- */
@@ -176,7 +185,8 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
  * aren't taken by a bonus of the same dice, such as Bless's d4, which Foundry rolls. Only a d20 roll
  * is changed so. Damage is rolled as it is, but as the kind of damage the player chose, where it
  * offers a choice: anything added to it would take a critical hit's extra dice, and be added once
- * for each of its parts.
+ * for each of its parts. A hit die's formula is written with its die outside dnd5e's `max`, where
+ * the player's die can reach it, coming to the same.
  * @param {object} process   The roll process's configuration.
  * @param {object} config    The roll's configuration.
  * @param {number} index     The roll's place among the process's rolls.
@@ -188,6 +198,12 @@ function onBuildRollConfig(process, config, index) {
   config.options ??= {};
   config.options[ROLL_TAG] = tag;
   const hookNames = process?.hookNames ?? [];
+  if ( hookNames.includes("hitDie") ) {
+    if ( (index === 0) && (plan.command.kind === "hitDie") ) {
+      config.parts = (config.parts ?? []).map(part => hitDieFormula(part, config.data) ?? part);
+    }
+    return;
+  }
   if ( hookNames.includes("damage") ) {
     const type = plan.command.types?.[index];
     if ( (typeof type === "string") && config.options.types?.includes(type) ) config.options.type = type;
@@ -205,13 +221,21 @@ function onBuildRollConfig(process, config, index) {
 }
 
 /**
- * Before a player's damage is rolled, roll it without dnd5e's damage dialog, whatever asked for it,
- * as Midi-QOL does for a choice of damage types: the player chose, in the app.
+ * The rolls tagged on their process whose dialog a player's roll never opens, whatever asked for
+ * it: damage, a hit die and a utility's own roll.
+ * @type {string[]}
+ */
+const UNASKED = ["damage", "hitDie", "formula"];
+
+/**
+ * Before a player's damage, hit die or utility's roll is rolled, roll it without dnd5e's dialog,
+ * whatever asked for it, as Midi-QOL does for a choice of damage types, and a utility set to prompt
+ * for its roll does: the player chose, in the app.
  * @param {object} process   The roll process's configuration.
  * @param {object} dialog    The roll dialog's configuration.
  */
 function onPreRoll(process, dialog) {
-  if ( !process?.hookNames?.includes("damage") || !dialog ) return;
+  if ( !UNASKED.some(name => process?.hookNames?.includes(name)) || !dialog ) return;
   if ( planFor(process[ROLL_TAG]) ) dialog.configure = false;
 }
 
@@ -238,8 +262,10 @@ function tagOf(process, config, index) {
 /**
  * Once dnd5e has built a tagged roll, keep how the player chose to roll it, whatever changed it
  * since, as a module granting advantage might; and change the first of a player's damage rolls as
- * they chose in the app.
+ * they chose in the app. A hit die or utility's roll another module changed so that the player's
+ * dice can't reach it, as inside a function, is called off: nothing is spent or healed.
  * @param {Roll[]} rolls
+ * @returns {boolean|void}   False to call the roll off.
  */
 function onRollConfiguration(rolls) {
   for ( const [index, roll] of (rolls ?? []).entries() ) {
@@ -248,12 +274,63 @@ function onRollConfiguration(rolls) {
       if ( index === 0 ) reshapeDamage(roll, plan.command.modifiers);
       continue;
     }
+    if ( ["hitDie", "formula"].includes(plan?.command.kind) ) {
+      if ( (index === 0) && !takesPlayersDice(roll, plan.command.dice) ) {
+        plan.refusal = "dice";
+        return false;
+      }
+      continue;
+    }
     if ( !plan?.command.explicit ) continue;
     const { mode } = plan.command;
     if ( roll.options.advantageMode === mode ) continue;
     roll.options.advantageMode = mode;
     roll.configureModifiers?.();
   }
+}
+
+/**
+ * Can a roll take every die the player rolled for it: has it as many dice of each size as they
+ * rolled, among its own, outside any function or parentheses?
+ * @param {Roll} roll   Built, not yet rolled.
+ * @param {{faces: number, results: number[]}[]} dice
+ * @returns {boolean}
+ */
+function takesPlayersDice(roll, dice) {
+  const { DiceTerm } = foundry.dice.terms;
+  const thrown = new Map();
+  for ( const term of roll.terms ) {
+    if ( (term instanceof DiceTerm) && Number.isInteger(term.number) ) {
+      thrown.set(term.faces, (thrown.get(term.faces) ?? 0) + term.number);
+    }
+  }
+  const rolled = new Map();
+  for ( const { faces, results } of dice ?? [] ) rolled.set(faces, (rolled.get(faces) ?? 0) + results.length);
+  return Array.from(rolled).every(([faces, number]) => (thrown.get(faces) ?? 0) >= number);
+}
+
+/**
+ * dnd5e's formula for a hit die, `max(least, 1dX + @abilities.con.mod)`, which the player's die
+ * can't reach inside its `max`, written with the die outside it, coming to the same: the die at
+ * least as high as it must be for the total to reach the least, then the modifier, such as
+ * `1d8min4 + @abilities.con.mod` for a Constitution of -3. A die no face of which reaches it
+ * always comes to the least. Null for any other formula, such as one a module wrote.
+ * @param {string} part   The roll's part, as dnd5e wrote it.
+ * @param {object} data   The roll's data, with the character's Constitution modifier.
+ * @returns {string|null}
+ */
+export function hitDieFormula(part, data) {
+  const match = /^max\(\s*(\d+)\s*,\s*1d(\d+)\s*\+\s*@abilities\.con\.mod\s*\)$/.exec(String(part ?? "").trim());
+  const mod = Number(data?.abilities?.con?.mod);
+  if ( !match || !Number.isInteger(mod) ) return null;
+  const least = Number(match[1]);
+  const faces = Number(match[2]);
+  const lowest = least - mod;
+  if ( lowest <= 1 ) return `1d${faces} + @abilities.con.mod`;
+  if ( lowest <= faces ) return `1d${faces}min${lowest} + @abilities.con.mod`;
+  // Foundry raises a die no higher than its faces.
+  const rest = least - faces;
+  return `1d${faces}min${faces} ${(rest < 0) ? "-" : "+"} ${Math.abs(rest)}`;
 }
 
 /**
@@ -292,6 +369,34 @@ export function plannedDice(roll) {
     else if ( /d\d/i.test(term.formula ?? term.expression ?? "") ) return { plannable: false, dice: [] };
   }
   return { plannable: true, dice };
+}
+
+/**
+ * Are these the dice a roll throws, as planned: the same dice, in order? None, for one that can't
+ * be planned or has no dice.
+ * @param {{faces: number, results: number[]}[]} dice
+ * @param {{faces: number, number: number}[]} planned
+ * @returns {boolean}
+ */
+export function matchesDice(dice, planned) {
+  if ( dice.length !== planned.length ) return false;
+  return dice.every((die, index) => (die.faces === planned[index].faces) && (die.results.length === planned[index].number));
+}
+
+/**
+ * A utility activity's own roll, such as a d4 of luck, as dnd5e builds it, built but not rolled:
+ * with the character's numbers in its formula, such as `1d4 + 3` for `1d4 + @abilities.wis.mod`.
+ * Null for an activity with no roll of its own, or one Foundry can't read.
+ * @param {Activity} [activity]
+ * @returns {Roll|null}
+ */
+export function formulaRoll(activity) {
+  if ( (activity?.type !== "utility") || !activity.roll?.formula ) return null;
+  try {
+    return new CONFIG.Dice.BasicRoll(activity.roll.formula, activity.getRollData());
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -489,9 +594,18 @@ export async function selfTest() {
     Object.assign(diceStatus, { ready: true, reason: null, error: null });
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    Object.assign(diceStatus, { ready: false, reason: "self-test", error, attacks: false });
+    Object.assign(diceStatus, { ready: false, reason: "self-test", error, hitDice: false, attacks: false });
     console.warn(`${MODULE_ID} | Players' rolls from Sending Stone can't be made in this game: ${error}`, err);
     return;
+  }
+
+  try {
+    await hitDieSelfTest();
+    Object.assign(diceStatus, { hitDice: true, hitDiceError: null });
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    Object.assign(diceStatus, { hitDice: false, hitDiceError: error });
+    console.warn(`${MODULE_ID} | Players can't spend hit dice from Sending Stone in this game: ${error}`, err);
   }
 
   try {
@@ -511,6 +625,36 @@ export async function selfTest() {
     const error = err instanceof Error ? err.message : String(err);
     Object.assign(diceStatus, { modifiers: false, modifiersError: error });
     console.warn(`${MODULE_ID} | Players can't change their damage from Sending Stone in this game: ${error}`, err);
+  }
+}
+
+/**
+ * Check that a player's die reaches a hit die, as dnd5e builds its roll without its dialog, and
+ * that the roll comes to dnd5e's total, however the die is raised to reach the least it heals.
+ * Other modules' hooks aren't called, there being no character to roll for; one that changes the
+ * formula so the player's die can't reach it has the roll called off when it's made.
+ * @returns {Promise<void>}
+ */
+async function hitDieSelfTest() {
+  const BasicRoll = CONFIG.Dice?.BasicRoll;
+  if ( !BasicRoll ) throw new Error("dnd5e has no basic rolls");
+  // The least, the die, the Constitution modifier and the player's roll: no least to raise it to; a
+  // least it must be raised to; the legacy rules' least of 0; a die above it; and a die no face of
+  // which reaches it.
+  const cases = [[1, 8, 2, 5], [1, 8, -3, 2], [0, 10, -3, 1], [1, 6, -3, 6], [1, 4, -5, 3]];
+  for ( const [least, faces, mod, rolled] of cases ) {
+    const id = `self-test-${foundry.utils.randomID()}`;
+    const config = { parts: [`max(${least}, 1d${faces} + @abilities.con.mod)`], data: { abilities: { con: { mod } } } };
+    const dice = [{ faces, results: [rolled] }];
+    await withPlan({ id, kind: "hitDie", denomination: `d${faces}`, dice }, async plan => {
+      onBuildRollConfig({ hookNames: ["hitDie", ""], [ROLL_TAG]: id }, config, 0);
+      const roll = BasicRoll.fromConfig(config, {});
+      check(takesPlayersDice(roll, dice), `a hit die, ${roll.formula}, can't take the player's d${faces}`);
+      await roll.evaluate();
+      check(plan.remaining(faces) === 0, `a hit die, ${roll.formula}, didn't take the player's d${faces}`);
+      const total = Math.max(least, rolled + mod);
+      check(roll.total === total, `a hit die, ${roll.formula}, came to ${roll.total} with a ${rolled}, not ${total}`);
+    });
   }
 }
 

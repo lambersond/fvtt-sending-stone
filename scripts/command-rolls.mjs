@@ -1,13 +1,16 @@
 import { ATTACK_KINDS, DIE_FACES, MODULE_ID, ROLL_KINDS, ROLL_TAG } from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
-import { diceStatus, withPlan } from "./dice-plan.mjs";
+import { diceStatus, formulaRoll, matchesDice, plannedDice, withPlan } from "./dice-plan.mjs";
 import { findPrompt, outcomeOf } from "./prompts.mjs";
+import { castSpellOf, visibleActivities } from "./sheet-rolls.mjs";
+import { castFrom } from "./sheet-spells.mjs";
 
 /**
  * Making a player's roll from the Sending Stone app: a check, saving throw, death saving throw or
- * initiative, through dnd5e, as if the player had rolled it in Foundry, with the dice they rolled;
- * and a saving throw the game asked them for, on the card that asked.
+ * initiative, a hit die spent, or a utility's own roll, such as a d4 of luck, through dnd5e, as if
+ * the player had rolled it in Foundry, with the dice they rolled; and a saving throw the game asked
+ * them for, on the card that asked.
  */
 
 /**
@@ -24,6 +27,13 @@ export const PUBLIC = "public";
 const KEYED = new Set(["skill", "tool", "ability", "save"]);
 
 /**
+ * The rolls made as they are, with no advantage and nothing added: a hit die, and a utility's own
+ * roll.
+ * @type {Set<string>}
+ */
+const PLAIN = new Set(["hitDie", "formula"]);
+
+/**
  * What became of a player's roll, as the app is told.
  * @typedef {object} CommandResult
  * @property {string} id
@@ -33,8 +43,10 @@ const KEYED = new Set(["skill", "tool", "ability", "save"]);
  * @property {string|null} messageId    The chat message the roll made.
  * @property {boolean} visible          May its player see the roll? Not one made blind.
  * @property {object[]} rolls           The roll as made, when its player may see it.
+ * @property {number} [healed]          For a hit die: the hit points it gained.
  * @property {object|null} [attack]     For an attack: whether it was a critical hit or a fumble, and
- *                                      whether it hit its target, when its player may know.
+ *                                      whether it hit its target, or each target of an area attack,
+ *                                      when its player may know.
  * @property {object|null} [damage]     For an attack: the dice its damage will throw, for its player
  *                                      to roll; null when no damage follows.
  * @property {string|null} [outcome]    For a save the game asked for: "success" or "failure", where
@@ -66,6 +78,7 @@ export async function runRollCommand(command, campaign) {
   if ( !campaign.rolls || !diceStatus.ready ) return failed("off");
   const invalid = checkCommand(command);
   if ( invalid ) return failed("invalid", invalid);
+  if ( (command.kind === "hitDie") && !diceStatus.hitDice ) return failed("self-test");
   const actor = game.actors.get(command.actorId);
   if ( !actor || !campaign.characters.has(actor.id) ) return failed("unknown");
   const refusal = checkRoll(command, actor);
@@ -78,18 +91,25 @@ export async function runRollCommand(command, campaign) {
     prompt = found.prompt;
   }
 
+  const hp = actor.system.attributes?.hp?.value ?? 0;
   let made;
+  let plan;
   try {
-    made = await withPlan(command, () => (prompt ? answerPrompt(command, actor, prompt) : makeRoll(command, actor)));
+    made = await withPlan(command, planned => {
+      plan = planned;
+      return prompt ? answerPrompt(command, actor, prompt) : makeRoll(command, actor);
+    });
   } catch (err) {
     console.error(`${MODULE_ID} | Could not make ${actor.name}'s roll from Sending Stone`, err);
     return failed("error", err instanceof Error ? err.message : String(err));
   }
   const message = prompt ? made?.message : made;
-  // A roll a module called off, as dnd5e's hooks allow, made nothing.
-  if ( !message ) return failed("cancelled");
+  // A roll a module called off, as dnd5e's hooks allow, made nothing; so did one called off here.
+  if ( !message ) return failed(plan?.refusal ?? "cancelled");
   const result = describeResult(command, message, actor, campaign);
   if ( prompt ) result.outcome = result.visible ? made.outcome : null;
+  // The hit points dnd5e gave the character for a hit die: none where a module kept it from it.
+  if ( command.kind === "hitDie" ) result.healed = Math.max((actor.system.attributes?.hp?.value ?? hp) - hp, 0);
   return result;
 }
 
@@ -102,6 +122,7 @@ export async function runRollCommand(command, campaign) {
 export function checkCommand(command) {
   if ( ATTACK_KINDS.includes(command.kind) ) return checkAttackCommand(command);
   if ( !ROLL_KINDS.includes(command.kind) ) return "kind";
+  if ( PLAIN.has(command.kind) ) return checkPlainCommand(command);
   if ( KEYED.has(command.kind) !== (typeof command.key === "string") ) return "key";
   if ( (command.kind === "initiative") !== (typeof command.combatId === "string") ) return "combat";
   if ( ![-1, 0, 1].includes(command.mode) || (typeof command.explicit !== "boolean") ) return "mode";
@@ -109,6 +130,31 @@ export function checkCommand(command) {
   const { extras, dice } = command;
   if ( !Array.isArray(extras) || (extras.length > 10) || !extras.every(isExtra) ) return "extras";
   if ( !Array.isArray(dice) || !dice.length || (dice.length > 11) || !dice.every(isRolled) ) return "dice";
+  return null;
+}
+
+/**
+ * Why a fetched hit die or utility's roll isn't one to make, if it isn't. Neither is rolled with
+ * advantage, has anything added, or answers a prompt. A hit die names its size, and has the one die
+ * rolled of it; a utility's roll names the item and activity, and has the dice its formula throws,
+ * if any, which are checked against them when it's made.
+ * @param {object} command
+ * @returns {string|null}
+ */
+function checkPlainCommand(command) {
+  if ( (command.mode !== 0) || (command.explicit !== false) ) return "mode";
+  if ( !Array.isArray(command.extras) || command.extras.length ) return "extras";
+  if ( (command.prompt !== undefined) && (command.prompt !== null) ) return "prompt";
+  const { dice } = command;
+  if ( command.kind === "hitDie" ) {
+    const faces = Number(/^d(\d{1,3})$/.exec(String(command.denomination ?? ""))?.[1]);
+    if ( !DIE_FACES.has(faces) ) return "denomination";
+    const one = Array.isArray(dice) && (dice.length === 1) && isRolled(dice[0]) && (dice[0].faces === faces)
+      && (dice[0].results.length === 1);
+    return one ? null : "dice";
+  }
+  if ( !isId(command.item) || !isId(command.activity) ) return "item";
+  if ( !Array.isArray(dice) || (dice.length > 20) || !dice.every(isRolled) ) return "dice";
   return null;
 }
 
@@ -123,11 +169,12 @@ function isPromptId(value) {
 
 /**
  * Why a fetched attack, use or damage isn't one to make, if it isn't. An attack names the item and
- * activity it's made with, and the combatant it's made at, if any, and has its d20s and any dice
- * the player added; it may name the spell slot, ammunition and attack mode it's made with. A use
- * names the item and activity, the combatants it's used at, and the spell slot, if any, and has no
- * dice. Damage names the use it follows and has the dice that use's damage throws, if any, which
- * are checked against them when it's made, and the kind of damage chosen for each of its rolls.
+ * activity it's made with, and the combatant it's made at, if any, or for an area attack those in
+ * its area, but not both, and has its d20s and any dice the player added; it may name the spell
+ * slot, ammunition and attack mode it's made with. A use names the item and activity, the
+ * combatants it's used at, and the spell slot, if any, and has no dice. Damage names the use it
+ * follows and has the dice that use's damage throws, if any, which are checked against them when
+ * it's made, and the kind of damage chosen for each of its rolls.
  * @param {object} command
  * @returns {string|null}
  */
@@ -150,8 +197,12 @@ function checkAttackCommand(command) {
     if ( !Array.isArray(targets) || (targets.length > 20) || !targets.every(isTarget) ) return "target";
     return null;
   }
-  const { target } = command;
+  const { target, targets } = command;
   if ( (target !== null) && (target !== undefined) && !isTarget(target) ) return "target";
+  if ( (targets !== null) && (targets !== undefined) ) {
+    const single = (target !== null) && (target !== undefined);
+    if ( single || !Array.isArray(targets) || (targets.length > 20) || !targets.every(isTarget) ) return "target";
+  }
   if ( !isOptional(command.ammunition, isId) ) return "ammo";
   if ( !isOptional(command.attackMode, isKey) ) return "attack-mode";
   if ( ![-1, 0, 1].includes(command.mode) || (typeof command.explicit !== "boolean") ) return "mode";
@@ -240,8 +291,46 @@ function checkRoll(command, actor) {
       return dying ? null : "not-dying";
     }
     case "initiative": return initiativeTurn(command, actor).refusal ?? null;
+    case "hitDie": return hitDieLeft(command, actor) ? null : "no-hit-dice";
+    case "formula": return formulaActivity(command, actor).refusal ?? null;
     default: return "unknown";
   }
+}
+
+/**
+ * Has the character a hit die of the size a player spends left, as dnd5e looks for one: an NPC
+ * its own, a character a class's? dnd5e would otherwise tell the Gamemaster it hasn't.
+ * @param {object} command
+ * @param {Actor} actor
+ * @returns {boolean}
+ */
+function hitDieLeft(command, actor) {
+  const hd = actor.system.attributes?.hd;
+  if ( actor.system.isNPC ) return (command.denomination === `d${hd?.denomination}`) && (hd?.value > 0);
+  return Array.from(hd?.classes ?? []).some(cls => (cls.system?.hd?.denomination === command.denomination)
+    && (cls.system.hd.value > 0));
+}
+
+/**
+ * The utility activity whose own roll a player rolls, as the sheet lists it: of an item that's
+ * identified, and for a spell an item casts, one the item can cast now; or the activity of the
+ * spell a Cast activity casts, by the Cast activity's id. Its
+ * formula's dice must be ones a player can roll, and the ones they rolled.
+ * @param {object} command
+ * @param {Actor} actor
+ * @returns {{refusal?: string, activity?: Activity}}
+ */
+function formulaActivity(command, actor) {
+  const item = actor.items?.get(command.item);
+  // Nor of a spell an item casts while the item can't cast it, as a use of it is refused.
+  if ( !item || (item.system?.identified === false) || (castFrom(item)?.usable === false) ) return { refusal: "item" };
+  const named = visibleActivities(item).find(activity => activity.id === command.activity);
+  const activity = (named?.type === "cast") ? castSpellOf(named)?.lead : named;
+  const roll = formulaRoll(activity);
+  const planned = roll ? plannedDice(roll) : null;
+  if ( !planned?.plannable ) return { refusal: "activity" };
+  if ( !matchesDice(command.dice, planned.dice) ) return { refusal: "dice" };
+  return { activity };
 }
 
 /**
@@ -287,8 +376,48 @@ async function makeRoll(command, actor) {
     case "save": return messageOf(await actor.rollSavingThrow(config({ ability: key }), dialog, message));
     case "death": return messageOf(await actor.rollDeathSave(config({}), dialog, message));
     case "initiative": return rollInitiative(command, actor, { author, flags });
+    case "hitDie": return rollHitDie(command, actor, message);
+    case "formula": return rollFormula(command, actor, message);
     default: return null;
   }
+}
+
+/**
+ * Spend a hit die as dnd5e does, without its dialog, healing the character. dnd5e adds its own
+ * roll to those it's given, so it's tagged on the process; and names the roll's kind in a way the
+ * message's own flags would replace, so they name it.
+ * @param {object} command
+ * @param {Actor} actor
+ * @param {object} message   The roll's message, as for any roll.
+ * @returns {Promise<ChatMessage|null>}
+ */
+async function rollHitDie(command, actor, message) {
+  const flags = { ...message.data.flags, dnd5e: { roll: { type: "hitDie" } } };
+  return messageOf(await actor.rollHitDie(
+    { denomination: command.denomination, [ROLL_TAG]: command.id },
+    { configure: false },
+    { ...message, data: { ...message.data, flags } }
+  ));
+}
+
+/**
+ * Roll a utility activity's own formula, as its card's button does, without its dialog. dnd5e
+ * adds its own roll to those it's given, so it's tagged on the process; and would name the
+ * Gamemaster's own targets on its card, so it names none.
+ * @param {object} command
+ * @param {Actor} actor
+ * @param {object} message   The roll's message, as for any roll.
+ * @returns {Promise<ChatMessage|null>}
+ */
+async function rollFormula(command, actor, message) {
+  const { activity } = formulaActivity(command, actor);
+  if ( !activity ) return null;
+  const flags = { ...message.data.flags, dnd5e: { targets: [] } };
+  return messageOf(await activity.rollFormula(
+    { [ROLL_TAG]: command.id },
+    { configure: false },
+    { ...message, data: { ...message.data, flags } }
+  ));
 }
 
 /**

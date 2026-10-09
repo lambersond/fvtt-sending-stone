@@ -3,7 +3,7 @@ import {
   ACTION_KINDS, activationTypeOf, activityName, activityUses, castSpellOf, ownLabels, rangeOf, REACTIONS,
   rollsOf, visibleActivities
 } from "./sheet-rolls.mjs";
-import { castFrom } from "./sheet-spells.mjs";
+import { castCopy, castFrom } from "./sheet-spells.mjs";
 import { finite, localize } from "./sheet-values.mjs";
 
 /**
@@ -48,6 +48,7 @@ const FOLLOWING = ["", "none", "special"];
 export function actionSections(actor, texts) {
   const sections = new Map(SECTIONS.map(id => [id, { id, label: sectionLabel(id), actions: [] }]));
   const items = Array.from(actor.items ?? [])
+    // Not the copies of spells items cast, which their items' rows cast.
     .filter(item => (item.isHidden !== true) && !castCopy(item))
     .sort((a, b) => ((a.sort ?? 0) - (b.sort ?? 0)) || a.name.localeCompare(b.name, game.i18n.lang));
   for ( const item of items ) {
@@ -92,18 +93,6 @@ function rowsOf(item) {
   }
   return Array.from(rows.values());
 }
-
-/**
- * Is this the copy of a spell dnd5e keeps for an item that casts it, such as a wand's? The item's
- * row casts it.
- * @param {Item} item
- * @returns {boolean}
- */
-function castCopy(item) {
-  return (item.type === "spell") && Boolean(item.getFlag?.("dnd5e", "cachedFor") ?? item.flags?.dnd5e?.cachedFor);
-}
-
-/* -------------------------------------------- */
 
 /**
  * Does Tidy 5e list this item on its Actions tab, by default or as the player chose?
