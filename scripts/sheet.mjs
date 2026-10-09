@@ -59,7 +59,7 @@ export function characterSheet(actor, texts=new SheetTexts()) {
     deathSaves: deathSavesOf(actor),
     details: detailsOf(actor, texts),
     actions: actionSections(actor, texts),
-    favorites: favoritesOf(actor)
+    favorites: favoritesOf(actor, texts)
   };
 }
 

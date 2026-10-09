@@ -1,4 +1,4 @@
-import { describeActivity, visibleActivities } from "./sheet-rolls.mjs";
+import { castSpellOf, describeActivity, visibleActivities } from "./sheet-rolls.mjs";
 import { traitLabel } from "./sheet-details.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
 import { combinedMode, finite, limitedUses, localize } from "./sheet-values.mjs";
@@ -18,14 +18,15 @@ import { combinedMode, finite, limitedUses, localize } from "./sheet-values.mjs"
 /**
  * The character's favorites, in the order dnd5e shows them.
  * @param {Actor} actor
+ * @param {SheetTexts} [texts]   Collects the descriptions of the spells its items cast.
  * @returns {object[]}
  */
-export function favoritesOf(actor) {
+export function favoritesOf(actor, texts) {
   const marked = Array.from(actor.system?.favorites ?? [])
     .sort((a, b) => (finite(a?.sort) ?? 0) - (finite(b?.sort) ?? 0));
   return [
     ...resourcesOf(actor),
-    ...marked.map(favorite => describeFavorite(actor, favorite)).filter(Boolean)
+    ...marked.map(favorite => describeFavorite(actor, favorite, texts)).filter(Boolean)
   ];
 }
 
@@ -37,10 +38,10 @@ export function favoritesOf(actor) {
  * @param {{type: string, id: string}} favorite
  * @returns {object|null}
  */
-function describeFavorite(actor, { type, id }={}) {
+function describeFavorite(actor, { type, id }={}, texts) {
   switch ( type ) {
     case "item": return itemFavorite(actor, resolve(actor, id));
-    case "activity": return activityFavorite(actor, resolve(actor, id));
+    case "activity": return activityFavorite(actor, resolve(actor, id), texts);
     case "effect": return effectFavorite(actor, resolve(actor, id));
     case "skill": return skillFavorite(actor, id);
     case "tool": return toolFavorite(actor, id);
@@ -68,9 +69,12 @@ function itemFavorite(actor, { item, activity, effect }) {
  * @param {{item?: Item, activity?: Activity}} found
  * @returns {object|null}
  */
-function activityFavorite(actor, { item, activity }) {
+function activityFavorite(actor, { item, activity }, texts) {
   if ( !item || !activity || hidden(actor, item) ) return null;
   if ( !visibleActivities(item).includes(activity) ) return null;
+  const described = describeActivity(item, activity);
+  // One that casts a spell from the item opens to the spell's description.
+  const spell = described.cast && texts ? castSpellOf(activity)?.spell : null;
   return {
     type: "activity",
     id: activity.id,
@@ -79,7 +83,10 @@ function activityFavorite(actor, { item, activity }) {
     itemName: item.name,
     name: activity.name || item.name,
     img: activity.img || item.img || null,
-    ...describeActivity(item, activity)
+    ...described,
+    ...(spell && {
+      cast: { ...described.cast, text: texts.add({ html: spell.system?.description?.value, relativeTo: spell }) }
+    })
   };
 }
 
@@ -205,5 +212,16 @@ function resolve(actor, uuid) {
  * @returns {boolean}
  */
 function hidden(actor, item) {
-  return (item.isHidden === true) || (actor.hiddenItems?.has?.(item.id) === true);
+  return (item.isHidden === true) || (actor.hiddenItems?.has?.(item.id) === true) || unlistedCopy(item);
+}
+
+/**
+ * Is this the copy of a spell dnd5e keeps for an item that casts it, which the spellbook doesn't
+ * list, as dnd5e's doesn't while the item can't cast it? The item casts it, from the Actions tab.
+ * @param {Item} item
+ * @returns {boolean}
+ */
+function unlistedCopy(item) {
+  if ( !(item.getFlag?.("dnd5e", "cachedFor") ?? item.flags?.dnd5e?.cachedFor) ) return false;
+  return item.system?.linkedActivity?.displayInSpellbook !== true;
 }
