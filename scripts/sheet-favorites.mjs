@@ -1,5 +1,6 @@
 import { castSpellOf, describeActivity, visibleActivities } from "./sheet-rolls.mjs";
 import { traitLabel } from "./sheet-details.mjs";
+import { hiddenCopy } from "./sheet-spells.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
 import { combinedMode, finite, limitedUses, localize } from "./sheet-values.mjs";
 
@@ -206,22 +207,11 @@ function resolve(actor, uuid) {
 }
 
 /**
- * Is an item hidden from the character's sheet, as dnd5e 6 hides some?
+ * Is an item hidden from the character's sheet, as dnd5e 6 hides some, or a spell cast from one?
  * @param {Actor} actor
  * @param {Item} item
  * @returns {boolean}
  */
 function hidden(actor, item) {
-  return (item.isHidden === true) || (actor.hiddenItems?.has?.(item.id) === true) || unlistedCopy(item);
-}
-
-/**
- * Is this the copy of a spell dnd5e keeps for an item that casts it, which the spellbook doesn't
- * list, as dnd5e's doesn't while the item can't cast it? The item casts it, from the Actions tab.
- * @param {Item} item
- * @returns {boolean}
- */
-function unlistedCopy(item) {
-  if ( !(item.getFlag?.("dnd5e", "cachedFor") ?? item.flags?.dnd5e?.cachedFor) ) return false;
-  return item.system?.linkedActivity?.displayInSpellbook !== true;
+  return (item.isHidden === true) || (actor.hiddenItems?.has?.(item.id) === true) || hiddenCopy(item);
 }
