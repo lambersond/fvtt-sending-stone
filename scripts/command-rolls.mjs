@@ -168,12 +168,12 @@ function isPromptId(value) {
 
 /**
  * Why a fetched attack, use or damage isn't one to make, if it isn't. An attack names the item and
- * activity it's made with, and the combatant it's made at, if any, or for an area attack the
- * combatants in its area, but not both, and has its d20s and any dice the player added; it may
- * name the spell slot, ammunition and attack mode it's made with. A use
- * names the item and activity, the combatants it's used at, and the spell slot, if any, and has no
- * dice. Damage names the use it follows and has the dice that use's damage throws, if any, which
- * are checked against them when it's made, and the kind of damage chosen for each of its rolls.
+ * activity it's made with, and the combatant it's made at, if any, or for an area attack those in
+ * its area, but not both, and has its d20s and any dice the player added; it may name the spell
+ * slot, ammunition and attack mode it's made with. A use names the item and activity, the
+ * combatants it's used at, and the spell slot, if any, and has no dice. Damage names the use it
+ * follows and has the dice that use's damage throws, if any, which are checked against them when
+ * it's made, and the kind of damage chosen for each of its rolls.
  * @param {object} command
  * @returns {string|null}
  */
@@ -400,7 +400,7 @@ async function rollHitDie(command, actor, message) {
 /**
  * Roll a utility activity's own formula, as its card's button does, without its dialog. dnd5e
  * adds its own roll to those it's given, so it's tagged on the process; and would name the
- * Gamemaster's targets on its card.
+ * Gamemaster's own targets on its card, so it names none.
  * @param {object} command
  * @param {Actor} actor
  * @param {object} message   The roll's message, as for any roll.

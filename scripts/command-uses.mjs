@@ -232,7 +232,9 @@ async function prepareUse(command, actor) {
     targets.push({ ...target, picked: { combatId: picked.combatId, combatantId: picked.combatantId } });
   }
   // As many as it takes at the level it's cast at, as a spell may take more for each level higher.
-  if ( (!attack || area) && (targets.length > mostTargets(scaledActivity(activity, slot))) ) return { refusal: "target" };
+  if ( (!attack || area) && (targets.length > mostTargets(scaledActivity(activity, slot))) ) {
+    return { refusal: "target" };
+  }
 
   Object.assign(usage, {
     create: { ...usage.create, measuredTemplate: false },

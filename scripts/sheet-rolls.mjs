@@ -56,7 +56,8 @@ const NO_ROLLS = Object.freeze({
  * @param {boolean} [options.list]    List them even when there's only one.
  * @returns {{toHit: number|null, attackId: string|null, activity: object|null,
  *   attackModes: object[]|null, ammunition: object[]|null, save: object|null, damage: object[],
- *   attackArea?: object, rollFormula?: object, consumesSlot?: false, cast?: object, activities?: object[]}}
+ *   attackArea?: object, rollFormula?: object, consumesSlot?: false, cast?: object,
+ *   activities?: object[]}}
  */
 export function rollsOf(item, activities=visibleActivities(item), { list=false }={}) {
   if ( item.system?.identified === false ) return { ...NO_ROLLS, damage: [] };

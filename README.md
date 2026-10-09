@@ -8,10 +8,10 @@ It is built for D&D Fifth Edition (dnd5e 5.3.x): roll messages carry the kind of
 and the item, activity and targets involved. Chat and combat events work under any system.
 
 It also works the other way, for a campaign whose Gamemaster lets it: checks, saving throws,
-initiative, death saving throws, hit dice and features' own rolls a player rolls in the app are
-made in Foundry with the dice they rolled, as if they had rolled them there, and so can their
-attacks, spells and features and their damage or healing, through Midi-QOL's workflow where it's in
-use. See
+initiative, death saving throws, hit dice and features' own dice, such as a d4 of luck, that a
+player rolls in the app are made in Foundry with the dice they rolled, as if they had rolled them
+there, and so can their attacks, spells and features and their damage or healing, through
+Midi-QOL's workflow where it's in use. See
 [Players' rolls](#players-rolls) and [Players' attacks and spells](#players-attacks-and-spells).
 
 ## How it works
@@ -89,10 +89,11 @@ campaign titled after the world the first time a Gamemaster loads it.
 
 Tick **Let Players Roll from Sending Stone** for a campaign in Manage Campaigns, and its players'
 skill, tool and ability checks, saving throws, initiative and death saving throws in the app are
-made in Foundry too, with the dice they rolled there: the d20s, and any dice they added, such as
-a d4 for Bless. So are the hit dice they spend, and a feature's own roll, such as a d4 of luck. dnd5e makes each roll, without its dialog, as the character's player, so its card,
-critical hits, death saving throws, the combat tracker, Dice So Nice and Midi-QOL all behave as if
-they had rolled in Foundry. Each card is marked as rolled on Sending Stone.
+made in Foundry too, with the dice they rolled there: the d20s, and any dice they added, such as a
+d4 for Bless. So are the hit dice they spend, and a feature's own roll, such as a d4 of luck. dnd5e
+makes each roll, without its dialog, as the character's player, so its card, critical hits, death
+saving throws, the combat tracker, Dice So Nice and Midi-QOL all behave as if they had rolled in
+Foundry. Each card is marked as rolled on Sending Stone.
 
 - **Under D&D Fifth Edition only.** The Gamemaster's browser makes the rolls, so a Gamemaster must
   have the game open, as for everything else.
@@ -167,12 +168,12 @@ attack hit only where the game shows players.
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
   Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
   critical hit's extra dice included.
-- **Nothing asks you, where it can be helped.** Area attacks Midi targets itself around their
-  user, summoning, transforming and other activities dnd5e asks about, Midi's Active Defence, a used reaction or bonus action Midi
-  enforces, and an activity set to always show Midi's dialogs or to ask which effects to apply are
-  refused in the app with a reason. Midi may still ask you what it would in Foundry, such as a
-  target's reaction, an optional bonus or confirming ammunition or damage; the player is told it
-  took too long, then that it was made once you answer.
+- **Nothing asks you, where it can be helped.** Area attacks Midi targets itself around their user,
+  summoning, transforming and other activities dnd5e asks about, Midi's Active Defence, a used
+  reaction or bonus action Midi enforces, and an activity set to always show Midi's dialogs or to
+  ask which effects to apply are refused in the app with a reason. Midi may still ask you what it
+  would in Foundry, such as a target's reaction, an optional bonus or confirming ammunition or
+  damage; the player is told it took too long, then that it was made once you answer.
 - **Dice So Nice** doesn't animate a Midi attack while your tab is hidden, which would hold Midi's
   workflow until you came back.
 
