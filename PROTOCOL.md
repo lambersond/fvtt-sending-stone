@@ -711,7 +711,9 @@ A prompt:
   item's id to be listed once in `actions` takes the first it's listed under as the item.
 - Module 0.16.0 lists every spell an item casts among the spellbook's spells cast from items, and
   says with `castFrom`'s `usable` and `attune` which the item can't cast now, and why; those roll
-  nothing. A favorite of one is left out only when its item is hidden or not identified. It adds
+  nothing. A favorite of one is left out when its item is hidden or not identified, and a favorite
+  of one of its activities, as before, while the item can't cast it; a formula of one is refused
+  then (`"item"`). It adds
   `rules` to the sheet. Players may spend [hit dice and roll a utility's
   formula](#hit-dice-and-formulas): `"hitDie"`, once the self-test has checked it, and `"formula"`
   among the `kinds`, their fetched rolls, `rollFormula` on the sheet, `healed` in `command.result`,
@@ -848,8 +850,8 @@ anything added: `mode` is `0`, `explicit` `false` and `extras` empty.
   one. It has the dice the formula throws: one `{ faces, results }` for each of its dice terms, in
   order, with as many results as the term has dice. It's rolled as the card's button rolls it,
   without its dialog, as the character's player, its card naming none of the Gamemaster's targets;
-  even with Midi-QOL, it's the roll alone. Refused: `"item"` for no such item, or one not
-  identified yet; `"activity"` for no such activity, one without a roll of its own, or one whose
+  even with Midi-QOL, it's the roll alone. Refused: `"item"` for no such item, one not
+  identified yet, or a spell an item casts while the item can't cast it; `"activity"` for no such activity, one without a roll of its own, or one whose
   formula has a die no player rolls, such as a d3, or dice inside parentheses or a function; and
   `"dice"` for dice that aren't the ones its formula throws.
 
@@ -909,8 +911,10 @@ Gamemaster applies the damage to those hit, as in Foundry. Through Midi's workfl
 Gamemaster's targets are the player's while it's made; Midi checks the hit on each, and applies the
 damage to those hit. An area Midi targets itself, as it uses the activity, is refused (`"area"`):
 one around its user, such as a radius from *Self*, which Midi places and targets those in, unless
-its auto-targeting is off, or one it targets around its user without a template. Before module
-0.16.0, every area attack was refused.
+its auto-targeting is off, or one it targets around its user without a template. With its
+auto-targeting off, Midi still draws its own template around the user for such an area, as it does
+when it's used in Foundry, though the targets are the player's. Before module 0.16.0, every area
+attack was refused.
 
 Refused beforehand, rather than have the Gamemaster asked: an area attack Midi-QOL targets itself,
 as above (`"area"`); a spell slot the usage

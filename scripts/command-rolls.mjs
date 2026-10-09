@@ -4,6 +4,7 @@ import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, withPlan } from "./dice-plan.mjs";
 import { findPrompt, outcomeOf } from "./prompts.mjs";
 import { castSpellOf, visibleActivities } from "./sheet-rolls.mjs";
+import { castFrom } from "./sheet-spells.mjs";
 
 /**
  * Making a player's roll from the Sending Stone app: a check, saving throw, death saving throw or
@@ -312,7 +313,8 @@ function hitDieLeft(command, actor) {
 
 /**
  * The utility activity whose own roll a player rolls, as the sheet lists it: of an item that's
- * identified, or the activity of the spell a Cast activity casts, by the Cast activity's id. Its
+ * identified, and for a spell an item casts, one the item can cast now; or the activity of the
+ * spell a Cast activity casts, by the Cast activity's id. Its
  * formula's dice must be ones a player can roll, and the ones they rolled.
  * @param {object} command
  * @param {Actor} actor
@@ -320,7 +322,8 @@ function hitDieLeft(command, actor) {
  */
 function formulaActivity(command, actor) {
   const item = actor.items?.get(command.item);
-  if ( !item || (item.system?.identified === false) ) return { refusal: "item" };
+  // Nor of a spell an item casts while the item can't cast it, as a use of it is refused.
+  if ( !item || (item.system?.identified === false) || (castFrom(item)?.usable === false) ) return { refusal: "item" };
   const named = visibleActivities(item).find(activity => activity.id === command.activity);
   const activity = (named?.type === "cast") ? castSpellOf(named)?.lead : named;
   const roll = formulaRoll(activity);

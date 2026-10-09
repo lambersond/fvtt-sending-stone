@@ -1,6 +1,6 @@
 import { castSpellOf, describeActivity, visibleActivities } from "./sheet-rolls.mjs";
 import { traitLabel } from "./sheet-details.mjs";
-import { hiddenCopy } from "./sheet-spells.mjs";
+import { castFrom, hiddenCopy } from "./sheet-spells.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
 import { combinedMode, finite, limitedUses, localize } from "./sheet-values.mjs";
 
@@ -66,12 +66,15 @@ function itemFavorite(actor, { item, activity, effect }) {
 /**
  * One of an item's activities made a favorite, such as a staff's Cast Fireball: what it does, as
  * an action is described, since the sheet lists each item's actions by one of its activities.
+ * One of a spell an item casts, while the item can't cast it, as dnd5e's sheet doesn't list it then,
+ * is left out: it would do nothing.
  * @param {Actor} actor
  * @param {{item?: Item, activity?: Activity}} found
  * @returns {object|null}
  */
 function activityFavorite(actor, { item, activity }, texts) {
   if ( !item || !activity || hidden(actor, item) ) return null;
+  if ( castFrom(item)?.usable === false ) return null;
   if ( !visibleActivities(item).includes(activity) ) return null;
   const described = describeActivity(item, activity);
   // One that casts a spell from the item opens to the spell's description.
