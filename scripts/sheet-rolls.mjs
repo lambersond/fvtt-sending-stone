@@ -50,52 +50,70 @@ const NO_ROLLS = Object.freeze({
  * An action lists only some of an item's activities, those activated as its section of the
  * Actions tab has it, and rolls as the first of them; it lists them even when there's one, where
  * the item is listed in other sections too, so that the item can be put together again.
+ *
+ * Given the sheet's descriptions, a spell cast from the item carries its description, and under
+ * dnd5e 6 each activity listed its own, as `describeActivity` has them.
  * @param {Item} item
  * @param {Activity[]} [activities]   Those to list; all its player can see, by default.
  * @param {object} [options]
- * @param {boolean} [options.list]    List them even when there's only one.
+ * @param {boolean} [options.list]        List them even when there's only one.
+ * @param {SheetTexts} [options.texts]    Collects the descriptions they refer to.
  * @returns {{toHit: number|null, attackId: string|null, activity: object|null,
  *   attackModes: object[]|null, ammunition: object[]|null, save: object|null, damage: object[],
  *   attackArea?: object, rollFormula?: object, consumesSlot?: false, cast?: object,
- *   activities?: object[]}}
+ *   spellId?: string, activities?: object[]}}
  */
-export function rollsOf(item, activities=visibleActivities(item), { list=false }={}) {
+export function rollsOf(item, activities=visibleActivities(item), { list=false, texts }={}) {
   if ( item.system?.identified === false ) return { ...NO_ROLLS, damage: [] };
   return {
-    ...activityRolls(item, activities[0]),
+    ...activityRolls(item, activities[0], texts),
     ...(((activities.length > 1) || (list && activities.length))
-      && { activities: activities.map(activity => activityEntry(item, activity)) })
+      && { activities: activities.map(activity => activityEntry(item, activity, texts)) })
   };
 }
 
 /**
  * What a spell, feature or inventory item rolls, where it, or any of its activities, rolls or is
- * used through anything; the app takes one with none as nothing to roll.
+ * used through anything; the app takes one with none as nothing to roll. The descriptions it refers
+ * to are collected only for one that rolls, so that none is sent that nothing refers to.
  * @param {Item} item
+ * @param {SheetTexts} [texts]    Collects the descriptions it refers to.
  * @returns {object|null}   As `rollsOf`, or null.
  */
-export function rollsIfAny(item) {
+export function rollsIfAny(item, texts) {
   const rolls = rollsOf(item);
-  return (rollsAnything(rolls) || rolls.activities?.some(rollsAnything)) ? rolls : null;
+  if ( !(rollsAnything(rolls) || rolls.activities?.some(rollsAnything)) ) return null;
+  return texts ? rollsOf(item, undefined, { texts }) : rolls;
 }
 
 /**
  * One of an item's activities on its own, as a player made it a favorite, and as an item with more
- * than one lists each: how it's activated, its range and target, its bonus to hit, the saving
- * throw it calls for, its damage or healing, and its uses. An item not identified yet keeps them
- * to itself.
+ * than one lists each: how it's activated, its range and target, how long what it does lasts, what
+ * a reaction is taken in answer to, its bonus to hit, the saving throw it calls for, its damage or
+ * healing, and its uses; for a Cast, the spell's copy and how it's cast. Given the sheet's
+ * descriptions, a Cast carries its spell's, and under dnd5e 6, which gives an activity a
+ * description of its own, the activity carries that. An item not identified yet keeps them all to
+ * itself.
  * @param {Item} item
  * @param {Activity} activity
+ * @param {SheetTexts} [texts]    Collects the descriptions it refers to.
  * @returns {object}
  */
-export function describeActivity(item, activity) {
+export function describeActivity(item, activity, texts) {
   const identified = item.system?.identified !== false;
-  const rolls = identified ? activityRolls(item, activity) : { ...NO_ROLLS, damage: [] };
+  const rolls = identified ? activityRolls(item, activity, texts) : { ...NO_ROLLS, damage: [] };
+  const duration = identified ? durationOf(activity) : null;
+  const trigger = identified ? (activity.activation?.condition?.trim?.() || null) : null;
+  // dnd5e 5 gives an activity no description of its own, only a line of chat flavor.
+  const text = (identified && texts) ? texts.add({ html: activity.description?.value, relativeTo: item }) : null;
   return {
     activation: activity.labels?.activation || null,
     activationType: activationTypeOf(activity),
     range: rangeOf(item, activity),
     target: activity.labels?.target || null,
+    ...(duration && { duration }),
+    ...(trigger && { trigger }),
+    ...(text && { text }),
     ...rolls,
     uses: identified ? activityUses(item, activity) : null
   };
@@ -128,11 +146,12 @@ export function usageOf(item) {
  * slot, as one used after the spell is cast does, such as Hex's Bonus Hex Damage, says so.
  * @param {Item} item
  * @param {Activity} [activity]
+ * @param {SheetTexts} [texts]    Collects the description of a spell it casts.
  * @returns {object}
  */
-function activityRolls(item, activity) {
+function activityRolls(item, activity, texts) {
   if ( !activity ) return { ...NO_ROLLS, damage: [] };
-  if ( activity.type === "cast" ) return castRolls(item, activity);
+  if ( activity.type === "cast" ) return castRolls(item, activity, texts);
   const attack = activity.type === "attack";
   const area = attack ? attackAreaOf(item, activity) : null;
   const roll = formulaRoll(activity);
@@ -158,14 +177,15 @@ function activityRolls(item, activity) {
  * "Bonus Hex Damage", or else its kind's, such as "Attack", its kind, and what it does.
  * @param {Item} item
  * @param {Activity} activity
+ * @param {SheetTexts} [texts]    Collects the descriptions it refers to.
  * @returns {object}
  */
-function activityEntry(item, activity) {
+function activityEntry(item, activity, texts) {
   return {
     id: activity.id,
     name: activityName(activity),
     type: activity.type,
-    ...describeActivity(item, activity)
+    ...describeActivity(item, activity, texts)
   };
 }
 
@@ -243,32 +263,57 @@ export function castSpellOf(cast) {
  * What a Cast activity rolls, or is used through: its spell's, as the spell's own activity has
  * them, but by the Cast activity's id, through which the app has it cast from the item; and how
  * it's cast: the level it's cast at, whether it takes concentration, and how many of the item's
- * uses it spends, and whether there are that many left.
+ * uses it spends, and whether there are that many left; and, given the sheet's descriptions, the
+ * spell's, the same the Spells tab refers to for its copy.
+ *
+ * Wherever dnd5e keeps a copy of the spell, its id, by which the Spells tab lists it under the item,
+ * goes with it, even while the item can't cast it or it rolls nothing here, so that the app can
+ * show the spell's details.
  * @param {Item} item
  * @param {Activity} cast
+ * @param {SheetTexts} [texts]    Collects the spell's description.
  * @returns {object}
  */
-function castRolls(item, cast) {
+function castRolls(item, cast, texts) {
+  const copy = cast.cachedSpell?.id ? { spellId: cast.cachedSpell.id } : {};
   const found = castSpellOf(cast);
-  if ( !found ) return { ...NO_ROLLS, damage: [] };
+  if ( !found ) return { ...NO_ROLLS, damage: [], ...copy };
   const { spell, lead } = found;
   // Cast from the item, a spell's activity spends no slot; there's no level to choose.
   const { consumesSlot, ...rolls } = activityRolls(spell, lead);
-  if ( !rollsAnything(rolls) ) return { ...NO_ROLLS, damage: [] };
+  if ( !rollsAnything(rolls) ) return { ...NO_ROLLS, damage: [], ...copy };
   const cost = castCost(item, cast);
   return {
     ...rolls,
     attackId: rolls.attackId && cast.id,
     activity: rolls.activity && { ...rolls.activity, id: cast.id, targets: { ...rolls.activity.targets, perLevel: null } },
     ...(rolls.attackArea && { attackArea: { ...rolls.attackArea, perLevel: null } }),
+    ...copy,
     cast: {
       level: Math.max(finite(spell.system?.level) ?? 0, finite(cast.spell?.level) ?? 0),
       concentration: (spell.system?.properties?.has?.("concentration") ?? false)
         || (lead.duration?.concentration === true),
       charges: cost?.amount ?? null,
-      short: cost?.short ?? false
+      short: cost?.short ?? false,
+      // A spell cast from the item opens to the spell's description.
+      ...(texts && { text: texts.add({ html: spell.system?.description?.value, relativeTo: spell }) })
     }
   };
+}
+
+/**
+ * How long what an activity does lasts, as dnd5e labels it, such as "1 Minute", or "Concentration,
+ * up to 1 minute" for one that takes it; for a Cast, as its spell's copy has it, as the Spells tab
+ * shows the spell. Null for one that's instantaneous, or has no duration.
+ * @param {Activity} activity
+ * @returns {string|null}
+ */
+function durationOf(activity) {
+  const copy = (activity.type === "cast") ? activity.cachedSpell : null;
+  const units = copy ? copy.system?.duration?.units : activity.duration?.units;
+  if ( units === "inst" ) return null;
+  const labels = (copy ? copy.labels : activity.labels) ?? {};
+  return labels.concentrationDuration || labels.duration || null;
 }
 
 /**

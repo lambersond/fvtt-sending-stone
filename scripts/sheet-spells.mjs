@@ -133,7 +133,7 @@ function describeSpell(spell, texts) {
     castFrom: from,
     // What it rolls, so it's cast or rolled from the Spells tab as from Actions; nothing for one its
     // item can't cast now.
-    ...((from?.usable !== false) && rollsIfAny(spell)),
+    ...((from?.usable !== false) && rollsIfAny(spell, texts)),
     text: texts.add({ html: system.description?.value, relativeTo: spell })
   };
 }

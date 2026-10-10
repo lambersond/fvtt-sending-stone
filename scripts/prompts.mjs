@@ -2,7 +2,7 @@ import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignCharacterId, playerOwners } from "./characters.mjs";
-import { chatAudience } from "./chat-data.mjs";
+import { askedSave, chatAudience } from "./chat-data.mjs";
 import { midiActivities } from "./command-uses.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { send } from "./transport.mjs";
@@ -35,7 +35,10 @@ export const PROMPT_LIFETIME = 10 * 60_000;
  * @property {string[]} abilities              The abilities it may be rolled with, one for
  *                                             concentration.
  * @property {number|null} dc
- * @property {boolean} showsDc                 May its player see the DC, and whether they saved?
+ * @property {boolean} hideDC                  Does its card keep its DC from everyone, as dnd5e's
+ *                                             request for a link whose author hid it does?
+ * @property {boolean} showsDc                 May its player see the DC, unless the card hides it,
+ *                                             and whether they saved?
  * @property {string|null} label               What asks, such as the spell, or what the character
  *                                             is concentrating on.
  * @property {number} openedAt                 When its card was posted, in milliseconds.
@@ -73,52 +76,6 @@ export function prompting(campaign) {
 /* -------------------------------------------- */
 /*  Reading cards                               */
 /* -------------------------------------------- */
-
-/**
- * A save a chat card asks for, as its buttons have it, before it's known whom it asks.
- * @typedef {object} AskedSave
- * @property {"concentration"|"save"|"request"} source   dnd5e's concentration card, a save's
- *                                                        card, or a request posted in chat.
- * @property {"save"|"concentration"} type
- * @property {string[]} abilities   The abilities its buttons offer; for concentration, the one it
- *                                  names, if any.
- * @property {number|null} dc
- */
-
-/**
- * The save a chat card asks for, if it asks for one: as dnd5e's buttons for it say.
- * @param {ChatMessage} message
- * @returns {AskedSave|null}
- */
-function askedSave(message) {
-  const content = message.content;
-  if ( (typeof content !== "string") || !content.includes("data-action") ) return null;
-  const buttons = Array.from(new DOMParser().parseFromString(content, "text/html").querySelectorAll("button[data-action]"))
-    .map(button => button.dataset);
-  const concentration = buttons.find(({ action, type }) => (action === "concentration") && (type === "concentration"));
-  if ( concentration ) return asked("concentration", "concentration", [concentration]);
-  const saves = buttons.filter(({ action }) => action === "rollSave");
-  if ( saves.length ) return asked("save", "save", saves);
-  const requests = buttons.filter(({ action, type }) => (action === "rollRequest") && ["save", "concentration"].includes(type));
-  if ( requests.length ) {
-    const type = requests[0].type;
-    return asked("request", type, requests.filter(request => request.type === type));
-  }
-  return null;
-}
-
-/**
- * The save some buttons ask for.
- * @param {AskedSave["source"]} source
- * @param {AskedSave["type"]} type
- * @param {DOMStringMap[]} buttons   Each button's data.
- * @returns {AskedSave}
- */
-function asked(source, type, buttons) {
-  const abilities = buttons.map(({ ability }) => ability).filter(ability => ability in CONFIG.DND5E.abilities);
-  const dc = Number.parseInt(buttons[0].dc);
-  return { source, type, abilities: Array.from(new Set(abilities)), dc: Number.isFinite(dc) ? dc : null };
-}
 
 /**
  * Does Midi-QOL roll the saves this card asks for itself? It does a save's, as items' uses go
@@ -176,13 +133,15 @@ function actorOf(uuid) {
 
 /**
  * The prompts a chat card opens in a campaign: one for each of its characters it asks a save of,
- * while the campaign asks its players for their saves.
+ * while the campaign asks its players for their saves. A roll request a player posts from the app
+ * asks no one, whoever it's posted as: it's for the Gamemaster, to roll for the creatures it names,
+ * and anyone in Foundry may click it.
  * @param {ChatMessage} message
  * @param {Campaign} campaign
  * @returns {RollPrompt[]}
  */
 export function promptsOf(message, campaign) {
-  if ( !prompting(campaign) ) return [];
+  if ( !prompting(campaign) || message.flags?.[MODULE_ID]?.ask ) return [];
   const save = askedSave(message);
   if ( !save || leftToMidi(save) ) return [];
   return askedOf(message, save, campaign).flatMap(actorId => {
@@ -210,6 +169,7 @@ function describePrompt(message, save, actor) {
     type: save.type,
     abilities,
     dc: save.dc,
+    hideDC: save.hideDC === true,
     showsDc: showsChallenge(message, actor),
     label: labelOf(message, save, actor),
     openedAt,
@@ -304,7 +264,8 @@ function answered(messageId, actorId) {
 }
 
 /**
- * A prompt as a campaign is told of it: its DC only where its player may see it.
+ * A prompt as a campaign is told of it: its DC only where its player may see it, and never where its
+ * card keeps it from everyone.
  * @param {RollPrompt} prompt
  * @returns {object}
  */
@@ -315,7 +276,7 @@ function summarizePrompt(prompt) {
     messageId: prompt.messageId,
     type: prompt.type,
     abilities: prompt.abilities,
-    dc: prompt.showsDc ? prompt.dc : null,
+    dc: (prompt.showsDc && !prompt.hideDC) ? prompt.dc : null,
     label: prompt.label,
     openedAt: new Date(prompt.openedAt).toISOString(),
     expiresAt: new Date(prompt.expiresAt).toISOString()

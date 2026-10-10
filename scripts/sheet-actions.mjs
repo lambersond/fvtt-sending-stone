@@ -197,8 +197,8 @@ function describeAction(item, texts, activities=visibleActivities(item), { split
   const first = visibleActivities(item)[0];
   // dnd5e gives the item one activity's labels, which aren't another activity's.
   const labels = ownLabels(item, lead) ? (item.labels ?? {}) : {};
-  const rolls = rollsOf(item, activities, { list: split });
-  const spell = rolls.cast ? castSpellOf(lead)?.spell : null;
+  // A spell cast from the item opens to the spell's description; under dnd5e 6, an activity to its own.
+  const rolls = rollsOf(item, activities, { list: split, texts });
   return {
     id: item.id,
     name: item.name,
@@ -210,8 +210,6 @@ function describeAction(item, texts, activities=visibleActivities(item), { split
     range: rangeOf(item, lead),
     target: lead?.labels?.target || labels.target || null,
     ...rolls,
-    // A spell cast from the item opens to the spell's description.
-    ...(spell && { cast: { ...rolls.cast, text: texts.add({ html: spell.system?.description?.value, relativeTo: spell }) } }),
     // The item's, or else those of the activity it's listed for.
     uses: identified ? (usesOf(item) ?? activityUses(item, lead)) : null,
     level: (item.type === "spell") ? (finite(system.level) ?? 0) : null,
