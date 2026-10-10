@@ -1,10 +1,29 @@
 import { MODULE_ID } from "./constants.mjs";
 import { includeGmContent } from "./config.mjs";
 import { campaignActors, campaignCharacterId, charactersSeenBy } from "./characters.mjs";
+import { traitLabel } from "./sheet-details.mjs";
 
 /**
  * Turning chat messages into plain data for the listener.
  */
+
+/**
+ * The abilities a check the app is told of may be made with: the six it knows.
+ * @type {string[]}
+ */
+const SIX_ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
+
+/**
+ * The most checks an ask the app is told of offers. A card that asks for more asks nothing of it.
+ * @type {number}
+ */
+const MOST_CHECKS = 10;
+
+/**
+ * A key dnd5e names a skill or tool by, as the app accepts one.
+ * @type {RegExp}
+ */
+const CHECK_KEY = /^[A-Za-z][\w-]{0,31}$/;
 
 /**
  * A content link as stored, unenriched, such as `@UUID[Actor.abc]{Thorin}`, to reduce to its label.
@@ -144,7 +163,7 @@ function challengeShown(message) {
 }
 
 /* -------------------------------------------- */
-/*  Cards that ask for a save                   */
+/*  Cards that ask for a save or check          */
 /* -------------------------------------------- */
 
 /**
@@ -220,28 +239,80 @@ function dcHidden(button) {
 }
 
 /**
- * The save a roll request card asks the table for, as the app shows it: the Gamemaster's, posted
- * from a description, or a player's, posted from the app. Its DC only where players may see it,
- * as dnd5e shows it: never one the card keeps from everyone; and for a player's, what asks for it,
- * such as their item. Null for any other message.
+ * A check a roll request card asks the table for, as its buttons have it.
+ * @typedef {object} AskedCheck
+ * @property {{type: string, ability: string, skill?: string, tool?: string, name?: string}[]} checks
+ *   The checks its buttons offer: an ability check, or a skill or tool check, with the ability
+ *   it's made with; a tool with its name.
+ * @property {number|null} dc
+ * @property {boolean} hideDC   Does the card keep its DC from everyone? As for a save.
+ */
+
+/**
+ * The check a roll request card asks for, if it asks for one: as dnd5e's buttons for it say, each
+ * an ability, skill or tool check dnd5e has, by a key the app accepts, with one of the six
+ * abilities, its own or else the skill's or tool's, as dnd5e's request makes it; each check once.
+ * Never a name any object answers to, which anyone posting a card could write in. Null for any
+ * other card, and for one that offers more checks than the app is told of.
  * @param {ChatMessage} message
- * @returns {{type: string, abilities: string[], dc?: number, label?: string}|null}
+ * @returns {AskedCheck|null}
+ */
+function askedCheck(message) {
+  const content = message.content;
+  if ( (game.system.id !== "dnd5e") || (typeof content !== "string") || !content.includes("rollRequest") ) return null;
+  const parsed = new DOMParser().parseFromString(content, "text/html");
+  const buttons = Array.from(parsed.querySelectorAll("button[data-action]")).filter(({ dataset }) => {
+    return (dataset.action === "rollRequest") && ["check", "skill", "tool"].includes(dataset.type);
+  });
+  const config = CONFIG.DND5E ?? {};
+  const own = (list, key) => ((typeof key === "string") && CHECK_KEY.test(key) && Object.hasOwn(list ?? {}, key))
+    ? list[key] : null;
+  const known = new Set();
+  const checks = [];
+  for ( const { dataset } of buttons ) {
+    const { type } = dataset;
+    const key = (type === "skill") ? dataset.skill : ((type === "tool") ? dataset.tool : null);
+    const entry = (type === "skill") ? own(config.skills, key)
+      : ((type === "tool") ? (own(config.tools, key) ?? own(config.vehicleTypes, key)) : true);
+    const ability = dataset.ability || entry?.ability;
+    if ( !entry || !SIX_ABILITIES.includes(ability) || !Object.hasOwn(config.abilities ?? {}, ability) ) continue;
+    const id = (type === "check") ? `check:${ability}` : `${type}:${key}`;
+    if ( known.has(id) ) continue;
+    known.add(id);
+    if ( type === "check" ) checks.push({ type, ability });
+    else if ( type === "skill" ) checks.push({ type, ability, skill: key });
+    else checks.push({ type, ability, tool: key, name: traitLabel(key, "tool") });
+  }
+  if ( !checks.length || (checks.length > MOST_CHECKS) ) return null;
+  const dc = Number.parseInt(buttons[0].dataset.dc);
+  return { checks, dc: Number.isFinite(dc) ? dc : null, hideDC: buttons.some(dcHidden) };
+}
+
+/**
+ * The save or check a roll request card asks the table for, as the app shows it: the Gamemaster's,
+ * posted from a description, or a player's, posted from the app. Its DC only where players may see
+ * it, as dnd5e shows it: never one the card keeps from everyone; and for a player's, what asks for
+ * it, such as their item. Null for any other message.
+ * @param {ChatMessage} message
+ * @returns {{type: string, abilities?: string[], checks?: object[], dc?: number, label?: string}|null}
  */
 function askOf(message) {
   const save = askedSave(message);
-  if ( save?.source !== "request" ) return null;
+  const check = save ? null : askedCheck(message);
+  if ( (save?.source !== "request") && !check ) return null;
+  const asked = save ?? check;
   const label = askLabel(message);
   return {
-    type: save.type,
-    abilities: save.abilities,
-    ...(((save.dc !== null) && !save.hideDC && challengeShown(message)) && { dc: save.dc }),
+    ...(save ? { type: save.type, abilities: save.abilities } : { type: "check", checks: check.checks }),
+    ...(((asked.dc !== null) && !asked.hideDC && challengeShown(message)) && { dc: asked.dc }),
     ...(label && { label })
   };
 }
 
 /**
  * The flavor of a roll request card posted for a player from the app: dnd5e's "Roll Request",
- * then what asks for the save, such as their item, its name escaped, being one players may write.
+ * then what asks for the save or check, such as their item, its name escaped, being one players
+ * may write.
  * @param {string} name
  * @returns {string}
  */
@@ -250,8 +321,8 @@ export function askFlavor(name) {
 }
 
 /**
- * What asks for the save on a roll request card posted for a player from the app, read back from
- * its flavor. Null for any other card.
+ * What asks for the save or check on a roll request card posted for a player from the app, read
+ * back from its flavor. Null for any other card.
  * @param {ChatMessage} message
  * @returns {string|null}
  */

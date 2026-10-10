@@ -1,6 +1,6 @@
 import { hitPoints } from "./characters.mjs";
 import { actionSections } from "./sheet-actions.mjs";
-import { deathSavesOf, detailsOf, traitsOf } from "./sheet-details.mjs";
+import { deathSavesOf, describeTool, detailsOf, traitsOf } from "./sheet-details.mjs";
 import { conditionsOf, effectSections } from "./sheet-effects.mjs";
 import { favoritesOf } from "./sheet-favorites.mjs";
 import { classesOf, featureSections } from "./sheet-features.mjs";
@@ -50,6 +50,9 @@ export function characterSheet(actor, texts=new SheetTexts()) {
     skills: Object.entries(system.skills)
       .map(([id, skill]) => describeSkill(actor, id, skill))
       .sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang)),
+    tools: Object.entries(system.tools ?? {})
+      .map(([id, tool]) => describeTool(actor, id, tool))
+      .sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang)),
     conditions: conditionsOf(actor, texts),
     features: featureSections(actor, texts),
     effects: effectSections(actor, texts),

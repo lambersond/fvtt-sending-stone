@@ -1,8 +1,8 @@
 import { describeActivity, visibleActivities } from "./sheet-rolls.mjs";
-import { traitLabel } from "./sheet-details.mjs";
+import { describeTool } from "./sheet-details.mjs";
 import { castFrom, hiddenCopy } from "./sheet-spells.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
-import { combinedMode, finite, limitedUses, localize } from "./sheet-values.mjs";
+import { finite, limitedUses, localize } from "./sheet-values.mjs";
 
 /**
  * A character's favorites, as dnd5e's sheet shows them under Favorites, and Tidy 5e in its own:
@@ -122,8 +122,8 @@ function skillFavorite(actor, id) {
 }
 
 /**
- * A tool made a favorite: as a skill is described, since the sheet has no tools of its own to
- * refer to.
+ * A tool made a favorite: as the sheet's tools describe it, which favorites before module 0.18.0
+ * were the only place for.
  * @param {Actor} actor
  * @param {string} id   Such as "thief".
  * @returns {object|null}
@@ -131,16 +131,7 @@ function skillFavorite(actor, id) {
 function toolFavorite(actor, id) {
   const tool = actor.system?.tools?.[id];
   if ( !tool ) return null;
-  return {
-    type: "tool",
-    id,
-    name: traitLabel(id, "tool"),
-    ability: tool.ability ?? null,
-    total: finite(tool.total) ?? 0,
-    passive: finite(tool.passive),
-    proficiency: finite(tool.prof?.multiplier) ?? finite(tool.value) ?? 0,
-    mode: combinedMode(actor, [`abilities.${tool.ability}.check.roll.mode`, `tools.${id}.roll.mode`])
-  };
+  return { type: "tool", ...describeTool(actor, id, tool) };
 }
 
 /**

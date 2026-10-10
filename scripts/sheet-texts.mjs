@@ -1,5 +1,5 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
-import { actorOf, cleanLinks, cutShort, normaliseLinks, saveActivities } from "./sheet-links.mjs";
+import { actorOf, checkActivities, cleanLinks, cutShort, normaliseLinks, saveActivities } from "./sheet-links.mjs";
 import { sendLater } from "./transport.mjs";
 
 /**
@@ -16,10 +16,10 @@ import { sendLater } from "./transport.mjs";
  * The markup descriptions are sent in, part of every hash: raising it sends every description
  * again under a new hash, so nothing the app or a browser keeps under an old one is shown.
  * 1, before it was part of the hash: as Foundry enriched them. 2: with the spans of
- * sheet-links.mjs, since 0.17.0.
+ * sheet-links.mjs, since 0.17.0. 3: with their checks, `ss-check`, since 0.18.0.
  * @type {number}
  */
-const TEXT_FORMAT = 2;
+const TEXT_FORMAT = 3;
 
 /**
  * The most a character.texts payload should hold, in characters of JSON, well within the 1 MB a
@@ -30,13 +30,14 @@ const CHUNK = 400_000;
 
 /**
  * What a description's text says that makes it show the character's numbers: a roll or link,
- * which shows their modifiers; their spell save DC; a saving throw, which may show the DC of the
- * item's; damage of the item's activities.
+ * which shows their modifiers; their spell save DC; a saving throw or a check, which may show the
+ * DC of the item's; damage of the item's activities.
  * @type {RegExp}
  */
 const ROLLS = /\[\[/;
 const SPELL_DC = /spell\s{1,4}save\s{1,4}DC/i;
 const SAVES = /sav(?:e|ing)/i;
+const CHECKS = /check|\[\[\/(?:skill|tool)/i;
 const DAMAGE = /\[\[\/(?:damage|heal)/i;
 
 /**
@@ -295,8 +296,10 @@ function textFormat() {
 /**
  * What a description shows of the character's numbers, by what its text says: a roll shows their
  * level, proficiency, ability modifiers and spell save DC; "your spell save DC", that DC; a saving
- * throw, the DCs of the item's saving throws, which one with no DC of its own takes; and dnd5e's
- * damage links, the damage of the item's activities. An effect's are its actor's.
+ * throw, the DCs of the item's saving throws, which one with no DC of its own takes; a check, as
+ * dnd5e's `[[/check]]` and its skill and tool links, those of the item's checks, which dnd5e's
+ * `[[/check]]` shows, and one with no DC of its own takes; and dnd5e's damage links, the damage of
+ * the item's activities. An effect's are its actor's.
  * @param {string} html
  * @param {Document} [document]   The description's document.
  * @returns {string}
@@ -307,6 +310,7 @@ function numbersShown(html, document) {
   if ( ROLLS.test(html) ) shown.push(rollNumbers(actor));
   else if ( SPELL_DC.test(html) ) shown.push(JSON.stringify([actor?.system?.attributes?.spell?.dc ?? null]));
   if ( SAVES.test(html) ) shown.push(saveNumbers(document));
+  if ( CHECKS.test(html) ) shown.push(checkNumbers(document));
   if ( DAMAGE.test(html) ) shown.push(damageNumbers(document));
   return shown.join("\n");
 }
@@ -333,6 +337,18 @@ function saveNumbers(document) {
   const saves = saveActivities(document)
     .map(activity => [Array.from(activity.save?.ability ?? []).sort(), activity.save?.dc?.value ?? null]);
   return saves.length ? JSON.stringify(saves) : "";
+}
+
+/**
+ * The abilities, skills and tools, and DCs of an identified item's checks.
+ * @param {Document} [document]
+ * @returns {string}
+ */
+function checkNumbers(document) {
+  const checks = checkActivities(document).map(({ check }) => [
+    check?.ability ?? null, Array.from(check?.associated ?? []).sort(), check?.dc?.value ?? null
+  ]);
+  return checks.length ? JSON.stringify(checks) : "";
 }
 
 /**
