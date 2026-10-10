@@ -1,9 +1,18 @@
+import { MODULE_ID } from "./constants.mjs";
 import { includeGmContent } from "./config.mjs";
 import { campaignActors, campaignCharacterId, charactersSeenBy } from "./characters.mjs";
 
 /**
  * Turning chat messages into plain data for the listener.
  */
+
+/**
+ * A content link as stored, unenriched, such as `@UUID[Actor.abc]{Thorin}`, to reduce to its label.
+ * Bounded, and never reading on past the next `@`, so that no message, which anyone may write, can
+ * make it take long.
+ * @type {RegExp}
+ */
+const CONTENT_LINK = /@\w{1,50}\[[^\]@]{0,500}\]\{([^}@]{0,500})\}/g;
 
 /**
  * Which players can read a message, and which of a campaign's characters those players own.
@@ -71,7 +80,8 @@ export function serializeMessage(message, campaign, audience=chatAudience(messag
     title: message.title || null,
     flavor: message.flavor ?? "",
     content: message.content ?? "",
-    text: htmlToText(message.content),
+    text: htmlToText(message.content, { challenge: challengeShown(message) }),
+    ask: askOf(message),
     blind: message.blind,
     audience,
     rolls: message.rolls.map(summarizeRoll),
@@ -96,18 +106,163 @@ function styleName(style) {
  *
  * Parsed into an inert document: content set on an element of the live page would load its images
  * and run its event handler attributes. Content links are stored unenriched, so they are reduced
- * to their labels.
+ * to their labels. dnd5e's cards, such as a roll request or a spell's saving throw, hold the label
+ * of each button twice, with its DC and without, and show one: only that one is kept.
  * @param {string} html
+ * @param {object} [options]
+ * @param {boolean} [options.challenge]   Do players see the message's DCs? Its labels without them
+ *                                        are kept where they don't.
  * @returns {string}
  */
-function htmlToText(html) {
+function htmlToText(html, { challenge=true }={}) {
   if ( !html ) return "";
   const parsed = new DOMParser().parseFromString(html, "text/html");
+  parsed.body?.querySelectorAll?.(challenge ? ".hidden-dc" : ".visible-dc").forEach(label => label.remove());
   return (parsed.body?.textContent ?? "")
-    .replace(/@\w+\[[^\]]*\]\{([^}]*)\}/g, "$1")
+    .replace(CONTENT_LINK, "$1")
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/**
+ * May players see the DCs on a message's cards, and whether a roll met them, as dnd5e shows them to
+ * players other than its author: as its Challenge Visibility has it, on everyone's messages, on
+ * players' but not the Gamemaster's, or on no one's.
+ * @param {ChatMessage} message
+ * @returns {boolean}
+ */
+function challengeShown(message) {
+  let visibility;
+  try {
+    visibility = game.settings.get("dnd5e", "challengeVisibility");
+  } catch {
+    return false;
+  }
+  if ( visibility === "all" ) return true;
+  if ( visibility === "player" ) return !message.author?.isGM;
+  return false;
+}
+
+/* -------------------------------------------- */
+/*  Cards that ask for a save                   */
+/* -------------------------------------------- */
+
+/**
+ * A save a chat card asks for, as its buttons have it, before it's known whom it asks.
+ * @typedef {object} AskedSave
+ * @property {"concentration"|"save"|"request"} source   dnd5e's concentration card, a save's
+ *                                                        card, or a request posted in chat.
+ * @property {"save"|"concentration"} type
+ * @property {string[]} abilities   The abilities its buttons offer; for concentration, the one it
+ *                                  names, if any.
+ * @property {number|null} dc
+ * @property {boolean} hideDC       Does the card keep its DC from everyone, as dnd5e's request for a
+ *                                  link whose author hid it does? Its DC is then for rolling against
+ *                                  alone.
+ */
+
+/**
+ * The save a chat card asks for, if it asks for one: as dnd5e's buttons for it say.
+ * @param {ChatMessage} message
+ * @returns {AskedSave|null}
+ */
+export function askedSave(message) {
+  const content = message.content;
+  if ( (game.system.id !== "dnd5e") || (typeof content !== "string") || !content.includes("data-action") ) return null;
+  const parsed = new DOMParser().parseFromString(content, "text/html");
+  const buttons = Array.from(parsed.querySelectorAll("button[data-action]"));
+  const concentration = buttons.find(({ dataset }) => (dataset.action === "concentration")
+    && (dataset.type === "concentration"));
+  if ( concentration ) return asked("concentration", "concentration", [concentration]);
+  const saves = buttons.filter(({ dataset }) => dataset.action === "rollSave");
+  if ( saves.length ) return asked("save", "save", saves);
+  const requests = buttons.filter(({ dataset }) => (dataset.action === "rollRequest")
+    && ["save", "concentration"].includes(dataset.type));
+  if ( requests.length ) {
+    const type = requests[0].dataset.type;
+    return asked("request", type, requests.filter(request => request.dataset.type === type));
+  }
+  return null;
+}
+
+/**
+ * The save some buttons ask for: only the abilities dnd5e has, never a name any object answers to,
+ * such as "constructor", which anyone posting a card could write in.
+ * @param {AskedSave["source"]} source
+ * @param {AskedSave["type"]} type
+ * @param {HTMLButtonElement[]} buttons
+ * @returns {AskedSave}
+ */
+function asked(source, type, buttons) {
+  const abilities = buttons.map(({ dataset: { ability } }) => ability)
+    .filter(ability => Object.hasOwn(CONFIG.DND5E?.abilities ?? {}, ability));
+  const dc = Number.parseInt(buttons[0].dataset.dc);
+  return {
+    source, type,
+    abilities: Array.from(new Set(abilities)),
+    dc: Number.isFinite(dc) ? dc : null,
+    hideDC: buttons.some(dcHidden)
+  };
+}
+
+/**
+ * Does a button keep its DC from everyone? As dnd5e's request for a link whose author hid its DC
+ * does, marking it so, and labelling it without the DC both for those who may see DCs and for
+ * those who may not; or as any card that labels it the same either way.
+ * @param {HTMLButtonElement} button
+ * @returns {boolean}
+ */
+function dcHidden(button) {
+  if ( button.dataset.hideDc === "true" ) return true;
+  const shown = button.querySelector(".visible-dc");
+  const hidden = button.querySelector(".hidden-dc");
+  return Boolean(shown && hidden) && (shown.textContent.trim() === hidden.textContent.trim());
+}
+
+/**
+ * The save a roll request card asks the table for, as the app shows it: the Gamemaster's, posted
+ * from a description, or a player's, posted from the app. Its DC only where players may see it,
+ * as dnd5e shows it: never one the card keeps from everyone; and for a player's, what asks for it,
+ * such as their item. Null for any other message.
+ * @param {ChatMessage} message
+ * @returns {{type: string, abilities: string[], dc?: number, label?: string}|null}
+ */
+function askOf(message) {
+  const save = askedSave(message);
+  if ( save?.source !== "request" ) return null;
+  const label = askLabel(message);
+  return {
+    type: save.type,
+    abilities: save.abilities,
+    ...(((save.dc !== null) && !save.hideDC && challengeShown(message)) && { dc: save.dc }),
+    ...(label && { label })
+  };
+}
+
+/**
+ * The flavor of a roll request card posted for a player from the app: dnd5e's "Roll Request",
+ * then what asks for the save, such as their item, its name escaped, being one players may write.
+ * @param {string} name
+ * @returns {string}
+ */
+export function askFlavor(name) {
+  return `${game.i18n.localize("EDITOR.DND5E.Inline.RollRequest")}: ${foundry.utils.escapeHTML(String(name))}`;
+}
+
+/**
+ * What asks for the save on a roll request card posted for a player from the app, read back from
+ * its flavor. Null for any other card.
+ * @param {ChatMessage} message
+ * @returns {string|null}
+ */
+function askLabel(message) {
+  if ( !message.flags?.[MODULE_ID]?.ask ) return null;
+  const prefix = `${game.i18n.localize("EDITOR.DND5E.Inline.RollRequest")}: `;
+  const flavor = htmlToText(message.flavor);
+  return flavor.startsWith(prefix) ? (flavor.slice(prefix.length) || null) : null;
+}
+
+/* -------------------------------------------- */
 
 /**
  * Read a boolean getter from a roll, if the roll's class defines one. Some throw rather than

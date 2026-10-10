@@ -308,7 +308,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `details` | `about`, `{ id, label, value }` for alignment, age and the like that are filled in; `personality`, likewise, for personality traits, ideals, bonds and flaws; `appearance`; `xp`, `{ value, max }`, `max` being `null` at the highest level; and `biography`, a description's hash. |
 | `actions` | What the character can do in a fight, listed as Tidy 5e's Actions tab lists it by default: equipped weapons; equipped equipment and consumables used in a fight, not over minutes or more; spells that can be cast now and deal damage, are cast as a bonus action or reaction, last a minute or a round, or apply effects; and features that are activated. An item a player added to Tidy 5e's list, or took off it, is listed or not as they chose. Since module 0.15.0 the spells an item casts with its Cast activities are cast from the item, and the copies of them dnd5e keeps aren't listed; an item Tidy 5e's rules leave off the list is still listed for the spells it casts, unless the player took it off. Sections are by activation, in Tidy 5e's order: `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"`, `"special"`, `"other"` for any other, then any the player named in Tidy 5e, whose `id` and `label` are its name. Empty sections are left out. Since module 0.15.0 an item is listed in each section for how its activities are activated, such as a staff that strikes as an action and casts Silvery Barbs as a reaction, under `"action"` and under `"reaction"`, each time with the activities activated that way; an activity with no activation of its own, or a special one, used along with another, such as Hex's Bonus Hex Damage, goes with the item's first. An item the player gave a section of its own, or one not identified yet, is listed once, with all its activities, or for one Tidy 5e's rules leave off the list, all the spells it casts. Before, an item was listed once, by its first activity's activation. |
 | `favorites` | What dnd5e's sheet shows under Favorites, and Tidy 5e in its own, in its order: the old-style resources (`"resource"`) that are named and have a maximum, then what the player made a favorite, in their order. Each has a `type` and an `id` that refers to what the sheet lists elsewhere, where it lists it, and a `name`. An `"item"`'s `id` is the item's, as in `inventory`, `spells`, `features` and `actions`, with its `itemType` and `img`. An `"activity"`, one of an item's activities, has the item's `itemId`, `itemType` and `itemName`, its own `name` and `img`, and `activation`, `range`, `target`, `toHit`, `save`, `damage` and `uses` as on an action, for that activity alone, with its own id as `attackId`, and its `attackModes` and `ammunition`, when it's an attack, and itself as `activity` when it's a save, damage, healing or utility activity, and `consumesSlot` as on an action; an item not identified yet keeps them back, as on an action. An `"effect"`'s `id` is as in `effects`, with its `img`, whether it's `disabled`, and whether it's `suppressed`. A `"skill"`'s `id` is as in `skills`. A `"tool"`, which the sheet has nowhere else, has its `ability`, its `total` modifier, `passive` score, `proficiency` and roll `mode`, as a skill has. A `"slots"`'s `id` is as in `spells`, with `value`, `max` and `level` as a section's `slots`. A `"resource"` has `uses` as on a feature. A favorite that refers to nothing any longer, or to what a player doesn't see, such as an item hidden from the sheet or an effect of an item not yet identified, is left out. |
-| `actions[].actions` | Items, in the order the player keeps them. `activation`, `range` (for a weapon, its reach or range, such as `"reach 5 ft or range 20/60 ft"`) and `target` are dnd5e's labels; `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save` and `damage` are its first activity's, in dnd5e's order, as [below](#what-an-item-rolls): `toHit` the bonus to hit of an attack, without any dice in it, as dnd5e's sheets show it; `attackId` the attack activity's id, so that the app can have the attack [made in the game](#attacks), `null` for any other; `activity` the activity itself, for one [used in the game](#spells-and-features) other than by attacking, `{ id, type, targets }`: `type` being `"save"`, `"damage"`, `"heal"` or `"utility"`, and `targets`, `{ self, area, count, perLevel, affects }`, whom it's used at: `self` its user alone, `area` everyone in an area, `count` the most targets it takes, or `null` for no limit, `perLevel` how many more a spell takes for each level it's cast above its own, as Bless does, or `null`, and `affects` dnd5e's kind of target, such as `"ally"`, `"enemy"`, `"creature"` or `"willing"`, or `null`; `null` for any other; `attackModes` the ways its attack is made, each `{ value, label }`, such as one- or two-handed, or thrown, when there's more than one, otherwise `null`; `ammunition` what its attack fires, each `{ id, name, quantity }` the character has, for a weapon that fires ammunition, otherwise `null`; `save`, `{ ability, dc }`, the saving throw it calls for, `ability` being `"DC"` when the target chooses among several; `damage` its damage or healing as dnd5e labels it, each part `{ formula, type, healing }` with the ability modifier in the formula; `consumesSlot` `false` for a spell's activity used without spending a spell slot, and otherwise left out (module 0.14.0); `attackArea` and `rollFormula` for an attack at an area and a utility with a roll of its own, as [below](#what-an-item-rolls), and otherwise left out (module 0.16.0); `activities` each of its activities, for an item with more than one (module 0.14.0): since module 0.15.0, those activated as its section has it, and those even when there's one, where the item is listed in other sections too; `uses` as on a feature, the first activity's when the item has none: since module 0.15.0, that of the first activity it's listed for, or for one that casts a spell, those casting it spends; `level` a spell's, `0` for a cantrip, otherwise `null`; `castFrom` as on a spell, `null` for anything but a spell. Since module 0.15.0, an item listed in a section for an activity other than its first names it, `activityName`, such as `"Silvery Barbs"`, and is otherwise without; `activationType` is the kind of action its first activity there is activated with, as a section's `id` names it, `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"` or `"special"`, where it takes just one, Midi-QOL's kinds of reaction being `"reaction"`, or `null` for any other, such as two actions, a Legendary Action that costs two, a minute or a long rest; `consumable` is `true` for one of the consumables: an item dnd5e's inventory has among them, such as a potion, a scroll or a wand, or another whose uses never come back, and otherwise left out; and `cast`, for one that casts a spell, as [below](#what-an-item-rolls), also has `text`, the spell's description's hash. An item not identified yet has no `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save`, `damage`, `attackArea`, `rollFormula`, `activities`, `uses`, `activityName`, `consumable` or `cast`. |
+| `actions[].actions` | Items, in the order the player keeps them. `activation`, `range` (for a weapon, its reach or range, such as `"reach 5 ft or range 20/60 ft"`) and `target` are dnd5e's labels; `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save` and `damage` are its first activity's, in dnd5e's order, as [below](#what-an-item-rolls): `toHit` the bonus to hit of an attack, without any dice in it, as dnd5e's sheets show it; `attackId` the attack activity's id, so that the app can have the attack [made in the game](#attacks), `null` for any other; `activity` the activity itself, for one [used in the game](#spells-and-features) other than by attacking, `{ id, type, targets }`: `type` being `"save"`, `"damage"`, `"heal"` or `"utility"`, and `targets`, `{ self, area, count, perLevel, affects }`, whom it's used at: `self` its user alone, `area` everyone in an area, `count` the most targets it takes, or `null` for no limit, `perLevel` how many more a spell takes for each level it's cast above its own, as Bless does, or `null`, and `affects` dnd5e's kind of target, such as `"ally"`, `"enemy"`, `"creature"` or `"willing"`, or `null`; `null` for any other; `attackModes` the ways its attack is made, each `{ value, label }`, such as one- or two-handed, or thrown, when there's more than one, otherwise `null`; `ammunition` what its attack fires, each `{ id, name, quantity }` the character has, for a weapon that fires ammunition, otherwise `null`; `save`, `{ ability, dc }`, the saving throw it calls for, `ability` being `"DC"` when the target chooses among several; `damage` its damage or healing as dnd5e labels it, each part `{ formula, type, healing }` with the ability modifier in the formula; `consumesSlot` `false` for a spell's activity used without spending a spell slot, and otherwise left out (module 0.14.0); `attackArea` and `rollFormula` for an attack at an area and a utility with a roll of its own, as [below](#what-an-item-rolls), and otherwise left out (module 0.16.0); `activities` each of its activities, for an item with more than one (module 0.14.0): since module 0.15.0, those activated as its section has it, and those even when there's one, where the item is listed in other sections too; `uses` as on a feature, the first activity's when the item has none: since module 0.15.0, that of the first activity it's listed for, or for one that casts a spell, those casting it spends; `level` a spell's, `0` for a cantrip, otherwise `null`; `castFrom` as on a spell, `null` for anything but a spell. Since module 0.15.0, an item listed in a section for an activity other than its first names it, `activityName`, such as `"Silvery Barbs"`, and is otherwise without; `activationType` is the kind of action its first activity there is activated with, as a section's `id` names it, `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"` or `"special"`, where it takes just one, Midi-QOL's kinds of reaction being `"reaction"`, or `null` for any other, such as two actions, a Legendary Action that costs two, a minute or a long rest; `consumable` is `true` for one of the consumables: an item dnd5e's inventory has among them, such as a potion, a scroll or a wand, or another whose uses never come back, and otherwise left out; and `cast` and `spellId`, for one that casts a spell, as [below](#what-an-item-rolls). An item not identified yet has no `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save`, `damage`, `attackArea`, `rollFormula`, `activities`, `uses`, `activityName`, `consumable`, `cast` or `spellId`. |
 | `text` | A [description](#descriptions)'s hash, or `null` if there is none. |
 
 #### What an item rolls
@@ -333,13 +333,18 @@ activity also lists each in `activities`, its first first, so that each can be r
 | `type` | Its kind, such as `"attack"`, `"save"`, `"damage"`, `"heal"`, `"utility"`, or one the app can't use, such as `"summon"`. |
 | `activation`, `activationType`, `range`, `target`, `uses` | As on an action, for this activity alone. A Cast activity's `uses` are those casting its spell spends, such as the item's charges. |
 | `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save`, `damage`, `attackArea`, `rollFormula`, `consumesSlot` | What it rolls, and what it's used through, as on an action. |
-| `cast` | For a Cast activity, `{ level, concentration, charges, short }`, as below. |
+| `cast` | For a Cast activity, `{ level, concentration, charges, short, text }`, as below. |
+| `spellId` | For a Cast activity, the `id` of the copy of its spell dnd5e keeps, as below. Module 0.17.0. |
+| `duration` | How long what it does lasts, as dnd5e labels it, such as `"1 Minute"`, or `"Concentration, up to 1 Minute"` for one that takes it; for a Cast activity, as its spell's copy has it, as the Spells tab shows the spell. Left out for one that's instantaneous or has no duration. Module 0.17.0. |
+| `trigger` | When it's used, as the activity's activation condition says it, such as what a reaction is taken in answer to: `"when you are hit by an attack"`. Left out where it says nothing. Module 0.17.0. |
+| `text` | Under dnd5e 6, which gives an activity a description of its own, that [description](#descriptions)'s hash, enriched with its item's numbers. Left out where it has none, as always under dnd5e 5, where an activity has only a line of chat flavor. Module 0.17.0. |
 
-An activity favorite has the same fields. `consumesSlot` is `false` for a spell's activity used
-after it's cast without spending a slot, such as Spirit Guardians' save each turn or Hex's Bonus
-Hex Damage: dnd5e still asks the level it's used at, which its damage may scale with, but spends
-nothing, so it's used whether any slot is left or not. A spell with one activity, or an item with
-none, has no `activities`.
+An activity favorite has the same fields, and of an item not identified yet keeps them all back,
+`duration`, `trigger`, `text` and `spellId` too. `consumesSlot` is `false` for a spell's activity
+used after it's cast without spending a slot, such as Spirit Guardians' save each turn or Hex's
+Bonus Hex Damage: dnd5e still asks the level it's used at, which its damage may scale with, but
+spends nothing, so it's used whether any slot is left or not. A spell with one activity, or an item
+with none, has no `activities`.
 
 Since module 0.15.0 a Cast activity, by which an item casts a spell, such as a staff's Silvery
 Barbs or a scroll's spell, rolls and is used as its spell's first activity does, as dnd5e keeps a
@@ -352,8 +357,15 @@ activity's own, it spends first, its cost scaled for a spell cast above its own 
 scales it, or `null` for none, or one that's a formula; and `short`, whether any of the uses it
 spends has fewer left than it spends. Its `uses` are the first it spends. One whose spell dnd5e
 hasn't copied yet, or that the item can't cast, such as one the character must attune to and
-hasn't, rolls nothing, as a summoning doesn't, but has the same `uses`. An activity favorite that
-casts a spell also has the spell's description's hash in `cast`'s `text`.
+hasn't, rolls nothing, as a summoning doesn't, but has the same `uses`.
+
+Since module 0.17.0 every `cast` has `text`: its spell's description's hash, the same its copy has
+on the Spells tab, so it's no more to send; or `null` for a spell without one. Before, only an
+action's and an activity favorite's had it. And a Cast activity whose spell dnd5e has copied has
+`spellId`, the copy's `id`, by which the Spells tab lists the spell among those cast from items, so
+that the app can show the spell's details: even where it rolls nothing, such as Find Familiar's, or
+the item can't cast it now, which have no `cast`. An action, feature or inventory item whose first
+activity is a Cast activity has its `spellId` with its other fields.
 
 Since module 0.16.0 two more are sent where they apply, and left out otherwise, so that a listener
 that doesn't know them sees nothing new:
@@ -373,15 +385,82 @@ an unidentified item's, are left out, even though a Gamemaster's browser sends i
 
 A sheet refers to each description by `text`, a 14-character hexadecimal hash of where it comes
 from, and the description itself is sent in [`character.texts`](#charactertexts). It is HTML,
-enriched as the character's player sees it in Foundry: links to documents and rolls are already
-turned into HTML, and secret sections, which the player may see as the character's owner, are
-included. Images and links in it are relative to the game's address, like `img`. It is not
-sanitised: treat it as untrusted and sanitise it before showing it. A description longer than
-100,000 characters is cut short.
+enriched as the character's player sees it in Foundry: links to documents are already turned into
+HTML, and secret sections, which the player may see as the character's owner, are included. Since
+module 0.17.0 the saving throws, damage, healing and rolls in it that the app can act on, and the
+conditions it names, are spans of their own, as [below](#links-in-descriptions), and Foundry's and
+dnd5e's other roll links are their text. Its rolls have the numbers of the document it's on, and
+an effect's those of the item or character it's on. Images and links in it are relative to the
+game's address, like `img`. It is not sanitised: treat it as untrusted and sanitise it before
+showing it. A description longer than 100,000 characters is cut short, short of any tag the cut
+would split.
 
-The same hash always names the same description. A description with rolls in it is hashed with the
-character's level, proficiency and ability modifiers, since its rolls may show them, so it gets a
-new hash when they change.
+The same hash always names the same description, its links numbered the same. Its hash is of
+everything what's sent depends on: the format descriptions are sent in, the rules the world is
+played by and the game's language, where it comes from and its HTML, and what it shows of the
+character's numbers. A description with rolls in it shows the character's level, proficiency,
+ability modifiers and spell save DC; one that says "spell save DC", that DC; one that names a
+saving throw, the abilities and DCs of its item's saving throws, which a saving throw without a DC
+of its own takes; and one with dnd5e's damage or healing links, its item's damage. So it gets a new
+hash when any of them changes. Module 0.17.0 sends descriptions in a new format, so each gets a new
+hash, and is sent again once, with its next hello.
+
+#### Links in descriptions
+
+Since module 0.17.0 the links in a description that the app can act on are spans of their own,
+which say what they are in data attributes, so that a player can act on them [from the
+app](#descriptions-that-roll):
+
+```html
+<span class="ss-save roll" data-n="0" data-ability="dex" data-dc="15">DC 15 Dexterity saving throw</span>
+<span class="ss-damage roll" data-n="1" data-formulas="2d6&amp;1d4" data-types="fire&amp;cold|fire">2d6 Fire plus 1d4 Cold or Fire</span>
+<span class="ss-roll roll" data-n="2" data-formula="1d6">1d6</span>
+<span class="ss-condition ref" data-condition="prone">Prone</span>
+```
+
+| Span | Is | Attributes |
+| --- | --- | --- |
+| `ss-save roll` | A saving throw, or a concentration check. | `data-ability`: the ability, as dnd5e's key, such as `"dex"`, or several joined by `\|` for a choice, such as `"str\|dex"`; left out for a concentration check that names none. `data-dc`: its DC, a whole number from 1 to 99, where one is known. `data-type`: `"concentration"` for a concentration check, else left out. |
+| `ss-damage roll` | Damage or healing, in one or more parts. | `data-formulas`: each part's formula, joined by `&`. `data-types`: each part's kinds of damage or healing, as dnd5e's keys, joined by `&` in the same order, and a part's choice among several joined by `\|`; a part that names none has nothing in its place, and a single part that names none leaves it out. `data-healing`: `"true"` for healing, else left out. |
+| `ss-roll roll` | A roll in the text, such as Foundry's `[[/r 1d6]]` or `[[1d6]]`. | `data-formula`: its formula, never what the Gamemaster's browser rolled for it as it enriched the description. |
+| `ss-condition ref` | A condition named, to read about. | `data-condition`: one of dnd5e's `conditionTypes` keys, such as `"prone"`; never one dnd5e marks as only like a condition, such as burning or bleeding. |
+
+- **`data-n`.** Each span to act on, every one but a condition, is numbered `0` to `199` in the
+  order it comes in the description, and a player's command names one by its description's hash
+  and this number. A description has at most 200 to act on and 200 conditions; any more are text.
+- **Labels are text alone,** with no elements in them.
+- **Formulas** have the character's numbers in, as dnd5e resolves them, such as `"1d8 + 3"` for
+  `1d8 + @mod`: no more than 100 characters, of letters, digits, spaces and `+ - * / ( ) . ,`, and
+  one Foundry can roll. Never `@`, `&` or `|`. A link whose formula isn't is text.
+- **A saving throw's DC** is dnd5e's, or else one the text gives around it, "DC 15 Dexterity
+  saving throw" or "Dexterity saving throw (DC 15)", or for "against your spell save DC" the
+  character's, or else that of its item's saving throw with that ability. One whose author hid its
+  DC, as with `[[/save dex 15 hideDC]]`, has none in the span: the module keeps it to itself, never
+  sending it, and rolls and asks for the save against it, as dnd5e does. A concentration check
+  never takes its item's.
+- **What's marked:** dnd5e's saving throw, concentration, damage and healing links; Foundry's
+  inline rolls made for everyone to see, such as `[[/r 1d6]]`, and those rolled as the description
+  was enriched, such as `[[1d6]]`; links to a condition's rules, dnd5e's
+  `&Reference[prone]`, or a link to a condition's page in either the 2024 or 2014 rules; and in a
+  game in English, plain text such as "a DC 15 Dexterity saving throw", "a Strength or Dexterity
+  saving throw", "2d6 fire damage" or "7 (2d6) fire damage". Conditions are also marked by their
+  names, capitalised as dnd5e names them, in any language, and in English in lower case where the
+  words around say something is in one, as "falls prone" or "the poisoned condition" do. Text in a
+  link, a heading or a button is never marked, and "advantage on Strength saving throws" isn't a
+  saving throw.
+- **What's text:** an inline roll that always comes to the same, such as `[[@prof]]`, as what it
+  comes to; one made for the Gamemaster's eyes or the roller's alone, such as `[[/gmr]]`, `[[/br]]`
+  or `[[/sr]]`; dnd5e's attack, check, skill, tool, passive, item and lookup links; and what dnd5e
+  or Foundry couldn't enrich, such as `[[/save]]` on an item with no saving throw, as its label, or
+  else the words of its configuration, such as `2d6 fire` for `[[/damage 2d6 fire]]`. dnd5e's
+  "Request Roll" and "Apply Status" buttons and its award links, which are the Gamemaster's, are
+  left out.
+- **A condition's rules,** a condition's `text`, mark conditions only, with nothing to act on.
+- **Nothing in the source is trusted.** Any class beginning `ss-`, and any `data-n`, in what was
+  stored are taken off first, and the attributes above and the class `roll` are taken off every
+  element but the spans made. So a span a player wrote into their biography acts on nothing.
+- **Older listeners** see the classes `roll` and `ref` that Foundry's and dnd5e's links had, and can
+  show them as before.
 
 ### Chat message
 
@@ -396,7 +475,8 @@ new hash when they change.
 | `character` | The campaign character's actor id if one spoke it, else `null`. |
 | `title` | The pop-out title, or `null`. |
 | `flavor`, `content` | As stored, in HTML. Content links are not yet rendered: they appear as `@UUID[…]{Label}`. |
-| `text` | `content` as plain text, with content links reduced to their labels. |
+| `text` | `content` as plain text, with content links reduced to their labels. dnd5e's cards, such as a roll request or a spell's saving throw, give each button two labels, with its DC and without, and show one; since module 0.17.0, only the one players see is kept, as `ask`'s `dc` below. Before, both were. |
+| `ask` | The save a roll request card asks the table for, or `null` for any other message: the Gamemaster's, posted from a `/save` or `/concentration` enricher's request link, or a player's [asked from the app](#descriptions-that-roll). `{ type, abilities, dc, label }`: `type` is `"save"`, or `"concentration"` for a concentration check; `abilities` the abilities its buttons offer, as dnd5e's keys, or for a concentration check the one it names, if any; `dc` its DC, only where dnd5e's *Challenge Visibility* shows players the card's DC: *Show all*, or *Show only from other players* for a card a player posted; and never for a card that shows it no one, as dnd5e's request for a link whose author hid its DC, or any card that labels its buttons alike with the DC and without; otherwise left out; `label`, for a player's, where the save comes from, such as their item, and otherwise left out. dnd5e 6's requests, which are messages of their own kind, have `null`. Module 0.17.0. |
 | `blind` | Was it a blind roll? |
 | `audience` | Who can read it. See [Visibility](#visibility). |
 | `rolls` | Every roll in the message, as below. |
@@ -499,7 +579,11 @@ would not match the list and would reveal how many were left out.
 
 `initiative` is `null` until rolled. `character` is the campaign character's actor id, or `null`.
 `hp` is present for the campaign's characters, and for every combatant when Gamemaster-only
-information is on; it is `null` when the system does not model hit points the way dnd5e does.
+information is on; it is `null` when the system does not model hit points the way dnd5e does. Its
+`max` is the maximum dnd5e shows on the sheet and token bar, and heals up to: since module 0.17.0,
+with any temporary change to it, such as Aid's or a wraith's Life Drain, which dnd5e keeps apart
+from the maximum itself. Before, it left that change out, so a character at their lowered maximum
+was sent as short of it.
 `hidden` is present only when Gamemaster-only information is on.
 
 ## Events
@@ -516,7 +600,7 @@ the destination, the campaigns or any event setting changes.
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; and `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters. See [Rolls from the app](#rolls-from-the-app). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Make Players' Attacks and Spells Through Midi-QOL** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; and `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters. See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 | `prompts` | Every [prompt](#prompts) open for the campaign's players, read afresh from the chat log: any the campaign was told of that isn't among them has closed. Empty while its players aren't asked for their saves. |
@@ -575,7 +659,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | --- | --- |
 | `id` | The roll's `id`, as fetched. |
 | `status` | `"done"`, or `"failed"` when it wasn't made. |
-| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). `null` when done. |
+| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). For an ask, a description's roll, damage or healing, or a save rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). `null` when done. |
 | `error` | What went wrong, for `"invalid"` and `"error"`, what dnd5e said for `"consume"`, and why for `"prompt"`; otherwise `null`. |
 | `messageId` | The chat message the roll made. |
 | `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check. |
@@ -584,7 +668,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | `attack` | For an attack: `{ critical, fumble, outcome }`, and for an area attack `targets`, when `visible`; see [Attacks](#attacks). |
 | `use` | For a use: `{ type }`, the kind of activity used; see [Spells and features](#spells-and-features). |
 | `damage` | For an attack or a use: the dice its damage or healing will throw, or `null`; see [Attacks](#attacks). |
-| `outcome` | For a save answering a prompt: `"success"` or `"failure"`, where its player may see whether they saved, as the card would show them; otherwise `null`. |
+| `outcome` | For a save answering a prompt: `"success"` or `"failure"`, where its player may see whether they saved, as the card would show them; since module 0.17.0, for a save rolled for a [description's link](#descriptions-that-roll), whether it met the DC it was rolled against, as its card shows the player, when `visible`; otherwise `null`. |
 
 A roll made after the module reported its `"timeout"`, as once the Gamemaster has answered what a
 module asked them, is reported again when it's made, `"done"`.
@@ -648,7 +732,7 @@ A prompt:
 | `messageId` | The chat card that asks. |
 | `type` | `"save"`, or `"concentration"` for a concentration check. |
 | `abilities` | The abilities it may be rolled with, such as `["dex"]`, or `["str", "dex"]` for a choice; one for a concentration check. |
-| `dc` | The DC, where dnd5e's *Challenge Visibility* lets the character's player see it on the card; otherwise `null`. |
+| `dc` | The DC, where dnd5e's *Challenge Visibility* lets the character's player see it on the card; otherwise `null`, as also for a card that shows it no one, such as a request for a link whose author hid its DC (module 0.17.0). |
 | `label` | What asks: the spell or feature whose card it is, or what the character is concentrating on; or `null`. |
 | `openedAt`, `expiresAt` | When its card was posted, and when it stops waiting, ten minutes later. |
 
@@ -723,6 +807,25 @@ A prompt:
   still refused (`"area"`). `attackArea`, `rollFormula`, `healed` and `attack`'s `targets` are left
   out where they don't apply; a listener that sends neither the new kinds nor an attack's `targets`
   needs no change.
+- Module 0.17.0 marks the [links in descriptions](#links-in-descriptions) the app can act on, as
+  `ss-save`, `ss-damage`, `ss-roll` and `ss-condition` spans, those to act on numbered by `data-n`,
+  and makes Foundry's and dnd5e's other roll links their text. Descriptions are sent in this new
+  format under new hashes, so each is sent again once; a description's hash now also changes with
+  the character's spell save DC, its item's saving throws and damage, and the rules and language,
+  and an effect's with its character's numbers. Players may act on the links [from the
+  app](#descriptions-that-roll): `"ask"`, `"textRoll"` and `"textDamage"` among the `kinds`, their
+  fetched commands, a save's `text` and `link`, and its `outcome`, with the reasons `"gone"`,
+  `"link"`, `"busy"`, `"secret"` and `"type"` for them in `command.result`; under dnd5e 5 only. A
+  request a player asks for opens no [prompt](#prompts), and a prompt's `dc` is `null` for a card
+  that shows its DC no one. Chat messages carry [`ask`](#chat-message), the save a roll
+  request card asks for, and their `text` keeps only the label with or without a DC that players
+  see. On the sheet, [activities](#what-an-item-rolls) and activity favorites have `duration`,
+  `trigger` and, under dnd5e 6, `text`; a Cast activity has `spellId`, as does an item whose first
+  activity is one; and every `cast` has `text`. `hp`'s `max`, on the sheet and on combatants, is
+  the maximum dnd5e shows, with any temporary change to it. The new sheet fields are left out where
+  they don't apply, and `ask` is `null`; a listener that sends none of the new kinds needs no
+  change, and one that styled the `roll` and `ref` classes of Foundry's and dnd5e's links can keep
+  doing so.
 
 ## Changes from protocol 1
 
@@ -745,11 +848,13 @@ campaign, with **Let Players Roll from Sending Stone** in Manage Campaigns. It i
 | `skill` | A skill check, such as Perception. | `key`: dnd5e's skill key, such as `"prc"`. |
 | `tool` | A tool check. | `key`: dnd5e's tool key, such as `"thief"`. |
 | `ability` | An ability check. | `key`: the ability, such as `"str"`. |
-| `save` | A saving throw. | `key`: the ability; `prompt`, the [prompt](#saves-the-game-asks-for) it answers, if any. |
+| `save` | A saving throw. | `key`: the ability; `prompt`, the [prompt](#saves-the-game-asks-for) it answers, if any; or since module 0.17.0 `text` and `link`, the [saving throw in a description](#descriptions-that-roll) it's rolled for, if any. |
 | `death` | A death saving throw, while the character is dying. | |
 | `initiative` | Initiative, while the character has none in the combat the Gamemaster has up. | `combatId` |
 | `hitDie` | A [hit die](#hit-dice-and-formulas) spent, healing the character. Module 0.16.0. | `denomination`: its size, such as `"d10"`. |
 | `formula` | A utility's [own roll](#hit-dice-and-formulas), such as a d4 of luck. Module 0.16.0. | `item`, `activity`: the item and activity with its `rollFormula`. |
+| `textRoll` | A [roll in a description](#descriptions-that-roll), such as `[[/r 1d4]]`. Module 0.17.0. | `text`, `link`: the description and the link in it. |
+| `ask` | Not a roll: the table [asked](#descriptions-that-roll) for a description's saving throw. Module 0.17.0. | `text`, `link` |
 
 ### Fetching rolls
 
@@ -793,11 +898,11 @@ the order they came.
 | --- | --- |
 | `id` | Unique to the roll. |
 | `actorId` | The campaign's character it is for. |
-| `kind`, `key`, `combatId`, `denomination`, `item`, `activity` | What is rolled, as above. |
+| `kind`, `key`, `combatId`, `denomination`, `item`, `activity`, `text`, `link` | What is rolled, as above. |
 | `mode` | `-1`, `0` or `1`: rolled with disadvantage, normally, or with advantage. |
 | `explicit` | Did the player choose how, as in dnd5e's roll dialog? Then the game rolls it that way. Otherwise it rolls as the character's sheet has it, which is where the app's `mode` came from. |
 | `extras` | What the player added, each `{ sign, count, sides }` or `{ sign, flat }`: such as `+1d4` for Bless. At most 10. Made as the roll's situational bonus. |
-| `dice` | Every die thrown, in order: the d20s, one or two (`mode` not `0`), then each added term's dice; for a hit die, its one die; for a formula, each of its dice terms'. Each `{ faces, results }`, every result one of the die's faces. |
+| `dice` | Every die thrown, in order: the d20s, one or two (`mode` not `0`), then each added term's dice; for a hit die, its one die; for a formula or a description's roll, each of its dice terms'. Each `{ faces, results }`, every result one of the die's faces. |
 
 ### Making a roll
 
@@ -1025,7 +1130,9 @@ a player to click a button on a chat card:
   or `/concentration` enricher's request link. Each of the campaign's characters whose player can
   read it is asked: every one, unless it's whispered.
 
-A card its character's player can't read asks no one. Where Midi-QOL rolls the saves itself, as
+A card its character's player can't read asks no one, and nor does a roll request a player
+[asked for from the app](#descriptions-that-roll), whoever it's posted as. Where Midi-QOL rolls the
+saves itself, as
 its *Auto Check Saves* has it, or posts and rolls its own concentration card, it still does, and
 no one is asked; with its *Concentration Check* at "chat only", it posts dnd5e's card, and the
 player is asked.
@@ -1049,3 +1156,107 @@ with why in `error`: `"off"` (the campaign doesn't ask its players now), `"chara
 character's), `"gone"` (its card is gone, or asks no save of the character), `"expired"`,
 `"answered"` (the character has rolled it), or `"ability"` (one the prompt doesn't offer).
 `command.result` adds `outcome`.
+
+### Descriptions that roll
+
+Since module 0.17.0 a player can act from the app on the [links in their character's
+descriptions](#links-in-descriptions): ask the table for a saving throw a description calls for,
+roll that saving throw themselves against its DC, and roll a description's damage, healing or other
+roll with their dice. Each names its link by the description's hash, `text`, and the link's
+`data-n`, `link`:
+
+| `kind` | What it does | Offered |
+| --- | --- | --- |
+| `ask` | Asks the table for a description's saving throw or concentration check, on dnd5e's roll request card. | Where players' rolls are made, under dnd5e 5. |
+| `save` with `text` and `link` | Rolls that saving throw or concentration check, against its DC. | Where players' rolls are made. |
+| `textRoll` | Rolls a description's roll, such as `[[/r 1d4]]`. | Where players' rolls are made, under dnd5e 5. |
+| `textDamage` | Rolls a description's damage or healing. | Where the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, under dnd5e 5. |
+
+Under dnd5e 6, whose damage, healing and roll requests are messages of kinds of their own, none
+but `save` is offered yet, and one fetched anyway is refused as `"off"`: a card for a description's
+damage posted as dnd5e 5 posts it would have no tray to apply it from there.
+
+The module reads the link from its own copy of the description, as it sent it, among the
+descriptions the character's sheet refers to now: the app sends no formula or DC of its own, and
+what a player can roll is only what a description on their sheet says. Refused for any of them:
+`"gone"` for a description the sheet no longer refers to, as once it's edited, its item or effect
+is gone, or the character's numbers it shows have changed, so that it has a new hash, which comes
+with the `character.updated` that changes it; and `"link"` for a link that isn't in it, or isn't
+of the kind, or a description that's a condition's rules.
+
+**Asking the table.**
+
+```json
+{ "id": "r4", "actorId": "aB3…", "kind": "ask", "text": "7a1c3e5f9b2d40", "link": 0 }
+```
+
+The module posts dnd5e's own roll request card, as a Gamemaster could from the description's
+link: a button for each ability the saving throw offers, or one for a concentration check, each
+labelled with its DC and without, for dnd5e to show the one each viewer may see; or for a link
+whose author hid its DC, labelled without it either way, the DC on the button marked hidden
+(`data-hide-dc`), for rolls from the card to be judged by, as dnd5e's own request has it. It's for the
+Gamemaster, to roll for the creatures it calls on, and anyone in Foundry may click it; it asks no
+one in the app, and opens no [prompt](#saves-the-game-asks-for). It's posted as the character's
+player (the user whose character it is, or else its only player, or else the Gamemaster), spoken
+as the character, for everyone to see, with the flavor `Roll Request: ` and where the description
+comes from, its name escaped: its item's name, as an item not identified yet is called;
+`Spell (Item)` for the spell an item casts; an effect's name; or the character's, for their
+biography. It's flagged `flags["sending-stone"].request` with the ask's `id` and
+`flags["sending-stone"].ask` with `{ actorId, text, link }`; and for an item's description,
+`flags.dnd5e.item` with the item's `{ id, uuid, type }`, or for a spell an item casts, the item's
+that casts it. It's sent in chat with its [`ask`](#chat-message), and `command.result` names its
+`messageId`, with no rolls. Refused: `"off"` also under dnd5e 6, whose requests are messages of
+their own kind; `"link"` for a link that isn't a saving throw or concentration check; `"secret"`
+for one in a secret section, which only the character's owners and the Gamemaster see, and the
+card would show everyone; and `"busy"` while the character asked within the last 10 seconds, or
+asked for the same link within the last 30.
+
+**A saving throw against its DC.** A `save` may name a description's saving throw with `text` and
+`link`, both or neither, and never with a `prompt` (`"invalid"`). Its `key` must be one of the
+link's abilities, or for a concentration check that names none, Constitution or the character's
+own concentration ability (`"link"`), which is rolled with the character's own either way, as
+dnd5e rolls it from the link. The module makes it as dnd5e does from the link, without its
+dialog, as the character's player: against the link's DC, if it has one, even one its author hid,
+and a concentration check without one against dnd5e's 10, so the card shows them whether they
+saved; and `command.result` adds `outcome`, `"success"` or `"failure"`, when `visible`, or `null`
+for a save against no DC. A concentration check is made as one, with what adds to it,
+such as War Caster; failed, it doesn't end concentration, as dnd5e's link doesn't: that's left to
+the Gamemaster, or to Midi-QOL as they have it set up. One in a secret section may be rolled so.
+
+**A description's damage or healing.**
+
+```json
+{ "id": "r5", "actorId": "aB3…", "kind": "textDamage", "text": "2c8e1f4b6a0d93", "link": 1,
+  "types": ["fire", null], "dice": [ { "faces": 6, "results": [3, 5] }, { "faces": 4, "results": [2] } ] }
+```
+
+| Roll field | Meaning |
+| --- | --- |
+| `text`, `link` | The description, and its damage or healing link. |
+| `types` | Optional: for each of its parts, in order, the kind of damage chosen from that part's types, or `null`. A part with no choice made is rolled as the first kind it names. A kind a part doesn't offer, or more kinds than parts, is refused (`"type"`). |
+| `dice` | One `{ faces, results }` for each dice term of its parts' formulas, in order, with as many results as the term has dice, as for a [formula](#hit-dice-and-formulas). |
+
+It's rolled as dnd5e rolls its description's link, without the damage dialog: a roll for each
+part, of the kind chosen for it, never a critical hit's, and never changed in the app (`modifiers`
+is refused as `"invalid"`). The card is the player's, spoken as the character, with the flavor
+`<where it comes from> - Damage Roll`, or `Healing Roll`, and `flags.dnd5e` of `{ messageType:
+"roll", roll: { type: "damage" }, targets: [] }`, `type` `"healing"` for healing, with `item` as an
+ask has it, for dnd5e to head the card with it, but none for a spell an item casts: dnd5e would
+head its card with the item alone, in place of the flavor naming both. It names no targets: the
+Gamemaster applies it from the card, as from dnd5e's own link. Even with Midi-QOL, it's the roll alone, outside any workflow:
+dnd5e's `dnd5e.rollDamage` hook isn't called, so no workflow waiting for damage takes it. Refused:
+`"attacks-off"` while the Gamemaster doesn't let the campaign's players attack, `"self-test"`
+where damage doesn't take their dice, and `"dice"` for dice that aren't the ones its formulas
+throw, or a formula with a die no player rolls, such as a d3, or dice inside parentheses or a
+function.
+
+**A description's roll.** A `textRoll` has the same `text`, `link` and `dice`, for an `ss-roll`
+link. It's rolled as dnd5e rolls a formula, without its dialog, on a card spoken as the character,
+with where it comes from as its flavor, `flags.dnd5e.roll.type` `"generic"`, and the item as for
+damage, none for a spell an item casts. Refused as `"dice"` as damage is; and where a module changes the roll so that the player's
+dice can no longer reach it, as inside a function, it's called off, and nothing is posted.
+
+Neither is rolled with advantage or has anything added: `mode`, `explicit` and `extras` may be
+left out, and if given are `0`, `false` and empty. Both are flagged
+`flags["sending-stone"].request` with the roll's `id`, as other rolls are, and both report their
+rolls as other rolls do.

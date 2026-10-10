@@ -110,7 +110,7 @@ function describeItem(item, texts) {
     properties: identified ? Array.from(item.labels?.properties ?? [], property => property.label).filter(Boolean) : [],
     identified,
     // What it rolls, and how it's used, so it's used or rolled from Inventory as from Actions.
-    ...usableFields(item),
+    ...usableFields(item, texts),
     text: texts.add({
       html: identified ? system.description?.value : system.unidentified?.description,
       relativeTo: item
@@ -122,10 +122,12 @@ function describeItem(item, texts) {
  * What an item rolls, and how it's used, as an action has them; nothing where it rolls nothing,
  * or isn't identified yet.
  * @param {Item} item
+ * @param {SheetTexts} [texts]    Collects the descriptions of the spells it casts, and under dnd5e
+ *                                6, of its activities.
  * @returns {object}
  */
-function usableFields(item) {
-  const rolls = rollsIfAny(item);
+function usableFields(item, texts) {
+  const rolls = rollsIfAny(item, texts);
   return rolls ? { ...usageOf(item), ...rolls } : {};
 }
 

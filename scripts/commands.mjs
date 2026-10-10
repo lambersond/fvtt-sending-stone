@@ -4,13 +4,14 @@ import { describeCampaign, getCampaigns } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, runRollCommand } from "./command-rolls.mjs";
+import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { prompting } from "./prompts.mjs";
 import { currentSession, send } from "./transport.mjs";
 
 /**
  * Fetching what players ask the game to do from the Sending Stone app: their rolls, their attacks,
- * and their spells and features.
+ * their spells and features, and what the links in their descriptions do.
  *
  * The app can't reach the Gamemaster's browser, so the bridge fetches from it instead, for each
  * campaign that lets its players roll from the app. While a player has their table open, the app
@@ -90,8 +91,10 @@ const queues = new Map();
  * player's die. Attacks, the uses of spells and features, and their damage are among them when the
  * Gamemaster lets the campaign's players attack and cast from the app too, and they can be made
  * here; and then whether players may change their damage in the app, as the self-test found, and
- * that an area attack is made at the targets they pick. And whether its players are asked in the
- * app for the saves the game asks of them.
+ * that an area attack is made at the targets they pick. The links in their descriptions are among
+ * them too: a description's own roll, asking the table for a save, where dnd5e's card for it can be
+ * made, and a description's damage or healing, where players may attack and damage takes their
+ * dice. And whether its players are asked in the app for the saves the game asks of them.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean}}
@@ -103,7 +106,11 @@ export function rollFeatures(campaign) {
   const attacks = campaign.attacks && !attacksUnavailable();
   return {
     enabled: true,
-    kinds: [...ROLL_KINDS.filter(kind => (kind !== "hitDie") || diceStatus.hitDice), ...(attacks ? ATTACK_KINDS : [])],
+    kinds: [
+      ...ROLL_KINDS.filter(kind => (kind !== "hitDie") || diceStatus.hitDice),
+      ...(attacks ? ATTACK_KINDS : []),
+      ...textKinds(campaign)
+    ],
     reason: null,
     modifiers: attacks && diceStatus.modifiers,
     areaAttacks: attacks,
@@ -360,6 +367,9 @@ function runCommand(command, campaign, signal) {
     case "attack":
     case "use": return runUseCommand(command, campaign, { signal });
     case "damage": return runDamageCommand(command, campaign);
+    case "ask": return runAskCommand(command, campaign);
+    case "textDamage": return runTextDamageCommand(command, campaign);
+    case "textRoll": return runTextRollCommand(command, campaign);
     default: return runRollCommand(command, campaign);
   }
 }

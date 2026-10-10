@@ -98,16 +98,18 @@ export function roster(campaign, texts) {
 }
 
 /**
- * An actor's hit points, if its system models them the way D&D Fifth Edition does.
+ * An actor's hit points, if its system models them the way D&D Fifth Edition does. The maximum is
+ * the one dnd5e shows on its sheet and token bar, and heals up to: with any temporary change to it,
+ * such as Aid's or a wraith's Life Drain, which dnd5e keeps apart from the maximum itself.
  * @param {Actor|null|undefined} actor
- * @returns {{value: number, max: number, temp: number}|null}
+ * @returns {{value: number, max: number|null, temp: number}|null}
  */
 export function hitPoints(actor) {
   const hp = actor?.system?.attributes?.hp;
   if ( !hp || !Number.isFinite(hp.value) ) return null;
   return {
     value: hp.value,
-    max: Number.isFinite(hp.max) ? hp.max : null,
+    max: Number.isFinite(hp.effectiveMax) ? hp.effectiveMax : (Number.isFinite(hp.max) ? hp.max : null),
     temp: Number.isFinite(hp.temp) ? hp.temp : 0
   };
 }

@@ -108,7 +108,7 @@ function describeFeature(item, texts) {
     // As dnd5e decides: a trait, or anything with nothing to use, is passive.
     passive: (system.properties?.has?.("trait") ?? false) || !(system.activities?.size > 0),
     uses: usesOf(item),
-    ...usableFields(item),
+    ...usableFields(item, texts),
     text: texts.add({ html: system.description?.value, relativeTo: item })
   };
 }
@@ -117,10 +117,12 @@ function describeFeature(item, texts) {
  * What a feature rolls, and its range, target and concentration, as an action has them, so it's
  * used or rolled from the Features tab as from Actions; nothing where it rolls nothing.
  * @param {Item} item
+ * @param {SheetTexts} [texts]    Collects the descriptions of the spells it casts, and under dnd5e
+ *                                6, of its activities.
  * @returns {object}
  */
-function usableFields(item) {
-  const rolls = rollsIfAny(item);
+function usableFields(item, texts) {
+  const rolls = rollsIfAny(item, texts);
   if ( !rolls ) return {};
   const { range, target, concentration } = usageOf(item);
   return { range, target, concentration, ...rolls };

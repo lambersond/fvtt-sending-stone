@@ -262,8 +262,9 @@ function tagOf(process, config, index) {
 /**
  * Once dnd5e has built a tagged roll, keep how the player chose to roll it, whatever changed it
  * since, as a module granting advantage might; and change the first of a player's damage rolls as
- * they chose in the app. A hit die or utility's roll another module changed so that the player's
- * dice can't reach it, as inside a function, is called off: nothing is spent or healed.
+ * they chose in the app. A hit die, a utility's roll or a description's roll another module changed
+ * so that the player's dice can't reach it, as inside a function, is called off: nothing is spent
+ * or healed, and nothing posted.
  * @param {Roll[]} rolls
  * @returns {boolean|void}   False to call the roll off.
  */
@@ -274,7 +275,7 @@ function onRollConfiguration(rolls) {
       if ( index === 0 ) reshapeDamage(roll, plan.command.modifiers);
       continue;
     }
-    if ( ["hitDie", "formula"].includes(plan?.command.kind) ) {
+    if ( ["hitDie", "formula", "textRoll"].includes(plan?.command.kind) ) {
       if ( (index === 0) && !takesPlayersDice(roll, plan.command.dice) ) {
         plan.refusal = "dice";
         return false;

@@ -1,4 +1,4 @@
-import { castSpellOf, describeActivity, visibleActivities } from "./sheet-rolls.mjs";
+import { describeActivity, visibleActivities } from "./sheet-rolls.mjs";
 import { traitLabel } from "./sheet-details.mjs";
 import { castFrom, hiddenCopy } from "./sheet-spells.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
@@ -19,7 +19,8 @@ import { combinedMode, finite, limitedUses, localize } from "./sheet-values.mjs"
 /**
  * The character's favorites, in the order dnd5e shows them.
  * @param {Actor} actor
- * @param {SheetTexts} [texts]   Collects the descriptions of the spells its items cast.
+ * @param {SheetTexts} [texts]   Collects the descriptions of the spells its items cast, and under
+ *                               dnd5e 6, of its activities.
  * @returns {object[]}
  */
 export function favoritesOf(actor, texts) {
@@ -37,6 +38,7 @@ export function favoritesOf(actor, texts) {
  * A favorite, as the listener needs it, or null for one to leave out.
  * @param {Actor} actor
  * @param {{type: string, id: string}} favorite
+ * @param {SheetTexts} [texts]
  * @returns {object|null}
  */
 function describeFavorite(actor, { type, id }={}, texts) {
@@ -65,20 +67,19 @@ function itemFavorite(actor, { item, activity, effect }) {
 
 /**
  * One of an item's activities made a favorite, such as a staff's Cast Fireball: what it does, as
- * an action is described, since the sheet lists each item's actions by one of its activities.
- * One of a spell an item casts, while the item can't cast it, as dnd5e's sheet doesn't list it then,
- * is left out: it would do nothing.
+ * an action is described, since the sheet lists each item's actions by one of its activities. One
+ * that casts a spell from the item opens to the spell's description, and under dnd5e 6 one with a
+ * description of its own to that. One of a spell an item casts, while the item can't cast it, as
+ * dnd5e's sheet doesn't list it then, is left out: it would do nothing.
  * @param {Actor} actor
  * @param {{item?: Item, activity?: Activity}} found
+ * @param {SheetTexts} [texts]
  * @returns {object|null}
  */
 function activityFavorite(actor, { item, activity }, texts) {
   if ( !item || !activity || hidden(actor, item) ) return null;
   if ( castFrom(item)?.usable === false ) return null;
   if ( !visibleActivities(item).includes(activity) ) return null;
-  const described = describeActivity(item, activity);
-  // One that casts a spell from the item opens to the spell's description.
-  const spell = described.cast && texts ? castSpellOf(activity)?.spell : null;
   return {
     type: "activity",
     id: activity.id,
@@ -87,10 +88,7 @@ function activityFavorite(actor, { item, activity }, texts) {
     itemName: item.name,
     name: activity.name || item.name,
     img: activity.img || item.img || null,
-    ...described,
-    ...(spell && {
-      cast: { ...described.cast, text: texts.add({ html: spell.system?.description?.value, relativeTo: spell }) }
-    })
+    ...describeActivity(item, activity, texts)
   };
 }
 

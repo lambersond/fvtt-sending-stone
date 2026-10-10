@@ -11,8 +11,10 @@ It also works the other way, for a campaign whose Gamemaster lets it: checks, sa
 initiative, death saving throws, hit dice and features' own dice, such as a d4 of luck, that a
 player rolls in the app are made in Foundry with the dice they rolled, as if they had rolled them
 there, and so can their attacks, spells and features and their damage or healing, through
-Midi-QOL's workflow where it's in use. See
-[Players' rolls](#players-rolls) and [Players' attacks and spells](#players-attacks-and-spells).
+Midi-QOL's workflow where it's in use, and the saving throws, damage and rolls their descriptions
+call for. See [Players' rolls](#players-rolls),
+[Players' attacks and spells](#players-attacks-and-spells) and
+[Descriptions that roll](#descriptions-that-roll).
 
 ## How it works
 
@@ -53,7 +55,9 @@ features and inventory items that roll anything, and their favorites, as dnd5e's
 When a character
 changes, such as taking damage, levelling up or gaining a condition, its campaigns are sent it again, so players can see their character and roll from it
 in the app. Descriptions, enriched as the player would see them in Foundry, are sent once and
-then only when one is new, since they are most of a sheet's size.
+then only when one is new, since they are most of a sheet's size. Their saving throws, damage,
+healing, rolls and conditions are marked for the app to act on, and your own links in them, such
+as Request Roll and Apply Status, are left out.
 
 | Setting | Effect |
 | --- | --- |
@@ -188,10 +192,12 @@ the card shows whether they saved.
 - **What asks.** dnd5e's concentration check after a concentrating character takes damage; a spell
   or feature that calls for a saving throw, at each character it targets; and a saving throw or
   concentration check you request in chat from an enricher, such as `[[/save dex 15]]`'s request
-  link, at every character whose player can read it.
+  link, at every character whose player can read it. A request a player asks the table for from
+  the app asks no one; see [Descriptions that roll](#descriptions-that-roll).
 - **Only what the player could click.** A card whispered to you alone asks no one. The DC, and
   whether they saved, are shown in the app only where dnd5e's Challenge Visibility would show the
-  player on the card.
+  player on the card, and the DC never where the card hides it from everyone, as a request for a
+  link with `hideDC` does.
 - **A failed concentration check ends concentration**, which the player can't do from the app.
 - **With Midi-QOL**, saves Midi rolls itself, as its Auto Check Saves has it, and its own
   concentration checks stay Midi's, and no one is asked; with its Concentration Check at "chat
@@ -199,6 +205,49 @@ the card shows whether they saved.
   check, as you have it set up.
 - **Ten minutes.** A request waits ten minutes, or until its card is deleted or the save is rolled
   from it in Foundry.
+
+### Descriptions that roll
+
+With **Let Players Roll from Sending Stone** ticked, players can act in the app on what their
+character's descriptions call for: a spell's "DC 15 Dexterity saving throw" or "8d6 fire damage",
+dnd5e's save, damage and healing links, or a `[[/r 1d4]]` in their biography. The conditions a
+description names, such as Prone, are marked in every campaign, for the app to show their rules.
+Under dnd5e 6 players can only roll a description's save themselves for now: asking the table and
+rolling a description's damage or roll aren't offered yet.
+
+- **Asking the table.** A player can ask the table for a description's saving throw: dnd5e's own
+  roll request card is posted in Foundry, from their character, naming where it's from, such as
+  "Roll Request: Staff of Fire", for you to roll for the creatures it calls on. No one is asked in
+  the app, and anyone in Foundry may click it, as on a request you post. A character can ask once
+  in 10 seconds, and for the same save once in 30. Never for a save in a secret section of the
+  description, which the card would show everyone. A save whose DC its author hid (`hideDC`) is
+  asked for with its DC shown no one, as dnd5e's own request does, and rolls from it are judged
+  against it.
+- **Their own save.** A player can roll the save themselves, with their dice, against its DC, as if
+  they had clicked it in the description, so the card shows whether they saved; against one its
+  author hid too, which the app is never told. A concentration check is rolled as one, with War
+  Caster and the like, with the character's own concentration ability where the link names none,
+  and against 10 where it has no DC; a failed one leaves ending concentration to you, as dnd5e's
+  link does, or to Midi-QOL as you have it set up.
+- **Damage and healing**, with **Let Players Attack and Cast from Sending Stone** ticked too, are
+  rolled with their dice, on a card naming where they're from, such as "Starry Wisp (Staff of
+  Fire)" for a spell an item casts, and no targets: you apply them from the card, as from dnd5e's
+  own link. Never a critical hit's, and with no dice added. With Midi-QOL,
+  it's the roll alone, outside any workflow, and it's offered even with **Make Players' Attacks and
+  Spells Through Midi-QOL** off.
+- **Rolls**, such as `[[/r 1d4]]`, are rolled with their dice on a card naming where they're from.
+  One with a die the app doesn't roll, such as a d3, is refused.
+- **Only what the description says.** The app names a link in a description the module sent it,
+  and the module reads its formula and DC from its own copy, as the character's sheet has it now:
+  a description that has changed since is refused until the app has the new one. Nothing a player
+  writes into a description, such as their biography, can pass for a link, and every formula is
+  the character's, resolved and checked, as in Foundry.
+- **What's marked.** dnd5e's save, concentration, damage and healing links, Foundry's inline rolls,
+  links to a condition's rules, and, in a game in English, saving throws and damage in plain words.
+  Conditions are found by name in any language. Attack, check and other links are shown as text,
+  as are rolls made for your eyes or the roller's alone (`/gmr`, `/br`, `/sr`).
+
+Module 0.17.0 sends every description again once, in this new form.
 
 ### The listener must allow cross-origin requests
 
@@ -245,6 +294,7 @@ With **Send Gamemaster-Only Information** off, the listener receives what player
 | Character sheets | The campaign's own characters only: what their players can already see in Foundry. |
 | Attack targets | Name only; armor class is withheld. |
 | Success or failure against a DC | Left out of roll summaries, so a hidden DC is not revealed. |
+| DCs on chat cards | A card's text, and a roll request's DC, as dnd5e's *Challenge Visibility* shows players: of the two labels its buttons have, with the DC and without, only the one players see; never a DC the card shows no one, as a request for a link with `hideDC`. |
 
 Every chat message carries an `audience` listing which players, and which of the campaign's
 characters, can read it. That lets the listener route each message to the right player even with
@@ -319,7 +369,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites |
 | `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through |
-| `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, hashed, and sent only when a campaign lacks them |
+| `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, their links marked, hashed, and sent only when a campaign lacks them |
+| `scripts/sheet-links.mjs` | The links in a description the app can act on, marked as its own spans, and finding the one a player's command names |
 | `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON |
 | `scripts/character-sync.mjs` | Sending a character again when it changes |
 | `scripts/chat.mjs` | Chat hooks |
@@ -327,8 +378,9 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
-| `scripts/commands.mjs` | Fetching players' rolls, attacks and spells from the app, one campaign at a time, and reporting what became of each |
-| `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card |
+| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, and reporting what became of each |
+| `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card; a description's save against its DC |
+| `scripts/command-texts.mjs` | Asking the table for a description's save, and rolling a description's damage, healing or roll with a player's dice |
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, and the self-test that it works |
 | `scripts/apps/campaign-config.mjs` | Manage Campaigns: the app's address, and each campaign's title, secret, characters, players' rolls, attacks and spells, and connection test |
