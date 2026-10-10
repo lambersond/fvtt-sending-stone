@@ -11,8 +11,8 @@ import { castFrom } from "./sheet-spells.mjs";
  * Making a player's roll from the Sending Stone app: a check, saving throw, death saving throw or
  * initiative, a hit die spent, or a utility's own roll, such as a d4 of luck, through dnd5e, as if
  * the player had rolled it in Foundry, with the dice they rolled; a saving throw the game asked
- * them for, on the card that asked; and a saving throw a description of theirs calls for, against
- * its DC.
+ * them for, on the card that asked; and a saving throw or check a description of theirs calls for,
+ * against its DC.
  */
 
 /**
@@ -23,10 +23,17 @@ import { castFrom } from "./sheet-spells.mjs";
 export const PUBLIC = "public";
 
 /**
- * The rolls of something on the sheet: a skill, tool or ability, by its key.
+ * The rolls of something on the sheet: a skill, tool or ability, by its key. Each may be rolled for
+ * a link in a description, a check or a saving throw.
  * @type {Set<string>}
  */
 const KEYED = new Set(["skill", "tool", "ability", "save"]);
+
+/**
+ * The kind of check each roll of a check is, as a description's check names its choices.
+ * @type {Record<string, string>}
+ */
+const CHECK_TYPES = { ability: "check", skill: "skill", tool: "tool" };
 
 /**
  * The rolls made as they are, with no advantage and nothing added: a hit die, and a utility's own
@@ -51,8 +58,9 @@ const PLAIN = new Set(["hitDie", "formula"]);
  *                                      when its player may know.
  * @property {object|null} [damage]     For an attack: the dice its damage will throw, for its player
  *                                      to roll; null when no damage follows.
- * @property {string|null} [outcome]    For a save the game asked for, or one a description calls for
- *                                      against a DC: "success" or "failure", where its player may know.
+ * @property {string|null} [outcome]    For a save the game asked for, or a save or check a description
+ *                                      calls for against a DC: "success" or "failure", where its
+ *                                      player may know.
  */
 
 /**
@@ -86,10 +94,12 @@ export async function runRollCommand(command, campaign) {
   const refusal = checkRoll(command, actor);
   if ( refusal ) return failed(refusal);
   let link = null;
+  let check = null;
   if ( isTextHash(command.text) ) {
-    const found = await linkedSave(command, actor);
+    const found = (command.kind === "save") ? await linkedSave(command, actor) : await linkedCheck(command, actor);
     if ( found.refusal ) return failed(found.refusal);
     link = found.link;
+    check = found.check ?? null;
   }
   let prompt = null;
   if ( command.prompt ) {
@@ -106,6 +116,7 @@ export async function runRollCommand(command, campaign) {
     made = await withPlan(command, planned => {
       plan = planned;
       if ( prompt ) return answerPrompt(command, actor, prompt);
+      if ( check ) return rollLinkedCheck(command, actor, link, check);
       return link ? rollLinkedSave(command, actor, link) : makeRoll(command, actor);
     });
   } catch (err) {
@@ -125,8 +136,8 @@ export async function runRollCommand(command, campaign) {
 /**
  * Why a fetched roll isn't one to make, if it isn't. The app checks the same, but what reaches the
  * game is checked again here: only dice a player can roll, and only values those dice show. A
- * saving throw may name the link in a description it's rolled for, but not while answering a
- * prompt.
+ * check or saving throw may name the link in a description it's rolled for, but not while
+ * answering a prompt.
  * @param {object} command
  * @returns {string|null}
  */
@@ -141,7 +152,7 @@ export function checkCommand(command) {
   if ( ![-1, 0, 1].includes(command.mode) || (typeof command.explicit !== "boolean") ) return "mode";
   if ( !isOptional(command.prompt, isPromptId) || (command.prompt && (command.kind !== "save")) ) return "prompt";
   const linked = (command.text !== undefined) && (command.text !== null);
-  if ( linked && ((command.kind !== "save") || !isTextHash(command.text)) ) return "text";
+  if ( linked && (!KEYED.has(command.kind) || !isTextHash(command.text)) ) return "text";
   if ( linked ? !isLinkIndex(command.link) : ((command.link !== undefined) && (command.link !== null)) ) return "link";
   if ( linked && command.prompt ) return "prompt";
   const { extras, dice } = command;
@@ -348,7 +359,8 @@ export function isRolled(rolled) {
 }
 
 /**
- * Why the character can't make this roll now, if it can't.
+ * Why the character can't make this roll now, if it can't. A tool check needs no proficiency, as in
+ * dnd5e; and one a description calls for may be with a kind of vehicle, as dnd5e's link may be.
  * @param {object} command
  * @param {Actor} actor
  * @returns {string|null}
@@ -357,7 +369,10 @@ function checkRoll(command, actor) {
   const { key } = command;
   switch ( command.kind ) {
     case "skill": return (CONFIG.DND5E.skills?.[key] && actor.system.skills?.[key]) ? null : "unknown";
-    case "tool": return CONFIG.DND5E.tools?.[key] ? null : "unknown";
+    case "tool": {
+      const vehicle = isTextHash(command.text) && Object.hasOwn(CONFIG.DND5E.vehicleTypes ?? {}, key);
+      return (CONFIG.DND5E.tools?.[key] || vehicle) ? null : "unknown";
+    }
     case "ability":
     case "save": return (CONFIG.DND5E.abilities?.[key] && actor.system.abilities?.[key]) ? null : "unknown";
     case "death": {
@@ -430,6 +445,27 @@ async function linkedSave(command, actor) {
   const own = actor.system.attributes?.concentration?.ability;
   const abilities = (named.length || (link.kind === "save")) ? named : ["con", own];
   return abilities.includes(command.key) ? { link } : { refusal: "link" };
+}
+
+/**
+ * The check a description on the character's sheet calls for, which a player rolls their own, by
+ * its link: one of the checks it offers, of the kind and with the skill, tool or ability the
+ * player names, made with the ability the link names for it. It's read from the description as it
+ * was sent, so its DC is the description's, not the player's. Or why not: the description isn't on
+ * the sheet now (`gone`), or the link isn't a check, or doesn't offer that one (`link`).
+ * @param {object} command
+ * @param {Actor} actor
+ * @returns {Promise<{link?: object, check?: {type: string, ability: string, key?: string},
+ *   refusal?: string}>}
+ */
+async function linkedCheck(command, actor) {
+  const found = await findLink(actor, command.text, command.link);
+  if ( found.refusal ) return { refusal: found.refusal };
+  const { link } = found;
+  if ( link?.kind !== "check" ) return { refusal: "link" };
+  const type = CHECK_TYPES[command.kind];
+  const check = (link.checks ?? []).find(each => (each.type === type) && ((each.key ?? each.ability) === command.key));
+  return check ? { link, check } : { refusal: "link" };
 }
 
 /**
@@ -580,16 +616,53 @@ async function rollLinkedSave(command, actor, link) {
     ? await actor.rollConcentration(config, dialog, message)
     : await actor.rollSavingThrow(config, dialog, message);
   const made = Array.isArray(rolls) ? rolls : [rolls].filter(Boolean);
-  return { message: messageOf(made), outcome: saveOutcome(made) };
+  return { message: messageOf(made), outcome: outcomeAgainstDC(made) };
 }
 
 /**
- * Whether a saving throw met its DC, as dnd5e's card shows it, or as a module decided it: the DC it
- * was rolled against, which for a concentration check is dnd5e's 10 where none was given.
- * @param {Roll[]} rolls   The save's rolls, as made.
- * @returns {"success"|"failure"|null}   Null for a save against no DC.
+ * Roll a check a description calls for, through dnd5e, without its dialog, as the player's own, as
+ * dnd5e rolls one clicked in the description, or on its request card: with the ability the link
+ * names for it, which for a skill or tool may not be the character's own; a skill checked using a
+ * tool with it, for dnd5e to add the higher of their proficiencies, and give advantage where the
+ * character is proficient in both; and against
+ * the link's DC, if it names one, even one its author hid.
+ * @param {object} command
+ * @param {Actor} actor
+ * @param {{dc: number|null, usingTool?: string}} link
+ * @param {{type: string, ability: string, key?: string}} check   The one of its checks rolled.
+ * @returns {Promise<{message: ChatMessage|null, outcome: string|null}>}   The roll's message, and
+ *   whether it met its DC, where it was rolled against one, as the card shows its author.
  */
-function saveOutcome(rolls) {
+async function rollLinkedCheck(command, actor, link, check) {
+  const author = authorFor(actor);
+  const flags = { [MODULE_ID]: { request: command.id } };
+  const target = Number.isInteger(link.dc) ? link.dc : null;
+  const config = {
+    ability: check.ability,
+    ...((check.type === "skill") && { skill: check.key, ...(link.usingTool && { tool: link.usingTool }) }),
+    ...((check.type === "tool") && { tool: check.key }),
+    ...((target !== null) && { target }),
+    rolls: [{ options: { [ROLL_TAG]: command.id } }]
+  };
+  const dialog = { configure: false };
+  const message = { rollMode: PUBLIC, data: { author: author.id, flags } };
+  let rolls;
+  switch ( check.type ) {
+    case "skill": rolls = await actor.rollSkill(config, dialog, message); break;
+    case "tool": rolls = await actor.rollToolCheck(config, dialog, message); break;
+    default: rolls = await actor.rollAbilityCheck(config, dialog, message);
+  }
+  const made = Array.isArray(rolls) ? rolls : [rolls].filter(Boolean);
+  return { message: messageOf(made), outcome: outcomeAgainstDC(made) };
+}
+
+/**
+ * Whether a saving throw or check met its DC, as dnd5e's card shows it, or as a module decided it:
+ * the DC it was rolled against, which for a concentration check is dnd5e's 10 where none was given.
+ * @param {Roll[]} rolls   Its rolls, as made.
+ * @returns {"success"|"failure"|null}   Null for one against no DC.
+ */
+function outcomeAgainstDC(rolls) {
   const [roll] = rolls;
   if ( !roll || !Number.isNumeric(roll.options?.target) ) return null;
   return (roll.isSuccess || (roll.options.success === true)) ? "success" : "failure";

@@ -1,4 +1,4 @@
-import { finite, localize } from "./sheet-values.mjs";
+import { combinedMode, finite, localize } from "./sheet-values.mjs";
 
 /**
  * A character's details, traits and biography, as dnd5e's sheet shows them: who the character is,
@@ -164,6 +164,28 @@ function toolsOf(tools) {
   return Object.entries(tools ?? {})
     .filter(([, tool]) => (tool?.value ?? 0) > 0)
     .map(([key]) => traitLabel(key, "tool"));
+}
+
+/**
+ * A tool the character has, as dnd5e keeps it with its proficiency: its modifier, passive score
+ * and proficiency, and whether its checks are rolled with advantage or disadvantage, combining its
+ * own and its ability's, as a skill is described.
+ * @param {Actor} actor
+ * @param {string} id     Such as "thief".
+ * @param {object} tool   The prepared tool data.
+ * @returns {{id: string, name: string, ability: string|null, total: number, passive: number|null,
+ *   proficiency: number, mode: number}}
+ */
+export function describeTool(actor, id, tool) {
+  return {
+    id,
+    name: traitLabel(id, "tool"),
+    ability: tool.ability ?? null,
+    total: finite(tool.total) ?? 0,
+    passive: finite(tool.passive),
+    proficiency: finite(tool.prof?.multiplier) ?? finite(tool.value) ?? 0,
+    mode: combinedMode(actor, [`abilities.${tool.ability}.check.roll.mode`, `tools.${id}.roll.mode`])
+  };
 }
 
 /* -------------------------------------------- */

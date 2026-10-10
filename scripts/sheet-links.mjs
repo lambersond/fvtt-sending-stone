@@ -1,8 +1,8 @@
 import { MODULE_ID } from "./constants.mjs";
 
 /**
- * The links in a description that the app can act on: saving throws, damage and healing, rolls,
- * and conditions.
+ * The links in a description that the app can act on: saving throws, checks, damage and healing,
+ * rolls, and conditions.
  *
  * dnd5e and Foundry enrich a description into links that only work inside Foundry. Before it is
  * sent, each one the app can act on becomes a span of its own, which says what it is in data
@@ -10,6 +10,9 @@ import { MODULE_ID } from "./constants.mjs";
  *
  * - `<span class="ss-save roll" data-n data-ability="dex" data-dc="15">`, with "str|dex" for a
  *   choice of abilities and `data-type="concentration"` for a concentration check;
+ * - `<span class="ss-check roll" data-n data-checks="skill:str:ath|check:dex" data-dc="15">`, a
+ *   check, with `|` between a choice of checks, each "check:<ability>", "skill:<ability>:<skill>"
+ *   or "tool:<ability>:<tool>", and `data-using-tool="thief"` for a skill checked using a tool;
  * - `<span class="ss-damage roll" data-n data-formulas="2d6&1d4" data-types="fire&cold|fire">`,
  *   with `&` between parts, `|` between a part's choice of types, and `data-healing="true"` for
  *   healing;
@@ -18,8 +21,8 @@ import { MODULE_ID } from "./constants.mjs";
  *
  * Those to act on are numbered by `data-n`, in the order they come in the text, and a command from
  * the app names one by its description's hash and that number. Plain text the game's language is
- * English for, such as "a DC 15 Dexterity saving throw" or "2d6 fire damage", is marked too, as
- * are conditions named in any language.
+ * English for, such as "a DC 15 Dexterity saving throw", "a Strength (Athletics) check" or "2d6
+ * fire damage", is marked too, as are conditions named in any language.
  *
  * Nothing in a description is trusted: it may be a player's own. Spans in its source that look
  * like these lose their classes and data, and every formula is the character's, resolved and
@@ -57,13 +60,42 @@ const SHOW_TEXT = 4;
  * "ss-", loses it.
  * @type {string[]}
  */
-const LINK_CLASSES = ["ss-save", "ss-damage", "ss-roll", "ss-condition"];
+const LINK_CLASSES = ["ss-save", "ss-check", "ss-damage", "ss-roll", "ss-condition"];
 
 /**
  * The data attributes of the spans this makes. Any other element with one loses it.
  * @type {string[]}
  */
-const LINK_DATA = ["n", "ability", "dc", "type", "formulas", "types", "healing", "formula", "condition"];
+const LINK_DATA = [
+  "n", "ability", "dc", "type", "checks", "using-tool", "formulas", "types", "healing", "formula", "condition"
+];
+
+/**
+ * The most checks one link offers a choice of. One that offers more is text.
+ * @type {number}
+ */
+const MOST_CHECKS = 10;
+
+/**
+ * The kinds of check a link may offer, as dnd5e's roll request buttons name them: an ability
+ * check, a skill check, or a tool check.
+ * @type {string[]}
+ */
+const CHECK_TYPES = ["check", "skill", "tool"];
+
+/**
+ * A key dnd5e names a skill or tool by, as the app accepts one: never ":" or "|", which separate
+ * the checks a span offers.
+ * @type {RegExp}
+ */
+const CHECK_KEY = /^[A-Za-z][\w-]{0,31}$/;
+
+/**
+ * The abilities a check may be made with: the six the app knows. A link to a check with any other,
+ * such as a world's own, is text.
+ * @type {string[]}
+ */
+const SIX_ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
 
 /**
  * Where text is never marked: links, headings, and the spans this makes.
@@ -173,6 +205,20 @@ const GAP = "\\s{1,4}";
 const SPACE = "\\s{0,4}";
 
 /**
+ * The most choices plain text may list for one saving throw or check, "Strength, Dexterity, or
+ * Constitution": as many as the six abilities.
+ * @type {number}
+ */
+const MOST_LISTED = 6;
+
+/**
+ * How far before a saving throw or check in plain text is read for a list it ends: "Charisma
+ * (Deception, Intimidation, Performance, or Persuasion) or ".
+ * @type {number}
+ */
+const LIST_BEFORE = 64;
+
+/**
  * Words before a condition's name, in English, that say something is in it: "is prone", "falls
  * unconscious". Tested on the few characters before a match, never as part of the pattern.
  * @type {RegExp}
@@ -187,17 +233,21 @@ const IN_CONDITION = new RegExp("(?:^|[^\\p{L}\\p{N}_])"
 const CONDITION_WORD = /^\s{1,3}condition(?![\p{L}\p{N}_])/iu;
 
 /**
- * A DC just before a saving throw's link, "DC 15 ", and one just after it, "saving throw (DC 15)".
+ * A DC just before a saving throw's or check's link, "DC 15 ", and one just after it, "saving
+ * throw (DC 15)" or "check (DC 15)".
  * @type {RegExp}
  */
 const DC_BEFORE = /DC\s{0,3}(\d{1,3})\s{0,3}$/;
 const DC_AFTER = /^\s{0,3}(?:(?:saving\s{1,3}throw|save)\s{0,3})?\(DC\s{0,3}(\d{1,3})\)/i;
+const CHECK_DC_AFTER = /^\s{0,3}(?:check\s{0,3})?\(DC\s{0,3}(\d{1,3})\)/i;
 
 /**
- * "against your spell save DC" just after a saving throw's link, in English.
+ * "against your spell save DC" just after a saving throw's or check's link, in English.
  * @type {RegExp}
  */
 const SPELL_DC_AFTER = new RegExp("^\\s{0,3}(?:(?:saving\\s{1,3}throw|save)\\s{1,3})?"
+  + "against\\s{1,3}your\\s{1,3}spell\\s{1,3}save\\s{1,3}DC(?![\\p{L}\\p{N}_])", "iu");
+const CHECK_SPELL_DC_AFTER = new RegExp("^\\s{0,3}(?:check\\s{1,3})?"
   + "against\\s{1,3}your\\s{1,3}spell\\s{1,3}save\\s{1,3}DC(?![\\p{L}\\p{N}_])", "iu");
 
 /**
@@ -369,8 +419,9 @@ function markReferences(body, context) {
 }
 
 /**
- * A dnd5e roll link: a saving throw or concentration check, or damage or healing, as a span to act
- * on; anything else, such as an attack, a check or an item to use, as its text.
+ * A dnd5e roll link: a saving throw or concentration check, an ability, skill or tool check, or
+ * damage or healing, as a span to act on; anything else, such as an attack or an item to use, as
+ * its text.
  * @param {HTMLElement} el      Its `.roll-link-group`.
  * @param {object} context
  */
@@ -380,6 +431,7 @@ function replaceRollLink(el, context) {
   let span = null;
   if ( context.actionable ) {
     if ( (data.type === "save") || (data.type === "concentration") ) span = enrichedSave(el, label, context);
+    else if ( CHECK_TYPES.includes(data.type) ) span = enrichedCheck(el, label, context);
     else if ( data.type === "damage" ) span = damageSpan(context, {
       formulas: (data.formulas ?? "").split("&"),
       types: (data.damageTypes ?? "").split("&"),
@@ -415,6 +467,59 @@ function enrichedSave(el, label, context) {
     ?? challenge(DC_AFTER.exec(after)?.[1]) ?? (spellDC ? spellDCOf(context.actor) : null)
     ?? (concentration ? null : activityDC(context.relativeTo, abilities));
   return saveSpan(context, { abilities, dc, concentration }, label);
+}
+
+/**
+ * A dnd5e check link, from `[[/check]]`, `[[/skill]]` or `[[/tool]]`, as a span offering the checks
+ * dnd5e's request for it would: an ability check, for a link that names no skill or tool; or else
+ * a check with each skill and tool it names, with the ability it names, or else each one's own, as
+ * dnd5e's configuration has it, never the character's; but not with a tool a skill is checked
+ * using, as under the 2024 rules. Its DC is dnd5e's, or one the text gives around it, or the
+ * item's. One whose author hid its DC has none in the span; its DC is noted apart, by the span,
+ * for the module alone, as a saving throw's is. dnd5e's passive checks are no link to act on.
+ * @param {HTMLElement} el
+ * @param {string} label
+ * @param {object} context
+ * @returns {HTMLElement|null}
+ */
+function enrichedCheck(el, label, context) {
+  const data = el.dataset;
+  const skills = CONFIG.DND5E?.skills ?? {};
+  const tools = CONFIG.DND5E?.tools ?? {};
+  const fixed = data.ability || null;
+  const skillKeys = splitKeys(data.skill);
+  const toolKeys = splitKeys(data.tool);
+  const offered = (type, list) => key => ({ type, ability: fixed ?? ownEntry(list, key)?.ability, key });
+  // A tool a skill is checked using is no check of its own.
+  const named = (!skillKeys.length && !toolKeys.length) ? [{ type: "check", ability: fixed }] : [
+    ...skillKeys.map(offered("skill", skills)),
+    ...(data.usingTool ? [] : toolKeys).map(offered("tool", tools))
+  ];
+  const checks = checkOptions(named);
+  if ( !checks ) return null;
+  const usingTool = usingToolOf(checks, data.usingTool);
+  if ( data.hideDC === "true" ) {
+    const span = checkSpan(context, { checks, dc: null, usingTool }, label);
+    const hidden = challenge(data.dc);
+    if ( span && (hidden !== null) ) context.hidden.set(span, hidden);
+    return span;
+  }
+  const before = (el.previousSibling?.nodeType === 3) ? el.previousSibling.data.slice(-24) : "";
+  const after = (el.nextSibling?.nodeType === 3) ? el.nextSibling.data.slice(0, 64) : "";
+  const spellDC = english() && CHECK_SPELL_DC_AFTER.test(after);
+  const dc = challenge(data.dc) ?? challenge(DC_BEFORE.exec(before)?.[1])
+    ?? challenge(CHECK_DC_AFTER.exec(after)?.[1]) ?? (spellDC ? spellDCOf(context.actor) : null)
+    ?? checkActivityDC(context.relativeTo, checks);
+  return checkSpan(context, { checks, dc, usingTool }, label);
+}
+
+/**
+ * The keys a dnd5e link lists, joined by `|`, as its `data-skill` and `data-tool` have them.
+ * @param {string} [value]
+ * @returns {string[]}
+ */
+function splitKeys(value) {
+  return String(value ?? "").split("|").filter(Boolean);
 }
 
 /**
@@ -530,7 +635,7 @@ function plainWords(words) {
 /* -------------------------------------------- */
 
 /**
- * Mark what plain text says the app can act on: saving throws and damage in English, and
+ * Mark what plain text says the app can act on: saving throws, checks and damage in English, and
  * conditions by name in any language. Only text is read, never inside a link, a heading or a span
  * this made, and each match becomes a span beside the text around it, never HTML.
  * @param {HTMLElement} body
@@ -538,7 +643,7 @@ function plainWords(words) {
  */
 function markPlainText(body, context) {
   const patterns = plainPatterns();
-  if ( !patterns.save && !patterns.damage && !patterns.condition && !patterns.lower ) return;
+  if ( !patterns.save && !patterns.check && !patterns.damage && !patterns.condition && !patterns.lower ) return;
   for ( const node of textNodes(body, context.doc) ) {
     if ( node.parentElement?.closest(UNMARKED) ) continue;
     const text = node.data;
@@ -565,7 +670,7 @@ function markPlainText(body, context) {
 
 /**
  * The spans a text's plain words make, in order, none overlapping another. Where two matches
- * overlap, a saving throw comes before damage, and damage before a condition.
+ * overlap, a saving throw or check comes before damage, and damage before a condition.
  * @param {string} text
  * @param {object} patterns
  * @param {object} context
@@ -581,6 +686,7 @@ function plainSpans(text, patterns, context) {
   };
   if ( context.actionable ) {
     add(0, patterns.save, match => plainSave(match, patterns, context));
+    add(0, patterns.check, match => plainCheck(match, patterns, context));
     add(1, patterns.damage, match => plainDamage(match, patterns, context));
   }
   add(2, patterns.condition, match => conditionSpan(context, patterns.conditions.get(match[1]), match[1]));
@@ -611,21 +717,61 @@ function inCondition(text, match) {
 }
 
 /**
- * A saving throw in plain text, "a DC 15 Dexterity saving throw", as a span. Its DC is the one
- * the text gives, or the character's spell save DC if it says so, or the item's.
+ * Does a saving throw or check in plain text end a list of choices longer than its match, as one
+ * of more than six, or with skills the pattern doesn't take: "Charisma (Deception, Intimidation,
+ * Performance, or Persuasion) or Wisdom (Animal Handling) check"? Read from a few characters
+ * before it, as `inCondition` reads them. Such a one is left as text, rather than offering only
+ * the last of the choices its words give.
+ * @param {RegExpMatchArray} match
+ * @param {object} patterns
+ * @returns {boolean}
+ */
+function inLongerList(match, patterns) {
+  return patterns.listed.test(match.input.slice(Math.max(0, match.index - LIST_BEFORE), match.index));
+}
+
+/**
+ * A saving throw in plain text, "a DC 15 Dexterity saving throw", or a choice, "a Strength,
+ * Dexterity, or Constitution saving throw", as a span. Its DC is the one the text gives, or the
+ * character's spell save DC if it says so, or the item's.
  * @param {RegExpMatchArray} match
  * @param {object} patterns
  * @param {object} context
  * @returns {HTMLElement|null}
  */
 function plainSave(match, patterns, context) {
-  const [label, before, first, second, after, spell] = match;
-  const named = [first, second].filter(Boolean).map(name => patterns.abilities.get(name.toLowerCase()));
+  const [label, before, listed, after, spell] = match;
+  if ( inLongerList(match, patterns) ) return null;
+  const named = Array.from(listed.matchAll(patterns.abilityName), ([, name]) => patterns.abilities.get(name.toLowerCase()));
   const abilities = abilityKeys(named);
   if ( !abilities.length ) return null;
   const dc = challenge(before) ?? challenge(after) ?? (spell ? spellDCOf(context.actor) : null)
     ?? activityDC(context.relativeTo, abilities);
   return saveSpan(context, { abilities, dc, concentration: false }, label);
+}
+
+/**
+ * A check in plain text, "a DC 15 Strength (Athletics) check", "an Intelligence or Wisdom check"
+ * or "a Strength, Dexterity, or Constitution check", as a span: an ability check with each ability
+ * it names alone, and a skill check with each it names with a skill. Its DC is the one the text
+ * gives, or the character's spell save DC if it says so, or the item's.
+ * @param {RegExpMatchArray} match
+ * @param {object} patterns
+ * @param {object} context
+ * @returns {HTMLElement|null}
+ */
+function plainCheck(match, patterns, context) {
+  const [label, before, listed, after, spell] = match;
+  if ( inLongerList(match, patterns) ) return null;
+  const checks = checkOptions(Array.from(listed.matchAll(patterns.option), ([, name, skill]) => {
+    const ability = patterns.abilities.get(name.toLowerCase());
+    if ( !skill ) return { type: "check", ability };
+    return { type: "skill", ability, key: patterns.skills.get(skill.toLowerCase()) };
+  }));
+  if ( !checks ) return null;
+  const dc = challenge(before) ?? challenge(after) ?? (spell ? spellDCOf(context.actor) : null)
+    ?? checkActivityDC(context.relativeTo, checks);
+  return checkSpan(context, { checks, dc, usingTool: null }, label);
 }
 
 /**
@@ -644,14 +790,15 @@ function plainDamage(match, patterns, context) {
 
 /**
  * The patterns plain text is matched with, for the game's language and dnd5e's labels: saving
- * throws and damage in English, and conditions by name, capitalised as dnd5e names them, in any;
- * in English also in lower case, where the words around say something is in it.
+ * throws, checks and damage in English, and conditions by name, capitalised as dnd5e names them,
+ * in any; in English also in lower case, where the words around say something is in it.
  * @returns {object}
  */
 function plainPatterns() {
   const config = CONFIG.DND5E ?? {};
   const isEnglish = english();
   const abilities = labelsOf(config.abilities, "label");
+  const skills = labelsOf(config.skills, "label");
   const types = labelsOf(config.damageTypes, "label");
   const conditions = new Map();
   for ( const [key, condition] of Object.entries(config.conditionTypes ?? {}) ) {
@@ -659,23 +806,40 @@ function plainPatterns() {
     const name = localize(condition?.name ?? condition?.label);
     if ( name && (name.length > 2) ) conditions.set(name, key);
   }
-  const key = JSON.stringify([isEnglish, [...abilities], [...types], [...conditions]]);
+  const key = JSON.stringify([isEnglish, [...abilities], [...skills], [...types], [...conditions]]);
   if ( plain?.key === key ) return plain;
   const lowerConditions = new Map([...conditions].map(([name, id]) => [name.toLowerCase(), id]));
   const ability = alternatives(abilities.keys());
+  const skill = alternatives(skills.keys()) || "(?!)";
   const type = alternatives(types.keys()) || "(?!)";
   const dice = `\\d{0,3}d\\d{1,3}(?:${SPACE}[+\\-−]${SPACE}\\d{1,3})?`;
-  // "DC 15 Strength or Dexterity saving throw (DC 15) against your spell save DC"
-  const save = `${START}(?:DC${SPACE}(\\d{1,3})${GAP})?(${ability})(?:${GAP}or${GAP}(${ability}))?`
+  // "Strength", "Strength or Dexterity", or "Strength, Dexterity, or Constitution": six at most
+  const listOf = choice => `${choice}(?:(?:,${GAP}${choice}){0,${MOST_LISTED - 2}},?${GAP}or${GAP}${choice})?`;
+  // "DC 15 Strength, Dexterity, or Constitution saving throw (DC 15) against your spell save DC"
+  const save = `${START}(?:DC${SPACE}(\\d{1,3})${GAP})?(${listOf(`(?:${ability})`)})`
     + `${GAP}(?:saving${GAP}throw|save)${END}(?:${SPACE}\\(DC${SPACE}(\\d{1,3})\\))?`
     + `(?:${GAP}(against${GAP}your${GAP}spell${GAP}save${GAP}DC)${END})?`;
+  // "DC 15 Strength (Athletics) or Dexterity (Acrobatics) check (DC 15) against your spell save DC";
+  // never a passive one, "passive Wisdom (Perception)", nor "advantage on Strength checks"
+  const option = `(?:${ability})(?:${SPACE}\\(${SPACE}(?:${skill})${SPACE}\\))?`;
+  const check = `${START}(?<!passive${GAP})(?:DC${SPACE}(\\d{1,3})${GAP})?(${listOf(option)})`
+    + `${GAP}check${END}(?:${SPACE}\\(DC${SPACE}(\\d{1,3})\\))?`
+    + `(?:${GAP}(against${GAP}your${GAP}spell${GAP}save${GAP}DC)${END})?`;
+  // What a list of choices that goes on before a match ends with: "Strength, ", "Persuasion) or "
+  const listed = `(?:${START}(?:${ability})|${START}(?:${skill})${SPACE}\\))`
+    + `(?:${SPACE},${SPACE}(?:(?:or|and)${GAP})?|${GAP}(?:or|and)${GAP})$`;
   // "7 (2d6 + 1) fire damage", "1d6 damage"
   const damage = `${START}(?:(\\d{1,4})${SPACE}\\(${SPACE}(${dice})${SPACE}\\)|(${dice}))${END}`
     + `(?:${GAP}(${type}))?${GAP}damage${END}`;
   const named = names => `${START}(${alternatives(names)})${END}`;
   plain = {
-    key, abilities, types, conditions, lowerConditions,
+    key, abilities, skills, types, conditions, lowerConditions,
     save: (isEnglish && ability) ? new RegExp(save, "giu") : null,
+    check: (isEnglish && ability) ? new RegExp(check, "giu") : null,
+    // Each choice in a list a saving throw or check matched, and what a longer one ends with.
+    abilityName: new RegExp(`${START}(${ability || "(?!)"})${END}`, "giu"),
+    option: new RegExp(`${START}(${ability || "(?!)"})(?:${SPACE}\\(${SPACE}(${skill})${SPACE}\\))?`, "giu"),
+    listed: new RegExp(listed, "iu"),
     damage: isEnglish ? new RegExp(damage, "giu") : null,
     condition: conditions.size ? new RegExp(named(conditions.keys()), "gu") : null,
     lower: (isEnglish && conditions.size) ? new RegExp(named(lowerConditions.keys()), "gu") : null
@@ -697,7 +861,7 @@ function alternatives(labels) {
 
 /**
  * The keys of one of dnd5e's lists of things by their labels in lower case, as the game's
- * language names them: abilities, or damage types.
+ * language names them: abilities, skills, or damage types.
  * @param {object} [list]
  * @param {string} field    The field each entry's label is in.
  * @returns {Map<string, string>}
@@ -758,6 +922,22 @@ function saveSpan(context, { abilities, dc, concentration }, label) {
 }
 
 /**
+ * A check to act on: one or a choice of several, each an ability check, or a skill or tool check,
+ * with the ability it's made with; and the tool a skill is checked using, if any.
+ * @param {object} context
+ * @param {{checks: CheckOption[], dc: number|null, usingTool: string|null}} check
+ * @param {string} label
+ * @returns {HTMLElement|null}
+ */
+function checkSpan(context, { checks, dc, usingTool }, label) {
+  return makeSpan(context, "ss-check", {
+    checks: checks.map(checkName).join("|"),
+    dc,
+    "using-tool": usingTool
+  }, label);
+}
+
+/**
  * Damage or healing to act on: one or more parts, each a formula with the types it may be. None if
  * any part's formula can't be rolled.
  * @param {object} context
@@ -803,8 +983,8 @@ function conditionSpan(context, key, label) {
 
 /**
  * Number the spans to act on, in the order they come, noting by its number the DC of each saving
- * throw whose author hid it; and take the data of the spans this makes off every other element,
- * and the look of a roll, so nothing else can be taken for one.
+ * throw or check whose author hid it; and take the data of the spans this makes off every other
+ * element, and the look of a roll, so nothing else can be taken for one.
  * @param {HTMLElement} body
  * @param {object} context
  */
@@ -893,6 +1073,97 @@ function abilityKeys(keys) {
 }
 
 /**
+ * One check a link offers: an ability check, or a skill or tool check, by dnd5e's key.
+ * @typedef {object} CheckOption
+ * @property {"check"|"skill"|"tool"} type
+ * @property {string} ability   The ability it's made with, such as "str".
+ * @property {string} [key]     The skill or tool, such as "ath" or "thief"; none for an ability
+ *                              check.
+ */
+
+/**
+ * The checks a link offers, each one dnd5e has, with one of the six abilities the app knows, and
+ * each kind of check once, the first it names; or null if it offers none of them, or more than
+ * the most a link may offer.
+ * @param {{type: string, ability?: string|null, key?: string|null}[]} options
+ * @returns {CheckOption[]|null}
+ */
+function checkOptions(options) {
+  const config = CONFIG.DND5E ?? {};
+  const known = new Set();
+  const checks = [];
+  for ( const { type, ability, key } of options ) {
+    if ( !CHECK_TYPES.includes(type) || !SIX_ABILITIES.includes(ability) ) continue;
+    if ( !Object.hasOwn(config.abilities ?? {}, ability) ) continue;
+    if ( (type === "skill") && !(CHECK_KEY.test(key ?? "") && Object.hasOwn(config.skills ?? {}, key)) ) continue;
+    if ( (type === "tool") && !isTool(key) ) continue;
+    const id = (type === "check") ? `check:${ability}` : `${type}:${key}`;
+    if ( known.has(id) ) continue;
+    known.add(id);
+    checks.push((type === "check") ? { type, ability } : { type, ability, key });
+  }
+  return (checks.length && (checks.length <= MOST_CHECKS)) ? checks : null;
+}
+
+/**
+ * A check as a span names it: "check:str", "skill:str:ath" or "tool:dex:thief".
+ * @param {CheckOption} check
+ * @returns {string}
+ */
+function checkName({ type, ability, key }) {
+  return (type === "check") ? `check:${ability}` : `${type}:${ability}:${key}`;
+}
+
+/**
+ * The checks a span names, as `checkName` names them, checked again.
+ * @param {string} [value]
+ * @returns {CheckOption[]|null}
+ */
+function readChecks(value) {
+  const names = String(value ?? "").split("|");
+  if ( names.length > MOST_CHECKS ) return null;
+  const options = names.map(name => {
+    const parts = name.split(":");
+    const [type, ability, key] = parts;
+    return (parts.length === ((type === "check") ? 2 : 3)) ? { type, ability, key } : null;
+  });
+  return options.every(Boolean) ? checkOptions(options) : null;
+}
+
+/**
+ * The tool a link's skill is checked using, if it names one dnd5e has, and offers a skill check to
+ * use it with.
+ * @param {CheckOption[]} checks
+ * @param {string} [key]
+ * @returns {string|null}
+ */
+function usingToolOf(checks, key) {
+  return (checks.some(check => check.type === "skill") && isTool(key)) ? key : null;
+}
+
+/**
+ * Is this a tool dnd5e can roll a check with: one of its tools, or a kind of vehicle?
+ * @param {unknown} key
+ * @returns {boolean}
+ */
+function isTool(key) {
+  if ( (typeof key !== "string") || !CHECK_KEY.test(key) ) return false;
+  const config = CONFIG.DND5E ?? {};
+  return Object.hasOwn(config.tools ?? {}, key) || Object.hasOwn(config.vehicleTypes ?? {}, key);
+}
+
+/**
+ * An entry of one of dnd5e's lists by its key, if it's one of its own, never a name any object
+ * answers to.
+ * @param {object} list
+ * @param {string} key
+ * @returns {object|null}
+ */
+function ownEntry(list, key) {
+  return Object.hasOwn(list ?? {}, key) ? list[key] : null;
+}
+
+/**
  * Damage or healing types by key, as dnd5e has them, each once.
  * @param {string[]} keys
  * @returns {string[]}
@@ -956,17 +1227,61 @@ function activityDC(document, abilities) {
 }
 
 /**
+ * The DC of an item's check for one of these checks, for text that names the check without one:
+ * "make a Strength (Athletics) check". A check activity is for each skill or tool it names, made
+ * with the ability it names, or else the skill's or tool's own, as dnd5e makes it; or for an
+ * ability check with the ability it names. An item not identified yet keeps its checks to itself.
+ * @param {Document} [document]
+ * @param {CheckOption[]} checks
+ * @returns {number|null}
+ */
+function checkActivityDC(document, checks) {
+  const config = CONFIG.DND5E ?? {};
+  for ( const activity of checkActivities(document) ) {
+    const ability = activity.check?.ability || null;
+    const associated = Array.from(activity.check?.associated ?? []);
+    const matches = checks.some(check => {
+      if ( check.type === "check" ) return ability === check.ability;
+      if ( !associated.includes(check.key) ) return false;
+      const own = ownEntry((check.type === "skill") ? config.skills : config.tools, check.key)?.ability;
+      return (ability ?? own) === check.ability;
+    });
+    if ( matches ) return challenge(activity.check?.dc?.value);
+  }
+  return null;
+}
+
+/**
  * An identified item's saving throw activities, as dnd5e has them.
  * @param {Document} [document]
  * @returns {object[]}
  */
 export function saveActivities(document) {
+  return activitiesOf(document, "save");
+}
+
+/**
+ * An identified item's check activities, as dnd5e has them.
+ * @param {Document} [document]
+ * @returns {object[]}
+ */
+export function checkActivities(document) {
+  return activitiesOf(document, "check");
+}
+
+/**
+ * An identified item's activities of a type, as dnd5e has them.
+ * @param {Document} [document]
+ * @param {string} type     Such as "save".
+ * @returns {object[]}
+ */
+function activitiesOf(document, type) {
   if ( (document?.documentName !== "Item") || (document.system?.identified === false) ) return [];
   const activities = document.system?.activities;
   if ( !activities ) return [];
-  if ( typeof activities.getByType === "function" ) return Array.from(activities.getByType("save") ?? []);
+  if ( typeof activities.getByType === "function" ) return Array.from(activities.getByType(type) ?? []);
   const all = (typeof activities.values === "function") ? Array.from(activities.values()) : [];
-  return all.filter(activity => activity?.type === "save");
+  return all.filter(activity => activity?.type === type);
 }
 
 /**
@@ -1048,10 +1363,12 @@ function textNodes(root, doc) {
  * @returns {Promise<{source: object, origin: {name: string, item?: Item, spell?: Item}, link: object}
  *   |{refusal: "gone"|"link"}>}
  *   The description, where it comes from, and the link: a saving throw or concentration check
- *   `{kind, abilities, dc, secret}`, with `hideDC: true` where its author hid its DC, which is then
- *   the one noted as it was sent; damage or healing `{kind: "damage", parts: [{formula, types}],
- *   healing}`; or a roll `{kind: "roll", formula}`. Refused as "gone" when the character's sheet
- *   has no such description now, and as "link" when it has no such link.
+ *   `{kind, abilities, dc, secret}`; a check `{kind: "check", checks: [{type, ability, key?}], dc,
+ *   usingTool?, secret}`, a choice of the checks it offers; either with `hideDC: true` where its
+ *   author hid its DC, which is then the one noted as it was sent; damage or healing `{kind:
+ *   "damage", parts: [{formula, types}], healing}`; or a roll `{kind: "roll", formula}`. Refused as
+ *   "gone" when the character's sheet has no such description now, and as "link" when it has no
+ *   such link.
  */
 export async function findLink(actor, hash, n) {
   const { characterSheet } = await import("./sheet.mjs");
@@ -1069,7 +1386,7 @@ export async function findLink(actor, hash, n) {
   const link = readLink(await textOf(hash, source), n);
   if ( !link ) return { refusal: "link" };
   const hidden = (await hiddenDCsOf(hash, source)).get(n);
-  if ( (hidden !== undefined) && ["save", "concentration"].includes(link.kind) ) {
+  if ( (hidden !== undefined) && ["save", "concentration", "check"].includes(link.kind) ) {
     Object.assign(link, { dc: hidden, hideDC: true });
   }
   return { source, origin: originOf(actor, source), link };
@@ -1095,6 +1412,18 @@ export function readLink(html, n) {
       kind: concentration ? "concentration" : "save",
       abilities,
       dc: challenge(data.dc),
+      secret: Boolean(el.closest("section.secret"))
+    };
+  }
+  if ( el.classList.contains("ss-check") ) {
+    const checks = readChecks(data.checks);
+    if ( !checks ) return null;
+    const usingTool = usingToolOf(checks, data.usingTool);
+    return {
+      kind: "check",
+      checks,
+      dc: challenge(data.dc),
+      ...(usingTool && { usingTool }),
       secret: Boolean(el.closest("section.secret"))
     };
   }

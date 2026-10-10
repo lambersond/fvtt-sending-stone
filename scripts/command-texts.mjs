@@ -6,9 +6,9 @@ import { findLink } from "./sheet-links.mjs";
 
 /**
  * Acting from the Sending Stone app on the links in a character's descriptions: asking the table
- * for the saving throw a description calls for, on dnd5e's own roll request card; and rolling a
- * description's damage, healing or other roll with the player's dice, on a card naming where it
- * comes from.
+ * for the saving throw or check a description calls for, on dnd5e's own roll request card; and
+ * rolling a description's damage, healing or other roll with the player's dice, on a card naming
+ * where it comes from.
  *
  * A command names a link by its description's hash and the link's number in it, and the link is
  * read from the description as this module sent it, from the character's sheet as it is now. So a
@@ -40,9 +40,10 @@ const asked = new Map();
 /**
  * What a campaign's players can do from the app with the links in their descriptions, for its
  * hello, where its players' rolls are made here, under dnd5e 5.x: roll a description's own roll,
- * such as a d4 of luck, always; ask the table for a saving throw, where dnd5e's roll request card
- * can be made; and roll a description's damage or healing where the Gamemaster lets the campaign's
- * players attack, and damage takes their dice, as the self-test found. None under dnd5e 6.
+ * such as a d4 of luck, always; ask the table for a saving throw or check, where dnd5e's roll
+ * request card can be made; and roll a description's damage or healing where the Gamemaster lets
+ * the campaign's players attack, and damage takes their dice, as the self-test found. None under
+ * dnd5e 6.
  * @param {Campaign} campaign
  * @returns {string[]}
  */
@@ -67,9 +68,9 @@ function textsOffered() {
 }
 
 /**
- * Can the table be asked for a saving throw here, on dnd5e's roll request card? Under dnd5e 5.x,
- * which has its template and labels; not yet under dnd5e 6, whose requests are messages of their
- * own kind.
+ * Can the table be asked for a saving throw or check here, on dnd5e's roll request card? Under
+ * dnd5e 5.x, which has its template and labels; not yet under dnd5e 6, whose requests are messages
+ * of their own kind.
  * @returns {boolean}
  */
 export function asksOffered() {
@@ -81,14 +82,14 @@ export function asksOffered() {
 /* -------------------------------------------- */
 
 /**
- * Ask the table for the saving throw a description on a character's sheet calls for: post dnd5e's
- * roll request card for it, from the character, naming where it comes from, as the Gamemaster
- * could from the description. It prompts no one: it's for the Gamemaster, who rolls it for the
- * creatures it names, and anyone in Foundry may click it. Refused while the campaign doesn't take
- * its players' rolls (`off`); for a description no longer on the sheet (`gone`); for a link that
- * isn't a save (`link`); for one in a section only the Gamemaster's players see, which would be
- * posted for everyone (`secret`); and while the character asked within the last ten seconds, or
- * that link within the last thirty (`busy`).
+ * Ask the table for the saving throw or check a description on a character's sheet calls for: post
+ * dnd5e's roll request card for it, from the character, naming where it comes from, as the
+ * Gamemaster could from the description. It prompts no one: it's for the Gamemaster, who rolls it
+ * for the creatures it names, and anyone in Foundry may click it. Refused while the campaign
+ * doesn't take its players' rolls (`off`); for a description no longer on the sheet (`gone`); for
+ * a link that isn't a save or check (`link`); for one in a section only the Gamemaster's players
+ * see, which would be posted for everyone (`secret`); and while the character asked within the
+ * last ten seconds, or that link within the last thirty (`busy`).
  * @param {object} command      The player's ask, as fetched from the app.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @returns {Promise<CommandResult>}
@@ -103,8 +104,9 @@ export async function runAskCommand(command, campaign) {
   const found = await findLink(actor, command.text, command.link);
   if ( found.refusal ) return failed(found.refusal);
   const { link, origin } = found;
-  if ( !["save", "concentration"].includes(link?.kind) ) return failed("link");
+  if ( !["save", "concentration", "check"].includes(link?.kind) ) return failed("link");
   if ( (link.kind === "save") && !link.abilities?.length ) return failed("link");
+  if ( (link.kind === "check") && !link.checks?.length ) return failed("link");
   if ( link.secret ) return failed("secret");
   const now = Date.now();
   if ( askedLately(actor, command, now) ) return failed("busy");
@@ -112,6 +114,28 @@ export async function runAskCommand(command, campaign) {
   if ( !message ) return failed("cancelled");
   noteAsked(actor, command, now);
   return describeResult(command, message, actor, campaign, { rolls: [] });
+}
+
+/**
+ * The dataset of a roll request card's button for one of the checks a description's check offers,
+ * as dnd5e's request for a choice of checks makes each one's: its kind, the ability it's made with,
+ * and its skill or tool, with the tool a skill is checked using, if any.
+ * @param {{type: string, ability: string, key?: string}} check
+ * @param {{usingTool?: string}} link
+ * @param {number|undefined} dc
+ * @param {true|undefined} hideDC
+ * @returns {object}
+ */
+function checkDataset({ type, ability, key }, link, dc, hideDC) {
+  return {
+    type,
+    ability,
+    ...((type === "skill") && { skill: key, ...(link.usingTool && { usingTool: link.usingTool }) }),
+    ...((type === "tool") && { tool: key }),
+    dc,
+    hideDC,
+    format: "short"
+  };
 }
 
 /**
@@ -154,25 +178,32 @@ function askedKey(actor, command) {
 }
 
 /**
- * Post dnd5e's roll request card for a description's save, as dnd5e's own request from the
- * description would make it: a button for each ability, each labelled with its DC and without, for
- * dnd5e to show the one each viewer may see; or for a save whose author hid its DC, without it
- * either way, but with the DC on the button for its rolls to be judged by. It's the player's,
- * spoken by their character, so it's shown and its DC hidden as dnd5e does for a player's card;
- * and it's flagged as an ask, so that no one is prompted for it.
+ * Post dnd5e's roll request card for a description's save or check, as dnd5e's own request from
+ * the description would make it: a button for each ability a save offers, or each check a check
+ * offers, each labelled with its DC and without, for dnd5e to show the one each viewer may see; or
+ * for one whose author hid its DC, without it either way, but with the DC on the button for its
+ * rolls to be judged by. It's the player's, spoken by their character, so it's shown and its DC
+ * hidden as dnd5e does for a player's card; and it's flagged as an ask, so that no one is prompted
+ * for it.
  * @param {object} command
  * @param {Actor} actor
  * @param {{name: string, item?: Item}} origin   Where the description comes from.
- * @param {{kind: string, abilities: string[], dc: number|null, hideDC?: boolean}} link
+ * @param {object} link   A save `{kind, abilities, dc, hideDC?}`, or a check `{kind: "check",
+ *                        checks, dc, usingTool?, hideDC?}`, as findLink reads it.
  * @returns {Promise<ChatMessage|null>}
  */
 async function postAsk(command, actor, origin, link) {
   const { createRollLabel } = dnd5e.enrichers;
   const dc = Number.isInteger(link.dc) ? link.dc : undefined;
   const hideDC = ((dc !== undefined) && (link.hideDC === true)) ? true : undefined;
-  const datasets = (link.kind === "save")
-    ? link.abilities.map(ability => ({ type: "save", ability, dc, hideDC, format: "long" }))
-    : [{ type: "concentration", ability: link.abilities?.[0], dc, hideDC, format: "short" }];
+  let datasets;
+  if ( link.kind === "save" ) {
+    datasets = link.abilities.map(ability => ({ type: "save", ability, dc, hideDC, format: "long" }));
+  } else if ( link.kind === "check" ) {
+    datasets = link.checks.map(check => checkDataset(check, link, dc, hideDC));
+  } else {
+    datasets = [{ type: "concentration", ability: link.abilities?.[0], dc, hideDC, format: "short" }];
+  }
   const buttons = datasets.map(dataset => ({
     buttonLabel: createRollLabel({ ...dataset, icon: true }),
     hiddenLabel: createRollLabel({ ...dataset, icon: true, hideDC: true }),
