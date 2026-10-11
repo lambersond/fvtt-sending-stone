@@ -1,4 +1,4 @@
-import { MODULE_ID } from "./constants.mjs";
+import { DIE_FACES, MODULE_ID } from "./constants.mjs";
 
 /**
  * The links in a description that the app can act on: saving throws, checks, damage and healing,
@@ -15,9 +15,11 @@ import { MODULE_ID } from "./constants.mjs";
  *   or "tool:<ability>:<tool>", and `data-using-tool="thief"` for a skill checked using a tool;
  * - `<span class="ss-damage roll" data-n data-formulas="2d6&1d4" data-types="fire&cold|fire">`,
  *   with `&` between parts, `|` between a part's choice of types, `data-healing="true"` for
- *   healing, and `data-critical="false"` for damage never rolled as a critical hit's: dnd5e's own
- *   link offers none, as for a saving throw's damage, or its critical hit throws dice the app can't
- *   plan, such as a melee weapon's extra dice;
+ *   healing, and `data-critical="false"` for damage never rolled as a critical hit's, as dnd5e's
+ *   own link offers none, as for a saving throw's damage; with `data-critical-dice="1&0"` and
+ *   `data-critical-damage="1d6&"`, what a critical hit adds to each part, such as a melee weapon's
+ *   extra dice and an attack's critical damage, where dnd5e's own link adds any. Where it adds dice,
+ *   it's marked `data-critical="false"` too, for apps before 0.20.0, which can't plan them;
  * - `<span class="ss-roll roll" data-n data-formula="1d6">`, a roll in the text;
  * - `<span class="ss-condition ref" data-condition="prone">`, a condition, to read about.
  *
@@ -69,8 +71,8 @@ const LINK_CLASSES = ["ss-save", "ss-check", "ss-damage", "ss-roll", "ss-conditi
  * @type {string[]}
  */
 const LINK_DATA = [
-  "n", "ability", "dc", "type", "checks", "using-tool", "formulas", "types", "healing", "critical", "formula",
-  "condition"
+  "n", "ability", "dc", "type", "checks", "using-tool", "formulas", "types", "healing", "critical", "critical-dice",
+  "critical-damage", "formula", "condition"
 ];
 
 /**
@@ -113,6 +115,21 @@ const UNMARKED = ["a", "h1", "h2", "h3", "h4", "h5", "h6", "button", "script", "
  * @type {RegExp}
  */
 const SAFE_FORMULA = /^[\w\s+\-*/().,]{1,100}$/;
+
+/**
+ * The most extra dice a critical hit may throw on a part's first die, and the most of a die its
+ * critical damage may throw, for the app to plan them: more than Brutal Critical's three, and more
+ * than any critical damage throws.
+ * @type {number}
+ */
+const MOST_CRITICAL_DICE = 20;
+
+/**
+ * A part's critical damage as the app is sent it: dice, numbers, spaces and signs, no longer than
+ * the app accepts.
+ * @type {RegExp}
+ */
+const CRITICAL_SEGMENT = /^[\dd +\-]{0,100}$/;
 
 /**
  * Inline rolls a player makes for everyone to see; one made for the Gamemaster's or their own eyes
@@ -951,7 +968,9 @@ function checkSpan(context, { checks, dc, usingTool }, label) {
  * Damage or healing to act on: one or more parts, each a formula with the types it may be. None if
  * any part's formula can't be rolled. Damage dnd5e's own link rolls through one of the item's
  * activities, as it does `[[/damage]]` naming no formula of its own, is a critical hit's only as
- * that activity allows, and the activity is noted, by the span, for the module alone.
+ * that activity allows, with what it adds to each part, both or neither of its attributes; marked
+ * never one, too, where that throws dice, which apps before 0.20.0 can't plan. The activity is
+ * noted, by the span, for the module alone.
  * @param {object} context
  * @param {{formulas: string[], types: string[], healing: boolean, activity: LinkActivity|null}} damage
  * @param {string} label
@@ -964,14 +983,21 @@ function damageSpan(context, { formulas, types, healing, activity }, label) {
     types: typeKeys((types[index] ?? "").split("|"))
   }));
   if ( !parts.length || parts.some(part => !part.formula) ) return null;
-  const critical = (healing || !activity) ? null : linkCritical(context.relativeTo, activity);
+  const critical = (healing || !activity) ? null : linkCritical(context.relativeTo, activity, parts.length);
+  const adds = critical?.allowed ? critical.adds : null;
   const span = makeSpan(context, "ss-damage", {
     formulas: parts.map(part => part.formula).join("&"),
     types: parts.map(part => part.types.join("|")).join("&"),
     healing: healing ? "true" : null,
-    critical: (critical && !critical.allowed) ? "false" : null
+    critical: (critical && (!critical.allowed || critical.diceAdded)) ? "false" : null
   }, label);
-  if ( span && critical?.allowed ) context.linked.set(span, activity);
+  if ( !span ) return null;
+  // Both, an empty part's too, wherever a critical hit adds anything at all.
+  if ( adds && (adds.dice.some(dice => dice > 0) || adds.damage.some(Boolean)) ) {
+    span.setAttribute("data-critical-dice", adds.dice.join("&"));
+    span.setAttribute("data-critical-damage", adds.damage.join("&"));
+  }
+  if ( critical?.allowed ) context.linked.set(span, activity);
   return span;
 }
 
@@ -1311,45 +1337,153 @@ function activitiesOf(document, type) {
  */
 
 /**
+ * dnd5e's own class for each kind of activity whose damage or healing dnd5e rolls, by its type.
+ * @type {Record<string, string>}
+ */
+export const DND5E_ACTIVITIES = { attack: "AttackActivity", save: "SaveActivity", damage: "DamageActivity", heal: "HealActivity" };
+
+/**
+ * An activity's damage configuration, as dnd5e's own class for its kind gives it, or else its own:
+ * not Midi-QOL's, which sets aside the attack mode it's given outside a workflow, and changes the
+ * workflow as it's called.
+ * @param {Activity} activity
+ * @param {object} [config]   Such as the attack mode.
+ * @returns {object|null}     None for an activity with no damage configuration.
+ */
+export function ownDamageConfig(activity, config={}) {
+  const own = globalThis.dnd5e?.documents?.activity?.[DND5E_ACTIVITIES[activity?.type]]?.prototype?.getDamageConfig;
+  const getDamageConfig = own ?? activity?.getDamageConfig;
+  return (typeof getDamageConfig === "function") ? getDamageConfig.call(activity, config) : null;
+}
+
+/**
+ * What a critical hit adds to damage's parts, as the app is sent it: for each part, the extra dice
+ * on its first die, and its critical damage, written as `criticalSegment` writes it; and as rolled,
+ * with its flavor, for its kind of damage.
+ * @typedef {object} CriticalAdds
+ * @property {number[]} dice
+ * @property {string[]} damage
+ * @property {string[]} rolled
+ */
+
+/**
  * How dnd5e's own link makes a description's damage a critical hit's, where it rolls it through one
- * of the item's activities: by that activity's damage configuration, which may allow none, as a
- * saving throw's, a healing's and most damage activities' don't, and adds to one what the activity
- * adds, such as an attack's critical damage, or a melee weapon's extra dice for its wielder's
- * Savage Attacks or Brutal Critical. Allowed only where the activity allows one whose dice the app
- * can plan: extra dice, or critical damage with dice of its own, aren't, so such damage isn't a
- * critical hit's until the app can plan them. None allowed of an activity the description's
- * document doesn't have, or one that can't be read.
+ * of the item's activities: by that activity's damage configuration as dnd5e's own class for it
+ * makes it, which may allow none, as a saving throw's, a healing's and most damage activities'
+ * don't, and adds to one what the activity adds, such as an attack's critical damage, or a melee
+ * weapon's extra dice for its wielder's Savage Attacks or Brutal Critical, as `criticalAdditions`
+ * reads them. None allowed of an activity the description's document doesn't have, one whose damage
+ * has another number of parts than the link's, or one that can't be read.
  * @param {Document} [relativeTo]   The document the description belongs to.
  * @param {LinkActivity} activity
- * @returns {{allowed: boolean, critical: object, rolls: object[]}}   Whether it's allowed, and what
- *   the activity's configuration adds to a critical hit's: for the damage as a whole, and for each
- *   of its rolls, in order.
+ * @param {number} partCount        How many parts the link's damage has.
+ * @returns {{allowed: boolean, critical: object, rolls: object[], adds: CriticalAdds|null,
+ *   diceAdded: boolean}}   Whether it's allowed; what the activity's configuration adds to a critical
+ *   hit's, for the damage as a whole, and for each of its rolls, in order, with the damage's own;
+ *   what that comes to for each part; and whether any of it throws dice.
  */
-export function linkCritical(relativeTo, { uuid, attackMode }) {
-  const none = { allowed: false, critical: {}, rolls: [] };
+export function linkCritical(relativeTo, { uuid, attackMode }, partCount) {
   const activities = relativeTo?.system?.activities;
   const all = (typeof activities?.values === "function") ? Array.from(activities.values()) : [];
   const activity = all.find(each => each?.uuid === uuid);
-  if ( typeof activity?.getDamageConfig !== "function" ) return none;
+  if ( !activity ) return NO_CRITICAL;
   try {
-    const config = activity.getDamageConfig(attackMode ? { attackMode } : {});
-    const rolls = config.rolls ?? [];
-    // Its critical damage resolved with the roll data it's added with, as the link's formulas are.
-    const resolved = (each, data) => {
-      const critical = foundry.utils.deepClone(each ?? {});
-      if ( critical.bonusDamage ) {
-        critical.bonusDamage = foundry.dice.Roll.replaceFormulaData(String(critical.bonusDamage), data ?? {}, { missing: "0" });
-      }
-      return critical;
-    };
-    const critical = resolved(config.critical, rolls[0]?.data);
-    const each = rolls.map(roll => resolved(roll.options?.critical, roll.data));
-    const adds = [critical, ...each].some(added => ((Number(added.bonusDice) || 0) !== 0)
-      || (added.bonusDamage && !new foundry.dice.Roll(added.bonusDamage).isDeterministic));
-    return { allowed: (critical.allow !== false) && !adds, critical, rolls: each };
+    return criticalAdditions(ownDamageConfig(activity, attackMode ? { attackMode } : {}), partCount);
   } catch {
-    return none;
+    return NO_CRITICAL;
   }
+}
+
+/**
+ * A critical hit that isn't allowed.
+ * @type {{allowed: false, critical: object, rolls: object[], adds: null, diceAdded: false}}
+ */
+const NO_CRITICAL = Object.freeze({ allowed: false, critical: {}, rolls: [], adds: null, diceAdded: false });
+
+/**
+ * What a critical hit adds to damage, as an activity's damage configuration says and dnd5e's damage
+ * rolls add it, for each of its parts: its extra dice, which dnd5e throws on the part's first die,
+ * as dnd5e builds the activity's own roll, none where that's a number; and its critical damage, as
+ * dnd5e adds it after the part's own. Allowed where the configuration allows a critical hit, has
+ * as many parts as the link, each of which can be read, and its extra dice are a whole number up to
+ * 20, and its critical damage can be written for the app.
+ * @param {object|null} process   A damage configuration, as `getDamageConfig` gives it.
+ * @param {number} partCount
+ * @returns {{allowed: boolean, critical: object, rolls: object[], adds: CriticalAdds|null,
+ *   diceAdded: boolean}}   As `linkCritical` gives it.
+ */
+export function criticalAdditions(process, partCount) {
+  const critical = process?.critical ?? {};
+  const rolls = process?.rolls ?? [];
+  if ( !process || (critical.allow === false) || (rolls.length !== partCount) ) return NO_CRITICAL;
+  const merged = rolls.map(roll => foundry.utils.mergeObject(critical, roll.options?.critical ?? {}, { inplace: false }));
+  const adds = { dice: [], damage: [], rolled: [] };
+  for ( const [index, roll] of rolls.entries() ) {
+    const { bonusDice, bonusDamage } = merged[index];
+    const dice = extraDiceOf(bonusDice, roll);
+    if ( dice === null ) return NO_CRITICAL;
+    // Its critical damage resolved with the roll data it's added with, as the link's formulas are.
+    const rolled = bonusDamage
+      ? foundry.dice.Roll.replaceFormulaData(String(bonusDamage), roll.data ?? {}, { missing: "0" }) : "";
+    const damage = criticalSegment(rolled);
+    if ( damage === null ) return NO_CRITICAL;
+    adds.dice.push(dice);
+    adds.damage.push(damage);
+    adds.rolled.push(rolled);
+  }
+  const diceAdded = adds.dice.some(dice => dice > 0) || adds.damage.some(damage => damage.includes("d"));
+  return { allowed: true, critical: foundry.utils.deepClone(critical), rolls: merged, adds, diceAdded };
+}
+
+/**
+ * How many extra dice a critical hit throws on a part's first die, as dnd5e's damage roll throws
+ * them: none where the part, as dnd5e builds the activity's own roll from it, starts with a number
+ * rather than dice. Null where they're set to what dnd5e can't throw, such as text, or more than 20.
+ * @param {unknown} bonusDice   As the part's critical configuration has them.
+ * @param {{parts: string[], data?: object}} roll
+ * @returns {number|null}
+ */
+function extraDiceOf(bonusDice, roll) {
+  if ( !bonusDice ) return 0;
+  if ( !Number.isInteger(bonusDice) || (bonusDice < 1) || (bonusDice > MOST_CRITICAL_DICE) ) {
+    return (parseInt(bonusDice) === 0) ? 0 : null;
+  }
+  const [first] = new CONFIG.Dice.DamageRoll(roll.parts.join(" + "), roll.data ?? {}).terms;
+  const { DiceTerm } = foundry.dice.terms;
+  return ((first instanceof DiceTerm) && Number.isInteger(first.number) && (first.number >= 1)) ? bonusDice : 0;
+}
+
+/**
+ * A part's critical damage as the app is sent it, resolved: a number for one that always comes to
+ * the same, from -100 to 100, and nothing for none or 0; else its terms in order, as dnd5e adds them,
+ * without their flavor, none merged, each one to twenty of a die a player rolls, with nothing
+ * changing them, a number up to 100, or a + or -. Null for one that can't be written so, such as
+ * one with dice in a function, or too long.
+ * @param {string} formula   As resolved, with its flavor.
+ * @returns {string|null}
+ */
+function criticalSegment(formula) {
+  if ( !formula ) return "";
+  const { DiceTerm, NumericTerm, OperatorTerm, RollTerm } = foundry.dice.terms;
+  const roll = new foundry.dice.Roll(formula.replace(RollTerm.FLAVOR_REGEXP, ""));
+  let segment;
+  if ( roll.isDeterministic ) {
+    const total = roll.evaluateSync().total;
+    if ( !Number.isInteger(total) || (Math.abs(total) > 100) ) return null;
+    segment = total ? String(total) : "";
+  } else {
+    const readable = roll.terms.every(term => {
+      if ( term instanceof OperatorTerm ) return ["+", "-"].includes(term.operator);
+      if ( term instanceof DiceTerm ) {
+        return Number.isInteger(term.number) && (term.number >= 1) && (term.number <= MOST_CRITICAL_DICE)
+          && DIE_FACES.has(term.faces) && !term.modifiers?.length;
+      }
+      return (term instanceof NumericTerm) && Number.isInteger(term.number) && (term.number >= 0) && (term.number <= 100);
+    });
+    if ( !readable ) return null;
+    segment = foundry.dice.Roll.getFormula(roll.terms);
+  }
+  return CRITICAL_SEGMENT.test(segment) ? segment : null;
 }
 
 /**

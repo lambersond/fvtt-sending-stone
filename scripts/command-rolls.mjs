@@ -1,4 +1,4 @@
-import { ATTACK_KINDS, DIE_FACES, MODULE_ID, ROLL_KINDS, ROLL_TAG } from "./constants.mjs";
+import { ATTACK_KINDS, DIE_FACES, MODULE_ID, MOST_HIT_DICE, ROLL_KINDS, ROLL_TAG } from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
@@ -9,10 +9,10 @@ import { castFrom } from "./sheet-spells.mjs";
 
 /**
  * Making a player's roll from the Sending Stone app: a check, saving throw, death saving throw or
- * initiative, a hit die spent, or a utility's own roll, such as a d4 of luck, through dnd5e, as if
- * the player had rolled it in Foundry, with the dice they rolled; a saving throw the game asked
- * them for, on the card that asked; and a saving throw or check a description of theirs calls for,
- * against its DC.
+ * initiative, a hit die spent, or several at once, or a utility's own roll, such as a d4 of luck,
+ * through dnd5e, as if the player had rolled it in Foundry, with the dice they rolled; a saving
+ * throw the game asked them for, on the card that asked; and a saving throw or check a description
+ * of theirs calls for, against its DC.
  */
 
 /**
@@ -36,11 +36,18 @@ const KEYED = new Set(["skill", "tool", "ability", "save"]);
 const CHECK_TYPES = { ability: "check", skill: "skill", tool: "tool" };
 
 /**
- * The rolls made as they are, with no advantage and nothing added: a hit die, and a utility's own
- * roll.
+ * The rolls made as they are, with no advantage and nothing added: a hit die, hit dice spent at
+ * once, and a utility's own roll.
  * @type {Set<string>}
  */
-const PLAIN = new Set(["hitDie", "formula"]);
+const PLAIN = new Set(["hitDie", "hitDice", "formula"]);
+
+/**
+ * The rolls that spend hit dice: one, or several at once. Both are made only once the self-test
+ * has shown a hit die takes the player's die.
+ * @type {readonly string[]}
+ */
+export const HIT_DICE_KINDS = Object.freeze(["hitDie", "hitDice"]);
 
 /**
  * What became of a player's roll, as the app is told.
@@ -49,10 +56,14 @@ const PLAIN = new Set(["hitDie", "formula"]);
  * @property {"done"|"failed"} status
  * @property {string|null} reason       Why it wasn't made, such as "not-dying".
  * @property {string|null} error        What went wrong, for an error.
- * @property {string|null} messageId    The chat message the roll made.
+ * @property {string|null} messageId    The chat message the roll made; for hit dice, the last.
  * @property {boolean} visible          May its player see the roll? Not one made blind.
- * @property {object[]} rolls           The roll as made, when its player may see it.
- * @property {number} [healed]          For a hit die: the hit points it gained.
+ * @property {object[]} rolls           The roll as made, when its player may see it; for hit dice,
+ *                                      every roll of every card, in order.
+ * @property {number} [healed]          For a hit die or hit dice: the hit points gained.
+ * @property {{count: number, made: number}} [spent]   For hit dice: how many were asked for, and
+ *                                      how many were rolled, a card each, before they were done or
+ *                                      stopped.
  * @property {object|null} [attack]     For an attack: whether it was a critical hit or a fumble, and
  *                                      whether it hit its target, or each target of an area attack,
  *                                      when its player may know.
@@ -81,18 +92,22 @@ export function failedResult(command, reason, error=null) {
  * can make it now.
  * @param {object} command      The player's roll, as fetched from the app.
  * @param {Campaign} campaign   The campaign it was fetched for.
+ * @param {object} [options]
+ * @param {AbortSignal} [options.signal]   Aborted once the app has been told the roll took too long:
+ *                                         hit dice spent at once then stop before the next die.
  * @returns {Promise<CommandResult>}
  */
-export async function runRollCommand(command, campaign) {
+export async function runRollCommand(command, campaign, { signal }={}) {
   const failed = (reason, error=null) => failedResult(command, reason, error);
   if ( !campaign.rolls || !diceStatus.ready ) return failed("off");
   const invalid = checkCommand(command);
   if ( invalid ) return failed("invalid", invalid);
-  if ( (command.kind === "hitDie") && !diceStatus.hitDice ) return failed("self-test");
+  if ( HIT_DICE_KINDS.includes(command.kind) && !diceStatus.hitDice ) return failed("self-test");
   const actor = game.actors.get(command.actorId);
   if ( !actor || !campaign.characters.has(actor.id) ) return failed("unknown");
   const refusal = checkRoll(command, actor);
   if ( refusal ) return failed(refusal);
+  if ( command.kind === "hitDice" ) return spendHitDice(command, actor, campaign, signal);
   let link = null;
   let check = null;
   if ( isTextHash(command.text) ) {
@@ -227,10 +242,12 @@ function isLinkIndex(value) {
 }
 
 /**
- * Why a fetched hit die or utility's roll isn't one to make, if it isn't. Neither is rolled with
- * advantage, has anything added, or answers a prompt. A hit die names its size, and has the one die
- * rolled of it; a utility's roll names the item and activity, and has the dice its formula throws,
- * if any, which are checked against them when it's made.
+ * Why a fetched hit die, hit dice or utility's roll isn't one to make, if it isn't. None is rolled
+ * with advantage, has anything added, or answers a prompt. A hit die names its size, and has the
+ * one die rolled of it. Hit dice name no one size, but each size and how many of it, each size
+ * once, and no more than a character of 20th level has; and have the dice rolled of each, in the
+ * same order. A utility's roll names the item and activity, and has the dice its formula throws, if
+ * any, which are checked against them when it's made.
  * @param {object} command
  * @returns {string|null}
  */
@@ -246,9 +263,31 @@ function checkPlainCommand(command) {
       && (dice[0].results.length === 1);
     return one ? null : "dice";
   }
+  if ( command.kind === "hitDice" ) {
+    if ( (command.denomination !== undefined) && (command.denomination !== null) ) return "denomination";
+    const { hitDice } = command;
+    if ( !Array.isArray(hitDice) || !hitDice.length || (hitDice.length > DIE_FACES.size) ) return "hit-dice";
+    const sizes = hitDice.map(entry => facesOf(entry?.denomination));
+    const counts = hitDice.map(entry => entry?.count);
+    if ( !sizes.every(faces => DIE_FACES.has(faces)) || (new Set(sizes).size !== sizes.length) ) return "hit-dice";
+    if ( !counts.every(count => Number.isInteger(count) && (count >= 1) && (count <= MOST_HIT_DICE)) ) return "hit-dice";
+    if ( counts.reduce((total, count) => total + count, 0) > MOST_HIT_DICE ) return "hit-dice";
+    const each = Array.isArray(dice) && (dice.length === hitDice.length) && dice.every((rolled, index) =>
+      isRolled(rolled) && (rolled.faces === sizes[index]) && (rolled.results.length === counts[index]));
+    return each ? null : "dice";
+  }
   if ( !isId(command.item) || !isId(command.activity) ) return "item";
   if ( !Array.isArray(dice) || (dice.length > 20) || !dice.every(isRolled) ) return "dice";
   return null;
+}
+
+/**
+ * The faces of a size of hit die, as a class names it, such as 10 for "d10"; NaN for anything else.
+ * @param {unknown} denomination
+ * @returns {number}
+ */
+function facesOf(denomination) {
+  return Number(/^d(\d{1,3})$/.exec((typeof denomination === "string") ? denomination : "")?.[1]);
 }
 
 /**
@@ -389,6 +428,10 @@ function checkRoll(command, actor) {
     }
     case "initiative": return initiativeTurn(command, actor).refusal ?? null;
     case "hitDie": return hitDieLeft(command, actor) ? null : "no-hit-dice";
+    case "hitDice": {
+      if ( !hitDiceLeft(command, actor) ) return "no-hit-dice";
+      return atFullHitPoints(actor) ? "full-hp" : null;
+    }
     case "formula": return formulaActivity(command, actor).refusal ?? null;
     default: return "unknown";
   }
@@ -406,6 +449,54 @@ function hitDieLeft(command, actor) {
   if ( actor.system.isNPC ) return (command.denomination === `d${hd?.denomination}`) && (hd?.value > 0);
   return Array.from(hd?.classes ?? []).some(cls => (cls.system?.hd?.denomination === command.denomination)
     && (cls.system.hd.value > 0));
+}
+
+/**
+ * Has the character as many hit dice of each size left as a player spends at once? A character's
+ * of a size are those of all their classes with it, which dnd5e spends from one after another; an
+ * NPC's, its own one size. dnd5e would otherwise tell the Gamemaster it hasn't one, part way.
+ * @param {object} command
+ * @param {Actor} actor
+ * @returns {boolean}
+ */
+function hitDiceLeft(command, actor) {
+  const hd = actor.system.attributes?.hd;
+  if ( actor.system.isNPC ) {
+    const [only] = command.hitDice;
+    return (command.hitDice.length === 1) && (only.denomination === `d${hd?.denomination}`)
+      && (hd?.value >= only.count);
+  }
+  const classes = Array.from(hd?.classes ?? []);
+  return command.hitDice.every(({ denomination, count }) => classes
+    .filter(cls => cls.system?.hd?.denomination === denomination)
+    .reduce((left, cls) => left + (cls.system.hd.value ?? 0), 0) >= count);
+}
+
+/**
+ * Is the character at full hit points, as far as a hit die can heal them? dnd5e still spends one
+ * then, healing nothing, as its rest dialog lets a player; but stops spending them once there, as
+ * when it spends them itself on a rest, and so do hit dice spent at once.
+ * @param {Actor} actor
+ * @returns {boolean}
+ */
+function atFullHitPoints(actor) {
+  const { value, max, effectiveMax } = actor.system.attributes?.hp ?? {};
+  return value >= Math.max(0, Number.isFinite(effectiveMax) ? effectiveMax : max);
+}
+
+/**
+ * How many hit dice of a size the character has spent: of all their classes with it, or an NPC's
+ * own.
+ * @param {Actor} actor
+ * @param {string} denomination
+ * @returns {number}
+ */
+function spentOf(actor, denomination) {
+  const hd = actor.system.attributes?.hd;
+  if ( actor.system.isNPC ) return hd?.spent ?? 0;
+  return Array.from(hd?.classes ?? [])
+    .filter(cls => cls.system?.hd?.denomination === denomination)
+    .reduce((spent, cls) => spent + (cls.system.hd.spent ?? 0), 0);
 }
 
 /**
@@ -539,6 +630,87 @@ async function rollHitDie(command, actor, message) {
     { configure: false },
     { ...message, data: { ...message.data, flags } }
   ));
+}
+
+/**
+ * Spend hit dice of one size or more at once, as dnd5e spends them on a short rest: one die at a
+ * time, a roll and a card each, each die with the one the player rolled for it, in the order they
+ * rolled them. Each die has its plan of its own, so a die a module adds to one, of its size or
+ * another, is Foundry's, never the player's next. They stop before the next die once the app has
+ * been told they took too long, once the character is at full hit points, as dnd5e stops spending
+ * them on a rest, or has none of that size left; and once a die is called off, as a module may, or
+ * as one the player's die can't reach, or a module kept dnd5e from spending one, which would
+ * otherwise post a card for each die left and spend none. Those spent before they stopped are told
+ * of all the same, as `spent`, with what they healed.
+ * @param {object} command
+ * @param {Actor} actor
+ * @param {Campaign} campaign
+ * @param {AbortSignal} [signal]   Aborted once the app has been told they took too long.
+ * @returns {Promise<CommandResult>}
+ */
+async function spendHitDice(command, actor, campaign, signal) {
+  const author = authorFor(actor);
+  const message = { rollMode: PUBLIC, data: { author: author.id, flags: { [MODULE_ID]: { request: command.id } } } };
+  const { hitDice, ...rest } = command;
+  const dice = hitDice.flatMap(({ denomination }, index) => {
+    const { faces, results } = command.dice[index];
+    return results.map(value => ({ denomination, faces, value }));
+  });
+  const hp = actor.system.attributes?.hp?.value ?? 0;
+  const cards = [];
+  let reason = null;
+  let error = null;
+  for ( const [index, { denomination, faces, value }] of dice.entries() ) {
+    if ( index > 0 ) {
+      if ( signal?.aborted ) reason = "timeout";
+      else if ( atFullHitPoints(actor) ) reason = "full-hp";
+      else if ( !hitDieLeft({ denomination }, actor) ) reason = "no-hit-dice";
+      if ( reason ) break;
+    }
+    const die = {
+      ...rest, id: `${command.id}-${index}`, kind: "hitDie", denomination, dice: [{ faces, results: [value] }]
+    };
+    const before = spentOf(actor, denomination);
+    let plan;
+    let card;
+    try {
+      card = await withPlan(die, planned => {
+        plan = planned;
+        return rollHitDie(die, actor, message);
+      });
+    } catch (err) {
+      console.error(`${MODULE_ID} | Could not spend ${actor.name}'s hit dice from Sending Stone`, err);
+      reason = "error";
+      error = err instanceof Error ? err.message : String(err);
+      break;
+    }
+    // A die a module called off, as dnd5e's hooks allow, made nothing; so did one called off here.
+    if ( !card ) {
+      reason = plan?.refusal ?? "cancelled";
+      break;
+    }
+    cards.push(card);
+    if ( (cards.length < dice.length) && (spentOf(actor, denomination) <= before) ) {
+      reason = "cancelled";
+      break;
+    }
+  }
+
+  const spent = { count: dice.length, made: cards.length };
+  if ( !cards.length ) return { ...failedResult(command, reason, error), spent };
+  const visible = cards.every(card => visibleTo(card, actor, campaign));
+  return {
+    id: command.id,
+    status: reason ? "failed" : "done",
+    reason,
+    error,
+    messageId: cards.at(-1).id,
+    visible,
+    rolls: visible ? cards.flatMap(card => card.rolls.map(summarizeRoll)) : [],
+    // The hit points dnd5e gave the character for them all: none where a module kept it from it.
+    healed: Math.max((actor.system.attributes?.hp?.value ?? hp) - hp, 0),
+    spent
+  };
 }
 
 /**

@@ -3,7 +3,7 @@ import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
-import { failedResult, runRollCommand } from "./command-rolls.mjs";
+import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { prompting } from "./prompts.mjs";
@@ -87,15 +87,15 @@ const queues = new Map();
 
 /**
  * What a campaign tells the app of its players' rolls in its hello: whether they're made here,
- * which, and if not, why not. A hit die is among them once the self-test has shown it takes the
- * player's die. Attacks, the uses of spells and features, and their damage are among them when the
- * Gamemaster lets the campaign's players attack and cast from the app too, and they can be made
- * here; and then that an area attack is made at the targets they pick. The links in their
- * descriptions are among them too: a description's own roll, asking the table for a save, where
- * dnd5e's card for it can be made, and a description's damage or healing, where players may attack
- * and damage takes their dice. Where their damage is, an attack's or a description's, whether
- * players may change it in the app, as the self-test found. And whether its players are asked in
- * the app for the saves the game asks of them.
+ * which, and if not, why not. A hit die, and several spent at once, are among them once the
+ * self-test has shown a hit die takes the player's die. Attacks, the uses of spells and features,
+ * and their damage are among them when the Gamemaster lets the campaign's players attack and cast
+ * from the app too, and they can be made here; and then that an area attack is made at the targets
+ * they pick. The links in their descriptions are among them too: a description's own roll, asking
+ * the table for a save, where dnd5e's card for it can be made, and a description's damage or
+ * healing, where players may attack and damage takes their dice. Where their damage is, an attack's
+ * or a description's, whether players may change it in the app, as the self-test found. And whether
+ * its players are asked in the app for the saves the game asks of them.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean}}
@@ -109,7 +109,7 @@ export function rollFeatures(campaign) {
   return {
     enabled: true,
     kinds: [
-      ...ROLL_KINDS.filter(kind => (kind !== "hitDie") || diceStatus.hitDice),
+      ...ROLL_KINDS.filter(kind => !HIT_DICE_KINDS.includes(kind) || diceStatus.hitDice),
       ...(attacks ? ATTACK_KINDS : []),
       ...texts
     ],
@@ -326,7 +326,8 @@ function take(command, campaign) {
 /**
  * Make a command, and tell the app what became of it. One that takes too long is reported as such,
  * and the character's next roll goes ahead; if it's made after all, as once the Gamemaster has
- * answered what a module asked them, the app is told so too.
+ * answered what a module asked them, the app is told so too; and so it is of hit dice spent at
+ * once, some of which were spent before they stopped for it.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {Promise<void>}
@@ -349,7 +350,9 @@ async function make(command, campaign) {
     send(EVENTS.COMMAND_RESULT, result, campaign, { sequenced: false });
     if ( watchdog.signal.aborted ) {
       void running.then(late => {
-        if ( late.status === "done" ) send(EVENTS.COMMAND_RESULT, late, campaign, { sequenced: false });
+        if ( (late.status === "done") || (late.spent?.made > 0) ) {
+          send(EVENTS.COMMAND_RESULT, late, campaign, { sequenced: false });
+        }
       });
     }
   } finally {
@@ -372,6 +375,6 @@ function runCommand(command, campaign, signal) {
     case "ask": return runAskCommand(command, campaign);
     case "textDamage": return runTextDamageCommand(command, campaign);
     case "textRoll": return runTextRollCommand(command, campaign);
-    default: return runRollCommand(command, campaign);
+    default: return runRollCommand(command, campaign, { signal });
   }
 }

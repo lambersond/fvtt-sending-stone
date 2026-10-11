@@ -146,13 +146,19 @@ export const EVENTS = Object.freeze({
 /**
  * The rolls a player can have made here from the app, with the dice they rolled there: a skill
  * check, a tool check, an ability check, a saving throw, a death saving throw, or initiative; a hit
- * die spent, offered once the self-test has checked it; or a utility's own roll, such as a d4 of
- * luck.
+ * die spent, or several, of one size or more, at once, offered once the self-test has checked a hit
+ * die; or a utility's own roll, such as a d4 of luck.
  * @type {readonly string[]}
  */
 export const ROLL_KINDS = Object.freeze([
-  "skill", "tool", "ability", "save", "death", "initiative", "hitDie", "formula"
+  "skill", "tool", "ability", "save", "death", "initiative", "hitDie", "hitDice", "formula"
 ]);
+
+/**
+ * The most hit dice a player can spend at once from the app: a character of 20th level's.
+ * @type {number}
+ */
+export const MOST_HIT_DICE = 20;
 
 /**
  * What a player can have made here from the app by using an item, as in Foundry: an attack, with the

@@ -260,11 +260,22 @@ export function castSpellOf(cast) {
 }
 
 /**
+ * Is this the copy of a spell dnd5e keeps for an item that casts it, such as a wand's?
+ * @param {Item} spell
+ * @returns {boolean}
+ */
+export function castCopy(spell) {
+  return (spell.type === "spell") && Boolean(spell.getFlag?.("dnd5e", "cachedFor") ?? spell.flags?.dnd5e?.cachedFor);
+}
+
+/**
  * What a Cast activity rolls, or is used through: its spell's, as the spell's own activity has
  * them, but by the Cast activity's id, through which the app has it cast from the item; and how
  * it's cast: the level it's cast at, whether it takes concentration, and how many of the item's
- * uses it spends, and whether there are that many left; and, given the sheet's descriptions, the
- * spell's, the same the Spells tab refers to for its copy.
+ * uses it spends, and whether there are that many left, and the levels it may be cast at above
+ * that, where it may; and, given the sheet's descriptions, the spell's, the same the Spells tab
+ * refers to for its copy. How many more it targets for each level higher is as many as its copy
+ * targets for each level above the one it's cast at.
  *
  * Wherever dnd5e keeps a copy of the spell, its id, by which the Spells tab lists it under the item,
  * goes with it, even while the item can't cast it or it rolls nothing here, so that the app can
@@ -279,15 +290,15 @@ function castRolls(item, cast, texts) {
   const found = castSpellOf(cast);
   if ( !found ) return { ...NO_ROLLS, damage: [], ...copy };
   const { spell, lead } = found;
-  // Cast from the item, a spell's activity spends no slot; there's no level to choose.
+  // Cast from the item, a spell's activity spends the item's uses, not a slot.
   const { consumesSlot, ...rolls } = activityRolls(spell, lead);
   if ( !rollsAnything(rolls) ) return { ...NO_ROLLS, damage: [], ...copy };
   const cost = castCost(item, cast);
+  const levels = castLevels(item, cast, found);
   return {
     ...rolls,
     attackId: rolls.attackId && cast.id,
-    activity: rolls.activity && { ...rolls.activity, id: cast.id, targets: { ...rolls.activity.targets, perLevel: null } },
-    ...(rolls.attackArea && { attackArea: { ...rolls.attackArea, perLevel: null } }),
+    activity: rolls.activity && { ...rolls.activity, id: cast.id },
     ...copy,
     cast: {
       level: Math.max(finite(spell.system?.level) ?? 0, finite(cast.spell?.level) ?? 0),
@@ -295,10 +306,80 @@ function castRolls(item, cast, texts) {
         || (lead.duration?.concentration === true),
       charges: cost?.amount ?? null,
       short: cost?.short ?? false,
+      ...(levels && { levels }),
       // A spell cast from the item opens to the spell's description.
       ...(texts && { text: texts.add({ html: spell.system?.description?.value, relativeTo: spell }) })
     }
   };
+}
+
+/**
+ * The levels a spell can be cast at from an item, each with what it costs, as `castCost` has it:
+ * the level it's cast at first, then each higher one its Cast activity offers, as `offeredLevels`
+ * has them, but for those it costs more of the item's uses to cast at than the item ever has, such
+ * as a 2014 wand's eighth and ninth with seven charges. Null where there are fewer than two, or
+ * they can't be worked out.
+ * @param {Item} item
+ * @param {Activity} cast
+ * @param {{spell: Item, lead: Activity}} found   The spell's copy, and its activity cast.
+ * @returns {{level: number, charges: number|null, short: boolean}[]|null}
+ */
+function castLevels(item, cast, found) {
+  try {
+    const offered = offeredLevels(cast, found);
+    const levels = offered.flatMap(level => {
+      const cost = castCost(item, cast, level);
+      if ( (level > offered[0]) && cost?.never ) return [];
+      return [{ level, charges: cost?.amount ?? null, short: cost?.short ?? false }];
+    });
+    return (levels.length > 1) ? levels : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The levels a spell can be cast at from an item, as dnd5e's usage dialog offers them for its Cast
+ * activity: from the level the Cast activity casts it at, never below the spell's own, up to as
+ * many levels as its scaling allows, the most it allows worked out from the item's numbers, such as
+ * a wand's `min(@item.uses.value, 3)` from its charges left, or otherwise up to 9th; none for a
+ * spell that's cast at one level, such as a cantrip, or from a Cast activity that doesn't scale.
+ * @param {Activity} cast
+ * @param {{spell: Item, lead: Activity}} found   The spell's copy, and its activity used.
+ * @returns {number[]}   In order, lowest first.
+ */
+export function offeredLevels(cast, found) {
+  if ( !found || (found.lead.requiresSpellSlot !== true) ) return [];
+  const scaling = cast.consumption?.scaling;
+  if ( scaling?.allowed !== true ) return [];
+  const base = finite(found.spell.system?.level) ?? 0;
+  const lowest = Math.max(finite(cast.spell?.level) ?? base, base);
+  const highest = Math.min(scaling.max
+    ? lowest + simplifyBonus(scaling.max, cast.getRollData?.({ deterministic: true }) ?? {}) - 1
+    : 9, 9);
+  const levels = [];
+  for ( let level = lowest; level <= highest; level++ ) levels.push(level);
+  return levels;
+}
+
+/**
+ * A formula of the item's numbers as a number, as dnd5e's `simplifyBonus` works it out: 0 for one
+ * that throws dice, can't be read, or comes to anything but a finite number.
+ * @param {string|number} bonus
+ * @param {object} [data]   The roll data its numbers come from.
+ * @returns {number}
+ */
+function simplifyBonus(bonus, data={}) {
+  if ( !bonus ) return 0;
+  if ( (typeof bonus === "number") || ((String(bonus).trim() !== "") && Number.isFinite(Number(bonus))) ) {
+    return finite(Number(bonus)) ?? 0;
+  }
+  try {
+    const roll = new foundry.dice.Roll(String(bonus), data);
+    return roll.isDeterministic ? (finite(roll.evaluateSync().total) ?? 0) : 0;
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -318,23 +399,24 @@ function durationOf(activity) {
 
 /**
  * What casting a spell from an item spends, as its Cast activity has it: so many of the item's
- * uses, or another item's, or the activity's own; the first of them, and those uses, and whether
- * any of them hasn't that many left. A spell cast above its own level spends more, where its cost
- * scales with the level, as dnd5e scales it. Nothing where it spends no uses, only a number that's a
- * formula, or where its spell's activity spends nothing, as one used after the spell is cast does,
- * for which dnd5e spends nothing of the item's either.
+ * uses, or another item's, or the activity's own; the first of them, and those uses, whether any of
+ * them hasn't that many left, and whether any of them never has that many. A spell cast above its
+ * own level spends more, where its cost scales with the level, as dnd5e scales it. Nothing where it
+ * spends no uses, only a number that's a formula, or where its spell's activity spends nothing, as
+ * one used after the spell is cast does, for which dnd5e spends nothing of the item's either.
  * @param {Item} item
  * @param {Activity} cast
+ * @param {number} [level]   The level it's cast at; by default, the Cast activity's own.
  * @returns {{amount: number, uses: {value: number, max: number, recovery: string|null},
- *   short: boolean}|null}
+ *   short: boolean, never: boolean}|null}
  */
-export function castCost(item, cast) {
+export function castCost(item, cast, level) {
   const found = castSpellOf(cast);
   if ( !found || (found.lead.consumption?.spellSlot === false) ) return null;
   const base = finite(found.spell.system?.level) ?? 0;
-  // dnd5e casts a leveled spell from the item at its Cast activity's level, and scales its cost by
-  // how far above the spell's own that is.
-  const above = (base > 0) ? Math.max((finite(cast.spell?.level) ?? base) - base, 0) : 0;
+  // dnd5e casts a leveled spell from the item at its Cast activity's level, or the one chosen, and
+  // scales its cost by how far above the spell's own that is.
+  const above = (base > 0) ? Math.max((level ?? finite(cast.spell?.level) ?? base) - base, 0) : 0;
   const costs = (cast.consumption?.targets ?? []).flatMap(target => {
     const uses = (target.type === "itemUses") ? usesOfItem(item, target.target)
       : (target.type === "activityUses") ? limitedUses(cast.uses, cast.labels) : undefined;
@@ -343,7 +425,11 @@ export function castCost(item, cast) {
     return ((amount !== null) && (amount > 0) && uses) ? [{ amount, uses }] : [];
   });
   if ( !costs.length ) return null;
-  return { ...costs[0], short: costs.some(({ amount, uses }) => uses.value < amount) };
+  return {
+    ...costs[0],
+    short: costs.some(({ amount, uses }) => uses.value < amount),
+    never: costs.some(({ amount, uses }) => uses.max < amount)
+  };
 }
 
 /**
@@ -386,14 +472,15 @@ function rollsAnything(rolls) {
 /**
  * Is this one of a spell's activities that's used without spending a spell slot, as one used after
  * the spell is cast is, such as Spirit Guardians' save each turn? dnd5e still asks the level it's
- * used at, which its damage may scale with.
+ * used at, which its damage may scale with. Of the copy of a spell an item casts, a cantrip's too:
+ * it spends none of the item's uses either.
  * @param {Item} item
  * @param {Activity} activity
  * @returns {boolean}
  */
 function spendsNoSlot(item, activity) {
-  return (item.type === "spell") && ((finite(item.system?.level) ?? 0) > 0)
-    && (activity.consumption?.spellSlot === false);
+  if ( (item.type !== "spell") || (activity.consumption?.spellSlot !== false) ) return false;
+  return ((finite(item.system?.level) ?? 0) > 0) || castCopy(item);
 }
 
 /**
@@ -437,11 +524,14 @@ function attackAreaOf(item, activity) {
 }
 
 /**
- * How many more targets a spell takes for each level it's cast above its own, as Bless or Hold
- * Person do: its number of targets is a formula of the spell's scaling. Null for none.
+ * How many more targets a spell takes for each level it's cast above the one it's cast at now, as
+ * Bless or Hold Person do: its number of targets is a formula of the spell's scaling, or its level.
+ * A spell an item casts above its own level is cast that much higher already, as dnd5e scales its
+ * copy, so it's counted from there: dnd5e grows a count of its level with each level more, but not
+ * one of its scaling, which stays at the Cast activity's. Null for none.
  * @param {Item} item
  * @param {Activity} activity
- * @param {number} count   How many it takes at its own level.
+ * @param {number} count   How many it takes at the level it's cast at now.
  * @returns {number|null}
  */
 function countPerLevel(item, activity, count) {
@@ -452,9 +542,12 @@ function countPerLevel(item, activity, count) {
     : (item.system._source?.target?.affects?.count ?? activity._source?.target?.affects?.count);
   if ( (typeof typed !== "string") || !/[^\d\s.]/.test(typed) ) return null;
   try {
-    const scaling = (finite(item.flags?.dnd5e?.scaling) ?? 0) + 1;
-    const scaled = item.clone({ "flags.dnd5e.scaling": scaling }, { keepId: true });
-    const more = (finite(scaled.system.activities?.get(activity.id)?.target?.affects?.count) ?? count) - count;
+    const scaling = finite(item.flags?.dnd5e?.scaling) ?? finite(item.system?.scalingIncrease) ?? 0;
+    const countAt = more => {
+      const scaled = item.clone({ "flags.dnd5e.scaling": scaling + more }, { keepId: true });
+      return finite(scaled.system.activities?.get(activity.id)?.target?.affects?.count) ?? count;
+    };
+    const more = countAt(1) - countAt(0);
     return (more > 0) ? more : null;
   } catch {
     return null;

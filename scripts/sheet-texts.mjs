@@ -1,5 +1,9 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
-import { actorOf, checkActivities, cleanLinks, cutShort, normaliseLinks, saveActivities } from "./sheet-links.mjs";
+import {
+  actorOf, checkActivities, cleanLinks, criticalAdditions, cutShort, DND5E_ACTIVITIES, normaliseLinks, ownDamageConfig,
+  saveActivities
+} from "./sheet-links.mjs";
+import { attackModesOf } from "./sheet-rolls.mjs";
 import { sendLater } from "./transport.mjs";
 
 /**
@@ -17,10 +21,11 @@ import { sendLater } from "./transport.mjs";
  * again under a new hash, so nothing the app or a browser keeps under an old one is shown.
  * 1, before it was part of the hash: as Foundry enriched them. 2: with the spans of
  * sheet-links.mjs, since 0.17.0. 3: with their checks, `ss-check`, since 0.18.0. 4: with damage
- * never a critical hit's marked, since 0.19.0.
+ * never a critical hit's marked, since 0.19.0. 5: with what a critical hit adds, and damage as
+ * resolved, since 0.20.0.
  * @type {number}
  */
-const TEXT_FORMAT = 4;
+const TEXT_FORMAT = 5;
 
 /**
  * The most a character.texts payload should hold, in characters of JSON, well within the 1 MB a
@@ -99,7 +104,7 @@ export class SheetTexts {
     if ( !reference && !html?.trim() ) return null;
     this.#format ??= textFormat();
     const from = reference ? `ref:${reference}`
-      : `${relativeTo?.uuid ?? ""}\n${numbersShown(html, relativeTo)}\n${html}`;
+      : `${relativeTo?.uuid ?? ""}\n${shownSafely(html, relativeTo)}\n${html}`;
     const hash = textHash(`${this.#format}\n${from}`);
     if ( !this.sources.has(hash) ) this.sources.set(hash, source);
     return hash;
@@ -315,13 +320,29 @@ function textFormat() {
 }
 
 /**
+ * What a description shows of the character's numbers, as `numbersShown` reads them, or nothing for
+ * what can't be read, as an item written so that nothing here foresaw it: one description can't
+ * cost its sheet the rest.
+ * @param {string} html
+ * @param {Document} [document]   The description's document.
+ * @returns {string}
+ */
+function shownSafely(html, document) {
+  try {
+    return numbersShown(html, document);
+  } catch {
+    return "";
+  }
+}
+
+/**
  * What a description shows of the character's numbers, by what its text says: a roll shows their
  * level, proficiency, ability modifiers and spell save DC; "your spell save DC", that DC; a saving
  * throw, the DCs of the item's saving throws, which one with no DC of its own takes; a check, as
  * dnd5e's `[[/check]]` and its skill and tool links, those of the item's checks, which dnd5e's
  * `[[/check]]` shows, and one with no DC of its own takes; and dnd5e's damage links, the damage of
- * the item's activities, and whether its wielder's critical hits with it throw extra dice. An
- * effect's are its actor's.
+ * the item's activities, as stored and as resolved, and what a critical hit adds to it. An effect's
+ * are its actor's.
  * @param {string} html
  * @param {Document} [document]   The description's document.
  * @returns {string}
@@ -375,9 +396,10 @@ function checkNumbers(document) {
 
 /**
  * The damage and healing of an identified item and its activities, as stored, which dnd5e's
- * `[[/damage]]` links show; and, for an item with an attack, the extra dice its wielder's critical
- * hits throw with a melee weapon, as Savage Attacks gives, which decide whether a link's damage may
- * be a critical hit's.
+ * `[[/damage]]` links show; for an item with an attack, the extra dice its wielder's critical hits
+ * throw with a melee weapon, as Savage Attacks gives; and, since 0.20.0, as each activity's damage
+ * configuration resolves it, in each of the item's attack modes, as `resolvedDamage` reads it, which
+ * changes with the character's bonuses to damage, such as Rage's, and their scale values.
  * @param {Document} [document]
  * @returns {string}
  */
@@ -390,7 +412,34 @@ function damageNumbers(document) {
   ]);
   const attacks = activities.some(([, type]) => type === "attack");
   const extraDice = attacks ? (actorOf(document)?.flags?.dnd5e?.meleeCriticalDamageDice ?? null) : null;
-  return JSON.stringify([system.damage ?? null, system.magicalBonus ?? null, activities, ...(attacks ? [extraDice] : [])]);
+  return JSON.stringify([
+    system.damage ?? null, system.magicalBonus ?? null, activities, ...(attacks ? [extraDice] : []), resolvedDamage(document)
+  ]);
+}
+
+/**
+ * The damage of an item's activities that dnd5e's `[[/damage]]` links roll, as dnd5e's own class
+ * for each kind of activity configures it, in each attack mode the item has, and none: each roll's
+ * formula, resolved, and what a critical hit adds to it, as `linkCritical` reads it for a link. Null
+ * for what can't be read.
+ * @param {Item} item
+ * @returns {Array<[string, Array<[string|null, string[], object]|null>]>}
+ */
+function resolvedDamage(item) {
+  const activities = item.system?.activities;
+  const all = (typeof activities?.values === "function") ? Array.from(activities.values()) : [];
+  const modes = [null, ...(attackModesOf(item) ?? []).map(mode => mode.value)];
+  return all.filter(activity => DND5E_ACTIVITIES[activity?.type]).map(activity => [activity.id, modes.map(mode => {
+    try {
+      const process = ownDamageConfig(activity, mode ? { attackMode: mode } : {});
+      const rolls = (process?.rolls ?? [])
+        .map(roll => foundry.dice.Roll.replaceFormulaData((roll.parts ?? []).join(" + "), roll.data ?? {}));
+      const { allowed, adds } = criticalAdditions(process, rolls.length);
+      return [mode, rolls, { allowed, dice: adds?.dice ?? null, damage: adds?.damage ?? null }];
+    } catch {
+      return null;
+    }
+  })]);
 }
 
 /**
