@@ -1,9 +1,9 @@
 import { usesOf } from "./sheet-features.mjs";
 import {
-  ACTION_KINDS, activationTypeOf, activityName, activityUses, castSpellOf, ownLabels, rangeOf, REACTIONS,
-  rollsOf, visibleActivities
+  ACTION_KINDS, activationTypeOf, activityName, activityUses, castCopy, castSpellOf, ownLabels, rangeOf,
+  REACTIONS, rollsOf, visibleActivities
 } from "./sheet-rolls.mjs";
-import { castCopy, castFrom } from "./sheet-spells.mjs";
+import { castFrom } from "./sheet-spells.mjs";
 import { finite, localize } from "./sheet-values.mjs";
 
 /**

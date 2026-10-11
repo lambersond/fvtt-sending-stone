@@ -5,7 +5,9 @@ import {
 import {
   damageRollsFor, diceForEach, diceStatus, matchesDice, modifiedDice, plannedDice, readModifiers, withPlan
 } from "./dice-plan.mjs";
-import { castSpellOf } from "./sheet-rolls.mjs";
+import { DND5E_ACTIVITIES, ownDamageConfig } from "./sheet-links.mjs";
+import { castCopy, castSpellOf, offeredLevels } from "./sheet-rolls.mjs";
+import { finite } from "./sheet-values.mjs";
 
 /**
  * Making a player's attack, spell or feature from the Sending Stone app: using the item as in
@@ -21,7 +23,9 @@ import { castSpellOf } from "./sheet-rolls.mjs";
  *
  * A spell an item casts, such as a staff's Silvery Barbs, is cast from the item by its Cast
  * activity: through the activity of the copy of the spell dnd5e keeps for it, as dnd5e's Cast
- * activity would cast it, which spends the item's uses rather than a spell slot.
+ * activity would cast it, which spends the item's uses rather than a spell slot; at the level the
+ * player chose, where the Cast activity lets it be cast higher for more of them, as a wand of magic
+ * missiles does.
  */
 
 /**
@@ -58,12 +62,6 @@ const REACTIONS = new Set(["reaction", "reactiondamage", "reactionmanual", "reac
  * @type {Set<string>}
  */
 const USES = new Set(["save", "damage", "heal", "utility"]);
-
-/**
- * dnd5e's own class for each kind of activity whose damage or healing a player rolls in the app.
- * @type {Record<string, string>}
- */
-const DND5E_ACTIVITIES = { attack: "AttackActivity", save: "SaveActivity", damage: "DamageActivity", heal: "HealActivity" };
 
 /**
  * The kinds of target Midi-QOL won't use an activity without, where it needs targets.
@@ -209,9 +207,14 @@ async function prepareUse(command, actor) {
   if ( !castable(item) ) return { refusal: "item" };
   const usable = attack ? (activity?.type === "attack") : USES.has(activity?.type);
   if ( !usable || !activity.canUse ) return { refusal: "activity" };
-  // As dnd5e's Cast activity lets other modules know, or stop it, before anything is worked out:
-  // what they change of how it's used holds.
-  const usage = {};
+  // A spell an item casts is cast at a level its Cast activity offers, whether through the Cast
+  // activity or through the spell's copy, as the spellbook casts it.
+  const castBy = linked ? cast : (castCopy(item) ? (item.system.linkedActivity ?? null) : null);
+  const level = castBy ? castLevel(command, castBy, item, activity) : null;
+  if ( level?.refusal ) return level;
+  // As dnd5e's Cast activity lets other modules know, or stop it, before anything is worked out,
+  // with the level it's cast at: what they change of how it's used holds.
+  const usage = level?.usage ?? {};
   if ( linked && (Hooks.call("dnd5e.preUseLinkedSpell", cast, usage, { configure: false }, {}) === false) ) {
     return { refusal: "cancelled" };
   }
@@ -219,7 +222,7 @@ async function prepareUse(command, actor) {
   const area = Boolean(activity.target?.template?.type);
   if ( attack && !area && (command.targets !== undefined) && (command.targets !== null) ) return { refusal: "target" };
 
-  const slot = slotFor(command, activity);
+  const slot = castBy ? (usage.spell?.slot ?? defaultSlot(activity)) : slotFor(command, activity);
   if ( slot === false ) return { refusal: "slot" };
   const weapon = attack ? weaponChoices(command, item, activity) : {};
   if ( weapon.refusal ) return weapon;
@@ -241,9 +244,10 @@ async function prepareUse(command, actor) {
     subsequentActions: false,
     ...(slot ? { spell: { ...usage.spell, slot } } : {})
   });
-  // What using it would spend, worked out without spending it: anything it can't spend is said
-  // here, rather than on the Gamemaster's screen.
+  // What using it would spend, worked out without spending it, at the level dnd5e will scale it to
+  // once it's used: anything it can't spend is said here, rather than on the Gamemaster's screen.
   const prepared = activity._prepareUsageConfig(usage);
+  scaleAsUsed(prepared, activity);
   try {
     const updates = await activity._prepareUsageUpdates(prepared, { returnErrors: true });
     if ( Array.isArray(updates) && updates.length ) return { refusal: "consume", error: updates[0]?.message ?? null };
@@ -279,10 +283,57 @@ function castFromItem(use, results) {
 }
 
 /**
+ * The level a spell an item casts is cast at, as dnd5e's usage dialog offers it for the item's Cast
+ * activity: the one the player chose, as the slot of that level, if the dialog offers it, or is the
+ * one the dialog would choose itself; otherwise the lowest it offers, never below the spell's own.
+ * The use is then told the slot and how many levels above the spell's own that is, as the dialog
+ * tells it; it spends the item's uses for it, scaled, not a slot. Where the dialog offers no choice,
+ * as for a Cast activity that doesn't scale, or a cantrip, which has no slot, the use is told none.
+ * @param {object} command
+ * @param {Activity} cast       The item's Cast activity.
+ * @param {Item} spell          The spell's copy.
+ * @param {Activity} activity   Its activity used.
+ * @returns {{usage: object}|{refusal: "slot"}}
+ */
+function castLevel(command, cast, spell, activity) {
+  let offered;
+  try {
+    offered = offeredLevels(cast, { spell, lead: activity });
+  } catch {
+    offered = [];
+  }
+  const own = offered.length ? `spell${offered[0]}` : defaultSlot(activity);
+  const slots = [...offered.map(level => `spell${level}`), own];
+  if ( command.slot && !slots.includes(command.slot) ) return { refusal: "slot" };
+  if ( !offered.length ) return { usage: {} };
+  const slot = command.slot ?? own;
+  const base = finite(spell.system?.level) ?? 0;
+  return { usage: { spell: { slot }, scaling: Math.max(0, Number(slot.slice("spell".length)) - base) } };
+}
+
+/**
+ * Scale how a use is worked out as dnd5e scales it once it's made, before it spends anything: by
+ * the level of the spell slot it's cast with, above the spell's own, or a scroll's spell's fixed
+ * level, so that what it spends is what dnd5e will spend, such as a wand's charges for a spell it
+ * casts above its own level.
+ * @param {object} config        As `_prepareUsageConfig` gave it, changed in place.
+ * @param {Activity} activity
+ */
+function scaleAsUsed(config, activity) {
+  const fixed = activity.item.getFlag?.("dnd5e", "spellLevel");
+  if ( fixed ) config.scaling = Math.max(0, fixed.value - fixed.base);
+  else if ( activity.isSpell ) {
+    const level = activity.actor?.system.spells?.[config.spell?.slot]?.level;
+    if ( level ) config.scaling = level - activity.item.system.level;
+  }
+}
+
+/**
  * The spell slot a spell is cast with: the one the player chose, if dnd5e's usage dialog offers it
  * and it has one left; otherwise the dialog's own choice. A slot chosen for anything cast without
- * one, such as a spell cast at will or from an item, is left out: dnd5e would cast it at that
- * slot's level without spending it.
+ * one, such as a spell cast at will, is left out: dnd5e would cast it at that slot's level without
+ * spending it. A spell an item casts is cast at a level its Cast activity offers instead, as
+ * `castLevel` has it.
  * @param {object} command
  * @param {Activity} activity
  * @returns {string|null|false}   False when the chosen slot can't cast it.
@@ -959,9 +1010,10 @@ function setTargets(ids) {
 /**
  * The dice a use's damage or healing will throw, worked out before it's rolled, for its player to
  * roll them in the app: as dnd5e will make up its rolls, for the attack mode and ammunition an
- * attack used, and with a critical hit's dice; and each roll's choice of damage types, if it has
- * one. dnd5e's own `getDamageConfig` for the kind of activity is used, not Midi-QOL's, which
- * changes its workflow as it's called.
+ * attack used, and with a critical hit's dice, its extra dice and critical damage's among them, the
+ * critical damage's marked `added`; and each roll's choice of damage types, if it has one. dnd5e's
+ * own `getDamageConfig` for the kind of activity is used, not Midi-QOL's, which changes its workflow
+ * as it's called.
  * @param {Activity|null} activity
  * @param {object} [config]
  * @param {string} [config.attackMode]
@@ -971,12 +1023,8 @@ function setTargets(ids) {
  *   for no damage or healing.
  */
 export function previewDamage(activity, { attackMode, ammunition, isCritical=false }={}) {
-  const kind = DND5E_ACTIVITIES[activity?.type];
-  if ( !kind ) return null;
-  const own = globalThis.dnd5e?.documents?.activity?.[kind]?.prototype?.getDamageConfig;
-  const getDamageConfig = own ?? activity.getDamageConfig;
-  if ( typeof getDamageConfig !== "function" ) return null;
-  const process = getDamageConfig.call(activity, { attackMode, ammunition: ammunition ?? undefined });
+  if ( !DND5E_ACTIVITIES[activity?.type] ) return null;
+  const process = ownDamageConfig(activity, { attackMode, ammunition: ammunition ?? undefined });
   if ( !process?.rolls?.length ) return null;
   const rolls = damageRollsFor({ ...process, isCritical });
   const planned = rolls.map(roll => plannedDice(roll));
@@ -1019,6 +1067,9 @@ function typeChoices(types) {
 /**
  * Roll a player's damage or healing, with their dice, on the use it follows: once, only with the
  * dice the use said it would throw, changed as they chose, and as the kinds of damage they chose.
+ * Damage that, once built and changed, can't take every die they rolled, as where a die more was
+ * chosen of a part whose only dice are its critical damage's, or a module changed it since its
+ * preview, is refused as the dice not its own, and nothing is rolled, so they may roll it again.
  * @param {object} command      The player's damage, as fetched from the app.
  * @param {Campaign} campaign
  * @returns {Promise<CommandResult>}
@@ -1042,11 +1093,14 @@ export async function runDamageCommand(command, campaign) {
   if ( !expected || !matchesDice(command.dice, expected) ) return failedResult(command, "invalid", "dice");
   if ( !offersTypes(command.types, stored.preview) ) return failedResult(command, "type");
 
+  const made = { plan: null };
   const rolls = (stored.path === "midi")
-    ? await midiDamage(command, card, stored)
-    : await dnd5eDamage(command, card, stored, actor);
+    ? await midiDamage(command, card, stored, made)
+    : await dnd5eDamage(command, card, stored, actor, made);
   if ( typeof rolls === "string" ) return failedResult(command, rolls);
-  if ( !rolls?.length ) return failedResult(command, "cancelled");
+  if ( !rolls?.length ) {
+    return (made.plan?.refusal === "dice") ? failedResult(command, "invalid", "dice") : failedResult(command, "cancelled");
+  }
   await card.setFlag(MODULE_ID, "damage", command.id);
   // Midi-QOL rolls damage onto its card; dnd5e posts it on its own.
   return describeResult(command, rolls[0].parent ?? card, actor, campaign, { rolls });
@@ -1073,26 +1127,30 @@ function offersTypes(types, preview) {
  * @param {ChatMessage} card
  * @param {object} stored   What the use kept on the card.
  * @param {Actor} actor
+ * @param {{plan: DicePlan|null}} made   Given the roll's plan, for why it was called off, if it was.
  * @returns {Promise<Roll[]|string|undefined>}   The rolls, or why not.
  */
-async function dnd5eDamage(command, card, stored, actor) {
+async function dnd5eDamage(command, card, stored, actor, made) {
   const activity = cardActivity(card);
   if ( !activity ) return "gone";
   const ammunition = ammunitionOf(findMessage(command.use), actor)
     ?? (stored.ammunition ? actor.items.get(stored.ammunition) : null);
   const author = authorFor(actor);
-  return withPlan(command, () => activity.rollDamage(
-    { attackMode: stored.attackMode ?? undefined, ammunition: ammunition ?? undefined, isCritical: stored.critical,
-      [ROLL_TAG]: command.id },
-    { configure: false },
-    {
-      rollMode: PUBLIC,
-      data: {
-        author: author.id,
-        flags: { dnd5e: { originatingMessage: card.id, targets: stored.targets }, [MODULE_ID]: { request: command.id } }
+  return withPlan(command, plan => {
+    made.plan = plan;
+    return activity.rollDamage(
+      { attackMode: stored.attackMode ?? undefined, ammunition: ammunition ?? undefined, isCritical: stored.critical,
+        [ROLL_TAG]: command.id },
+      { configure: false },
+      {
+        rollMode: PUBLIC,
+        data: {
+          author: author.id,
+          flags: { dnd5e: { originatingMessage: card.id, targets: stored.targets }, [MODULE_ID]: { request: command.id } }
+        }
       }
-    }
-  ));
+    );
+  });
 }
 
 /**
@@ -1102,29 +1160,33 @@ async function dnd5eDamage(command, card, stored, actor) {
  * @param {object} command
  * @param {ChatMessage} card
  * @param {object} stored   What the use kept on the card.
+ * @param {{plan: DicePlan|null}} made   Given the roll's plan, for why it was called off, if it was.
  * @returns {Promise<Roll[]|string|undefined>}   The rolls, or why not.
  */
-async function midiDamage(command, card, stored) {
+async function midiDamage(command, card, stored, made) {
   const workflow = globalThis.MidiQOL?.Workflow?.getWorkflow(card.uuid);
   if ( !workflow ) return "gone";
   if ( !waitingForDamage(workflow) ) return "not-waiting";
   const roll = () => {
     workflow.workflowOptions.damageRollDSN = !document.hidden;
-    return withPlan(command, () => workflow.activity.rollDamage(
-      {
-        workflow,
-        ammunition: workflow.ammunition ?? undefined,
-        midiOptions: {
-          ...workflow.rollOptions,
-          isCritical: workflow.isCritical,
-          fastForwardDamage: true,
-          workflowOptions: workflow.workflowOptions
+    return withPlan(command, plan => {
+      made.plan = plan;
+      return workflow.activity.rollDamage(
+        {
+          workflow,
+          ammunition: workflow.ammunition ?? undefined,
+          midiOptions: {
+            ...workflow.rollOptions,
+            isCritical: workflow.isCritical,
+            fastForwardDamage: true,
+            workflowOptions: workflow.workflowOptions
+          },
+          [ROLL_TAG]: command.id
         },
-        [ROLL_TAG]: command.id
-      },
-      { configure: false },
-      { create: false, data: { flags: { dnd5e: { targets: stored.targets } } } }
-    ));
+        { configure: false },
+        { create: false, data: { flags: { dnd5e: { targets: stored.targets } } } }
+      );
+    });
   };
   if ( !stored.area ) return roll();
 

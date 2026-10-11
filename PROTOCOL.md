@@ -157,7 +157,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 {
   "img": "worlds/erebor/thorin.webp",
   "rules": "modern",
-  "critical": { "perDie": 2, "multiplyNumeric": false, "powerfulCritical": false, "altered": false },
+  "critical": { "perDie": 2, "multiplyNumeric": false, "powerfulCritical": false, "altered": false, "bonusDice": "rolled" },
   "level": 5,
   "classes": [
     { "id": "4kWt1v7QeXzEa2Nc", "identifier": "fighter", "name": "Fighter", "levels": 4, "subclass": "Champion", "hitDice": { "die": "d10", "value": 3, "max": 4 } },
@@ -284,7 +284,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | --- | --- |
 | `img` | The portrait's path as Foundry stores it: relative to the game's address, or a full URL. |
 | `rules` | The rules the world is played by, as dnd5e's *Rules Version* setting has them: `"modern"` (2024) or `"legacy"` (2014), or `null` where that can't be read. Under the legacy rules a [hit die](#hit-dice-and-formulas) can heal nothing. Module 0.16.0. |
-| `critical` | How the world rolls a critical hit's damage, for the app to plan a [description's](#descriptions-that-roll): `{ perDie, multiplyNumeric, powerfulCritical, altered }`, each found by building a critical hit's damage as the Gamemaster's client builds it, so with the rules of modules that change it, such as Midi-QOL's critical damage for the Gamemaster, never from dnd5e's settings alone, which Midi's rules may set aside. `perDie` is how many times over each die is thrown, and no other die: `2`, dnd5e's own, or `1` where dnd5e's *Powerful Critical* adds the most its dice could roll instead. `multiplyNumeric`, whether its numbers are doubled, as dnd5e's *Critical Damage Modifiers* does, and `powerfulCritical`, whether the most its dice could roll is added, as dnd5e's *Powerful Critical* does, or Midi's "Max Critical Dice (flat number)": for the app to work out a total by. `altered`, whether the rules change the dice thrown beyond that, as Midi's do that roll them at their highest, double them or keep the highest of them: the app can then work out no total, and the game's is the one that counts, as it always is. `null` where the rules throw dice of their own beside each die, as Midi's that roll a critical hit's dice apart or explode them do, throw dice of one size otherwise than another's, come to numbers neither of dnd5e's settings would, or where it can't be found. Sent again in [`character.updated`](#characterupdated) when those settings change. Module 0.19.0. |
+| `critical` | How the world rolls a critical hit's damage, for the app to plan a [description's](#descriptions-that-roll): `{ perDie, multiplyNumeric, powerfulCritical, altered }`, each found by building a critical hit's damage as the Gamemaster's client builds it, so with the rules of modules that change it, such as Midi-QOL's critical damage for the Gamemaster, never from dnd5e's settings alone, which Midi's rules may set aside. `perDie` is how many times over each die is thrown, and no other die: `2`, dnd5e's own, or `1` where dnd5e's *Powerful Critical* adds the most its dice could roll instead. `multiplyNumeric`, whether its numbers are doubled, as dnd5e's *Critical Damage Modifiers* does, and `powerfulCritical`, whether the most its dice could roll is added, as dnd5e's *Powerful Critical* does, or Midi's "Max Critical Dice (flat number)": for the app to work out a total by. `altered`, whether the rules change the dice thrown beyond that, as Midi's do that roll them at their highest, double them or keep the highest of them: the app can then work out no total, and the game's is the one that counts, as it always is. `null` where the rules throw dice of their own beside each die, as Midi's that roll a critical hit's dice apart or explode them do, throw dice of one size otherwise than another's, come to numbers neither of dnd5e's settings would, or where it can't be found. `bonusDice` (module 0.20.0), what the rules do with a critical hit's extra dice, such as a melee weapon's for Savage Attacks or Brutal Critical, which dnd5e throws with a part's first die alone (a part's own, `d` of them, are in [`data-critical-dice`](#links-in-descriptions)): `"rolled"`, thrown on that die after it's thrown `perDie` times over, so its count becomes `n × perDie + d`, as dnd5e does; `"maximized"`, not thrown, but `d` times that die's faces added as a number, as Midi's "Max Critical Dice (flat number)" does; `"ignored"`, left out, as Midi's rules that change dice otherwise do; or `null` where that can't be told, as under dnd5e 6's *Powerful Critical*, when no addition with dice may be planned. It's found as the rest is, by building a critical hit's damage: one die with a die more and critical damage of a die and a number, then dice of two sizes with two dice more and critical damage of a number, which must come out the same way, the critical damage added after as it is. Left out before 0.20.0, which counts as `null`; not there when `critical` is `null`. Sent again in [`character.updated`](#characterupdated) when those settings change. Module 0.19.0. |
 | `level`, `classes` | Character level, and each class with its levels and subclass, highest first. A class's `identifier` is dnd5e's, such as `"fighter"`, and `hitDice` its `{ die, value, max }`: the size, how many are left and how many it has, or `null`. |
 | `species`, `background` | Their names, or `null`. |
 | `hp` | `{ value, max, temp }`, as on a [combatant](#combatant). |
@@ -314,7 +314,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `details` | `about`, `{ id, label, value }` for alignment, age and the like that are filled in; `personality`, likewise, for personality traits, ideals, bonds and flaws; `appearance`; `xp`, `{ value, max }`, `max` being `null` at the highest level; and `biography`, a description's hash. |
 | `actions` | What the character can do in a fight, listed as Tidy 5e's Actions tab lists it by default: equipped weapons; equipped equipment and consumables used in a fight, not over minutes or more; spells that can be cast now and deal damage, are cast as a bonus action or reaction, last a minute or a round, or apply effects; and features that are activated. An item a player added to Tidy 5e's list, or took off it, is listed or not as they chose. Since module 0.15.0 the spells an item casts with its Cast activities are cast from the item, and the copies of them dnd5e keeps aren't listed; an item Tidy 5e's rules leave off the list is still listed for the spells it casts, unless the player took it off. Sections are by activation, in Tidy 5e's order: `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"`, `"special"`, `"other"` for any other, then any the player named in Tidy 5e, whose `id` and `label` are its name. Empty sections are left out. Since module 0.15.0 an item is listed in each section for how its activities are activated, such as a staff that strikes as an action and casts Silvery Barbs as a reaction, under `"action"` and under `"reaction"`, each time with the activities activated that way; an activity with no activation of its own, or a special one, used along with another, such as Hex's Bonus Hex Damage, goes with the item's first. An item the player gave a section of its own, or one not identified yet, is listed once, with all its activities, or for one Tidy 5e's rules leave off the list, all the spells it casts. Before, an item was listed once, by its first activity's activation. |
 | `favorites` | What dnd5e's sheet shows under Favorites, and Tidy 5e in its own, in its order: the old-style resources (`"resource"`) that are named and have a maximum, then what the player made a favorite, in their order. Each has a `type` and an `id` that refers to what the sheet lists elsewhere, where it lists it, and a `name`. An `"item"`'s `id` is the item's, as in `inventory`, `spells`, `features` and `actions`, with its `itemType` and `img`. An `"activity"`, one of an item's activities, has the item's `itemId`, `itemType` and `itemName`, its own `name` and `img`, and `activation`, `range`, `target`, `toHit`, `save`, `damage` and `uses` as on an action, for that activity alone, with its own id as `attackId`, and its `attackModes` and `ammunition`, when it's an attack, and itself as `activity` when it's a save, damage, healing or utility activity, and `consumesSlot` as on an action; an item not identified yet keeps them back, as on an action. An `"effect"`'s `id` is as in `effects`, with its `img`, whether it's `disabled`, and whether it's `suppressed`. A `"skill"`'s `id` is as in `skills`. A `"tool"` has its `ability`, its `total` modifier, `passive` score, `proficiency` and roll `mode`, as a skill has, and as in `tools` since module 0.18.0. A `"slots"`'s `id` is as in `spells`, with `value`, `max` and `level` as a section's `slots`. A `"resource"` has `uses` as on a feature. A favorite that refers to nothing any longer, or to what a player doesn't see, such as an item hidden from the sheet or an effect of an item not yet identified, is left out. |
-| `actions[].actions` | Items, in the order the player keeps them. `activation`, `range` (for a weapon, its reach or range, such as `"reach 5 ft or range 20/60 ft"`) and `target` are dnd5e's labels; `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save` and `damage` are its first activity's, in dnd5e's order, as [below](#what-an-item-rolls): `toHit` the bonus to hit of an attack, without any dice in it, as dnd5e's sheets show it; `attackId` the attack activity's id, so that the app can have the attack [made in the game](#attacks), `null` for any other; `activity` the activity itself, for one [used in the game](#spells-and-features) other than by attacking, `{ id, type, targets }`: `type` being `"save"`, `"damage"`, `"heal"` or `"utility"`, and `targets`, `{ self, area, count, perLevel, affects }`, whom it's used at: `self` its user alone, `area` everyone in an area, `count` the most targets it takes, or `null` for no limit, `perLevel` how many more a spell takes for each level it's cast above its own, as Bless does, or `null`, and `affects` dnd5e's kind of target, such as `"ally"`, `"enemy"`, `"creature"` or `"willing"`, or `null`; `null` for any other; `attackModes` the ways its attack is made, each `{ value, label }`, such as one- or two-handed, or thrown, when there's more than one, otherwise `null`; `ammunition` what its attack fires, each `{ id, name, quantity }` the character has, for a weapon that fires ammunition, otherwise `null`; `save`, `{ ability, dc }`, the saving throw it calls for, `ability` being `"DC"` when the target chooses among several; `damage` its damage or healing as dnd5e labels it, each part `{ formula, type, healing }` with the ability modifier in the formula; `consumesSlot` `false` for a spell's activity used without spending a spell slot, and otherwise left out (module 0.14.0); `attackArea` and `rollFormula` for an attack at an area and a utility with a roll of its own, as [below](#what-an-item-rolls), and otherwise left out (module 0.16.0); `activities` each of its activities, for an item with more than one (module 0.14.0): since module 0.15.0, those activated as its section has it, and those even when there's one, where the item is listed in other sections too; `uses` as on a feature, the first activity's when the item has none: since module 0.15.0, that of the first activity it's listed for, or for one that casts a spell, those casting it spends; `level` a spell's, `0` for a cantrip, otherwise `null`; `castFrom` as on a spell, `null` for anything but a spell. Since module 0.15.0, an item listed in a section for an activity other than its first names it, `activityName`, such as `"Silvery Barbs"`, and is otherwise without; `activationType` is the kind of action its first activity there is activated with, as a section's `id` names it, `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"` or `"special"`, where it takes just one, Midi-QOL's kinds of reaction being `"reaction"`, or `null` for any other, such as two actions, a Legendary Action that costs two, a minute or a long rest; `consumable` is `true` for one of the consumables: an item dnd5e's inventory has among them, such as a potion, a scroll or a wand, or another whose uses never come back, and otherwise left out; and `cast` and `spellId`, for one that casts a spell, as [below](#what-an-item-rolls). An item not identified yet has no `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save`, `damage`, `attackArea`, `rollFormula`, `activities`, `uses`, `activityName`, `consumable`, `cast` or `spellId`. |
+| `actions[].actions` | Items, in the order the player keeps them. `activation`, `range` (for a weapon, its reach or range, such as `"reach 5 ft or range 20/60 ft"`) and `target` are dnd5e's labels; `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save` and `damage` are its first activity's, in dnd5e's order, as [below](#what-an-item-rolls): `toHit` the bonus to hit of an attack, without any dice in it, as dnd5e's sheets show it; `attackId` the attack activity's id, so that the app can have the attack [made in the game](#attacks), `null` for any other; `activity` the activity itself, for one [used in the game](#spells-and-features) other than by attacking, `{ id, type, targets }`: `type` being `"save"`, `"damage"`, `"heal"` or `"utility"`, and `targets`, `{ self, area, count, perLevel, affects }`, whom it's used at: `self` its user alone, `area` everyone in an area, `count` the most targets it takes, or `null` for no limit, `perLevel` how many more a spell takes for each level it's cast above its own, as Bless does, or `null`, for a spell cast from an item since module 0.20.0 for each level above the one it's cast at, its `cast`'s `level`, and `affects` dnd5e's kind of target, such as `"ally"`, `"enemy"`, `"creature"` or `"willing"`, or `null`; `null` for any other; `attackModes` the ways its attack is made, each `{ value, label }`, such as one- or two-handed, or thrown, when there's more than one, otherwise `null`; `ammunition` what its attack fires, each `{ id, name, quantity }` the character has, for a weapon that fires ammunition, otherwise `null`; `save`, `{ ability, dc }`, the saving throw it calls for, `ability` being `"DC"` when the target chooses among several; `damage` its damage or healing as dnd5e labels it, each part `{ formula, type, healing }` with the ability modifier in the formula; `consumesSlot` `false` for a spell's activity used without spending a spell slot, and otherwise left out (module 0.14.0); `attackArea` and `rollFormula` for an attack at an area and a utility with a roll of its own, as [below](#what-an-item-rolls), and otherwise left out (module 0.16.0); `activities` each of its activities, for an item with more than one (module 0.14.0): since module 0.15.0, those activated as its section has it, and those even when there's one, where the item is listed in other sections too; `uses` as on a feature, the first activity's when the item has none: since module 0.15.0, that of the first activity it's listed for, or for one that casts a spell, those casting it spends; `level` a spell's, `0` for a cantrip, otherwise `null`; `castFrom` as on a spell, `null` for anything but a spell. Since module 0.15.0, an item listed in a section for an activity other than its first names it, `activityName`, such as `"Silvery Barbs"`, and is otherwise without; `activationType` is the kind of action its first activity there is activated with, as a section's `id` names it, `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"` or `"special"`, where it takes just one, Midi-QOL's kinds of reaction being `"reaction"`, or `null` for any other, such as two actions, a Legendary Action that costs two, a minute or a long rest; `consumable` is `true` for one of the consumables: an item dnd5e's inventory has among them, such as a potion, a scroll or a wand, or another whose uses never come back, and otherwise left out; and `cast` and `spellId`, for one that casts a spell, as [below](#what-an-item-rolls). An item not identified yet has no `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save`, `damage`, `attackArea`, `rollFormula`, `activities`, `uses`, `activityName`, `consumable`, `cast` or `spellId`. |
 | `text` | A [description](#descriptions)'s hash, or `null` if there is none. |
 
 #### What an item rolls
@@ -339,7 +339,7 @@ activity also lists each in `activities`, its first first, so that each can be r
 | `type` | Its kind, such as `"attack"`, `"save"`, `"damage"`, `"heal"`, `"utility"`, or one the app can't use, such as `"summon"`. |
 | `activation`, `activationType`, `range`, `target`, `uses` | As on an action, for this activity alone. A Cast activity's `uses` are those casting its spell spends, such as the item's charges. |
 | `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save`, `damage`, `attackArea`, `rollFormula`, `consumesSlot` | What it rolls, and what it's used through, as on an action. |
-| `cast` | For a Cast activity, `{ level, concentration, charges, short, text }`, as below. |
+| `cast` | For a Cast activity, `{ level, concentration, charges, short, text }`, and `levels` where it may be cast higher (module 0.20.0), as below. |
 | `spellId` | For a Cast activity, the `id` of the copy of its spell dnd5e keeps, as below. Module 0.17.0. |
 | `duration` | How long what it does lasts, as dnd5e labels it, such as `"1 Minute"`, or `"Concentration, up to 1 Minute"` for one that takes it; for a Cast activity, as its spell's copy has it, as the Spells tab shows the spell. Left out for one that's instantaneous or has no duration. Module 0.17.0. |
 | `trigger` | When it's used, as the activity's activation condition says it, such as what a reaction is taken in answer to: `"when you are hit by an attack"`. Left out where it says nothing. Module 0.17.0. |
@@ -349,8 +349,9 @@ An activity favorite has the same fields, and of an item not identified yet keep
 `duration`, `trigger`, `text` and `spellId` too. `consumesSlot` is `false` for a spell's activity
 used after it's cast without spending a slot, such as Spirit Guardians' save each turn or Hex's
 Bonus Hex Damage: dnd5e still asks the level it's used at, which its damage may scale with, but
-spends nothing, so it's used whether any slot is left or not. A spell with one activity, or an item
-with none, has no `activities`.
+spends nothing, so it's used whether any slot is left or not. Of the copy of a spell an item casts,
+it marks an activity that spends none of the item's uses either, a cantrip's too since module
+0.20.0. A spell with one activity, or an item with none, has no `activities`.
 
 Since module 0.15.0 a Cast activity, by which an item casts a spell, such as a staff's Silvery
 Barbs or a scroll's spell, rolls and is used as its spell's first activity does, as dnd5e keeps a
@@ -365,6 +366,22 @@ spends has fewer left than it spends. Its `uses` are the first it spends. One wh
 hasn't copied yet, or that the item can't cast, such as one the character must attune to and
 hasn't, rolls nothing, as a summoning doesn't, but has the same `uses`.
 
+Since module 0.20.0 a `cast` whose Cast activity may cast its spell higher, for more of the item's
+uses, as a wand of magic missiles does, has `levels`: each level it may be [cast
+at](#spells-and-features), `{ level, charges, short }`, lowest first, with `charges` and `short` as
+`cast`'s own for that level. They're the levels dnd5e's usage dialog offers: from `cast`'s `level`,
+the Cast activity's or the spell's own, whichever is higher, up to as many levels as its scaling
+allows, the most worked out from the item's numbers, such as `min(@item.uses.value, 3)` from its
+charges left, or else up to 9th. Its first is `cast`'s own level, `charges` and `short`; a level
+above it that costs more than the item's uses ever come to, such as a 2014 wand's 8th and 9th with
+seven charges, is left out. Only a leveled spell whose Cast activity allows scaling has them, and
+none where fewer than two are left; they change with the charges left, as the sheet is sent again.
+A Cast activity above its spell's own level is cast higher as dnd5e casts it: its cost and a count
+of targets written with the spell's level grow with each level, but its damage, and a count
+written with its scaling, stay at the Cast activity's level. Its `activity`'s `targets` and its
+`attackArea` have `perLevel`, how many more for each level above `cast`'s `level`, where they had
+`null` before.
+
 Since module 0.17.0 every `cast` has `text`: its spell's description's hash, the same its copy has
 on the Spells tab, so it's no more to send; or `null` for a spell without one. Before, only an
 action's and an activity favorite's had it. And a Cast activity whose spell dnd5e has copied has
@@ -378,7 +395,7 @@ that doesn't know them sees nothing new:
 
 | Field | Meaning |
 | --- | --- |
-| `attackArea` | For an attack made at an area, such as a breath weapon's cone: `{ count, perLevel, affects }`, whom it's made at, as an `activity`'s `targets` say it: `count` the most targets it takes, or `null` for no limit, `perLevel` how many more for each level a spell is cast above its own, or `null`, always `null` for a spell cast from an item, and `affects` dnd5e's kind of target. The app has it [made at the targets the player picks](#attacks) in the area. |
+| `attackArea` | For an attack made at an area, such as a breath weapon's cone: `{ count, perLevel, affects }`, whom it's made at, as an `activity`'s `targets` say it: `count` the most targets it takes, or `null` for no limit, `perLevel` how many more for each level a spell is cast above its own, or `null`, for a spell cast from an item each level above its `cast`'s `level` (before module 0.20.0, always `null` on a Cast activity, and on its copy where the Cast activity is above the spell's own level), and `affects` dnd5e's kind of target. The app has it [made at the targets the player picks](#attacks) in the area. |
 | `rollFormula` | For a utility activity with a roll of its own, such as a d4 of luck: `{ formula, name }`, its `formula` with the character's numbers in, such as `"1d4 + 3"` for `1d4 + @abilities.wis.mod`, and its `name` as dnd5e's card's button has it, or `null`. The app rolls its dice and has it [rolled in the game](#hit-dice-and-formulas). |
 
 A Cast activity has its spell's first activity's, by its own id, as for its other fields.
@@ -411,9 +428,12 @@ of its own takes; one that names a check, or has dnd5e's skill or tool links, th
 tools and DCs of its item's checks, which dnd5e's `[[/check]]` shows and a check without a DC of its
 own takes (since module 0.18.0); and one with dnd5e's damage or healing links, its item's damage,
 and for an item with an attack, since module 0.19.0, whether the character's critical hits with a
-melee weapon throw extra dice, as Savage Attacks gives. So it gets a new hash when any of them
-changes. Modules 0.17.0, 0.18.0 and 0.19.0 each send descriptions in a new format, so each gets a
-new hash, and is sent again once, with its next hello.
+melee weapon throw extra dice, as Savage Attacks gives; and since module 0.20.0, its activities'
+damage as dnd5e resolves it, in each of the item's attack modes, so with the character's bonuses to
+damage, such as Rage's, and the scale values they name, and what a critical hit adds to it, such as
+an attack's critical damage. So it gets a new hash when any of them changes. Modules 0.17.0,
+0.18.0, 0.19.0 and 0.20.0 each send descriptions in a new format, so each gets a new hash, and is
+sent again once, with its next hello.
 
 #### Links in descriptions
 
@@ -431,13 +451,15 @@ app](#descriptions-that-roll):
 <span class="ss-check roll" data-n="5" data-checks="skill:str:ath|skill:dex:acr" data-dc="12">DC 12 Strength (Athletics) or Dexterity (Acrobatics)</span>
 <span class="ss-check roll" data-n="6" data-checks="tool:dex:thief" data-dc="15">DC 15 Dexterity (Thieves' Tools)</span>
 <span class="ss-check roll" data-n="7" data-checks="skill:dex:slt" data-using-tool="thief">Dexterity (Sleight of Hand) check using Thieves' Tools</span>
+<span class="ss-damage roll" data-n="8" data-formulas="1d12 + 4" data-types="slashing" data-critical="false" data-critical-dice="1" data-critical-damage="1d6">1d12 + 4 slashing</span>
+<span class="ss-damage roll" data-n="9" data-formulas="1d6 + 4" data-types="piercing" data-critical-dice="0" data-critical-damage="4">1d6 + 4 piercing</span>
 ```
 
 | Span | Is | Attributes |
 | --- | --- | --- |
 | `ss-save roll` | A saving throw, or a concentration check. | `data-ability`: the ability, as dnd5e's key, such as `"dex"`, or several joined by `\|` for a choice, such as `"str\|dex"`; left out for a concentration check that names none. `data-dc`: its DC, a whole number from 1 to 99, where one is known. `data-type`: `"concentration"` for a concentration check, else left out. |
 | `ss-check roll` | An ability, skill or tool check, or a choice of several. Module 0.18.0. | `data-checks`: from 1 to 10 checks joined by `\|`, each `check:<ability>` for an ability check, `skill:<ability>:<skill>` for a skill check, or `tool:<ability>:<tool>` for a tool check, as dnd5e's keys, such as `"skill:str:ath"`; each kind of check, by its skill or tool, or its ability for an ability check, at most once. The ability is always given: the one the description names, or else the skill's or tool's own, as dnd5e's configuration has it, as dnd5e's request for it would, never the character's own. Only the six abilities, `str` to `cha`. A tool is one of dnd5e's `tools`, or a kind of vehicle, as `water`. Keys match `[A-Za-z][\w-]{0,31}`. `data-dc` as for a save. `data-using-tool`: for a skill checked using a tool, as dnd5e's 2024 rules have it, "a Dexterity (Sleight of Hand) check using Thieves' Tools", the tool's key; else left out. |
-| `ss-damage roll` | Damage or healing, in one or more parts. | `data-formulas`: each part's formula, joined by `&`. `data-types`: each part's kinds of damage or healing, as dnd5e's keys, joined by `&` in the same order, and a part's choice among several joined by `\|`; a part that names none has nothing in its place, and a single part that names none leaves it out. `data-healing`: `"true"` for healing, else left out. `data-critical`: `"false"` for damage never [rolled as a critical hit's](#descriptions-that-roll), else left out: damage dnd5e's own link rolls through one of the item's activities, as it does `[[/damage]]` naming no formula of its own, where that activity allows none, as a saving throw's, a healing's and most damage activities' don't, or where its critical hit throws dice the app can't plan, such as a melee weapon's extra dice for Savage Attacks, or critical damage with dice of its own. Module 0.19.0. |
+| `ss-damage roll` | Damage or healing, in one or more parts. | `data-formulas`: each part's formula, joined by `&`. `data-types`: each part's kinds of damage or healing, as dnd5e's keys, joined by `&` in the same order, and a part's choice among several joined by `\|`; a part that names none has nothing in its place, and a single part that names none leaves it out. `data-healing`: `"true"` for healing, else left out. `data-critical`: `"false"` for damage never [rolled as a critical hit's](#descriptions-that-roll), else left out: damage dnd5e's own link rolls through one of the item's activities, as it does `[[/damage]]` naming no formula of its own, where that activity allows none, as a saving throw's, a healing's and most damage activities' don't, or its configuration can't be read. Module 0.19.0. `data-critical-dice` and `data-critical-damage`, module 0.20.0: what a critical hit adds to each part of damage dnd5e's own link rolls through an activity, joined by `&` in the parts' order, one for each part of `data-formulas`; both or neither, and only where it adds something. `data-critical-dice` is the extra dice on that part's first die, a whole number from 0 to 20, such as a melee weapon's for Savage Attacks or Brutal Critical: none where the part, as dnd5e builds the activity's own roll, starts with a number, though the link's formula is written with its dice first. `data-critical-damage` is that part's critical damage, as dnd5e adds it after the part's own: empty for none; a number, from -100 to 100, for one that always comes to the same, such as an attack's critical damage of its wielder's Strength modifier, empty for 0; or else its terms, resolved, in order, as dnd5e adds them, none merged, without their flavor, each one to twenty of a d4, d6, d8, d10, d12, d20 or d100 with nothing changing them, a whole number up to 100, or a `+` or `-` (`^[\dd +\-]{0,100}$`). Where any of it throws dice, `data-critical="false"` is written too, for apps before 0.20.0, which can't plan them: one that reads the pair takes `"false"` with it to mean a critical hit's is allowed, with those additions; one that doesn't, never. An activity whose additions can't be written so allows none. |
 | `ss-roll roll` | A roll in the text, such as Foundry's `[[/r 1d6]]` or `[[1d6]]`. | `data-formula`: its formula, never what the Gamemaster's browser rolled for it as it enriched the description. |
 | `ss-condition ref` | A condition named, to read about. | `data-condition`: one of dnd5e's `conditionTypes` keys, such as `"prone"`; never one dnd5e marks as only like a condition, such as burning or bleeding. |
 
@@ -630,7 +652,7 @@ the destination, the campaigns or any event setting changes.
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Make Players' Attacks and Spells Through Midi-QOL** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; and `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters. See [Rolls from the app](#rolls-from-the-app). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Make Players' Attacks and Spells Through Midi-QOL** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; and `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters. See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 | `prompts` | Every [prompt](#prompts) open for the campaign's players, read afresh from the chat log: any the campaign was told of that isn't among them has closed. Empty while its players aren't asked for their saves. |
@@ -689,19 +711,22 @@ What became of a player's roll, attack or use fetched from the listener; see
 | --- | --- |
 | `id` | The roll's `id`, as fetched. |
 | `status` | `"done"`, or `"failed"` when it wasn't made. |
-| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). For an ask, a description's roll, damage or healing, or a save or check rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). `null` when done. |
+| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for hit dice spent at once (module 0.20.0), those and `"full-hp"` (the character is at full hit points); for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). For an ask, a description's roll, damage or healing, or a save or check rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). `null` when done. |
 | `error` | What went wrong, for `"invalid"` and `"error"`, what dnd5e said for `"consume"`, and why for `"prompt"`; otherwise `null`. |
-| `messageId` | The chat message the roll made. |
-| `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check. |
-| `rolls` | The [rolls](#chat-message) as made, Foundry's total and every die, when `visible`; otherwise empty. |
-| `healed` | For a hit die: the hit points it gained; see [Hit dice and formulas](#hit-dice-and-formulas). |
+| `messageId` | The chat message the roll made; for hit dice, the last of their cards. |
+| `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check; for hit dice, `false` unless they may see every card. |
+| `rolls` | The [rolls](#chat-message) as made, Foundry's total and every die, when `visible`; otherwise empty. For hit dice, every roll of every card, in order. |
+| `healed` | For a hit die or hit dice: the hit points gained; see [Hit dice and formulas](#hit-dice-and-formulas). |
+| `spent` | For hit dice (module 0.20.0), once past the checks made before any is spent: `{ count, made }`, how many were asked for, and how many were rolled, a card each. Hit dice that stopped part way, with `made` below `count`, are `"failed"` with the reason they stopped, and still carry `messageId`, `visible`, `rolls` and `healed` for those made, where any were; see [Hit dice and formulas](#hit-dice-and-formulas). Left out otherwise. |
 | `attack` | For an attack: `{ critical, fumble, outcome }`, and for an area attack `targets`, when `visible`; see [Attacks](#attacks). |
 | `use` | For a use: `{ type }`, the kind of activity used; see [Spells and features](#spells-and-features). |
 | `damage` | For an attack or a use: the dice its damage or healing will throw, or `null`; see [Attacks](#attacks). |
 | `outcome` | For a save answering a prompt: `"success"` or `"failure"`, where its player may see whether they saved, as the card would show them; since module 0.17.0, for a save rolled for a [description's link](#descriptions-that-roll), and since 0.18.0 a check, whether it met the DC it was rolled against, as its card shows the player, when `visible`; otherwise `null`. |
 
 A roll made after the module reported its `"timeout"`, as once the Gamemaster has answered what a
-module asked them, is reported again when it's made, `"done"`.
+module asked them, is reported again when it's made, `"done"`; for hit dice, also when some were
+made before they stopped (`spent.made` above `0`), `"failed"` with the reason they stopped, as a
+rule `"timeout"`.
 
 ### Chat
 
@@ -885,6 +910,43 @@ A prompt:
   `critical` was never read: it was rolled as an ordinary hit's, or refused as `"dice"` where its
   dice were a critical hit's. A listener should send `critical` only where the sheet has
   `critical`, which module 0.19.0 sends; one that sends neither needs no change.
+- Module 0.20.0 offers critical hits that add dice. Damage dnd5e's own link rolls through an
+  activity has [`data-critical-dice` and `data-critical-damage`](#links-in-descriptions), both or
+  neither, what a critical hit adds to each of its parts, such as a melee weapon's extra dice for
+  Savage Attacks and an attack's critical damage, and keeps `data-critical="false"` where any of it
+  throws dice, so that apps before it keep it non-critical; an app that reads the pair takes it to
+  allow a critical hit's, rolled with those additions. The sheet's [`critical`](#character-sheet)
+  has `bonusDice`, what the world's rules do with extra dice. An attack's [`damage`](#attacks)
+  preview marks its critical damage's dice `added`, which a die more never changes; damage that,
+  once built, can't take the player's dice is refused (`"invalid"`, `"dice"`) with nothing posted,
+  a description's as `"dice"`. Descriptions are sent in a new format, 5, under new hashes, which
+  now change with the damage they show as resolved, so each is sent again once, with the next
+  hello. A listener that reads neither the pair nor `bonusDice` needs no change: unknown attributes
+  and fields are dropped, and `"false"` keeps such damage non-critical for it.
+- Module 0.20.0 also casts a spell from an item [at a higher level](#spells-and-features), where
+  its Cast activity lets it, for more of the item's uses: a `cast` has `levels`, the levels it may
+  be cast at with what each costs, and an attack or use of it, or of its copy's other activities,
+  names one as its `slot`, `"spell"` and the level; a level dnd5e wouldn't offer for the Cast
+  activity is refused (`"slot"`), and one it offers that the item can't pay for, as one left out
+  of `levels` for costing more than the item ever has, is refused as spending more than is left
+  (`"consume"`).
+  dnd5e's `dnd5e.preUseLinkedSpell` hook is told the level as `spell.slot` and `scaling`. A Cast
+  activity above its spell's own level is refused beforehand (`"consume"`) where its scaled cost
+  is more than is left. The `perLevel` of a Cast activity, on its `activity`'s `targets` and its
+  `attackArea`, is how many more for each level above the one it casts its spell at, rather than
+  `null`. Its copy's is counted from that level too: the same as before where the Cast activity
+  casts at the spell's own level, but where it casts above it, no longer `null` for a count
+  written with the spell's level. And `consumesSlot` marks a cantrip copy's activity that spends
+  nothing.
+  A listener that doesn't read `levels` sends no `slot` for a spell cast from an item, which is
+  then cast at its own level as before; its targets, counted from `cast`'s `level`, come to the
+  same.
+- Module 0.20.0 also spends [several hit dice at once](#hit-dice-and-formulas), of one size or
+  more, in one command, `"hitDice"`, among the `kinds` wherever `"hitDie"` is; dnd5e spends them
+  one at a time, a card each, and they stop at full hit points, with the new reason `"full-hp"`.
+  `command.result` has `spent`, and hit dice that stopped part way are reported with those made.
+  A listener should send `hitDice` only where the hello lists it, and otherwise a `hitDie` for
+  each die, each once the one before is made; one that sends no `hitDice` needs no change.
 
 ## Changes from protocol 1
 
@@ -911,6 +973,7 @@ campaign, with **Let Players Roll from Sending Stone** in Manage Campaigns. It i
 | `death` | A death saving throw, while the character is dying. | |
 | `initiative` | Initiative, while the character has none in the combat the Gamemaster has up. | `combatId` |
 | `hitDie` | A [hit die](#hit-dice-and-formulas) spent, healing the character. Module 0.16.0. | `denomination`: its size, such as `"d10"`. |
+| `hitDice` | Several [hit dice](#hit-dice-and-formulas) spent at once, of one or more sizes. Module 0.20.0. | `hitDice`: each size and how many of it, `[{ denomination, count }]`. |
 | `formula` | A utility's [own roll](#hit-dice-and-formulas), such as a d4 of luck. Module 0.16.0. | `item`, `activity`: the item and activity with its `rollFormula`. |
 | `textRoll` | A [roll in a description](#descriptions-that-roll), such as `[[/r 1d4]]`. Module 0.17.0. | `text`, `link`: the description and the link in it. |
 | `ask` | Not a roll: the table [asked](#descriptions-that-roll) for a description's saving throw, or since module 0.18.0 its check. Module 0.17.0. | `text`, `link` |
@@ -957,11 +1020,11 @@ the order they came.
 | --- | --- |
 | `id` | Unique to the roll. |
 | `actorId` | The campaign's character it is for. |
-| `kind`, `key`, `combatId`, `denomination`, `item`, `activity`, `text`, `link` | What is rolled, as above. |
+| `kind`, `key`, `combatId`, `denomination`, `hitDice`, `item`, `activity`, `text`, `link` | What is rolled, as above. |
 | `mode` | `-1`, `0` or `1`: rolled with disadvantage, normally, or with advantage. |
 | `explicit` | Did the player choose how, as in dnd5e's roll dialog? Then the game rolls it that way. Otherwise it rolls as the character's sheet has it, which is where the app's `mode` came from. |
 | `extras` | What the player added, each `{ sign, count, sides }` or `{ sign, flat }`: such as `+1d4` for Bless. At most 10. Made as the roll's situational bonus. |
-| `dice` | Every die thrown, in order: the d20s, one or two (`mode` not `0`), then each added term's dice; for a hit die, its one die; for a formula or a description's roll, each of its dice terms'. Each `{ faces, results }`, every result one of the die's faces. |
+| `dice` | Every die thrown, in order: the d20s, one or two (`mode` not `0`), then each added term's dice; for a hit die, its one die; for hit dice, one entry per `hitDice` entry, in the same order, with `count` results; for a formula or a description's roll, each of its dice terms'. Each `{ faces, results }`, every result one of the die's faces. |
 
 ### Making a roll
 
@@ -983,14 +1046,22 @@ Campaigns says why.
 
 ### Hit dice and formulas
 
-Since module 0.16.0 a player can spend a hit die in the app, as on a short rest, and roll a
-utility's own roll, such as a d4 of luck, which dnd5e's card offers as a button once it's used; and
-have them made in the game with the dice they rolled. Neither is rolled with advantage, or has
-anything added: `mode` is `0`, `explicit` `false` and `extras` empty.
+Since module 0.16.0 a player can spend a hit die in the app, as on a short rest, and since module
+0.20.0 several at once; and roll a utility's own roll, such as a d4 of luck, which dnd5e's card
+offers as a button once it's used; and have them made in the game with the dice they rolled. None
+is rolled with advantage, or has anything added: `mode` is `0`, `explicit` `false` and `extras`
+empty.
 
 ```json
 { "id": "r2", "actorId": "aB3…", "kind": "hitDie", "denomination": "d10", "mode": 0, "explicit": false,
   "extras": [], "dice": [ { "faces": 10, "results": [7] } ] }
+```
+
+```json
+{ "id": "r4", "actorId": "aB3…", "kind": "hitDice",
+  "hitDice": [ { "denomination": "d10", "count": 2 }, { "denomination": "d8", "count": 1 } ],
+  "mode": 0, "explicit": false, "extras": [],
+  "dice": [ { "faces": 10, "results": [7, 3] }, { "faces": 8, "results": [4] } ] }
 ```
 
 ```json
@@ -1009,6 +1080,27 @@ anything added: `mode` is `0`, `explicit` `false` and `extras` empty.
   left, before dnd5e would tell the Gamemaster so. Hit dice are offered once the self-test has
   checked that a hit die takes the player's die and comes to dnd5e's total; if not, the hello
   leaves `"hitDie"` out of `kinds`, and one fetched anyway is refused as `"self-test"`.
+- **Several hit dice**, since module 0.20.0, are one command, `"hitDice"`, offered wherever
+  `"hitDie"` is and refused as `"self-test"` where it isn't. It names no `denomination` (else
+  `"invalid"`, `"denomination"`), but each size and how many of it, `hitDice`: one to seven entries
+  `{ denomination, count }`, each size once, at most 20 dice in all (else `"invalid"`,
+  `"hit-dice"`); and has a `dice` entry for each, in the same order, of that size, with `count`
+  results (else `"invalid"`, `"dice"`). They're checked before any is spent: refused as
+  `"no-hit-dice"` where the character hasn't that many of each size left, those of every class with
+  that size together, or an NPC more than its own; and as `"full-hp"` where the character is at full
+  hit points, as a hit die alone isn't. The module then spends them as dnd5e's short rest does, one
+  die at a time, each as a hit die above, with a card of its own, flagged with the command's `id`
+  and marked: `hitDice[0]`'s dice in the order of their results, then `hitDice[1]`'s, and so on.
+  They stop before the next die once the module has reported them as taking too long (`"timeout"`),
+  once the character is at full hit points (`"full-hp"`), as dnd5e stops spending them on a rest, or
+  has none of the next size left (`"no-hit-dice"`); and at a die that's called off (`"cancelled"`,
+  or `"dice"` as below), or after one a module kept dnd5e from spending, which posts its card but
+  spends nothing (`"cancelled"`). `command.result` has [`spent`](#commandresult), how many were
+  asked for and made; and `healed`, `rolls`, every roll of every card, and `messageId`, the last
+  card, for all of them. Hit dice that stopped part way are `"failed"`, with the reason they
+  stopped, and still have those for the dice made, where any were. Each die takes the player's die
+  rolled for it and no other: a die a module adds to its roll, or to its card as a roll of its own,
+  of that size or another, is Foundry's, and heals as dnd5e has it.
 - **A formula** names the `item` and `activity`, as for a [use](#spells-and-features): a utility
   activity with a `rollFormula` on the sheet, or a Cast activity whose spell's first activity is
   one. It has the dice the formula throws: one `{ faces, results }` for each of its dice terms, in
@@ -1019,9 +1111,10 @@ anything added: `mode` is `0`, `explicit` `false` and `extras` empty.
   formula has a die no player rolls, such as a d3, or dice inside parentheses or a function; and
   `"dice"` for dice that aren't the ones its formula throws.
 
-A module may change either roll before it's made, as dnd5e's hooks allow. Where the player's dice
-can then no longer reach it, as inside a function, the roll is called off, nothing is spent or
-healed, and it's refused as `"dice"`. Dice a module adds are Foundry's.
+A module may change any of these rolls before it's made, as dnd5e's hooks allow, each of several
+hit dice too. Where the player's dice can then no longer reach it, as inside a function, the roll
+is called off, nothing is spent or healed, and it's refused as `"dice"`; for several hit dice, that
+die, after those spent before it, which stand. Dice a module adds are Foundry's.
 
 ### Attacks
 
@@ -1038,7 +1131,7 @@ roll it, its damage, on the same use, with their dice. It takes two rolls, an `a
 | `item`, `activity` | The item and its attack activity: an action's `id` and `attackId` in the sheet, or a spell's, feature's or inventory item's, or an activity favorite's `itemId` and `attackId`; or the item's `id` and the `attackId` of any of its `activities`. |
 | `target` | `{ combatId, combatantId }`: the combatant attacked, in a combat its player can see; or `null`. |
 | `targets` | For an attack with an `attackArea` (module 0.16.0), in place of `target`: the combatants in its area the player picked, each `{ combatId, combatantId }`, in one combat its player can see: up to 20, none twice, and no more than its `count`, at the level it's cast at; empty for none. An attack at one target with `targets` is refused (`"target"`), and one with both is `"invalid"`. |
-| `slot` | Optional: the spell slot a spell is cast with, such as `"spell3"` or `"pact"`, as a `spells` section's `id`. |
+| `slot` | Optional: the spell slot a spell is cast with, such as `"spell3"` or `"pact"`, as a `spells` section's `id`. For a spell cast from an item, since module 0.20.0, the level it's cast at, `"spell"` and one of its `cast`'s `levels`' `level`, such as `"spell2"`, or for its copy's activities its Cast activity's; never `"pact"`. |
 | `ammunition` | Optional: the `id` of the ammunition fired, one of the action's `ammunition`. |
 | `attackMode` | Optional: the attack mode, one of the action's `attackModes`' `value`, such as `"twoHanded"` or `"thrown"`. |
 | `mode`, `explicit`, `extras`, `dice` | As for a check: the d20s, then the dice the player added. |
@@ -1082,7 +1175,8 @@ attack was refused.
 
 Refused beforehand, rather than have the Gamemaster asked: an area attack Midi-QOL targets itself,
 as above (`"area"`); a spell slot the usage
-dialog doesn't offer, or with none left (`"slot"`); ammunition that isn't the weapon's, or is used
+dialog doesn't offer, or with none left, as for a spell cast from an item a level the dialog
+doesn't offer for its Cast activity, or any for a cantrip (`"slot"`); ammunition that isn't the weapon's, or is used
 up (`"ammo"`); an attack mode that isn't the weapon's (`"mode"`); Midi's Active Defence; a reaction
 or bonus action Midi enforces that's been used; an activity that always opens Midi's roll, consume
 or damage dialog, or has Midi ask which effects to apply; and a target Midi can't target, or no
@@ -1098,7 +1192,7 @@ the Gamemaster, as it would in Foundry, such as a target's reaction; an attack m
 | Field | Meaning |
 | --- | --- |
 | `attack` | `{ critical, fumble, outcome }`, when `visible`. `outcome` is `"hit"` or `"miss"` at its target, given only where the game shows players whether an attack hit: dnd5e's *Attack Roll Visibility* not *None*; Midi's *Auto Check Hits* showing hits to all, and not whispered as the Gamemaster's own rolls are when private. Otherwise `null`. A target under total cover is missed. The target's armor class is never sent. An area attack also has `targets` (module 0.16.0): each `{ combatId, combatantId, outcome }`, in the order picked, its `outcome` given as above, and `null` for a target Midi didn't check, not being on the Gamemaster's canvas; `outcome` is then the one target's, or `null` for several or none. Its targets' names and armor classes are never sent. |
-| `damage` | The dice the attack's damage will throw, for its player to roll: `{ critical, plannable, healing, rolls: [{ formula, type, types, dice: [{ faces, number }], perDie }] }`, as dnd5e will make up its rolls, with a critical hit's dice. A roll's `perDie` is how many dice it throws for each die of its own: `1`, or on a critical hit as many as this world's rules make of each, such as `2`; module 0.13.0. `plannable` is `false` when a die can't be known beforehand, such as a d3: the game then rolls all of them. `healing` is `true` for healing. A roll's `types`, `[{ key, label }]`, are the kinds of damage its roller chooses among, as Chromatic Orb's, or `null` for none. `null` when no damage follows, as when Midi's workflow ends at a miss. |
+| `damage` | The dice the attack's damage will throw, for its player to roll: `{ critical, plannable, healing, rolls: [{ formula, type, types, dice: [{ faces, number, added? }], perDie }] }`, as dnd5e will make up its rolls, with a critical hit's dice, its extra dice and its critical damage's among them; the dice a critical hit adds as terms of their own have `added: true` (module 0.20.0): its critical damage's, which dnd5e adds after the roll's own, and the copies Midi-QOL's rules that throw a critical hit's dice apart place beside each die; its extra dice, such as Savage Attacks', are counted in its first die's `number`, and the roll's own dice never have `added`. A roll's `perDie` is how many dice it throws for each die of its own: `1`, or on a critical hit as many as this world's rules make of each, such as `2`; module 0.13.0. `plannable` is `false` when a die can't be known beforehand, such as a d3: the game then rolls all of them. `healing` is `true` for healing. A roll's `types`, `[{ key, label }]`, are the kinds of damage its roller chooses among, as Chromatic Orb's, or `null` for none. `null` when no damage follows, as when Midi's workflow ends at a miss. |
 
 **The damage** is rolled on the attack's use: on dnd5e's cards, a damage roll linked to the use's
 card; with Midi, into the workflow waiting for it, which then applies it. Its dice must be the
@@ -1112,17 +1206,27 @@ bonus damage, are Foundry's.
 **Changed damage.** Where the hello says `modifiers`, a player may change their damage as dnd5e's
 damage dialog would let them: more of its first roll's first die, as a spell cast higher has; that
 die another size, as a versatile weapon or Toll the Dead has; or every die at its highest. The
-first die is changed before it's rolled, and a critical hit's dice made again, as this world makes
-them, so the player throws `perDie` more dice for each they add; dice that aren't those changed
-ones are refused (`"invalid"`, `"dice"`), as are changes the module can't read (`"invalid"`,
+first die is the first roll's first die without `added`, never one of a critical hit's critical
+damage, which dnd5e adds as it is; a first roll whose only dice are those has none to change. It's
+changed before it's rolled, and a critical hit's dice made again, as this world makes them, so the
+player throws `perDie` more dice for each they add; dice that aren't those changed ones are
+refused (`"invalid"`, `"dice"`), as are changes the module can't read (`"invalid"`,
 `"modifiers"`). Damage at its highest is rolled so, every die at its highest, Foundry's own too.
 Since module 0.19.0 a [description's damage](#descriptions-that-roll) may be changed the same way.
+Since module 0.20.0, damage that, once built and changed, can't take every die the player rolled,
+at least as many of each size, as where a module changed the activity since its preview, is called
+off before it's rolled and refused (`"invalid"`, `"dice"`): nothing is posted, the use's damage
+isn't spent, and Midi's workflow still waits for it, so it may be rolled again. Only the first
+damage roll made with the player's dice is changed and checked; another, as Midi's other damage,
+is left as it is.
 
 Players' attacks are offered once the self-test has also checked that the player's dice reach an
 attack's damage. If they don't, attacks and uses stay in the app, and Manage Campaigns says why.
 The self-test then checks that a critical hit's damage with a die more, made another size, throws
-the dice it should, and that damage at its highest is; if not, the hello says `modifiers` is
-`false`, and players' damage is rolled as it is.
+the dice it should, with extra dice and critical damage of a die too since module 0.20.0, whose die
+is never the one changed, that damage whose only die is its critical damage's has none to change,
+and that damage at its highest is; if not, the hello says `modifiers` is `false`, and players'
+damage is rolled as it is.
 
 ### Spells and features
 
@@ -1137,7 +1241,7 @@ healing, if any, is rolled once the player rolls it, as an attack's:
 | `kind` | `"use"`. |
 | `item`, `activity` | The item and the activity used: an action's `id` and its `activity`'s `id` in the sheet, or a spell's, feature's or inventory item's, or an activity favorite's `itemId` and `activity`'s `id`, or the item's `id` and the `activity`'s `id` of any of its `activities`: a `save`, `damage`, `heal` or `utility` activity, or since module 0.15.0 a Cast activity whose spell's first activity is one. |
 | `targets` | The combatants it's used at, each `{ combatId, combatantId }`, in a combat its player can see: up to 20, none twice, and no more than its `count`, at the level it's cast at; none for one used on its user alone. Empty out of combat. |
-| `slot` | The spell slot a spell is cast with, as for an attack; or `null` for the usage dialog's own. For an activity used without spending a slot (`consumesSlot` `false`), the level it's used at, as that slot's: one with none left too, since none is spent. |
+| `slot` | The spell slot a spell is cast with, as for an attack; or `null` for the usage dialog's own. For an activity used without spending a slot (`consumesSlot` `false`), the level it's used at, as that slot's: one with none left too, since none is spent. For a spell cast from an item, the level it's cast at, as for an attack (module 0.20.0). |
 
 A use has no dice. The module uses the activity as an attack's, without placing a template: an
 area's targets are those the player picked. Then:
@@ -1163,6 +1267,32 @@ refused after it. An attack spell, such as Starry Wisp, is cast so with an attac
 can't cast now, such as one the character must attune to and hasn't, or whose spell dnd5e hasn't
 copied yet, is refused (`"activity"`), as is the copy of the spell itself, cast from the spellbook,
 while the item's Cast activity can't be used (`"item"`).
+
+Since module 0.20.0 one whose `cast` has `levels` is cast at the level its `slot` names, one of
+them, or else at the first, `cast`'s own: the item's uses it spends are scaled for that level, as
+the level's `charges` say, and its targets and damage as dnd5e scales them. A listener sends a
+`slot` for a spell cast from an item only from its `cast`'s `levels`. A level dnd5e's usage dialog
+doesn't offer for the Cast activity, such as one the item's charges no longer allow, or any for a
+cantrip, is refused (`"slot"`), as is a slot other than its own level for a `cast` without
+`levels`, where the dialog offers no other; one the dialog offers but the item hasn't the uses for,
+as a level whose `charges` are `short`, or one left out of `levels` for costing more than the item
+ever has, is refused as spending more than is left (`"consume"`). dnd5e's
+`dnd5e.preUseLinkedSpell` hook is told the level as dnd5e's usage dialog tells it, `spell.slot`,
+such as `"spell2"`, and `scaling`, the levels above the spell's own; a module's change to them
+holds, and isn't checked again, and what's spent is worked out for the slot it leaves. A Cast activity above its spell's own level, as
+a wand of fireballs at 4th, costs what dnd5e charges for it: its cost scaled by the levels above
+the spell's, where it scales, which before module 0.20.0 was refused only as the use was made
+(`"cancelled"`) rather than beforehand (`"consume"`). Cast higher still, its cost and a count of
+targets written with the spell's level grow, but its damage stays at the Cast activity's level, as
+dnd5e scales the copy.
+
+The copy's other activities, such as Hex's Bonus Hex Damage once it's cast from an item, are used
+by the copy's `id`, its Cast activity's `spellId`, and the activity's own `id`, as the Spells tab
+lists it, as since module 0.15.0. They're used at the level a `slot` names as the Cast activity is,
+one of its `cast`'s `levels`, or else its own; each spends the item's uses again, scaled, as dnd5e
+spends them, unless it's marked `consumesSlot` `false`, when it spends nothing at any level the
+Cast activity offers, even one whose charges are `short`. As dnd5e's spellbook uses them, they call
+neither of the Cast activity's hooks.
 
 Refused beforehand, beyond what an attack is: an activity of another kind (`"activity"`), such as
 a summoning, which dnd5e would ask the Gamemaster about; more targets than it takes, or any for
@@ -1324,18 +1454,19 @@ secret section may be rolled so.
 | --- | --- |
 | `text`, `link` | The description, and its damage or healing link. |
 | `types` | Optional: for each of its parts, in order, the kind of damage chosen from that part's types, or `null`. A part with no choice made is rolled as the first kind it names. A kind a part doesn't offer, or more kinds than parts, is refused (`"type"`). |
-| `critical` | Optional: `true` to roll it as a critical hit's, as the world's rules make a critical hit's damage, and those of modules that change them, such as Midi-QOL's; `false` or left out for not. Its `dice` are then each dice term's as many times over as the sheet's [`critical`](#character-sheet) `perDie` says. Never for healing, nor for damage marked `data-critical="false"` (`"invalid"`, `"critical"`); `true` on a `textRoll`, or anything but a boolean, is refused the same way. Module 0.19.0. |
+| `critical` | Optional: `true` to roll it as a critical hit's, as the world's rules make a critical hit's damage, and those of modules that change them, such as Midi-QOL's; `false` or left out for not. Its `dice` are then each dice term's as many times over as the sheet's [`critical`](#character-sheet) `perDie` says, with what a critical hit adds to each part, as its span's [`data-critical-dice` and `data-critical-damage`](#links-in-descriptions) say (module 0.20.0): the extra dice on the part's first die as the sheet's `bonusDice` says, and its critical damage's dice after. Never for healing, nor for damage marked `data-critical="false"` without that pair (`"invalid"`, `"critical"`), nor where the activity dnd5e's link rolls it through allows none now, or what it adds can't be read; `true` on a `textRoll`, or anything but a boolean, is refused the same way. Module 0.19.0. |
 | `modifiers` | Optional, where the hello says `modifiers`: `{ extra, faces, maximize }`, each optional, how the player changed it in the app, as an [attack's damage](#attacks) may be, healing too. `extra` more of its first part's first die, whatever its sign, up to 40: for a critical hit's, `perDie` more for each, else one; `faces` that die another size, `4`, `6`, `8`, `10` or `12`; `maximize` every die at its highest, the game's own too. `dice` are then the changed ones. Refused on a `textRoll`, or where it can't be read (`"invalid"`, `"modifiers"`). Module 0.19.0. |
-| `dice` | One `{ faces, results }` for each dice term of its parts' formulas, in order, with as many results as the term has dice, as for a [formula](#hit-dice-and-formulas); as a critical hit's and as changed, if so. |
+| `dice` | One `{ faces, results }` for each dice term of its parts' formulas, in order, with as many results as the term has dice, as for a [formula](#hit-dice-and-formulas); as a critical hit's and as changed, if so. For a critical hit's, each part's own dice terms come first, in its formula's order, the first's count with its extra dice and the player's change, then its critical damage's dice terms, in order; then the next part's. |
 
 It's rolled as dnd5e rolls its description's link, without the damage dialog: a roll for each
 part, of the kind chosen for it; as a critical hit's, where the player chose one, as dnd5e's own
 link is where its roller does, so with the world's rules for a critical hit's damage, its *Critical
 Damage Modifiers* and *Powerful Critical*, or the Gamemaster's critical damage rules of Midi-QOL,
 and where dnd5e's link rolls it through one of the item's activities, with what that activity adds
-to a critical hit's, such as an attack's critical damage, and never where it allows none, even
-should it have come to allow none, or to add dice, since the description was sent (`"invalid"`,
-`"critical"`); and changed as the player chose, as an attack's damage is: the first part's first die is changed
+to a critical hit's, as the activity is now, such as a melee weapon's extra dice and an attack's
+critical damage, its critical damage rolled with its flavor, for its kind of damage, and never where
+it allows none, even should it have come to allow none since the description was sent (`"invalid"`,
+`"critical"`); and changed as the player chose, as an attack's damage is: the first part's first die of its own is changed
 before it's rolled, and a critical hit's dice made again, as the world makes them, and damage at
 its highest has every die at its highest. Damage changed where the self-test found it isn't changed
 as expected is refused (`"self-test"`); a critical hit's is still rolled. The card is the player's,
@@ -1350,9 +1481,11 @@ dnd5e's `dnd5e.rollDamage` hook isn't called, so no workflow waiting for damage 
 rolls in `command.result` have `critical`. Refused:
 `"attacks-off"` while the Gamemaster doesn't let the campaign's players attack, `"self-test"`
 where damage doesn't take their dice, and `"dice"` for dice that aren't the ones its formulas
-throw, as a critical hit's and as changed, as when the world's rules for critical hits changed
-since the app was told them, or there's no die to change in its first part; or a formula with a die
-no player rolls, such as a d3, or dice inside parentheses or a function.
+throw, as a critical hit's and as changed, as when the world's rules for critical hits or what the
+activity adds changed since the app was told them, or there's no die of its own to change in its
+first part; or a formula with a die no player rolls, such as a d3, or dice inside parentheses or a
+function; and since module 0.20.0, damage that, once built and changed, can't take every die the
+player rolled, as an attack's.
 
 **A description's roll.** A `textRoll` has the same `text`, `link` and `dice`, for an `ss-roll`
 link. It's rolled as dnd5e rolls a formula, without its dialog, on a card spoken as the character,

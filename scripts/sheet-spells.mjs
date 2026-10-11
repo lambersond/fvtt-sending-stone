@@ -1,5 +1,5 @@
 import { usesOf } from "./sheet-features.mjs";
-import { rollsIfAny } from "./sheet-rolls.mjs";
+import { castCopy, rollsIfAny } from "./sheet-rolls.mjs";
 import { finite, localize } from "./sheet-values.mjs";
 
 /**
@@ -156,15 +156,6 @@ export function castFrom(spell) {
     usable: false,
     attune: (linked.visibility?.requireAttunement === true) && (item.system?.attuned !== true)
   };
-}
-
-/**
- * Is this the copy of a spell dnd5e keeps for an item that casts it, such as a wand's?
- * @param {Item} spell
- * @returns {boolean}
- */
-export function castCopy(spell) {
-  return (spell.type === "spell") && Boolean(spell.getFlag?.("dnd5e", "cachedFor") ?? spell.flags?.dnd5e?.cachedFor);
 }
 
 /**
