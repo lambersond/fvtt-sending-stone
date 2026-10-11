@@ -172,7 +172,8 @@ attack hit only where the game shows players.
 - **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
   Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
-  critical hit's extra dice included.
+  critical hit's extra dice included. A description's damage too; see
+  [Descriptions that roll](#descriptions-that-roll).
 - **Nothing asks you, where it can be helped.** Area attacks Midi targets itself around their user,
   summoning, transforming and other activities dnd5e asks about, Midi's Active Defence, a used
   reaction or bonus action Midi enforces, and an activity set to always show Midi's dialogs or to
@@ -241,9 +242,22 @@ description's damage or roll aren't offered yet.
 - **Damage and healing**, with **Let Players Attack and Cast from Sending Stone** ticked too, are
   rolled with their dice, on a card naming where they're from, such as "Starry Wisp (Staff of
   Fire)" for a spell an item casts, and no targets: you apply them from the card, as from dnd5e's
-  own link. Never a critical hit's, and with no dice added. With Midi-QOL,
-  it's the roll alone, outside any workflow, and it's offered even with **Make Players' Attacks and
-  Spells Through Midi-QOL** off.
+  own link. With Midi-QOL, it's the roll alone, outside any workflow, and it's offered even with
+  **Make Players' Attacks and Spells Through Midi-QOL** off.
+- **A critical hit's, and changed.** A right-click or long-press on a description's damage lets the
+  player roll it as a critical hit's, as when they hit with it on a natural 20, or change it as
+  they would an attack's damage: at its highest, with more of its first die, or that die another
+  size. Healing can be changed, but is never a critical hit's. The game rolls a critical hit's as
+  your world rolls one: dnd5e's Critical Damage Modifiers and Powerful Critical, or Midi-QOL's
+  critical damage rules for the Gamemaster. Damage dnd5e's own link rolls through one of the item's
+  activities, as a `[[/damage]]` naming no formula, is a critical hit's only as that activity
+  allows: never for a saving throw's damage, as dnd5e's damage dialog offers none, and with what it
+  adds, such as a weapon's critical damage. One whose critical hit throws extra dice, as a melee
+  weapon does for a character with Savage Attacks, isn't offered as a critical hit's, as the app
+  can't yet plan those dice. Where Midi rolls a critical hit's dice apart, as its
+  "Max Critical Dice (roll dice)" and exploding rules do, the app can't plan a description's
+  critical hit, and doesn't offer one. Changes aren't offered where the self-test found damage
+  isn't changed as expected.
 - **Rolls**, such as `[[/r 1d4]]`, are rolled with their dice on a card naming where they're from.
   One with a die the app doesn't roll, such as a d3, is refused.
 - **Only what the description says.** The app names a link in a description the module sent it,
@@ -393,7 +407,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card; a description's save or check against its DC |
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow |
-| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, and the self-test that it works |
+| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, planning damage's dice as the world rolls them, critical hits too, and the self-test that it works |
 | `scripts/apps/campaign-config.mjs` | Manage Campaigns: the app's address, and each campaign's title, secret, characters, players' rolls, attacks and spells, and connection test |
 | `tools/echo-listener.mjs` | Stand-in listener for development |
 | `PROTOCOL.md` | Event envelope and payload reference |

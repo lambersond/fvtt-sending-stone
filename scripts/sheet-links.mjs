@@ -14,8 +14,10 @@ import { MODULE_ID } from "./constants.mjs";
  *   check, with `|` between a choice of checks, each "check:<ability>", "skill:<ability>:<skill>"
  *   or "tool:<ability>:<tool>", and `data-using-tool="thief"` for a skill checked using a tool;
  * - `<span class="ss-damage roll" data-n data-formulas="2d6&1d4" data-types="fire&cold|fire">`,
- *   with `&` between parts, `|` between a part's choice of types, and `data-healing="true"` for
- *   healing;
+ *   with `&` between parts, `|` between a part's choice of types, `data-healing="true"` for
+ *   healing, and `data-critical="false"` for damage never rolled as a critical hit's: dnd5e's own
+ *   link offers none, as for a saving throw's damage, or its critical hit throws dice the app can't
+ *   plan, such as a melee weapon's extra dice;
  * - `<span class="ss-roll roll" data-n data-formula="1d6">`, a roll in the text;
  * - `<span class="ss-condition ref" data-condition="prone">`, a condition, to read about.
  *
@@ -67,7 +69,8 @@ const LINK_CLASSES = ["ss-save", "ss-check", "ss-damage", "ss-roll", "ss-conditi
  * @type {string[]}
  */
 const LINK_DATA = [
-  "n", "ability", "dc", "type", "checks", "using-tool", "formulas", "types", "healing", "formula", "condition"
+  "n", "ability", "dc", "type", "checks", "using-tool", "formulas", "types", "healing", "critical", "formula",
+  "condition"
 ];
 
 /**
@@ -274,9 +277,13 @@ let plain = null;
  * @param {Map<number, number>} [options.hiddenDCs]   Filled with the DC of each saving throw whose
  *                                          author hid it, by its link's number: never in the HTML,
  *                                          for the module alone to roll it against, as dnd5e does.
+ * @param {Map<number, LinkActivity>} [options.activities]   Filled with the activity dnd5e rolls
+ *                                          each damage link by, by its link's number, where it does:
+ *                                          never in the HTML, for the module alone to roll its
+ *                                          critical hit as dnd5e's own link does.
  * @returns {string}
  */
-export function normaliseLinks(html, { relativeTo, rollData, actionable=true, hiddenDCs }={}) {
+export function normaliseLinks(html, { relativeTo, rollData, actionable=true, hiddenDCs, activities }={}) {
   const doc = new DOMParser().parseFromString(String(html ?? "").slice(0, LONGEST_READ), "text/html");
   const body = doc.body;
   const context = {
@@ -286,6 +293,8 @@ export function normaliseLinks(html, { relativeTo, rollData, actionable=true, hi
     made: new Set(),
     hidden: new Map(),
     hiddenDCs,
+    linked: new Map(),
+    activities,
     links: 0,
     conditions: 0
   };
@@ -435,7 +444,8 @@ function replaceRollLink(el, context) {
     else if ( data.type === "damage" ) span = damageSpan(context, {
       formulas: (data.formulas ?? "").split("&"),
       types: (data.damageTypes ?? "").split("&"),
-      healing: data.rollType === "healing"
+      healing: data.rollType === "healing",
+      activity: data.activityUuid ? { uuid: data.activityUuid, attackMode: data.attackMode || null } : null
     }, label);
   }
   el.replaceWith(span ?? label);
@@ -939,24 +949,30 @@ function checkSpan(context, { checks, dc, usingTool }, label) {
 
 /**
  * Damage or healing to act on: one or more parts, each a formula with the types it may be. None if
- * any part's formula can't be rolled.
+ * any part's formula can't be rolled. Damage dnd5e's own link rolls through one of the item's
+ * activities, as it does `[[/damage]]` naming no formula of its own, is a critical hit's only as
+ * that activity allows, and the activity is noted, by the span, for the module alone.
  * @param {object} context
- * @param {{formulas: string[], types: string[], healing: boolean}} damage
+ * @param {{formulas: string[], types: string[], healing: boolean, activity: LinkActivity|null}} damage
  * @param {string} label
  * @returns {HTMLElement|null}
  */
-function damageSpan(context, { formulas, types, healing }, label) {
+function damageSpan(context, { formulas, types, healing, activity }, label) {
   if ( context.links >= MOST_LINKS ) return null;
   const parts = formulas.map((formula, index) => ({
     formula: resolveFormula(formula, context.rollData),
     types: typeKeys((types[index] ?? "").split("|"))
   }));
   if ( !parts.length || parts.some(part => !part.formula) ) return null;
-  return makeSpan(context, "ss-damage", {
+  const critical = (healing || !activity) ? null : linkCritical(context.relativeTo, activity);
+  const span = makeSpan(context, "ss-damage", {
     formulas: parts.map(part => part.formula).join("&"),
     types: parts.map(part => part.types.join("|")).join("&"),
-    healing: healing ? "true" : null
+    healing: healing ? "true" : null,
+    critical: (critical && !critical.allowed) ? "false" : null
   }, label);
+  if ( span && critical?.allowed ) context.linked.set(span, activity);
+  return span;
 }
 
 /**
@@ -983,8 +999,9 @@ function conditionSpan(context, key, label) {
 
 /**
  * Number the spans to act on, in the order they come, noting by its number the DC of each saving
- * throw or check whose author hid it; and take the data of the spans this makes off every other
- * element, and the look of a roll, so nothing else can be taken for one.
+ * throw or check whose author hid it, and the activity dnd5e rolls each damage link by; and take the
+ * data of the spans this makes off every other element, and the look of a roll, so nothing else can
+ * be taken for one.
  * @param {HTMLElement} body
  * @param {object} context
  */
@@ -994,6 +1011,7 @@ function numberLinks(body, context) {
     if ( context.made.has(el) ) {
       if ( !el.hasAttribute("data-n") ) continue;
       if ( context.hidden.has(el) ) context.hiddenDCs?.set(n, context.hidden.get(el));
+      if ( context.linked.has(el) ) context.activities?.set(n, context.linked.get(el));
       el.setAttribute("data-n", String(n++));
       continue;
     }
@@ -1285,6 +1303,56 @@ function activitiesOf(document, type) {
 }
 
 /**
+ * The activity dnd5e's own link rolls a description's damage by: as its link names it, by its UUID,
+ * with the attack mode it names, if any.
+ * @typedef {object} LinkActivity
+ * @property {string} uuid
+ * @property {string|null} attackMode
+ */
+
+/**
+ * How dnd5e's own link makes a description's damage a critical hit's, where it rolls it through one
+ * of the item's activities: by that activity's damage configuration, which may allow none, as a
+ * saving throw's, a healing's and most damage activities' don't, and adds to one what the activity
+ * adds, such as an attack's critical damage, or a melee weapon's extra dice for its wielder's
+ * Savage Attacks or Brutal Critical. Allowed only where the activity allows one whose dice the app
+ * can plan: extra dice, or critical damage with dice of its own, aren't, so such damage isn't a
+ * critical hit's until the app can plan them. None allowed of an activity the description's
+ * document doesn't have, or one that can't be read.
+ * @param {Document} [relativeTo]   The document the description belongs to.
+ * @param {LinkActivity} activity
+ * @returns {{allowed: boolean, critical: object, rolls: object[]}}   Whether it's allowed, and what
+ *   the activity's configuration adds to a critical hit's: for the damage as a whole, and for each
+ *   of its rolls, in order.
+ */
+export function linkCritical(relativeTo, { uuid, attackMode }) {
+  const none = { allowed: false, critical: {}, rolls: [] };
+  const activities = relativeTo?.system?.activities;
+  const all = (typeof activities?.values === "function") ? Array.from(activities.values()) : [];
+  const activity = all.find(each => each?.uuid === uuid);
+  if ( typeof activity?.getDamageConfig !== "function" ) return none;
+  try {
+    const config = activity.getDamageConfig(attackMode ? { attackMode } : {});
+    const rolls = config.rolls ?? [];
+    // Its critical damage resolved with the roll data it's added with, as the link's formulas are.
+    const resolved = (each, data) => {
+      const critical = foundry.utils.deepClone(each ?? {});
+      if ( critical.bonusDamage ) {
+        critical.bonusDamage = foundry.dice.Roll.replaceFormulaData(String(critical.bonusDamage), data ?? {}, { missing: "0" });
+      }
+      return critical;
+    };
+    const critical = resolved(config.critical, rolls[0]?.data);
+    const each = rolls.map(roll => resolved(roll.options?.critical, roll.data));
+    const adds = [critical, ...each].some(added => ((Number(added.bonusDice) || 0) !== 0)
+      || (added.bonusDamage && !new foundry.dice.Roll(added.bonusDamage).isDeterministic));
+    return { allowed: (critical.allow !== false) && !adds, critical, rolls: each };
+  } catch {
+    return none;
+  }
+}
+
+/**
  * The actor a document belongs to: itself, or the actor of the item or effect it's on.
  * @param {Document} [document]
  * @returns {Actor|null}
@@ -1366,13 +1434,14 @@ function textNodes(root, doc) {
  *   `{kind, abilities, dc, secret}`; a check `{kind: "check", checks: [{type, ability, key?}], dc,
  *   usingTool?, secret}`, a choice of the checks it offers; either with `hideDC: true` where its
  *   author hid its DC, which is then the one noted as it was sent; damage or healing `{kind:
- *   "damage", parts: [{formula, types}], healing}`; or a roll `{kind: "roll", formula}`. Refused as
- *   "gone" when the character's sheet has no such description now, and as "link" when it has no
- *   such link.
+ *   "damage", parts: [{formula, types}], healing, critical?, activity?}`, with `critical: false`
+ *   where it's never a critical hit's, and the activity dnd5e's own link rolls it by, as noted as it
+ *   was sent; or a roll `{kind: "roll", formula}`. Refused as "gone" when the character's sheet has
+ *   no such description now, and as "link" when it has no such link.
  */
 export async function findLink(actor, hash, n) {
   const { characterSheet } = await import("./sheet.mjs");
-  const { SheetTexts, hiddenDCsOf, textOf } = await import("./sheet-texts.mjs");
+  const { SheetTexts, hiddenDCsOf, linkActivitiesOf, textOf } = await import("./sheet-texts.mjs");
   const texts = new SheetTexts();
   try {
     if ( !characterSheet(actor, texts) ) return { refusal: "gone" };
@@ -1389,6 +1458,8 @@ export async function findLink(actor, hash, n) {
   if ( (hidden !== undefined) && ["save", "concentration", "check"].includes(link.kind) ) {
     Object.assign(link, { dc: hidden, hideDC: true });
   }
+  const activity = (link.kind === "damage") ? (await linkActivitiesOf(hash, source)).get(n) : undefined;
+  if ( activity ) link.activity = activity;
   return { source, origin: originOf(actor, source), link };
 }
 
@@ -1434,7 +1505,7 @@ export function readLink(html, n) {
       types: typeKeys((types[index] ?? "").split("|"))
     }));
     if ( !parts.length || parts.some(part => !part.formula) ) return null;
-    return { kind: "damage", parts, healing: data.healing === "true" };
+    return { kind: "damage", parts, healing: data.healing === "true", ...((data.critical === "false") && { critical: false }) };
   }
   if ( el.classList.contains("ss-roll") ) {
     const formula = resolveFormula(data.formula ?? "");

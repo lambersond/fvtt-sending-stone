@@ -16,10 +16,11 @@ import { sendLater } from "./transport.mjs";
  * The markup descriptions are sent in, part of every hash: raising it sends every description
  * again under a new hash, so nothing the app or a browser keeps under an old one is shown.
  * 1, before it was part of the hash: as Foundry enriched them. 2: with the spans of
- * sheet-links.mjs, since 0.17.0. 3: with their checks, `ss-check`, since 0.18.0.
+ * sheet-links.mjs, since 0.17.0. 3: with their checks, `ss-check`, since 0.18.0. 4: with damage
+ * never a critical hit's marked, since 0.19.0.
  * @type {number}
  */
-const TEXT_FORMAT = 3;
+const TEXT_FORMAT = 4;
 
 /**
  * The most a character.texts payload should hold, in characters of JSON, well within the 1 MB a
@@ -42,10 +43,12 @@ const DAMAGE = /\[\[\/(?:damage|heal)/i;
 
 /**
  * Enriched descriptions, by hash, for this page load: the very text sent, which commands from the
- * app read their links from, and the DCs its authors hid of its saving throws, by link number,
- * which are never sent. A hash names the source, so the same source is enriched once, even for
- * campaigns being sent it at the same time.
- * @type {Map<string, {text: Promise<string>, hiddenDCs: Promise<Map<number, number>>}>}
+ * app read their links from; the DCs its authors hid of its saving throws, by link number, which
+ * are never sent; and the activities dnd5e's own links roll its damage by, by link number, for the
+ * module alone. A hash names the source, so the same source is enriched once, even for campaigns
+ * being sent it at the same time.
+ * @type {Map<string, {text: Promise<string>, hiddenDCs: Promise<Map<number, number>>,
+ *   activities: Promise<Map<number, LinkActivity>>}>}
  */
 const enriched = new Map();
 
@@ -126,15 +129,31 @@ export function hiddenDCsOf(hash, source) {
 }
 
 /**
+ * The activities dnd5e's own links roll a description's damage by, by link number, as it was sent
+ * without them: for the module to roll a critical hit's as dnd5e's link does.
+ * @param {string} hash
+ * @param {TextSource} source
+ * @returns {Promise<Map<number, LinkActivity>>}
+ */
+export function linkActivitiesOf(hash, source) {
+  return enrichedOf(hash, source).activities;
+}
+
+/**
  * A description enriched, by its hash, enriching it if it hasn't been yet this page load.
  * @param {string} hash
  * @param {TextSource} source
- * @returns {{text: Promise<string>, hiddenDCs: Promise<Map<number, number>>}}
+ * @returns {{text: Promise<string>, hiddenDCs: Promise<Map<number, number>>,
+ *   activities: Promise<Map<number, LinkActivity>>}}
  */
 function enrichedOf(hash, source) {
   if ( !enriched.has(hash) ) {
     const done = enrich(source);
-    enriched.set(hash, { text: done.then(({ html }) => html), hiddenDCs: done.then(({ hiddenDCs }) => hiddenDCs) });
+    enriched.set(hash, {
+      text: done.then(({ html }) => html),
+      hiddenDCs: done.then(({ hiddenDCs }) => hiddenDCs),
+      activities: done.then(({ activities }) => activities)
+    });
   }
   return enriched.get(hash);
 }
@@ -203,8 +222,9 @@ async function render(sources) {
  * is read as it's stored, one whose links can't be read has them cleaned up by string alone, and
  * failing that it goes as it is.
  * @param {TextSource} source
- * @returns {Promise<{html: string, hiddenDCs: Map<number, number>}>}   The HTML sent, and the DCs
- *   its authors hid, by link number.
+ * @returns {Promise<{html: string, hiddenDCs: Map<number, number>, activities: Map<number, LinkActivity>}>}
+ *   The HTML sent, the DCs its authors hid, and the activities its damage is rolled by, by link
+ *   number.
  */
 async function enrich({ html, relativeTo, reference }) {
   let text = html ?? "";
@@ -225,15 +245,16 @@ async function enrich({ html, relativeTo, reference }) {
   const enrichedText = (typeof result === "string") ? result : ((typeof text === "string") ? text : "");
   try {
     const hiddenDCs = new Map();
-    const normalised = normaliseLinks(enrichedText, { relativeTo, rollData, actionable: !reference, hiddenDCs });
-    return { html: cutShort(normalised), hiddenDCs };
+    const activities = new Map();
+    const normalised = normaliseLinks(enrichedText, { relativeTo, rollData, actionable: !reference, hiddenDCs, activities });
+    return { html: cutShort(normalised), hiddenDCs, activities };
   } catch (err) {
     console.warn(`${MODULE_ID} | Could not read the links of a description of ${relativeTo?.uuid ?? reference}`, err);
   }
   try {
-    return { html: cutShort(cleanLinks(enrichedText)), hiddenDCs: new Map() };
+    return { html: cutShort(cleanLinks(enrichedText)), hiddenDCs: new Map(), activities: new Map() };
   } catch {
-    return { html: cutShort(enrichedText), hiddenDCs: new Map() };
+    return { html: cutShort(enrichedText), hiddenDCs: new Map(), activities: new Map() };
   }
 }
 
@@ -299,7 +320,8 @@ function textFormat() {
  * throw, the DCs of the item's saving throws, which one with no DC of its own takes; a check, as
  * dnd5e's `[[/check]]` and its skill and tool links, those of the item's checks, which dnd5e's
  * `[[/check]]` shows, and one with no DC of its own takes; and dnd5e's damage links, the damage of
- * the item's activities. An effect's are its actor's.
+ * the item's activities, and whether its wielder's critical hits with it throw extra dice. An
+ * effect's are its actor's.
  * @param {string} html
  * @param {Document} [document]   The description's document.
  * @returns {string}
@@ -353,7 +375,9 @@ function checkNumbers(document) {
 
 /**
  * The damage and healing of an identified item and its activities, as stored, which dnd5e's
- * `[[/damage]]` links show.
+ * `[[/damage]]` links show; and, for an item with an attack, the extra dice its wielder's critical
+ * hits throw with a melee weapon, as Savage Attacks gives, which decide whether a link's damage may
+ * be a critical hit's.
  * @param {Document} [document]
  * @returns {string}
  */
@@ -364,7 +388,9 @@ function damageNumbers(document) {
   const activities = Object.values(system.activities ?? {}).map(activity => [
     activity?._id ?? null, activity?.type ?? null, activity?.damage ?? null, activity?.healing ?? null
   ]);
-  return JSON.stringify([system.damage ?? null, system.magicalBonus ?? null, activities]);
+  const attacks = activities.some(([, type]) => type === "attack");
+  const extraDice = attacks ? (actorOf(document)?.flags?.dnd5e?.meleeCriticalDamageDice ?? null) : null;
+  return JSON.stringify([system.damage ?? null, system.magicalBonus ?? null, activities, ...(attacks ? [extraDice] : [])]);
 }
 
 /**
