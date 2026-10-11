@@ -90,11 +90,12 @@ const queues = new Map();
  * which, and if not, why not. A hit die is among them once the self-test has shown it takes the
  * player's die. Attacks, the uses of spells and features, and their damage are among them when the
  * Gamemaster lets the campaign's players attack and cast from the app too, and they can be made
- * here; and then whether players may change their damage in the app, as the self-test found, and
- * that an area attack is made at the targets they pick. The links in their descriptions are among
- * them too: a description's own roll, asking the table for a save, where dnd5e's card for it can be
- * made, and a description's damage or healing, where players may attack and damage takes their
- * dice. And whether its players are asked in the app for the saves the game asks of them.
+ * here; and then that an area attack is made at the targets they pick. The links in their
+ * descriptions are among them too: a description's own roll, asking the table for a save, where
+ * dnd5e's card for it can be made, and a description's damage or healing, where players may attack
+ * and damage takes their dice. Where their damage is, an attack's or a description's, whether
+ * players may change it in the app, as the self-test found. And whether its players are asked in
+ * the app for the saves the game asks of them.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean}}
@@ -104,15 +105,16 @@ export function rollFeatures(campaign) {
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
   const attacks = campaign.attacks && !attacksUnavailable();
+  const texts = textKinds(campaign);
   return {
     enabled: true,
     kinds: [
       ...ROLL_KINDS.filter(kind => (kind !== "hitDie") || diceStatus.hitDice),
       ...(attacks ? ATTACK_KINDS : []),
-      ...textKinds(campaign)
+      ...texts
     ],
     reason: null,
-    modifiers: attacks && diceStatus.modifiers,
+    modifiers: (attacks || texts.includes("textDamage")) && diceStatus.modifiers,
     areaAttacks: attacks,
     prompts: prompting(campaign)
   };

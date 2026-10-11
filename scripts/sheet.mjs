@@ -1,4 +1,5 @@
 import { hitPoints } from "./characters.mjs";
+import { criticalRule } from "./dice-plan.mjs";
 import { actionSections } from "./sheet-actions.mjs";
 import { deathSavesOf, describeTool, detailsOf, traitsOf } from "./sheet-details.mjs";
 import { conditionsOf, effectSections } from "./sheet-effects.mjs";
@@ -36,6 +37,7 @@ export function characterSheet(actor, texts=new SheetTexts()) {
   return {
     img: actor.img ?? null,
     rules: rulesOf(),
+    critical: criticalRule(),
     level: finite(details.level),
     classes: classesOf(actor),
     species: nameOf(details.race ?? details.species),

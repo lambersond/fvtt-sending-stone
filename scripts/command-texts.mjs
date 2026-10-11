@@ -1,8 +1,10 @@
 import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import { askFlavor } from "./chat-data.mjs";
 import { authorFor, checkCommand, describeResult, failedResult, PUBLIC } from "./command-rolls.mjs";
-import { damageRollsFor, diceStatus, matchesDice, plannedDice, withPlan } from "./dice-plan.mjs";
-import { findLink } from "./sheet-links.mjs";
+import {
+  changesDamage, diceStatus, matchesDice, modifiedDice, plannedDamage, plannedDice, readModifiers, withPlan
+} from "./dice-plan.mjs";
+import { findLink, linkCritical } from "./sheet-links.mjs";
 
 /**
  * Acting from the Sending Stone app on the links in a character's descriptions: asking the table
@@ -231,12 +233,18 @@ async function postAsk(command, actor, origin, link) {
 /**
  * Roll a description's damage or healing with the player's dice, as dnd5e rolls it from the
  * description, without its dialog: each part as the kind the player chose, where it offers a
- * choice. Its card names where it comes from, and no target: the Gamemaster applies it from the
- * card. Never a critical hit's, nor changed in the app. Offered only under dnd5e 5.x where the
- * campaign's players' rolls are made (`off`), the Gamemaster lets them attack (`attacks-off`) and
- * damage takes their dice (`self-test`); refused for a description no longer on the sheet
- * (`gone`), a link that isn't damage (`link`), a kind of damage a part doesn't offer (`type`), and
- * dice that aren't the ones it throws (`dice`).
+ * choice; a critical hit's, where they chose, as this world's rules and its modules', such as
+ * Midi-QOL's, make a critical hit's damage, and as dnd5e's own link makes one where it rolls the
+ * damage through one of the item's activities, with what that activity adds to one, and never where
+ * it allows none; and changed as they chose in the app, as an attack's damage is: more of its first
+ * part's first die, as many more as a critical hit throws of each, that die another size, or every
+ * die at its highest. Its card names where it comes from, and no target: the Gamemaster applies it
+ * from the card. Offered only under dnd5e 5.x where the campaign's players' rolls are made (`off`),
+ * the Gamemaster lets them attack (`attacks-off`) and damage takes their dice (`self-test`), and
+ * changed only where it changes as expected (`self-test`); refused for a description no longer on
+ * the sheet (`gone`), a link that isn't damage (`link`), healing or damage never a critical hit's
+ * rolled as one (`invalid`), a kind of damage a part doesn't offer (`type`), and dice that aren't
+ * the ones it throws, changed or a critical hit's (`dice`).
  * @param {object} command      The player's roll, as fetched from the app.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @returns {Promise<CommandResult>}
@@ -248,6 +256,8 @@ export async function runTextDamageCommand(command, campaign) {
   if ( !diceStatus.attacks ) return failed("self-test");
   const invalid = checkCommand(command);
   if ( invalid ) return failed("invalid", invalid);
+  const modifiers = readModifiers(command.modifiers);
+  if ( changesDamage(modifiers) && !diceStatus.modifiers ) return failed("self-test");
   const actor = game.actors.get(command.actorId);
   if ( !actor || !campaign.characters.has(actor.id) ) return failed("unknown");
   const found = await findLink(actor, command.text, command.link);
@@ -256,19 +266,26 @@ export async function runTextDamageCommand(command, campaign) {
   if ( (link?.kind !== "damage") || !link.parts?.length ) return failed("link");
   const types = chosenTypes(command.types, link.parts);
   if ( !types ) return failed("type");
-  const planned = damageRollsFor(damageProcess(command, link, types)).map(roll => plannedDice(roll));
-  if ( !planned.every(each => each.plannable) || !matchesDice(command.dice, planned.flatMap(each => each.dice)) ) {
-    return failed("dice");
-  }
-
   const healing = link.healing === true;
+  const critical = command.critical === true;
+  // A critical hit's as dnd5e's own link makes one: through the activity it rolls the damage by, if
+  // any, with what that adds to one, and never where it allows none.
+  const added = (critical && link.activity) ? linkCritical(found.source?.relativeTo, link.activity) : null;
+  if ( critical && (healing || (link.critical === false) || (added && !added.allowed)) ) {
+    return failed("invalid", "critical");
+  }
+  // The dice its rolls throw, as this world makes them, then as the player changed them.
+  const planned = plannedDamage(damageProcess(command, link, types, critical, added));
+  const expected = planned.plannable ? modifiedDice(planned, modifiers) : null;
+  if ( !expected || !matchesDice(command.dice, expected) ) return failed("dice");
+
   const label = game.i18n.localize(healing ? "DND5E.HEAL.HealingRoll" : "DND5E.DamageRoll");
   const flavor = `${escapeName(origin.name)} - ${label}`;
   const message = rollMessage(command, actor, origin, flavor, healing ? "healing" : "damage");
   let plan;
   const rolls = await withPlan(command, made => {
     plan = made;
-    return CONFIG.Dice.DamageRoll.build(damageProcess(command, link, types), { configure: false }, message);
+    return CONFIG.Dice.DamageRoll.build(damageProcess(command, link, types, critical, added), { configure: false }, message);
   });
   if ( !rolls?.length ) return failed(plan?.refusal ?? "cancelled");
   return describeResult(command, rolls[0].parent, actor, campaign, { rolls });
@@ -334,22 +351,35 @@ function chosenTypes(chosen, parts) {
 
 /**
  * The configuration dnd5e rolls a description's damage or healing with, as its own description link
- * does: a roll for each part, as the kind chosen for it, offering the kinds it names; tagged as the
- * player's roll. Made afresh for each use, as dnd5e changes what it's given.
+ * does: a roll for each part, as the kind chosen for it, offering the kinds it names; a critical
+ * hit's where the player chose one, as the link's is where its roller does, with what the activity
+ * it rolls it by adds to one, as an attack's critical damage, for the damage as a whole and for each
+ * of its rolls; tagged as the player's roll. Made afresh for each use, as dnd5e changes what it's
+ * given.
  * @param {object} command
  * @param {{parts: {formula: string, types: string[]}[]}} link
  * @param {(string|undefined)[]} types   The kind of each part.
+ * @param {boolean} critical             Is it a critical hit's?
+ * @param {{critical: object, rolls: object[]}|null} [added]   What its activity adds to a critical
+ *                                       hit's, as `linkCritical` reads it.
  * @returns {object}
  */
-function damageProcess(command, link, types) {
+function damageProcess(command, link, types, critical, added=null) {
+  const adding = critical ? added : null;
   return {
     hookNames: ["damage"],
-    isCritical: false,
+    isCritical: critical,
+    ...(adding && { critical: foundry.utils.deepClone(adding.critical) }),
     [ROLL_TAG]: command.id,
     rolls: link.parts.map(({ formula, types: offered }, index) => ({
       parts: [formula],
       data: {},
-      options: { ...(types[index] && { type: types[index] }), types: [...offered], [ROLL_TAG]: command.id }
+      options: {
+        ...(types[index] && { type: types[index] }),
+        types: [...offered],
+        [ROLL_TAG]: command.id,
+        ...(adding?.rolls[index] && { critical: foundry.utils.deepClone(adding.rolls[index]) })
+      }
     }))
   };
 }

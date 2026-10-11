@@ -11,10 +11,11 @@ import { send } from "./transport.mjs";
  * it is in is sent `character.updated` with the character as it now stands, sheet included.
  *
  * A change to an actor's items or effects changes what its sheet shows, so those count too, as
- * does time passing in the game or a new round of combat, which runs effects down. A burst of
- * changes, such as a level up, is sent once it settles, and a change that leaves what a campaign
- * was told as it was is not sent at all. Any description the campaign has not been sent goes
- * first, in character.texts.
+ * does time passing in the game or a new round of combat, which runs effects down, and a change to
+ * the world's rules for a critical hit's damage, which every sheet says. A burst of changes, such
+ * as a level up, is sent once it settles, and a change that leaves what a campaign was told as it
+ * was is not sent at all. Any description the campaign has not been sent goes first, in
+ * character.texts.
  */
 
 /**
@@ -37,6 +38,15 @@ const told = new Map();
  */
 const settling = new Map();
 
+/**
+ * The world's settings that change how a critical hit's damage is rolled: dnd5e's, and Midi-QOL's,
+ * which keeps its rules for critical hits among its own.
+ * @type {Set<string>}
+ */
+const CRITICAL_SETTINGS = new Set([
+  "dnd5e.criticalDamageModifiers", "dnd5e.criticalDamageMaxDice", "midi-qol.ConfigSettings"
+]);
+
 /* -------------------------------------------- */
 
 /**
@@ -55,6 +65,10 @@ export function registerCharacterHooks() {
   Hooks.on("updateCombat", (combat, changes) => {
     if ( ("round" in changes) || ("turn" in changes) ) effectsRunningDown();
   });
+  // A world setting is stored the first time it's changed from its default, and updated after.
+  for ( const hook of ["createSetting", "updateSetting"] ) {
+    Hooks.on(hook, setting => criticalRulesChanged(setting));
+  }
 }
 
 /**
@@ -119,12 +133,30 @@ function characterChanged(actor) {
  */
 function effectsRunningDown() {
   if ( !canSend() ) return;
-  const ids = new Set(getCampaigns().flatMap(campaign => Array.from(campaign.characters)));
-  for ( const id of ids ) {
-    const actor = game.actors.get(id);
-    const effects = Array.from(actor?.allApplicableEffects?.() ?? []);
+  for ( const actor of campaignCharacters() ) {
+    const effects = Array.from(actor.allApplicableEffects?.() ?? []);
     if ( effects.some(effect => effect.isTemporary) ) characterChanged(actor);
   }
+}
+
+/**
+ * Note that every campaign character may have changed when one of the world's settings for critical
+ * hits does, since its sheet says how their damage is rolled.
+ * @param {Setting} setting   The setting stored or changed.
+ * @returns {void}
+ */
+function criticalRulesChanged(setting) {
+  if ( !CRITICAL_SETTINGS.has(setting?.key) || !canSend() ) return;
+  for ( const actor of campaignCharacters() ) characterChanged(actor);
+}
+
+/**
+ * Every character in a campaign, once each.
+ * @returns {Actor[]}
+ */
+function campaignCharacters() {
+  const ids = new Set(getCampaigns().flatMap(campaign => Array.from(campaign.characters)));
+  return Array.from(ids, id => game.actors.get(id)).filter(Boolean);
 }
 
 /**

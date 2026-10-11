@@ -157,6 +157,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 {
   "img": "worlds/erebor/thorin.webp",
   "rules": "modern",
+  "critical": { "perDie": 2, "multiplyNumeric": false, "powerfulCritical": false, "altered": false },
   "level": 5,
   "classes": [
     { "id": "4kWt1v7QeXzEa2Nc", "identifier": "fighter", "name": "Fighter", "levels": 4, "subclass": "Champion", "hitDice": { "die": "d10", "value": 3, "max": 4 } },
@@ -283,6 +284,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | --- | --- |
 | `img` | The portrait's path as Foundry stores it: relative to the game's address, or a full URL. |
 | `rules` | The rules the world is played by, as dnd5e's *Rules Version* setting has them: `"modern"` (2024) or `"legacy"` (2014), or `null` where that can't be read. Under the legacy rules a [hit die](#hit-dice-and-formulas) can heal nothing. Module 0.16.0. |
+| `critical` | How the world rolls a critical hit's damage, for the app to plan a [description's](#descriptions-that-roll): `{ perDie, multiplyNumeric, powerfulCritical, altered }`, each found by building a critical hit's damage as the Gamemaster's client builds it, so with the rules of modules that change it, such as Midi-QOL's critical damage for the Gamemaster, never from dnd5e's settings alone, which Midi's rules may set aside. `perDie` is how many times over each die is thrown, and no other die: `2`, dnd5e's own, or `1` where dnd5e's *Powerful Critical* adds the most its dice could roll instead. `multiplyNumeric`, whether its numbers are doubled, as dnd5e's *Critical Damage Modifiers* does, and `powerfulCritical`, whether the most its dice could roll is added, as dnd5e's *Powerful Critical* does, or Midi's "Max Critical Dice (flat number)": for the app to work out a total by. `altered`, whether the rules change the dice thrown beyond that, as Midi's do that roll them at their highest, double them or keep the highest of them: the app can then work out no total, and the game's is the one that counts, as it always is. `null` where the rules throw dice of their own beside each die, as Midi's that roll a critical hit's dice apart or explode them do, throw dice of one size otherwise than another's, come to numbers neither of dnd5e's settings would, or where it can't be found. Sent again in [`character.updated`](#characterupdated) when those settings change. Module 0.19.0. |
 | `level`, `classes` | Character level, and each class with its levels and subclass, highest first. A class's `identifier` is dnd5e's, such as `"fighter"`, and `hitDice` its `{ die, value, max }`: the size, how many are left and how many it has, or `null`. |
 | `species`, `background` | Their names, or `null`. |
 | `hp` | `{ value, max, temp }`, as on a [combatant](#combatant). |
@@ -407,9 +409,11 @@ ability modifiers and spell save DC; one that says "spell save DC", that DC; one
 saving throw, the abilities and DCs of its item's saving throws, which a saving throw without a DC
 of its own takes; one that names a check, or has dnd5e's skill or tool links, the abilities, skills,
 tools and DCs of its item's checks, which dnd5e's `[[/check]]` shows and a check without a DC of its
-own takes (since module 0.18.0); and one with dnd5e's damage or healing links, its item's damage.
-So it gets a new hash when any of them changes. Modules 0.17.0 and 0.18.0 each send descriptions in
-a new format, so each gets a new hash, and is sent again once, with its next hello.
+own takes (since module 0.18.0); and one with dnd5e's damage or healing links, its item's damage,
+and for an item with an attack, since module 0.19.0, whether the character's critical hits with a
+melee weapon throw extra dice, as Savage Attacks gives. So it gets a new hash when any of them
+changes. Modules 0.17.0, 0.18.0 and 0.19.0 each send descriptions in a new format, so each gets a
+new hash, and is sent again once, with its next hello.
 
 #### Links in descriptions
 
@@ -433,7 +437,7 @@ app](#descriptions-that-roll):
 | --- | --- | --- |
 | `ss-save roll` | A saving throw, or a concentration check. | `data-ability`: the ability, as dnd5e's key, such as `"dex"`, or several joined by `\|` for a choice, such as `"str\|dex"`; left out for a concentration check that names none. `data-dc`: its DC, a whole number from 1 to 99, where one is known. `data-type`: `"concentration"` for a concentration check, else left out. |
 | `ss-check roll` | An ability, skill or tool check, or a choice of several. Module 0.18.0. | `data-checks`: from 1 to 10 checks joined by `\|`, each `check:<ability>` for an ability check, `skill:<ability>:<skill>` for a skill check, or `tool:<ability>:<tool>` for a tool check, as dnd5e's keys, such as `"skill:str:ath"`; each kind of check, by its skill or tool, or its ability for an ability check, at most once. The ability is always given: the one the description names, or else the skill's or tool's own, as dnd5e's configuration has it, as dnd5e's request for it would, never the character's own. Only the six abilities, `str` to `cha`. A tool is one of dnd5e's `tools`, or a kind of vehicle, as `water`. Keys match `[A-Za-z][\w-]{0,31}`. `data-dc` as for a save. `data-using-tool`: for a skill checked using a tool, as dnd5e's 2024 rules have it, "a Dexterity (Sleight of Hand) check using Thieves' Tools", the tool's key; else left out. |
-| `ss-damage roll` | Damage or healing, in one or more parts. | `data-formulas`: each part's formula, joined by `&`. `data-types`: each part's kinds of damage or healing, as dnd5e's keys, joined by `&` in the same order, and a part's choice among several joined by `\|`; a part that names none has nothing in its place, and a single part that names none leaves it out. `data-healing`: `"true"` for healing, else left out. |
+| `ss-damage roll` | Damage or healing, in one or more parts. | `data-formulas`: each part's formula, joined by `&`. `data-types`: each part's kinds of damage or healing, as dnd5e's keys, joined by `&` in the same order, and a part's choice among several joined by `\|`; a part that names none has nothing in its place, and a single part that names none leaves it out. `data-healing`: `"true"` for healing, else left out. `data-critical`: `"false"` for damage never [rolled as a critical hit's](#descriptions-that-roll), else left out: damage dnd5e's own link rolls through one of the item's activities, as it does `[[/damage]]` naming no formula of its own, where that activity allows none, as a saving throw's, a healing's and most damage activities' don't, or where its critical hit throws dice the app can't plan, such as a melee weapon's extra dice for Savage Attacks, or critical damage with dice of its own. Module 0.19.0. |
 | `ss-roll roll` | A roll in the text, such as Foundry's `[[/r 1d6]]` or `[[1d6]]`. | `data-formula`: its formula, never what the Gamemaster's browser rolled for it as it enriched the description. |
 | `ss-condition ref` | A condition named, to read about. | `data-condition`: one of dnd5e's `conditionTypes` keys, such as `"prone"`; never one dnd5e marks as only like a condition, such as burning or bleeding. |
 
@@ -626,7 +630,7 @@ the destination, the campaigns or any event setting changes.
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Make Players' Attacks and Spells Through Midi-QOL** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; and `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters. See [Rolls from the app](#rolls-from-the-app). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Make Players' Attacks and Spells Through Midi-QOL** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; and `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters. See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 | `prompts` | Every [prompt](#prompts) open for the campaign's players, read afresh from the chat log: any the campaign was told of that isn't among them has closed. Empty while its players aren't asked for their saves. |
@@ -865,6 +869,22 @@ A prompt:
   opens no [prompt](#prompts). The sheet has [`tools`](#character-sheet). A listener that doesn't
   know `ss-check` can show it as text, and one that sends none of the new commands needs no change;
   one that reads `ask` should expect its new `type`.
+- Module 0.19.0 rolls a [description's damage](#descriptions-that-roll) as a critical hit's, where
+  the player chose one, with `critical` on a `"textDamage"`, never for healing, as the world's rules
+  make a critical hit's damage, Midi-QOL's too; and changed in the app, with `modifiers`, as an
+  attack's damage is: more of its first part's first die, that die another size, or every die at
+  its highest. The sheet has [`critical`](#character-sheet), how the world rolls a critical hit's
+  damage, for the app to plan its dice by, and is sent again when the world's settings for it
+  change. The hello's `modifiers` now also says whether a description's damage may be changed, and
+  is `true` where only it is offered, as with **Make Players' Attacks and Spells Through Midi-QOL**
+  off while Midi makes items' uses. Damage dnd5e's own link rolls through an activity that allows
+  no critical hit, or whose critical hit throws dice the app can't plan, is marked
+  [`data-critical="false"`](#links-in-descriptions), and is never one (`"invalid"`, `"critical"`);
+  descriptions are sent in this new format under new hashes, so each is sent again once. Before
+  module 0.19.0, a `textDamage` with `modifiers` was refused (`"invalid"`, `"modifiers"`), but its
+  `critical` was never read: it was rolled as an ordinary hit's, or refused as `"dice"` where its
+  dice were a critical hit's. A listener should send `critical` only where the sheet has
+  `critical`, which module 0.19.0 sends; one that sends neither needs no change.
 
 ## Changes from protocol 1
 
@@ -1096,6 +1116,7 @@ first die is changed before it's rolled, and a critical hit's dice made again, a
 them, so the player throws `perDie` more dice for each they add; dice that aren't those changed
 ones are refused (`"invalid"`, `"dice"`), as are changes the module can't read (`"invalid"`,
 `"modifiers"`). Damage at its highest is rolled so, every die at its highest, Foundry's own too.
+Since module 0.19.0 a [description's damage](#descriptions-that-roll) may be changed the same way.
 
 Players' attacks are offered once the self-test has also checked that the player's dice reach an
 attack's damage. If they don't, attacks and uses stay in the app, and Manage Campaigns says why.
@@ -1210,7 +1231,7 @@ description's hash, `text`, and the link's `data-n`, `link`:
 | `save` with `text` and `link` | Rolls that saving throw or concentration check, against its DC. | Where players' rolls are made. |
 | `skill`, `tool` or `ability` with `text` and `link` | Rolls one of the checks a description's check offers, against its DC. Module 0.18.0. | Where players' rolls are made. |
 | `textRoll` | Rolls a description's roll, such as `[[/r 1d4]]`. | Where players' rolls are made, under dnd5e 5. |
-| `textDamage` | Rolls a description's damage or healing. | Where the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, under dnd5e 5. |
+| `textDamage` | Rolls a description's damage or healing; since module 0.19.0 as a critical hit's, or changed in the app. | Where the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, under dnd5e 5. |
 
 Under dnd5e 6, whose damage, healing and roll requests are messages of kinds of their own, only a
 `save`, or a check, rolled for a link is offered yet, and one of the others fetched anyway is
@@ -1303,21 +1324,35 @@ secret section may be rolled so.
 | --- | --- |
 | `text`, `link` | The description, and its damage or healing link. |
 | `types` | Optional: for each of its parts, in order, the kind of damage chosen from that part's types, or `null`. A part with no choice made is rolled as the first kind it names. A kind a part doesn't offer, or more kinds than parts, is refused (`"type"`). |
-| `dice` | One `{ faces, results }` for each dice term of its parts' formulas, in order, with as many results as the term has dice, as for a [formula](#hit-dice-and-formulas). |
+| `critical` | Optional: `true` to roll it as a critical hit's, as the world's rules make a critical hit's damage, and those of modules that change them, such as Midi-QOL's; `false` or left out for not. Its `dice` are then each dice term's as many times over as the sheet's [`critical`](#character-sheet) `perDie` says. Never for healing, nor for damage marked `data-critical="false"` (`"invalid"`, `"critical"`); `true` on a `textRoll`, or anything but a boolean, is refused the same way. Module 0.19.0. |
+| `modifiers` | Optional, where the hello says `modifiers`: `{ extra, faces, maximize }`, each optional, how the player changed it in the app, as an [attack's damage](#attacks) may be, healing too. `extra` more of its first part's first die, whatever its sign, up to 40: for a critical hit's, `perDie` more for each, else one; `faces` that die another size, `4`, `6`, `8`, `10` or `12`; `maximize` every die at its highest, the game's own too. `dice` are then the changed ones. Refused on a `textRoll`, or where it can't be read (`"invalid"`, `"modifiers"`). Module 0.19.0. |
+| `dice` | One `{ faces, results }` for each dice term of its parts' formulas, in order, with as many results as the term has dice, as for a [formula](#hit-dice-and-formulas); as a critical hit's and as changed, if so. |
 
 It's rolled as dnd5e rolls its description's link, without the damage dialog: a roll for each
-part, of the kind chosen for it, never a critical hit's, and never changed in the app (`modifiers`
-is refused as `"invalid"`). The card is the player's, spoken as the character, with the flavor
+part, of the kind chosen for it; as a critical hit's, where the player chose one, as dnd5e's own
+link is where its roller does, so with the world's rules for a critical hit's damage, its *Critical
+Damage Modifiers* and *Powerful Critical*, or the Gamemaster's critical damage rules of Midi-QOL,
+and where dnd5e's link rolls it through one of the item's activities, with what that activity adds
+to a critical hit's, such as an attack's critical damage, and never where it allows none, even
+should it have come to allow none, or to add dice, since the description was sent (`"invalid"`,
+`"critical"`); and changed as the player chose, as an attack's damage is: the first part's first die is changed
+before it's rolled, and a critical hit's dice made again, as the world makes them, and damage at
+its highest has every die at its highest. Damage changed where the self-test found it isn't changed
+as expected is refused (`"self-test"`); a critical hit's is still rolled. The card is the player's,
+spoken as the character, with the flavor
 `<where it comes from> - Damage Roll`, or `Healing Roll`, and `flags.dnd5e` of `{ messageType:
 "roll", roll: { type: "damage" }, targets: [] }`, `type` `"healing"` for healing, with `item` as an
 ask has it, for dnd5e to head the card with it, but none for a spell an item casts: dnd5e would
 head its card with the item alone, in place of the flavor naming both. It names no targets: the
-Gamemaster applies it from the card, as from dnd5e's own link. Even with Midi-QOL, it's the roll alone, outside any workflow:
-dnd5e's `dnd5e.rollDamage` hook isn't called, so no workflow waiting for damage takes it. Refused:
+Gamemaster applies it from the card, as from dnd5e's own link; dnd5e heads an item's critical
+hit's with "Critical Hit". Even with Midi-QOL, it's the roll alone, outside any workflow:
+dnd5e's `dnd5e.rollDamage` hook isn't called, so no workflow waiting for damage takes it. Its
+rolls in `command.result` have `critical`. Refused:
 `"attacks-off"` while the Gamemaster doesn't let the campaign's players attack, `"self-test"`
 where damage doesn't take their dice, and `"dice"` for dice that aren't the ones its formulas
-throw, or a formula with a die no player rolls, such as a d3, or dice inside parentheses or a
-function.
+throw, as a critical hit's and as changed, as when the world's rules for critical hits changed
+since the app was told them, or there's no die to change in its first part; or a formula with a die
+no player rolls, such as a d3, or dice inside parentheses or a function.
 
 **A description's roll.** A `textRoll` has the same `text`, `link` and `dice`, for an `ss-roll`
 link. It's rolled as dnd5e rolls a formula, without its dialog, on a card spoken as the character,
@@ -1326,6 +1361,7 @@ damage, none for a spell an item casts. Refused as `"dice"` as damage is; and wh
 dice can no longer reach it, as inside a function, it's called off, and nothing is posted.
 
 Neither is rolled with advantage or has anything added: `mode`, `explicit` and `extras` may be
-left out, and if given are `0`, `false` and empty. Both are flagged
+left out, and if given are `0`, `false` and empty. A description's roll is never a critical hit's
+or changed in the app. Both are flagged
 `flags["sending-stone"].request` with the roll's `id`, as other rolls are, and both report their
 rolls as other rolls do.

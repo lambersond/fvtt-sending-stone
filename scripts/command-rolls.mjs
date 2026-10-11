@@ -1,7 +1,7 @@
 import { ATTACK_KINDS, DIE_FACES, MODULE_ID, ROLL_KINDS, ROLL_TAG } from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
-import { diceStatus, formulaRoll, matchesDice, plannedDice, withPlan } from "./dice-plan.mjs";
+import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
 import { findPrompt, outcomeOf } from "./prompts.mjs";
 import { findLink, MOST_LINKS } from "./sheet-links.mjs";
 import { castSpellOf, visibleActivities } from "./sheet-rolls.mjs";
@@ -175,10 +175,11 @@ export function checkAskCommand(command) {
 
 /**
  * Why a fetched roll of a description's damage, healing or other roll isn't one to make, if it
- * isn't. It names a description and a link in it; it's rolled as it is, with no advantage, nothing
- * added and nothing changed, as a utility's roll is; and has the dice the link's formula throws, if
- * any, which are checked against them when it's made. Damage may name the kind chosen for each of
- * its parts.
+ * isn't. It names a description and a link in it; it's rolled with no advantage and nothing added,
+ * as a utility's roll is; and has the dice the link's formula throws, if any, which are checked
+ * against them when it's made. Damage may name the kind chosen for each of its parts, be a critical
+ * hit's, and be changed as the player chose in the app, as an attack's damage may; a description's
+ * own roll is rolled as it is.
  * @param {object} command
  * @returns {string|null}
  */
@@ -190,11 +191,16 @@ export function checkTextCommand(command) {
   }
   if ( !isOptional(command.extras, extras => Array.isArray(extras) && !extras.length) ) return "extras";
   if ( (command.prompt !== undefined) && (command.prompt !== null) ) return "prompt";
-  if ( (command.modifiers !== undefined) && (command.modifiers !== null) ) return "modifiers";
+  const damage = command.kind === "textDamage";
+  if ( !isOptional(command.critical, critical => (critical === false) || (damage && (critical === true))) ) {
+    return "critical";
+  }
+  const changed = (command.modifiers !== undefined) && (command.modifiers !== null);
+  if ( changed && (!damage || (readModifiers(command.modifiers) === null)) ) return "modifiers";
   const { dice, types } = command;
   if ( !Array.isArray(dice) || (dice.length > 20) || !dice.every(isRolled) ) return "dice";
   if ( (types !== undefined) && (types !== null) ) {
-    if ( command.kind !== "textDamage" ) return "types";
+    if ( !damage ) return "types";
     if ( !Array.isArray(types) || (types.length > 20) || !types.every(type => (type === null) || isKey(type)) ) {
       return "types";
     }

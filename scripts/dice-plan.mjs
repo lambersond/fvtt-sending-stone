@@ -77,6 +77,13 @@ class DicePlan {
 const plans = new Map();
 
 /**
+ * The kinds of a player's roll that are damage, which they may change in the app: a use's, as an
+ * attack's, and a description's.
+ * @type {Set<string>}
+ */
+const DAMAGE_COMMANDS = new Set(["damage", "textDamage"]);
+
+/**
  * The dice of tagged rolls being evaluated, with their roll's plan, should a die not know the roll
  * it belongs to.
  * @type {WeakMap<DiceTerm, DicePlan>}
@@ -174,7 +181,7 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
     if ( term instanceof DiceTerm ) termPlans.set(term, plan);
   }
   // Damage the player chose at its highest has every die at its highest, Foundry's own too.
-  const maximize = (plan.command.kind === "damage") && (plan.command.modifiers?.maximize === true);
+  const maximize = DAMAGE_COMMANDS.has(plan.command.kind) && (plan.command.modifiers?.maximize === true);
   return wrapped({ ...options, allowInteractive: false, ...(maximize && { maximize: true }) }, ...rest);
 }
 
@@ -261,17 +268,17 @@ function tagOf(process, config, index) {
 
 /**
  * Once dnd5e has built a tagged roll, keep how the player chose to roll it, whatever changed it
- * since, as a module granting advantage might; and change the first of a player's damage rolls as
- * they chose in the app. A hit die, a utility's roll or a description's roll another module changed
- * so that the player's dice can't reach it, as inside a function, is called off: nothing is spent
- * or healed, and nothing posted.
+ * since, as a module granting advantage might; and change the first of a player's damage rolls, a
+ * use's or a description's, as they chose in the app. A hit die, a utility's roll or a description's
+ * roll another module changed so that the player's dice can't reach it, as inside a function, is
+ * called off: nothing is spent or healed, and nothing posted.
  * @param {Roll[]} rolls
  * @returns {boolean|void}   False to call the roll off.
  */
 function onRollConfiguration(rolls) {
   for ( const [index, roll] of (rolls ?? []).entries() ) {
     const plan = planFor(roll.options?.[ROLL_TAG]);
-    if ( plan?.command.kind === "damage" ) {
+    if ( DAMAGE_COMMANDS.has(plan?.command.kind) ) {
       if ( index === 0 ) reshapeDamage(roll, plan.command.modifiers);
       continue;
     }
@@ -481,6 +488,116 @@ export function readModifiers(modifiers) {
  */
 function reshapes(modifiers) {
   return ((modifiers?.extra ?? 0) > 0) || (modifiers?.faces !== undefined);
+}
+
+/**
+ * Do these change damage at all: more of its dice, another size of them, or every die at its
+ * highest?
+ * @param {{extra?: number, faces?: number, maximize?: boolean}} [modifiers]
+ * @returns {boolean}
+ */
+export function changesDamage(modifiers) {
+  return reshapes(modifiers) || (modifiers?.maximize === true);
+}
+
+/**
+ * The dice damage throws, worked out before it's rolled, as an attack's preview has them: each
+ * roll's dice, as this world rolls them, a critical hit's too, and how many it throws for each die
+ * of its own. None, for damage that can't be planned.
+ * @param {object} process   A damage roll's configuration, with whether it's a critical hit's.
+ * @returns {{plannable: boolean, rolls: {dice: {faces: number, number: number}[], perDie: number}[]}}
+ */
+export function plannedDamage(process) {
+  const planned = damageRollsFor(process).map(roll => plannedDice(roll));
+  const plannable = planned.every(each => each.plannable);
+  return {
+    plannable,
+    rolls: planned.map(({ dice }, index) => ({ dice: plannable ? dice : [], perDie: diceForEach(process, index) }))
+  };
+}
+
+/**
+ * The ways numbers may come out of a critical hit's damage, as dnd5e's two settings for it make
+ * them: doubled or not (Critical Damage Modifiers), and with the most its dice could roll added or
+ * not (Powerful Critical).
+ * @type {[boolean, boolean][]}
+ */
+const NUMBER_RULES = [[false, false], [true, false], [false, true], [true, true]];
+
+/**
+ * How this world rolls a critical hit's damage, for the app to plan a description's: each die
+ * thrown `perDie` times over, such as twice, or once where dnd5e's Powerful Critical adds the most
+ * it could roll instead, and no other die; whether its numbers are doubled, and the most its dice
+ * could roll added, for the app to work out its total by; and whether its dice are changed beyond
+ * that, as at their highest, so that only the game can. Found by building a critical hit's damage
+ * as this client builds it, with the rules of modules that change it, such as Midi-QOL's, which
+ * keeps its own for the Gamemaster, never from dnd5e's settings alone, which Midi's may set aside:
+ * one die and a number first, then dice of two sizes, which must come out the same way. Null where
+ * those rules throw dice of their own beside each, as Midi's that roll critical dice apart or
+ * explode them do, make dice of one size otherwise than another's, come to numbers dnd5e's settings
+ * don't, or can't be read.
+ * @returns {{perDie: number, multiplyNumeric: boolean, powerfulCritical: boolean, altered: boolean}|null}
+ */
+export function criticalRule() {
+  try {
+    const built = formula => damageRollsFor({ rolls: [{ parts: [formula], data: {}, options: {} }], isCritical: true })[0];
+    const one = built("1d6 + 3");
+    const thrown = plannedDice(one);
+    const perDie = thrown.dice[0]?.number;
+    if ( !thrown.plannable || (thrown.dice.length !== 1) || (thrown.dice[0].faces !== 6) ) return null;
+    if ( !Number.isInteger(perDie) || (perDie < 1) ) return null;
+    // Its numbers, 3 at first, as each pair of dnd5e's settings would make them, the most a d6 could
+    // roll being 6.
+    const rule = NUMBER_RULES.find(([doubled, most]) => numbersOf(one) === (doubled ? 6 : 3) + (most ? 6 : 0));
+    if ( !rule ) return null;
+    const [multiplyNumeric, powerfulCritical] = rule;
+    // Dice of two sizes, each thrown as many times over, and their numbers the same way: the most
+    // they could roll being 20.
+    const two = built("2d8 + 1d4 + 3");
+    const expected = [{ faces: 8, number: 2 * perDie }, { faces: 4, number: perDie }];
+    const planned = plannedDice(two);
+    if ( !planned.plannable || (JSON.stringify(planned.dice) !== JSON.stringify(expected)) ) return null;
+    if ( numbersOf(two) !== (multiplyNumeric ? 6 : 3) + (powerfulCritical ? 20 : 0) ) return null;
+    return { perDie, multiplyNumeric, powerfulCritical, altered: [one, two].some(roll => altersDice(roll)) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What a built roll's numbers come to, each with its sign, its dice left out; null for one with
+ * anything else in it, such as parentheses, or numbers multiplied or divided.
+ * @param {Roll} roll   Built, not yet evaluated.
+ * @returns {number|null}
+ */
+function numbersOf(roll) {
+  const { DiceTerm, NumericTerm, OperatorTerm } = foundry.dice.terms;
+  let sign = 1;
+  let total = 0;
+  for ( const term of roll.terms ) {
+    if ( term instanceof OperatorTerm ) {
+      if ( !["+", "-"].includes(term.operator) ) return null;
+      sign = (term.operator === "-") ? -sign : sign;
+    }
+    else if ( term instanceof NumericTerm ) {
+      total += sign * term.number;
+      sign = 1;
+    }
+    else if ( term instanceof DiceTerm ) sign = 1;
+    else return null;
+  }
+  return total;
+}
+
+/**
+ * Does a built roll change its dice beyond how many it throws, as Midi-QOL's rules for a critical
+ * hit's damage may: at their highest (`min`), the highest of them kept (`kh`), or each doubled?
+ * @param {Roll} roll   Built, not yet evaluated.
+ * @returns {boolean}
+ */
+function altersDice(roll) {
+  const { DiceTerm } = foundry.dice.terms;
+  return roll.terms.some(term => (term instanceof DiceTerm) && (term.modifiers?.length > 0));
 }
 
 /**
@@ -714,10 +831,7 @@ async function modifiersSelfTest() {
     rolls: [{ parts: ["1d8", "2"], data: {}, options: { type: "slashing", [ROLL_TAG]: id } }],
     isCritical: true
   };
-  const preview = {
-    plannable: true,
-    rolls: damageRollsFor(process).map((roll, index) => ({ dice: plannedDice(roll).dice, perDie: diceForEach(process, index) }))
-  };
+  const preview = plannedDamage(process);
   const modifiers = { extra: 1, faces: 10 };
   const expected = modifiedDice(preview, modifiers);
   const [roll] = damageRollsFor(process);
