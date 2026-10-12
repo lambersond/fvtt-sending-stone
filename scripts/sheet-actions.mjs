@@ -1,3 +1,4 @@
+import { enchantmentsOf } from "./sheet-enchant.mjs";
 import { usesOf } from "./sheet-features.mjs";
 import {
   ACTION_KINDS, activationTypeOf, activityName, activityUses, castCopy, castSpellOf, ownLabels, rangeOf,
@@ -182,7 +183,7 @@ function usedInAFight(activity) {
  * saving throw it calls for, its damage or healing; and the item's uses, and each of those
  * activities, where there's more than one, or where the item is listed in other sections too. One
  * that isn't the item's first activity is named, such as a staff's Silvery Barbs under Reactions.
- * An item not identified yet keeps them to itself.
+ * An item not identified yet keeps them to itself. And the enchantments the item carries.
  * @param {Item} item
  * @param {SheetTexts} texts
  * @param {Activity[]} [activities]   Those it lists; all the item's, by default.
@@ -218,6 +219,7 @@ function describeAction(item, texts, activities=visibleActivities(item), { split
       || (lead?.duration?.concentration === true)),
     identified,
     ...(consumable(item) && { consumable: true }),
+    ...enchantmentsOf(item),
     text: texts.add({
       html: identified ? system.description?.value : system.unidentified?.description,
       relativeTo: item

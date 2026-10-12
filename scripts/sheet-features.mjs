@@ -1,3 +1,4 @@
+import { enchantmentsOf } from "./sheet-enchant.mjs";
 import { finite, limitedUses, localize } from "./sheet-values.mjs";
 import { rollsIfAny, usageOf } from "./sheet-rolls.mjs";
 
@@ -90,7 +91,8 @@ function originOf(actor, item) {
 }
 
 /**
- * A feature: what kind it is, how it is used, how often, and its description.
+ * A feature: what kind it is, how it is used, how often, the enchantments it carries, and its
+ * description.
  * @param {Item} item
  * @param {SheetTexts} texts
  * @returns {object}
@@ -109,6 +111,7 @@ function describeFeature(item, texts) {
     passive: (system.properties?.has?.("trait") ?? false) || !(system.activities?.size > 0),
     uses: usesOf(item),
     ...usableFields(item, texts),
+    ...enchantmentsOf(item),
     text: texts.add({ html: system.description?.value, relativeTo: item })
   };
 }

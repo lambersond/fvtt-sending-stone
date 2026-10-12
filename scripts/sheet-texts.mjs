@@ -22,10 +22,11 @@ import { sendLater } from "./transport.mjs";
  * 1, before it was part of the hash: as Foundry enriched them. 2: with the spans of
  * sheet-links.mjs, since 0.17.0. 3: with their checks, `ss-check`, since 0.18.0. 4: with damage
  * never a critical hit's marked, since 0.19.0. 5: with what a critical hit adds, and damage as
- * resolved, since 0.20.0.
+ * resolved, since 0.20.0. 6: with damage whose dice this world can't plan for a player left as
+ * text, since 0.21.0, so that no link is numbered as it was.
  * @type {number}
  */
-const TEXT_FORMAT = 5;
+const TEXT_FORMAT = 6;
 
 /**
  * The most a character.texts payload should hold, in characters of JSON, well within the 1 MB a

@@ -1,4 +1,5 @@
 import { DIE_FACES, MODULE_ID } from "./constants.mjs";
+import { plannableDamage } from "./dice-plan.mjs";
 
 /**
  * The links in a description that the app can act on: saving throws, checks, damage and healing,
@@ -966,7 +967,9 @@ function checkSpan(context, { checks, dc, usingTool }, label) {
 
 /**
  * Damage or healing to act on: one or more parts, each a formula with the types it may be. None if
- * any part's formula can't be rolled. Damage dnd5e's own link rolls through one of the item's
+ * any part's formula can't be rolled, or its dice can't be planned in this world for a player to
+ * throw, as a d3's, or a leading −1d4 that Foundry's parser may put in parentheses: the game
+ * couldn't take their dice for it. Damage dnd5e's own link rolls through one of the item's
  * activities, as it does `[[/damage]]` naming no formula of its own, is a critical hit's only as
  * that activity allows, with what it adds to each part, both or neither of its attributes; marked
  * never one, too, where that throws dice, which apps before 0.20.0 can't plan. The activity is
@@ -982,7 +985,7 @@ function damageSpan(context, { formulas, types, healing, activity }, label) {
     formula: resolveFormula(formula, context.rollData),
     types: typeKeys((types[index] ?? "").split("|"))
   }));
-  if ( !parts.length || parts.some(part => !part.formula) ) return null;
+  if ( !parts.length || parts.some(part => !part.formula || !plannableDamage(part.formula)) ) return null;
   const critical = (healing || !activity) ? null : linkCritical(context.relativeTo, activity, parts.length);
   const adds = critical?.allowed ? critical.adds : null;
   const span = makeSpan(context, "ss-damage", {
@@ -1100,7 +1103,7 @@ function rollClass() {
  * @param {*} value
  * @returns {number|null}
  */
-function challenge(value) {
+export function challenge(value) {
   if ( (value === null) || (value === undefined) || (value === "") ) return null;
   const dc = Number(value);
   return (Number.isInteger(dc) && (dc >= 1) && (dc <= 99)) ? dc : null;
@@ -1132,7 +1135,7 @@ function abilityKeys(keys) {
  * @param {{type: string, ability?: string|null, key?: string|null}[]} options
  * @returns {CheckOption[]|null}
  */
-function checkOptions(options) {
+export function checkOptions(options) {
   const config = CONFIG.DND5E ?? {};
   const known = new Set();
   const checks = [];

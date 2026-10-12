@@ -127,15 +127,17 @@ function characterChanged(actor) {
 }
 
 /**
- * Note that every campaign character with a temporary effect may have changed, since the time it
- * has left is on its sheet.
+ * Note that every campaign character with a temporary effect, or an item of theirs with a temporary
+ * enchantment, may have changed, since the time it has left is on its sheet.
  * @returns {void}
  */
 function effectsRunningDown() {
   if ( !canSend() ) return;
   for ( const actor of campaignCharacters() ) {
     const effects = Array.from(actor.allApplicableEffects?.() ?? []);
-    if ( effects.some(effect => effect.isTemporary) ) characterChanged(actor);
+    const enchanted = Array.from(actor.items ?? []).some(item => (typeof item.effects?.some === "function")
+      && item.effects.some(effect => effect.isAppliedEnchantment && effect.isTemporary));
+    if ( enchanted || effects.some(effect => effect.isTemporary) ) characterChanged(actor);
   }
 }
 

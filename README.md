@@ -182,13 +182,58 @@ attack hit only where the game shows players.
   the item's Cast row in the app, as on the Spells tab, and used through dnd5e's copy of the spell,
   at any level the item's Cast activity offers. As in Foundry, one that spends no slot spends no
   charges either; any other spends the item's charges again.
+- **Check activities.** A feature's or item's check activity, such as the Thief's Fast Hands or
+  the Manacles' Bind, is used from the app as in Foundry: its card is posted with dnd5e's button for
+  each check it calls for, spending what it spends, for the table to roll. The player can instead
+  roll their own check, with their dice, against its DC, as the card's button rolls it, spending
+  nothing, a tool's own bonus added for a check of the tool. A spell's check, such as Maze's, is
+  its target's to make: the player casts the spell, and its card asks for it. A spell's checks
+  with no activation of their own, such as the 2014 Entangle's Escape Plants, are listed after how
+  it's cast, even where dnd5e lists them first; the 2014 Silent Image's and Disguise Self's checks
+  to see through them, and Entangle's, spend no slot, not being the spell cast, though they're used
+  at the level the player picks, as in Foundry. One whose DC scales with the level it's used at,
+  and every check activity under dnd5e 6 for now, are left to Foundry; with Midi-QOL, the targets'
+  checks are Midi's, rolled as Midi rolls them, and one Midi would have its user make at
+  themselves, as a tool's, is refused in the app, Midi rolling it with Foundry's dice.
+- **Free castings.** A spell granted with uses of its own, such as Fey Touched's Misty Step, has
+  dnd5e's free casting, a forward, which the app lists beneath it: cast from the app, it spends the
+  use, never a slot, at the spell's own level, or a warlock's at their pact slots' level, as dnd5e
+  casts it, and its card is the spell's. Repeats of the same free casting, as dnd5e gives a spell
+  granted more than once, are listed once; forwards that each spend uses of their own are each
+  listed. A forward to a summoning, a transformation, an enchantment or a Cast activity, or one
+  whose level may be chosen, is left to Foundry, and so is a free casting of a check that isn't the
+  spell cast, as the 2014 Silent Image's.
+- **Enchantments.** An enchant activity, such as Magic Weapon, Shillelagh, True Strike, Sacred
+  Weapon or Pact of the Blade, is used from the app on one of the character's own items: the player
+  picks the profile, from those dnd5e offers at the level it's cast at, such as Magic Weapon's +2 at
+  4th level, and the item, from those dnd5e's rules let take it, as a nonmagical weapon for Magic
+  Weapon or a club or quarterstaff for Shillelagh. Its card is posted, with dnd5e's tray, spending
+  what it spends, and the game applies it to that item as the tray would, tied to the
+  concentration the spell began, its riders, such as Pact of the Blade's attack, included; the
+  player's sheet then shows the item enchanted. Cast again on the same item, it replaces its
+  enchantment rather than stacking another, and what was tied to the concentration it ends goes
+  too, as a scroll of Magic Weapon read while concentrating on the spell. Left without an item, the
+  card is posted for you to apply to an ally's weapon. One on its own item, such as a Flame Tongue's
+  Engulf in Flames, is a switch in the app; used again while it's on, it's refused rather than put
+  out at the cost of what it spends. Players can end the enchantments on their character's items
+  from the app, as the item's owner can in Foundry with the ⟲ on dnd5e's card, an ally's Magic
+  Weapon included, the ally's concentration going on; a magic item's template's, and a permanent one
+  whose item is gone, stay. An item not identified yet is named as its player knows it. Where the
+  game won't apply it once it's used, as when the item can no longer take it, it's left on the card
+  for you; one whose concentration has ended by then isn't applied at all, as dnd5e's card no longer
+  offers it. Choices made once, such as Eldritch Spear or Spell Mastery, and a magic item's
+  templates, such as a Shield's +1, are left to Foundry; summoning and transforming are yours to do.
 - **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
   Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
   critical hit's extra dice and critical damage included, such as a melee weapon's die more for
-  Savage Attacks and a weapon's critical damage: the die added to is always the damage's own. A
-  description's damage too; see [Descriptions that roll](#descriptions-that-roll).
-- **Nothing asks you, where it can be helped.** Area attacks Midi targets itself around their user,
+  Savage Attacks and a weapon's critical damage: the die added to is always the damage's own,
+  never its critical damage's nor one it takes away, such as Reduce's or Ray of Enfeeblement's
+  −1d4; damage that takes a die away isn't offered at its highest, which would take the most away,
+  even damage the game rolls itself, such as a d3's.
+  A description's damage too; see [Descriptions that roll](#descriptions-that-roll).
+- **Nothing asks you, where it can be helped.** An enchantment's profile and item are chosen in the
+  app, so dnd5e's usage dialog never opens. Area attacks Midi targets itself around their user,
   summoning, transforming and other activities dnd5e asks about, Midi's Active Defence, a used
   reaction or bonus action Midi enforces, and an activity set to always show Midi's dialogs or to
   ask which effects to apply are refused in the app with a reason. Midi may still ask you what it
@@ -252,28 +297,32 @@ description's damage or roll aren't offered yet.
   link, with the ability the link names, against its DC, so the card shows whether they passed. A
   tool needs no proficiency, as in Foundry, and a skill checked using a tool, under the 2024 rules,
   gets the higher of the two proficiencies, and dnd5e's advantage where the character is proficient
-  with both: Foundry rolls the second d20, and the game's total counts.
+  with both: Foundry rolls the second d20, and the game's total counts. A check activity's own
+  check, such as Fast Hands' Sleight of Hand, is rolled the same way, against the activity's DC; see
+  [Players' attacks and spells](#players-attacks-and-spells).
 - **Damage and healing**, with **Let Players Attack and Cast from Sending Stone** ticked too, are
   rolled with their dice, on a card naming where they're from, such as "Starry Wisp (Staff of
   Fire)" for a spell an item casts, and no targets: you apply them from the card, as from dnd5e's
   own link. With Midi-QOL, it's the roll alone, outside any workflow, and it's offered even with
-  **Make Players' Attacks and Spells Through Midi-QOL** off.
+  **Make Players' Attacks and Spells Through Midi-QOL** off. A link whose dice your world can't
+  plan for the player, such as a d3's, is left as text.
 - **A critical hit's, and changed.** A right-click or long-press on a description's damage lets the
-  player roll it as a critical hit's, as when they hit with it on a natural 20, or change it as
-  they would an attack's damage: at its highest, with more of its first die, or that die another
-  size. Healing can be changed, but is never a critical hit's. The game rolls a critical hit's as
-  your world rolls one: dnd5e's Critical Damage Modifiers and Powerful Critical, or Midi-QOL's
-  critical damage rules for the Gamemaster. Damage dnd5e's own link rolls through one of the item's
-  activities, as a `[[/damage]]` naming no formula, is a critical hit's only as that activity
-  allows: never for a saving throw's damage, as dnd5e's damage dialog offers none, and with what it
-  adds, such as a weapon's critical damage. One whose critical hit throws extra dice, as a melee
-  weapon does for a character with Savage Attacks or Brutal Critical, or whose critical damage has
-  dice of its own, is offered with those dice, as your world rolls them: thrown with the weapon's
-  first die, at their most as Midi's "Max Critical Dice (flat number)" adds them, or left out where
-  Midi's rules leave them out. Where Midi rolls a critical hit's dice apart, as its
-  "Max Critical Dice (roll dice)" and exploding rules do, the app can't plan a description's
-  critical hit, and doesn't offer one. Changes aren't offered where the self-test found damage
-  isn't changed as expected.
+  player roll it as a critical hit's, as when they hit with it on a natural 20, or change it as they
+  would an attack's damage: at its highest, with more of its first die, or that die another size,
+  the die added to never one it takes away, as the −1d4 of `3 - 1d4 + 2d6`, and damage that takes a
+  die away never at its highest. Healing can be changed, but is never a critical hit's. The game
+  rolls a critical hit's as your world rolls one: dnd5e's Critical Damage Modifiers and Powerful
+  Critical, or Midi-QOL's critical damage rules for the Gamemaster. Damage dnd5e's own link rolls
+  through one of the item's activities, as a `[[/damage]]` naming no formula, is a critical hit's
+  only as that activity allows: never for a saving throw's damage, as dnd5e's damage dialog offers
+  none, and with what it adds, such as a weapon's critical damage. One whose critical hit throws
+  extra dice, as a melee weapon does for a character with Savage Attacks or Brutal Critical, or
+  whose critical damage has dice of its own, is offered with those dice, as your world rolls them:
+  thrown with the weapon's first die, at their most as Midi's "Max Critical Dice (flat number)" adds
+  them, or left out where Midi's rules leave them out. Where Midi rolls a critical hit's dice apart,
+  as its "Max Critical Dice (roll dice)" and exploding rules do, the app can't plan a description's
+  critical hit, and doesn't offer one. Changes aren't offered where the self-test found damage isn't
+  changed as expected.
 - **Rolls**, such as `[[/r 1d4]]`, are rolled with their dice on a card naming where they're from.
   One with a die the app doesn't roll, such as a d3, is refused.
 - **Only what the description says.** The app names a link in a description the module sent it,
@@ -288,8 +337,8 @@ description's damage or roll aren't offered yet.
   eyes or the roller's alone (`/gmr`, `/br`, `/sr`), and a check with an ability of your world's
   own.
 
-Modules 0.17.0, 0.18.0, 0.19.0 and 0.20.0 each send every description again once, in its new
-form. Since 0.20.0 a description with damage links is also sent again when the damage it shows
+Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0 and 0.21.0 each send every description again once, in its
+new form. Since 0.20.0 a description with damage links is also sent again when the damage it shows
 changes, as with Rage.
 
 ### The listener must allow cross-origin requests
@@ -411,7 +460,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites |
-| `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through; the levels an item may cast its spell at, and their cost |
+| `scripts/sheet-enchant.mjs` | Which enchant activities the app may use, with their profiles and the items each may enchant, as dnd5e's rules have it; and the enchantments an item carries, and which of them its player may end |
+| `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through; the levels an item may cast its spell at, and their cost; the checks a check activity calls for, and what a forward is used through and spends |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, their links marked, hashed, and sent only when a campaign lacks them |
 | `scripts/sheet-links.mjs` | The links in a description the app can act on, marked as its own spans, and finding the one a player's command names |
 | `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON |
@@ -421,10 +471,11 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
-| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, and reporting what became of each |
-| `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card; a description's save or check against its DC; several hit dice spent at once, a die at a time |
+| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, and reporting what became of each; what a campaign's hello says it makes |
+| `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time |
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
-| `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen |
+| `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name |
+| `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, planning damage's dice as the world rolls them, critical hits too, and the self-test that it works |
 | `scripts/apps/campaign-config.mjs` | Manage Campaigns: the app's address, and each campaign's title, secret, characters, players' rolls, attacks and spells, and connection test |
 | `tools/echo-listener.mjs` | Stand-in listener for development |
