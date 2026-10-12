@@ -1,18 +1,21 @@
-import { ATTACK_KINDS, DIE_FACES, MODULE_ID, MOST_HIT_DICE, ROLL_KINDS, ROLL_TAG } from "./constants.mjs";
+import {
+  ATTACK_KINDS, DIE_FACES, ENCHANT_KINDS, MODULE_ID, MOST_HIT_DICE, ROLL_KINDS, ROLL_TAG
+} from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
 import { findPrompt, outcomeOf } from "./prompts.mjs";
 import { findLink, MOST_LINKS } from "./sheet-links.mjs";
-import { castSpellOf, visibleActivities } from "./sheet-rolls.mjs";
+import { castSpellOf, checkOf, forwardTarget, shownActivity } from "./sheet-rolls.mjs";
 import { castFrom } from "./sheet-spells.mjs";
 
 /**
  * Making a player's roll from the Sending Stone app: a check, saving throw, death saving throw or
  * initiative, a hit die spent, or several at once, or a utility's own roll, such as a d4 of luck,
  * through dnd5e, as if the player had rolled it in Foundry, with the dice they rolled; a saving
- * throw the game asked them for, on the card that asked; and a saving throw or check a description
- * of theirs calls for, against its DC.
+ * throw the game asked them for, on the card that asked; a saving throw or check a description
+ * of theirs calls for, against its DC; and a check one of their check activities calls for, as its
+ * card's button rolls it.
  */
 
 /**
@@ -34,6 +37,19 @@ const KEYED = new Set(["skill", "tool", "ability", "save"]);
  * @type {Record<string, string>}
  */
 const CHECK_TYPES = { ability: "check", skill: "skill", tool: "tool" };
+
+/**
+ * The commands that may name an item and one of its activities: an attack, a use and a utility's
+ * roll, which must; and a check, which may, rolled for one of the item's check activities.
+ * @type {Set<string>}
+ */
+const WITH_ITEM = new Set(["attack", "use", "formula", "skill", "tool", "ability"]);
+
+/**
+ * Every command a player's roll may be, by kind, for which its item and activity are checked.
+ * @type {Set<string>}
+ */
+const KNOWN_KINDS = new Set([...ROLL_KINDS, ...ATTACK_KINDS, "ask", "textRoll", "textDamage"]);
 
 /**
  * The rolls made as they are, with no advantage and nothing added: a hit die, hit dice spent at
@@ -69,9 +85,10 @@ export const HIT_DICE_KINDS = Object.freeze(["hitDie", "hitDice"]);
  *                                      when its player may know.
  * @property {object|null} [damage]     For an attack: the dice its damage will throw, for its player
  *                                      to roll; null when no damage follows.
- * @property {string|null} [outcome]    For a save the game asked for, or a save or check a description
- *                                      calls for against a DC: "success" or "failure", where its
- *                                      player may know.
+ * @property {string|null} [outcome]    For a save the game asked for, a save or check a description
+ *                                      calls for against a DC, or a check a check activity calls for
+ *                                      against its own: "success" or "failure", where its player may
+ *                                      know.
  */
 
 /**
@@ -110,7 +127,13 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   if ( command.kind === "hitDice" ) return spendHitDice(command, actor, campaign, signal);
   let link = null;
   let check = null;
-  if ( isTextHash(command.text) ) {
+  if ( CHECK_TYPES[command.kind] && (typeof command.item === "string") ) {
+    const found = activityCheck(command, actor);
+    if ( found.refusal ) return failed(found.refusal);
+    link = { dc: found.dc, usingTool: null, tool: found.tool };
+    check = found.check;
+  }
+  else if ( isTextHash(command.text) ) {
     const found = (command.kind === "save") ? await linkedSave(command, actor) : await linkedCheck(command, actor);
     if ( found.refusal ) return failed(found.refusal);
     link = found.link;
@@ -152,11 +175,16 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * Why a fetched roll isn't one to make, if it isn't. The app checks the same, but what reaches the
  * game is checked again here: only dice a player can roll, and only values those dice show. A
  * check or saving throw may name the link in a description it's rolled for, but not while
- * answering a prompt.
+ * answering a prompt; and a check may name the item and check activity it's rolled for instead.
+ * Only a use names the enchantment it applies.
  * @param {object} command
  * @returns {string|null}
  */
 export function checkCommand(command) {
+  const named = checkItemCommand(command);
+  if ( named ) return named;
+  if ( ENCHANT_KINDS.includes(command.kind) ) return checkEnchantCommand(command);
+  if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);
   if ( ATTACK_KINDS.includes(command.kind) ) return checkAttackCommand(command);
@@ -173,6 +201,22 @@ export function checkCommand(command) {
   const { extras, dice } = command;
   if ( !Array.isArray(extras) || (extras.length > 10) || !extras.every(isExtra) ) return "extras";
   if ( !Array.isArray(dice) || !dice.length || (dice.length > 11) || !dice.every(isRolled) ) return "dice";
+  return null;
+}
+
+/**
+ * Why a fetched command's item and activity aren't ones to make it with, if they aren't: only an
+ * attack, a use, a utility's roll and a check name them, and then both, each an id; and a check
+ * rolled for a check activity names no description's link, nor a prompt, besides. Whether one that
+ * must name them does is checked with the rest of it.
+ * @param {object} command
+ * @returns {string|null}
+ */
+function checkItemCommand(command) {
+  const given = value => (value !== undefined) && (value !== null);
+  if ( !KNOWN_KINDS.has(command.kind) || (!given(command.item) && !given(command.activity)) ) return null;
+  if ( !WITH_ITEM.has(command.kind) || !isId(command.item) || !isId(command.activity) ) return "item";
+  if ( CHECK_TYPES[command.kind] && [command.text, command.link, command.prompt].some(given) ) return "item";
   return null;
 }
 
@@ -304,7 +348,8 @@ function isPromptId(value) {
  * activity it's made with, and the combatant it's made at, if any, or for an area attack those in
  * its area, but not both, and has its d20s and any dice the player added; it may name the spell
  * slot, ammunition and attack mode it's made with. A use names the item and activity, the
- * combatants it's used at, and the spell slot, if any, and has no dice. Damage names the use it
+ * combatants it's used at, and the spell slot, if any, and for an enchantment the profile chosen
+ * and the item, if any, and has no dice. Damage names the use it
  * follows and has the dice that use's damage throws, if any, which are checked against them when
  * it's made, and the kind of damage chosen for each of its rolls.
  * @param {object} command
@@ -327,6 +372,7 @@ function checkAttackCommand(command) {
   if ( command.kind === "use" ) {
     const { targets } = command;
     if ( !Array.isArray(targets) || (targets.length > 20) || !targets.every(isTarget) ) return "target";
+    if ( !isOptional(command.enchant, isEnchant) ) return "enchant";
     return null;
   }
   const { target, targets } = command;
@@ -342,6 +388,32 @@ function checkAttackCommand(command) {
   if ( !Array.isArray(extras) || (extras.length > 10) || !extras.every(isExtra) ) return "extras";
   if ( !Array.isArray(dice) || !dice.length || (dice.length > 11) || !dice.every(isRolled) ) return "dice";
   return null;
+}
+
+/**
+ * Why a fetched end of an enchantment isn't one to make, if it isn't: it names the item and the
+ * enchantment on it, and throws no dice.
+ * @param {object} command
+ * @returns {string|null}
+ */
+function checkEnchantCommand(command) {
+  const { enchantment } = command;
+  if ( !isId(enchantment?.item) || !isId(enchantment?.effect) ) return "enchantment";
+  if ( (command.mode !== 0) || (command.explicit !== false) ) return "dice";
+  const none = list => (list === undefined) || (list === null) || (Array.isArray(list) && !list.length);
+  if ( !none(command.extras) || !none(command.dice) ) return "dice";
+  return null;
+}
+
+/**
+ * Is this the enchantment a use applies, as the player chose it: its profile, and the item they
+ * chose, if any?
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isEnchant(value) {
+  if ( !value || (typeof value !== "object") || Array.isArray(value) ) return false;
+  return isId(value.profile) && isOptional(value.item, isId);
 }
 
 /**
@@ -502,8 +574,8 @@ function spentOf(actor, denomination) {
 /**
  * The utility activity whose own roll a player rolls, as the sheet lists it: of an item that's
  * identified, and for a spell an item casts, one the item can cast now; or the activity of the
- * spell a Cast activity casts, by the Cast activity's id. Its
- * formula's dice must be ones a player can roll, and the ones they rolled.
+ * spell a Cast activity casts, by the Cast activity's id; or the one a forward is used through, by
+ * the forward's id. Its formula's dice must be ones a player can roll, and the ones they rolled.
  * @param {object} command
  * @param {Actor} actor
  * @returns {{refusal?: string, activity?: Activity}}
@@ -512,13 +584,61 @@ function formulaActivity(command, actor) {
   const item = actor.items?.get(command.item);
   // Nor of a spell an item casts while the item can't cast it, as a use of it is refused.
   if ( !item || (item.system?.identified === false) || (castFrom(item)?.usable === false) ) return { refusal: "item" };
-  const named = visibleActivities(item).find(activity => activity.id === command.activity);
-  const activity = (named?.type === "cast") ? castSpellOf(named)?.lead : named;
+  const activity = activityNamed(command, item);
   const roll = formulaRoll(activity);
   const planned = roll ? plannedDice(roll) : null;
   if ( !planned?.plannable ) return { refusal: "activity" };
   if ( !matchesDice(command.dice, planned.dice) ) return { refusal: "dice" };
   return { activity };
+}
+
+/**
+ * The activity a roll is made for, by the id the sheet lists it by: one of the item's its player can
+ * see, as `shownActivity` has it, a forward the sheet leaves out as a repeat of another included;
+ * for a Cast activity, its spell's, as it casts it; for a forward, the one it's used through.
+ * @param {object} command
+ * @param {Item} item
+ * @returns {Activity|null}
+ */
+function activityNamed(command, item) {
+  const found = item.system?.activities?.get?.(command.activity);
+  const named = shownActivity(found) ? found : null;
+  if ( named?.type === "cast" ) return castSpellOf(named)?.lead ?? null;
+  return ((named?.type === "forward") ? forwardTarget(named) : named) ?? null;
+}
+
+/**
+ * The check a check activity on the character's sheet calls for, which a player rolls their own, as
+ * the button on the activity's card rolls it, using nothing and spending nothing: one of the checks
+ * it offers, as the sheet lists them, of the kind and with the skill, tool or ability the player
+ * names, against its DC as the sheet has it, none where that's none; for a tool item's check of its
+ * own tool, with the item's bonus, as the button adds it. Or why not: the item isn't the
+ * character's, isn't identified yet, or is a spell its item can't cast now (`item`); or the
+ * activity, or the one a forward is used through, isn't one they can see, isn't a check made here,
+ * is one another creature makes, as a spell's is, or doesn't offer that check (`activity`).
+ * @param {object} command
+ * @param {Actor} actor
+ * @returns {{refusal?: string, check?: {type: string, ability: string, key?: string}, dc?: number|null,
+ *   tool?: {bonus: string, prof: object, item: Item}|null}}
+ */
+function activityCheck(command, actor) {
+  const item = actor.items?.get(command.item);
+  if ( !item || (item.system?.identified === false) || (castFrom(item)?.usable === false) ) return { refusal: "item" };
+  const activity = activityNamed(command, item);
+  const owner = activity?.item ?? item;
+  const offered = (activity?.type === "check") ? checkOf(owner, activity) : null;
+  if ( !offered?.own ) return { refusal: "activity" };
+  const type = CHECK_TYPES[command.kind];
+  const check = offered.checks.find(each => (each.type === type) && ((each.key ?? each.ability) === command.key));
+  if ( !check ) return { refusal: "activity" };
+  const base = owner.system?.type?.baseItem;
+  const own = (check.type === "tool") && (owner.type === "tool") && (!base || (check.key === base));
+  return {
+    check,
+    // The DC the sheet sends, so that its outcome is the one the app shows: none for one it can't show.
+    dc: offered.dc,
+    tool: own ? { bonus: owner.system.bonus, prof: owner.system.prof, item: owner } : null
+  };
 }
 
 /**
@@ -803,10 +923,12 @@ async function rollLinkedSave(command, actor, link) {
  * names for it, which for a skill or tool may not be the character's own; a skill checked using a
  * tool with it, for dnd5e to add the higher of their proficiencies, and give advantage where the
  * character is proficient in both; and against
- * the link's DC, if it names one, even one its author hid.
+ * the link's DC, if it names one, even one its author hid. A check a check activity calls for is
+ * rolled the same, as its card's button rolls it: a tool item's check of its own tool with the
+ * item's bonus, proficiency and the item, as the button gives them.
  * @param {object} command
  * @param {Actor} actor
- * @param {{dc: number|null, usingTool?: string}} link
+ * @param {{dc: number|null, usingTool?: string|null, tool?: {bonus: string, prof: object, item: Item}|null}} link
  * @param {{type: string, ability: string, key?: string}} check   The one of its checks rolled.
  * @returns {Promise<{message: ChatMessage|null, outcome: string|null}>}   The roll's message, and
  *   whether it met its DC, where it was rolled against one, as the card shows its author.
@@ -815,10 +937,11 @@ async function rollLinkedCheck(command, actor, link, check) {
   const author = authorFor(actor);
   const flags = { [MODULE_ID]: { request: command.id } };
   const target = Number.isInteger(link.dc) ? link.dc : null;
+  const tool = link.tool ? { bonus: link.tool.bonus, prof: link.tool.prof, item: link.tool.item } : {};
   const config = {
     ability: check.ability,
     ...((check.type === "skill") && { skill: check.key, ...(link.usingTool && { tool: link.usingTool }) }),
-    ...((check.type === "tool") && { tool: check.key }),
+    ...((check.type === "tool") && { tool: check.key, ...tool }),
     ...((target !== null) && { target }),
     rolls: [{ options: { [ROLL_TAG]: command.id } }]
   };

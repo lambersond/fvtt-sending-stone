@@ -170,6 +170,13 @@ export const MOST_HIT_DICE = 20;
 export const ATTACK_KINDS = Object.freeze(["attack", "use", "damage"]);
 
 /**
+ * What a player can have done here from the app to an enchantment of theirs: end it, as the ⟲ on
+ * dnd5e's card does. Offered where `ATTACK_KINDS` are, as the enchantments are applied by uses.
+ * @type {readonly string[]}
+ */
+export const ENCHANT_KINDS = Object.freeze(["endEnchantment"]);
+
+/**
  * The roll option naming the player's roll a roll is made for, so that its dice can be the ones
  * the player rolled.
  * @type {string}

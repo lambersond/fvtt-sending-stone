@@ -1,3 +1,4 @@
+import { enchantmentsOf } from "./sheet-enchant.mjs";
 import { usesOf } from "./sheet-features.mjs";
 import { rollsIfAny, usageOf } from "./sheet-rolls.mjs";
 import { finite, localize } from "./sheet-values.mjs";
@@ -70,6 +71,14 @@ export function inventoryOf(actor, texts) {
 }
 
 /**
+ * The kinds of item the Inventory tab lists: those of its sections, and containers.
+ * @returns {Set<string>}
+ */
+export function inventoryTypes() {
+  return new Set([...inventorySections().map(({ type }) => type), "container"]);
+}
+
+/**
  * The inventory's sections, in order: from each item type's own section where dnd5e defines one,
  * as it does from 4.0, otherwise from its 4.0 to 6.0 defaults.
  * @returns {{type: string, id: string, label: string}[]}
@@ -86,7 +95,8 @@ function inventorySections() {
 /* -------------------------------------------- */
 
 /**
- * An item as its owner sees it: an unidentified one keeps its secrets.
+ * An item as its owner sees it, with the enchantments it carries: an unidentified one keeps its
+ * secrets.
  * @param {Item} item
  * @param {SheetTexts} texts
  * @returns {object}
@@ -111,6 +121,7 @@ function describeItem(item, texts) {
     identified,
     // What it rolls, and how it's used, so it's used or rolled from Inventory as from Actions.
     ...usableFields(item, texts),
+    ...enchantmentsOf(item),
     text: texts.add({
       html: identified ? system.description?.value : system.unidentified?.description,
       relativeTo: item

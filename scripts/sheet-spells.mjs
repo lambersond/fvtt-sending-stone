@@ -1,3 +1,4 @@
+import { enchantmentsOf } from "./sheet-enchant.mjs";
 import { usesOf } from "./sheet-features.mjs";
 import { castCopy, rollsIfAny } from "./sheet-rolls.mjs";
 import { finite, localize } from "./sheet-values.mjs";
@@ -100,7 +101,7 @@ export function spellbookOf(actor, texts) {
 /* -------------------------------------------- */
 
 /**
- * A spell: when and how it is cast, and whether it is prepared.
+ * A spell: when and how it is cast, whether it is prepared, and the enchantments it carries.
  * @param {Item} spell
  * @param {SheetTexts} texts
  * @returns {object}
@@ -134,6 +135,7 @@ function describeSpell(spell, texts) {
     // What it rolls, so it's cast or rolled from the Spells tab as from Actions; nothing for one its
     // item can't cast now.
     ...((from?.usable !== false) && rollsIfAny(spell, texts)),
+    ...enchantmentsOf(spell),
     text: texts.add({ html: system.description?.value, relativeTo: spell })
   };
 }

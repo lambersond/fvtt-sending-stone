@@ -1,4 +1,5 @@
 import { hitPoints } from "./characters.mjs";
+import { enchantingSheet } from "./sheet-enchant.mjs";
 import { criticalRule } from "./dice-plan.mjs";
 import { actionSections } from "./sheet-actions.mjs";
 import { deathSavesOf, describeTool, detailsOf, traitsOf } from "./sheet-details.mjs";
@@ -24,12 +25,23 @@ import { combinedMode, finite, localize, rollMode } from "./sheet-values.mjs";
 
 /**
  * A campaign character's sheet, or null if its system doesn't model one the way dnd5e does.
- * Works with dnd5e 5.x and 6.x, which name some of the derived values differently.
+ * Works with dnd5e 5.x and 6.x, which name some of the derived values differently. What each of
+ * its enchant activities may enchant is worked out once, however often the sheet lists it.
  * @param {Actor} actor
  * @param {SheetTexts} [texts]  Collects the descriptions the sheet refers to.
  * @returns {object|null}
  */
 export function characterSheet(actor, texts=new SheetTexts()) {
+  return enchantingSheet(() => sheetOf(actor, texts));
+}
+
+/**
+ * A campaign character's sheet, as `characterSheet` builds it.
+ * @param {Actor} actor
+ * @param {SheetTexts} texts
+ * @returns {object|null}
+ */
+function sheetOf(actor, texts) {
   const system = actor?.system;
   if ( !system?.abilities || !system.skills ) return null;
   const attributes = system.attributes ?? {};

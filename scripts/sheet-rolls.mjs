@@ -1,19 +1,41 @@
+import { describeEnchant, enchantInPlay } from "./sheet-enchant.mjs";
 import { formulaRoll } from "./dice-plan.mjs";
+import { challenge, checkOptions } from "./sheet-links.mjs";
 import { finite, limitedUses, localize } from "./sheet-values.mjs";
 
 /**
  * What an item rolls, or is used through, as the sheet tells the app: its bonus to hit and the
- * attack it's for, the saving throw it calls for, its damage or healing, and the activity it's
- * otherwise used through. Actions carry them, and so do the spells, features and inventory items
- * that have any, so that the app can roll them, or have them made in the game, from any tab.
+ * attack it's for, the saving throw it calls for, its damage or healing, the checks it calls for,
+ * and the activity it's otherwise used through. Actions carry them, and so do the spells, features
+ * and inventory items that have any, so that the app can roll them, or have them made in the game,
+ * from any tab.
  *
- * An item's own are its first activity's, in dnd5e's order: for a spell, how it's cast. An item
- * with more than one activity, such as Hex, with its Bonus Hex Damage, or a weapon that also
- * grapples, lists each of them besides, so that the app can roll or use each.
+ * An item's own are its first activity's, in dnd5e's order, as `visibleActivities` has it: for a
+ * spell, how it's cast, never a check called for once it's cast. An item with more than one
+ * activity, such as Hex, with its Bonus Hex Damage, or a weapon that also grapples, lists each of
+ * them besides, so that the app can roll or use each. A forward, such as a spell's free casting, is
+ * used as the activity it names, for what the forward spends. An enchant activity says what it may
+ * enchant, and with what.
  */
 
-/** The kinds of activity a player can use from the app other than an attack. */
-export const USES = new Set(["save", "damage", "heal", "utility"]);
+/**
+ * The kinds of activity a player can use from the app other than an attack: a saving throw, damage,
+ * healing, a check, an enchantment, or anything else, such as an effect.
+ */
+export const USES = new Set(["save", "damage", "heal", "utility", "check", "enchant"]);
+
+/**
+ * The kinds of activity a forward may be used through from the app: an attack, and those used
+ * otherwise; not a Cast, a summoning, a transformation or an enchantment, which are left to Foundry.
+ * @type {Set<string>}
+ */
+export const FORWARDED = new Set(["attack", "save", "damage", "heal", "utility", "check"]);
+
+/**
+ * The most forwards followed, one naming the next, to the activity they're used through.
+ * @type {number}
+ */
+const MOST_FORWARDS = 10;
 
 /** The activations Midi-QOL counts as using a reaction, besides dnd5e's own. */
 export const REACTIONS = new Set(["reaction", "reactiondamage", "reactionmanual", "reactionpreattack"]);
@@ -24,15 +46,82 @@ export const ACTION_KINDS = ["action", "bonus", "reaction", "legendary", "mythic
 /* -------------------------------------------- */
 
 /**
- * An item's activities that its player can see and use, in their order. dnd5e 6 hides those that
- * don't apply; dnd5e 5 says they can't be used.
+ * An item's activities that its player can see and use, in dnd5e's order: but for a spell, after
+ * its other activities, the checks it calls for once it's cast, as `isFollowUp` has them, such as
+ * the 2014 Entangle's Escape Plants, which dnd5e may list first, so that the spell leads with how
+ * it's cast. A forward that repeats an earlier one, used through the same activity, activated the
+ * same and for the same cost, of uses they share, as the free castings dnd5e gives a spell granted
+ * more than once are, is left out: it would be the same row again, though it's still used by its id.
  * @param {Item} item
  * @returns {Activity[]}
  */
 export function visibleActivities(item) {
-  return Array.from(item.system?.activities ?? []).filter(activity => ("isHidden" in activity)
-    ? !activity.isHidden
-    : (activity.canUse !== false));
+  const shown = Array.from(item.system?.activities ?? []).filter(shownActivity);
+  const ordered = (item.type === "spell")
+    ? [...shown.filter(activity => !isFollowUp(activity)), ...shown.filter(isFollowUp)]
+    : shown;
+  return ordered.reduce((kept, activity) => {
+    if ( (activity.type !== "forward") || !kept.some(earlier => repeatsForward(activity, earlier)) ) {
+      kept.push(activity);
+    }
+    return kept;
+  }, []);
+}
+
+/**
+ * Can its player see and use an activity: dnd5e 6 hides those that don't apply; dnd5e 5 says they
+ * can't be used.
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+export function shownActivity(activity) {
+  if ( !activity ) return false;
+  return ("isHidden" in activity) ? !activity.isHidden : (activity.canUse !== false);
+}
+
+/**
+ * Is this a check activity with no activation of its own, as a spell's check called for once it's
+ * cast is, such as the 2014 Entangle's Escape Plants or Silent Image's check to see through it?
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+function isFollowUp(activity) {
+  return (activity?.type === "check") && !activity.activation?.type;
+}
+
+/**
+ * Is this a spell's check activity called for once it's cast, as `isFollowUp` has it, but for one
+ * that leads the spell, where it has no other activity a player sees? It doesn't cast the spell.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+export function followUpCheck(item, activity) {
+  if ( (item?.type !== "spell") || !isFollowUp(activity) ) return false;
+  return activity.id !== visibleActivities(item)[0]?.id;
+}
+
+/**
+ * Does a forward repeat an earlier one: used through the same activity, activated the same, for
+ * the same cost, and letting the level be chosen, or not, alike? One used through nothing never
+ * does, nor one that spends uses of its own, which dnd5e spends from that forward's alone, so that
+ * another with the same cost has its own still to spend.
+ * @param {Activity} forward
+ * @param {Activity} earlier
+ * @returns {boolean}
+ */
+function repeatsForward(forward, earlier) {
+  if ( earlier.type !== "forward" ) return false;
+  const target = forwardTarget(forward);
+  if ( !target || (forwardTarget(earlier)?.id !== target.id) ) return false;
+  if ( (forward.activation?.type ?? "") !== (earlier.activation?.type ?? "") ) return false;
+  const scaling = activity => activity.consumption?.scaling?.allowed === true;
+  if ( scaling(forward) !== scaling(earlier) ) return false;
+  const targets = activity => Array.from(activity.consumption?.targets ?? []);
+  if ( targets(forward).some(({ type }) => type === "activityUses") ) return false;
+  const costs = activity => JSON.stringify(targets(activity)
+    .map(({ type, target, value }) => [type ?? null, target ?? null, String(value ?? "")]));
+  return costs(forward) === costs(earlier);
 }
 
 /** What an activity rolls, when it rolls nothing, or isn't to be told. */
@@ -90,10 +179,11 @@ export function rollsIfAny(item, texts) {
  * One of an item's activities on its own, as a player made it a favorite, and as an item with more
  * than one lists each: how it's activated, its range and target, how long what it does lasts, what
  * a reaction is taken in answer to, its bonus to hit, the saving throw it calls for, its damage or
- * healing, and its uses; for a Cast, the spell's copy and how it's cast. Given the sheet's
- * descriptions, a Cast carries its spell's, and under dnd5e 6, which gives an activity a
- * description of its own, the activity carries that. An item not identified yet keeps them all to
- * itself.
+ * healing, and its uses; for a Cast, the spell's copy and how it's cast. A forward, which dnd5e
+ * gives no range, target or duration of its own, has those of the activity it's used through, and
+ * its own activation. Given the sheet's descriptions, a Cast carries its spell's, and under
+ * dnd5e 6, which gives an activity a description of its own, the activity carries that. An item not
+ * identified yet keeps them all to itself.
  * @param {Item} item
  * @param {Activity} activity
  * @param {SheetTexts} [texts]    Collects the descriptions it refers to.
@@ -102,15 +192,16 @@ export function rollsIfAny(item, texts) {
 export function describeActivity(item, activity, texts) {
   const identified = item.system?.identified !== false;
   const rolls = identified ? activityRolls(item, activity, texts) : { ...NO_ROLLS, damage: [] };
-  const duration = identified ? durationOf(activity) : null;
+  const shown = ((activity.type === "forward") && forwardTarget(activity)) || activity;
+  const duration = identified ? durationOf(shown) : null;
   const trigger = identified ? (activity.activation?.condition?.trim?.() || null) : null;
   // dnd5e 5 gives an activity no description of its own, only a line of chat flavor.
   const text = (identified && texts) ? texts.add({ html: activity.description?.value, relativeTo: item }) : null;
   return {
     activation: activity.labels?.activation || null,
     activationType: activationTypeOf(activity),
-    range: rangeOf(item, activity),
-    target: activity.labels?.target || null,
+    range: rangeOf(item, shown),
+    target: shown.labels?.target || null,
     ...(duration && { duration }),
     ...(trigger && { trigger }),
     ...(text && { text }),
@@ -142,8 +233,9 @@ export function usageOf(item) {
  * What an activity rolls, or is used through: an attack's bonus to hit, by the attack's id, with
  * its weapon's attack modes and ammunition, and whom it's made at, for one at an area; or else the
  * activity itself, such as a save or healing; the saving throw it calls for; its damage or
- * healing; and a utility's own roll, such as a d4 of luck. A spell's activity that spends no spell
- * slot, as one used after the spell is cast does, such as Hex's Bonus Hex Damage, says so.
+ * healing; a utility's own roll, such as a d4 of luck; and the checks a check activity calls for.
+ * A spell's activity that spends no spell slot, as one used after the spell is cast does, such as
+ * Hex's Bonus Hex Damage, says so. A forward rolls as the activity it's used through.
  * @param {Item} item
  * @param {Activity} [activity]
  * @param {SheetTexts} [texts]    Collects the description of a spell it casts.
@@ -152,15 +244,17 @@ export function usageOf(item) {
 function activityRolls(item, activity, texts) {
   if ( !activity ) return { ...NO_ROLLS, damage: [] };
   if ( activity.type === "cast" ) return castRolls(item, activity, texts);
+  if ( activity.type === "forward" ) return forwardRolls(item, activity, texts);
   const attack = activity.type === "attack";
   const area = attack ? attackAreaOf(item, activity) : null;
   const roll = formulaRoll(activity);
+  const check = checkOf(item, activity);
   return {
     toHit: attack ? toHitOf(activity) : null,
     // The attack the bonus is for, so the app can have it made here.
     attackId: attack ? activity.id : null,
     // What else it's used through, such as a save or healing, so the app can have it used here.
-    activity: USES.has(activity.type) ? describeUse(item, activity) : null,
+    activity: usedHere(item, activity) ? describeUse(item, activity) : null,
     attackModes: attack ? attackModesOf(item) : null,
     ammunition: attack ? ammunitionOf(item) : null,
     save: saveOf(activity),
@@ -168,8 +262,24 @@ function activityRolls(item, activity, texts) {
     ...(area && { attackArea: area }),
     // With the character's numbers in it, so the app can roll its dice and have it made here.
     ...(roll && { rollFormula: { formula: roll.formula, name: activity.roll.name || null } }),
+    // The checks it calls for, which the app can have the table asked for, or the player roll.
+    ...(check && { check }),
     ...(spendsNoSlot(item, activity) && { consumesSlot: false })
   };
+}
+
+/**
+ * Is this an activity a player can use from the app, other than an attack: a saving throw, damage,
+ * healing, an effect, a check that's made here, as `checkUsable` has it, or an enchantment that
+ * is, as `enchantInPlay` has it?
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+function usedHere(item, activity) {
+  if ( !USES.has(activity?.type) ) return false;
+  if ( activity.type === "enchant" ) return enchantInPlay(activity);
+  return (activity.type !== "check") || checkUsable(item, activity);
 }
 
 /**
@@ -232,14 +342,17 @@ export function ownLabels(item, activity) {
 
 /**
  * An activity's uses, or for a Cast activity, those casting its spell spends, such as the item's
- * charges, as dnd5e's sheet shows them by the spell.
+ * charges, as dnd5e's sheet shows them by the spell; for a forward, those it spends, such as a
+ * spell's own once a day.
  * @param {Item} item
  * @param {Activity} [activity]
  * @returns {{value: number, max: number, recovery: string|null}|null}
  */
 export function activityUses(item, activity) {
   if ( !activity ) return null;
-  return ((activity.type === "cast") && castCost(item, activity)?.uses) || limitedUses(activity.uses, activity.labels);
+  const cost = (activity.type === "cast") ? castCost(item, activity)
+    : (activity.type === "forward") ? forwardCost(item, activity) : null;
+  return cost?.uses || limitedUses(activity.uses, activity.labels);
 }
 
 /* -------------------------------------------- */
@@ -417,9 +530,25 @@ export function castCost(item, cast, level) {
   // dnd5e casts a leveled spell from the item at its Cast activity's level, or the one chosen, and
   // scales its cost by how far above the spell's own that is.
   const above = (base > 0) ? Math.max((level ?? finite(cast.spell?.level) ?? base) - base, 0) : 0;
-  const costs = (cast.consumption?.targets ?? []).flatMap(target => {
+  return usesCost(item, cast, above);
+}
+
+/**
+ * What using an activity spends of uses, as its consumption targets have it: so many of the item's
+ * uses, or another item's, or the activity's own; the first of them, and those uses, whether any of
+ * them hasn't that many left, and whether any of them never has that many. Each cost is scaled by
+ * amount for a spell cast so many levels higher, as dnd5e's resolveCost scales it. Nothing where it
+ * spends no uses, or only a number that's a formula.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @param {number} [above]   How many levels above its own a spell is cast at.
+ * @returns {{amount: number, uses: {value: number, max: number, recovery: string|null},
+ *   short: boolean, never: boolean}|null}
+ */
+function usesCost(item, activity, above=0) {
+  const costs = (activity.consumption?.targets ?? []).flatMap(target => {
     const uses = (target.type === "itemUses") ? usesOfItem(item, target.target)
-      : (target.type === "activityUses") ? limitedUses(cast.uses, cast.labels) : undefined;
+      : (target.type === "activityUses") ? limitedUses(activity.uses, activity.labels) : undefined;
     if ( uses === undefined ) return [];
     const amount = scaledCost(target, above);
     return ((amount !== null) && (amount > 0) && uses) ? [{ amount, uses }] : [];
@@ -473,23 +602,248 @@ function rollsAnything(rolls) {
  * Is this one of a spell's activities that's used without spending a spell slot, as one used after
  * the spell is cast is, such as Spirit Guardians' save each turn? dnd5e still asks the level it's
  * used at, which its damage may scale with. Of the copy of a spell an item casts, a cantrip's too:
- * it spends none of the item's uses either.
+ * it spends none of the item's uses either. A forward, such as a spell's free casting, spends what
+ * the forward spends instead, never a slot; and a check called for once the spell is cast, as
+ * `freeCheck` has it, spends none.
  * @param {Item} item
  * @param {Activity} activity
  * @returns {boolean}
  */
 function spendsNoSlot(item, activity) {
-  if ( (item.type !== "spell") || (activity.consumption?.spellSlot !== false) ) return false;
+  if ( item.type !== "spell" ) return false;
+  if ( (activity.type === "forward") || freeCheck(item, activity) ) return true;
+  if ( activity.consumption?.spellSlot !== false ) return false;
   return ((finite(item.system?.level) ?? 0) > 0) || castCopy(item);
 }
 
 /**
+ * Is this a leveled spell's check called for once it's cast, as `followUpCheck` has it, such as the
+ * 2014 Silent Image's check to see through the illusion? It doesn't cast the spell, so it's used
+ * without spending a slot, as a Foundry player would use it, unticking the slot dnd5e's dialog
+ * would otherwise spend, at the level chosen there.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+export function freeCheck(item, activity) {
+  return ((finite(item?.system?.level) ?? 0) > 0) && followUpCheck(item, activity);
+}
+
+/* -------------------------------------------- */
+/*  Checks                                      */
+/* -------------------------------------------- */
+
+/**
+ * Are check activities made here: under dnd5e 5.x, whose card for one is what this module posts and
+ * rolls from; not yet under dnd5e 6, as a description's requests aren't.
+ * @returns {boolean}
+ */
+export function checksOffered() {
+  if ( game.system?.id !== "dnd5e" ) return false;
+  return Number.parseInt(String(game.system.version ?? "")) < 6;
+}
+
+/**
+ * Is a check activity one a player can use from the app: under dnd5e 5.x, and not one that scales,
+ * whose DC is worked out from the level it's used at, or which an item lets be used at a level
+ * chosen, such as the Hat of Many Spells' check, which are left to Foundry.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+export function checkUsable(item, activity) {
+  if ( !checksOffered() ) return false;
+  if ( /@scaling\b/.test(String(activity.check?.dc?.formula ?? "")) ) return false;
+  return (item.type === "spell") || (activity.consumption?.scaling?.allowed !== true);
+}
+
+/**
+ * The checks a check activity calls for, as dnd5e's card for it offers them, a button each: one
+ * of each skill or tool it names, or of the tool a tool item is, made with the ability dnd5e makes
+ * it with; or else an ability check of the ability it names. A key that's neither a skill nor a
+ * tool is an ability check, as dnd5e's card makes it. Each kind of check once, with one of the six
+ * abilities the app knows, as a description's checks are. A tool item's check of its own tool adds
+ * the item's bonus, as the card's button does; one whose bonus throws dice, which the app can't
+ * add, is left out. With its DC, and whether the character makes it: not a spell's, whose target
+ * makes it, such as Maze's. Null for a check activity not used here, or one with no check the app
+ * can roll, such as one that names none.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {{checks: {type: string, ability: string, key?: string, bonus?: number}[], dc: number|null,
+ *   own: boolean}|null}
+ */
+export function checkOf(item, activity) {
+  if ( (activity?.type !== "check") || !checkUsable(item, activity) ) return null;
+  const skills = CONFIG.DND5E?.skills ?? {};
+  const tools = CONFIG.DND5E?.tools ?? {};
+  const associated = Array.from(activity.check?.associated ?? []);
+  if ( !associated.length && (item.type === "tool") ) associated.push(item.system?.type?.baseItem);
+  const named = associated.length
+    ? associated.map(key => ({
+      type: Object.hasOwn(skills, key ?? "") ? "skill" : Object.hasOwn(tools, key ?? "") ? "tool" : "check",
+      ability: activity.getAbility?.(key) ?? null,
+      key
+    }))
+    : [{ type: "check", ability: activity.check?.ability || null }];
+  const baseItem = (item.type === "tool") ? (item.system?.type?.baseItem || null) : undefined;
+  const checks = (checkOptions(named) ?? []).flatMap(check => {
+    // As dnd5e's button adds it: to a tool item's own tool, or any tool of one that's of none.
+    const own = (check.type === "tool") && (baseItem !== undefined) && (!baseItem || (check.key === baseItem));
+    if ( !own ) return [check];
+    const bonus = toolBonus(item);
+    if ( bonus === null ) return [];
+    return [bonus ? { ...check, bonus } : check];
+  });
+  if ( !checks.length ) return null;
+  return { checks, dc: challenge(activity.check?.dc?.value), own: item.type !== "spell" };
+}
+
+/**
+ * A tool item's bonus to its checks, as dnd5e adds it to one rolled from its check activity's card:
+ * a whole number, or one worked out from the character's; null for one that throws dice, or isn't a
+ * whole number, which the app can't add.
+ * @param {Item} item
+ * @returns {number|null}
+ */
+function toolBonus(item) {
+  const bonus = item.system?.bonus;
+  if ( (bonus === undefined) || (bonus === null) || (String(bonus).trim() === "") ) return 0;
+  let total = Number(bonus);
+  if ( !Number.isFinite(total) ) {
+    try {
+      const roll = new foundry.dice.Roll(String(bonus), item.getRollData?.() ?? {});
+      if ( !roll.isDeterministic ) return null;
+      total = roll.evaluateSync().total;
+    } catch {
+      return null;
+    }
+  }
+  return Number.isInteger(total) ? total : null;
+}
+
+/* -------------------------------------------- */
+/*  Forwards                                    */
+/* -------------------------------------------- */
+
+/**
+ * The activity a forward is used through: the one it names, or for a chain of forwards, the one
+ * the last names, as each of dnd5e's forwards uses the next. Null where one is missing, or one
+ * along the way, or the activity, isn't one its player can see, as `shownActivity` has it, or the
+ * chain goes round, or goes on too long.
+ * @param {Activity} forward
+ * @returns {Activity|null}
+ */
+export function forwardTarget(forward) {
+  const activities = forward?.item?.system?.activities;
+  const seen = new Set([forward?.id]);
+  let next = forward;
+  for ( let hop = 0; hop < MOST_FORWARDS; hop++ ) {
+    next = activities?.get?.(next.activity?.id);
+    if ( !next || seen.has(next.id) || !shownActivity(next) ) return null;
+    if ( next.type !== "forward" ) return next;
+    seen.add(next.id);
+  }
+  return null;
+}
+
+/**
+ * What a forward rolls, or is used through: what the activity it's used through does, as
+ * `activityRolls` tells it, but by the forward's id, through which the app has it used. A spell's
+ * spends no slot: dnd5e casts it at the level it would by default, its own, or for a warlock's spell
+ * its Pact Magic's, so it targets as many as it does at that level, and no more for one higher. And
+ * what the forward spends, such as a spell's own once a day, and whether there's that much left:
+ * none, where it spends nothing. Nothing where it's used through anything the app doesn't use, such
+ * as a summoning or a Cast, or a check called for once the spell is cast, as `followUpCheck` has it,
+ * which a free casting would spend the day's use on for nothing; or lets the level be chosen, which
+ * is left to Foundry.
+ * @param {Item} item
+ * @param {Activity} forward
+ * @param {SheetTexts} [texts]
+ * @returns {object}
+ */
+function forwardRolls(item, forward, texts) {
+  const target = forwardTarget(forward);
+  if ( !target || !FORWARDED.has(target.type) || followUpCheck(item, target)
+    || (forward.consumption?.scaling?.allowed === true) ) return { ...NO_ROLLS, damage: [] };
+  const { consumesSlot, ...rolls } = activityRolls(item, target, texts);
+  if ( !rolls.attackId && !rolls.activity ) return { ...NO_ROLLS, damage: [] };
+  const count = forwardCount(item, forward, target);
+  const atLevel = targets => (targets && { ...targets, count: (count ?? targets.count), perLevel: null });
+  const cost = forwardCost(item, forward, target);
+  return {
+    ...rolls,
+    attackId: rolls.attackId && forward.id,
+    activity: rolls.activity && { ...rolls.activity, id: forward.id, targets: atLevel(rolls.activity.targets) },
+    ...(rolls.attackArea && { attackArea: atLevel(rolls.attackArea) }),
+    ...(spendsNoSlot(item, forward) && { consumesSlot: false }),
+    forward: {
+      charges: forwardSpendsNothing(item, forward, target) ? 0 : (cost?.amount ?? null),
+      short: cost?.short ?? false
+    }
+  };
+}
+
+/**
+ * What using a forward spends, as `usesCost` has it, of the forward's own consumption: dnd5e spends
+ * it in place of the activity's, but none of it for a spell's activity that spends no slot.
+ * @param {Item} item
+ * @param {Activity} forward
+ * @param {Activity|null} [target]   The activity it's used through.
+ * @returns {{amount: number, uses: object, short: boolean, never: boolean}|null}
+ */
+export function forwardCost(item, forward, target=forwardTarget(forward)) {
+  if ( !target || forwardSpendsNothing(item, forward, target) ) return null;
+  return usesCost(item, forward);
+}
+
+/**
+ * Does using a forward spend nothing: it has nothing to spend, or it's used through a spell's
+ * activity that spends no slot, for which dnd5e spends none of the forward's either?
+ * @param {Item} item
+ * @param {Activity} forward
+ * @param {Activity} target   The activity it's used through.
+ * @returns {boolean}
+ */
+function forwardSpendsNothing(item, forward, target) {
+  if ( !Array.from(forward.consumption?.targets ?? []).length ) return true;
+  return (item.type === "spell") && (target.consumption?.spellSlot === false);
+}
+
+/**
+ * How many a spell used through a forward targets, at the level dnd5e casts it at with no slot
+ * spent: worked out as dnd5e works out the slot, with the forward as what it's used for, so that a
+ * warlock's spell is cast at its Pact Magic's level. Null where that's its own level, or it can't be
+ * worked out.
+ * @param {Item} item
+ * @param {Activity} forward
+ * @param {Activity} target
+ * @returns {number|null}
+ */
+function forwardCount(item, forward, target) {
+  if ( (item.type !== "spell") || (typeof target._prepareUsageConfig !== "function") ) return null;
+  try {
+    const prepared = target._prepareUsageConfig({
+      cause: { activity: forward.relativeUUID }, consume: { resources: false, spellSlot: false }
+    });
+    const level = finite(item.actor?.system?.spells?.[prepared?.spell?.slot]?.level);
+    const scaling = (level ?? 0) - (finite(item.system?.level) ?? 0);
+    if ( scaling <= 0 ) return null;
+    const scaled = item.clone({ "flags.dnd5e.scaling": scaling }, { keepId: true });
+    const count = finite(scaled.system?.activities?.get(target.id)?.target?.affects?.count);
+    return (count > 0) ? count : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * An activity a player can use from the app, by its id, with whom it's used at: its user alone, an
- * area, or a number of targets, and of what kind, such as allies or enemies.
+ * area, or a number of targets, and of what kind, such as allies or enemies; and for an enchant
+ * activity, what it may enchant, and with what, as `describeEnchant` has it.
  * @param {Item} item
  * @param {Activity} activity
  * @returns {{id: string, type: string, targets: {self: boolean, area: boolean, count: number|null,
- *   perLevel: number|null, affects: string|null}}}
+ *   perLevel: number|null, affects: string|null}, enchant?: object}}
  */
 export function describeUse(item, activity) {
   const target = activity.target ?? {};
@@ -505,7 +859,8 @@ export function describeUse(item, activity) {
       count: (count > 0) ? count : null,
       perLevel: (count > 0) ? countPerLevel(item, activity, count) : null,
       affects
-    }
+    },
+    ...((activity.type === "enchant") && { enchant: describeEnchant(item, activity) })
   };
 }
 

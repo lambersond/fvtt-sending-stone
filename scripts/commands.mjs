@@ -1,12 +1,14 @@
-import { ATTACK_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_KINDS } from "./constants.mjs";
+import { ATTACK_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_KINDS } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
+import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { prompting } from "./prompts.mjs";
+import { checksOffered } from "./sheet-rolls.mjs";
 import { currentSession, send } from "./transport.mjs";
 
 /**
@@ -90,18 +92,25 @@ const queues = new Map();
  * which, and if not, why not. A hit die, and several spent at once, are among them once the
  * self-test has shown a hit die takes the player's die. Attacks, the uses of spells and features,
  * and their damage are among them when the Gamemaster lets the campaign's players attack and cast
- * from the app too, and they can be made here; and then that an area attack is made at the targets
- * they pick. The links in their descriptions are among them too: a description's own roll, asking
- * the table for a save, where dnd5e's card for it can be made, and a description's damage or
- * healing, where players may attack and damage takes their dice. Where their damage is, an attack's
- * or a description's, whether players may change it in the app, as the self-test found. And whether
- * its players are asked in the app for the saves the game asks of them.
+ * from the app too, and they can be made here, and ending an enchantment of theirs with them; and
+ * then that an area attack is made at the targets they pick. The links in their descriptions are
+ * among them too: a description's own roll, asking the table for a save, where dnd5e's card for it
+ * can be made, and a description's damage or healing, where players may attack and damage takes
+ * their dice. Where their damage is, an attack's or a description's, whether players may change it
+ * in the app, as the self-test found. Whether its players are asked in the app for the saves the
+ * game asks of them. And whether a check their check activities call for, such as Fast Hands'
+ * Sleight of Hand, may be rolled for the activity, against its DC, under dnd5e 5.x, where check
+ * activities are made here. And, from module 0.21.0, that more dice and another die change only a
+ * die the damage adds, never one it takes away, which previews mark (`signedDice`).
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
- *   areaAttacks: boolean, prompts: boolean}}
+ *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean}}
  */
 export function rollFeatures(campaign) {
-  const off = { enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false };
+  const off = {
+    enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
+    signedDice: false
+  };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
   const attacks = campaign.attacks && !attacksUnavailable();
@@ -110,13 +119,15 @@ export function rollFeatures(campaign) {
     enabled: true,
     kinds: [
       ...ROLL_KINDS.filter(kind => !HIT_DICE_KINDS.includes(kind) || diceStatus.hitDice),
-      ...(attacks ? ATTACK_KINDS : []),
+      ...(attacks ? [...ATTACK_KINDS, ...ENCHANT_KINDS] : []),
       ...texts
     ],
     reason: null,
     modifiers: (attacks || texts.includes("textDamage")) && diceStatus.modifiers,
     areaAttacks: attacks,
-    prompts: prompting(campaign)
+    prompts: prompting(campaign),
+    activityChecks: checksOffered(),
+    signedDice: true
   };
 }
 
@@ -372,6 +383,7 @@ function runCommand(command, campaign, signal) {
     case "attack":
     case "use": return runUseCommand(command, campaign, { signal });
     case "damage": return runDamageCommand(command, campaign);
+    case "endEnchantment": return runEndEnchantmentCommand(command, campaign);
     case "ask": return runAskCommand(command, campaign);
     case "textDamage": return runTextDamageCommand(command, campaign);
     case "textRoll": return runTextRollCommand(command, campaign);

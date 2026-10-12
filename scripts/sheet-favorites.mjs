@@ -1,4 +1,4 @@
-import { describeActivity, visibleActivities } from "./sheet-rolls.mjs";
+import { describeActivity, shownActivity } from "./sheet-rolls.mjs";
 import { describeTool } from "./sheet-details.mjs";
 import { castFrom, hiddenCopy } from "./sheet-spells.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
@@ -70,7 +70,8 @@ function itemFavorite(actor, { item, activity, effect }) {
  * an action is described, since the sheet lists each item's actions by one of its activities. One
  * that casts a spell from the item opens to the spell's description, and under dnd5e 6 one with a
  * description of its own to that. One of a spell an item casts, while the item can't cast it, as
- * dnd5e's sheet doesn't list it then, is left out: it would do nothing.
+ * dnd5e's sheet doesn't list it then, is left out: it would do nothing; and so is one its player
+ * can't see. A forward the item's own list leaves out as a repeat of another is kept, as made one.
  * @param {Actor} actor
  * @param {{item?: Item, activity?: Activity}} found
  * @param {SheetTexts} [texts]
@@ -79,7 +80,7 @@ function itemFavorite(actor, { item, activity, effect }) {
 function activityFavorite(actor, { item, activity }, texts) {
   if ( !item || !activity || hidden(actor, item) ) return null;
   if ( castFrom(item)?.usable === false ) return null;
-  if ( !visibleActivities(item).includes(activity) ) return null;
+  if ( !shownActivity(activity) ) return null;
   return {
     type: "activity",
     id: activity.id,

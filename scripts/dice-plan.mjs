@@ -387,14 +387,16 @@ export function extrasFormula(extras=[]) {
 /**
  * The dice a roll will throw, before it's rolled, for a player to roll them in the app: each die
  * term's faces and number, in order, those of a critical hit's critical damage, which dnd5e adds
- * after the roll's own, marked `added`. A roll can't be planned when one of its dice can't be known
+ * after the roll's own, marked `added`, and those the roll takes away, as Reduce's −1d4, marked
+ * `subtracted`; a die may be both. A roll can't be planned when one of its dice can't be known
  * beforehand: dice inside parentheses or a function, a number of dice still to be worked out, or a
  * die a player can't roll, such as a d3. Foundry then rolls all of them.
  * @param {Roll} roll   Built, not yet evaluated.
- * @returns {{plannable: boolean, dice: {faces: number, number: number, added?: true}[]}}
+ * @returns {{plannable: boolean, dice: {faces: number, number: number, added?: true, subtracted?: true}[]}}
  */
 export function plannedDice(roll) {
   const { DiceTerm } = foundry.dice.terms;
+  const taken = subtractedTerms(roll.terms);
   const dice = [];
   for ( const term of roll.terms ) {
     if ( term instanceof DiceTerm ) {
@@ -402,11 +404,132 @@ export function plannedDice(roll) {
       if ( !Number.isInteger(number) || (number < 0) || (number > 40) || !DIE_FACES.has(faces) ) {
         return { plannable: false, dice: [] };
       }
-      if ( number > 0 ) dice.push({ faces, number, ...(criticalDamageTerm(term) && { added: true }) });
+      if ( number > 0 ) dice.push({
+        faces, number, ...(criticalDamageTerm(term) && { added: true }), ...(taken.has(term) && { subtracted: true })
+      });
     }
     else if ( /d\d/i.test(term.formula ?? term.expression ?? "") ) return { plannable: false, dice: [] };
   }
   return { plannable: true, dice };
+}
+
+/**
+ * Can this world plan the dice of a part of damage, built as dnd5e builds one, for a player to roll
+ * them: every die one a player rolls, none inside parentheses or a function, as Foundry's parser
+ * may put a leading −1d4? Such damage is Foundry's to roll where it's an attack's, and isn't
+ * offered where it's a description's. One that can't be built can't be planned.
+ * @param {string} formula   Resolved, with no data left in it.
+ * @returns {boolean}
+ */
+export function plannableDamage(formula) {
+  const DamageRoll = CONFIG.Dice?.DamageRoll;
+  if ( !DamageRoll ) return true;
+  try {
+    return plannedDice(new DamageRoll(formula, {}, {})).plannable;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The dice a roll's terms take away, as dnd5e reads the signs of damage when it adds it up
+ * (aggregate-damage-rolls.mjs: chunkTerms): a + or a - ends a group of terms, each - turns the sign
+ * over, and *, / and % keep terms together, so that "5 - 2 * 1d4" takes its d4 away.
+ * @param {RollTerm[]} terms
+ * @returns {Set<DiceTerm>}
+ */
+export function subtractedTerms(terms) {
+  const { DiceTerm, OperatorTerm } = foundry.dice.terms;
+  const taken = new Set();
+  let negative = false;
+  // The sign of the group being read, once it has a term.
+  let chunk = null;
+  for ( const term of terms ?? [] ) {
+    if ( (term instanceof OperatorTerm) && ["+", "-"].includes(term.operator) ) {
+      if ( chunk !== null ) {
+        chunk = null;
+        negative = false;
+      }
+      if ( term.operator === "-" ) negative = !negative;
+      continue;
+    }
+    chunk ??= negative;
+    if ( chunk && (term instanceof DiceTerm) ) taken.add(term);
+  }
+  return taken;
+}
+
+/**
+ * Does damage, as its preview has it, take any of its dice away, as Reduce's −1d4 does? Such damage
+ * isn't rolled at its highest, which would take the most away. Damage whose dice can't be planned
+ * has none to mark: its rolls' formulas say, as `formulaTakesAway` reads them.
+ * @param {{plannable: boolean, rolls: {dice: object[], formula?: string}[]}} preview
+ * @returns {boolean}
+ */
+export function takesAway(preview) {
+  if ( !preview ) return false;
+  if ( !preview.plannable ) return preview.rolls.some(roll => formulaTakesAway(roll.formula));
+  return preview.rolls.some(roll => roll.dice.some(die => die.subtracted === true));
+}
+
+/**
+ * Does a roll's formula take a die away, read as it's written, for damage whose dice can't be
+ * planned: where a die is in a group of terms that comes out negative, as dnd5e reads the signs of
+ * damage (chunkTerms), at each depth of parentheses, each group's own `-` turning it over, and a
+ * `-` after `*`, `/` or `%` or opening it too, as in `1d3 + 3 - 1d4`, or the `(1d4 * -1)` Foundry's
+ * parser may make of a leading −1d4. `1d3 - 1` takes none away, nor does `- - 1d4`. A die within a
+ * function counts as within parentheses. The app reads it so too.
+ * @param {string} [formula]
+ * @returns {boolean}
+ */
+export function formulaTakesAway(formula) {
+  if ( typeof formula !== "string" ) return false;
+  return groupTakesAway(formula.replace(/\[[^\]]*\]/g, ""), false);
+}
+
+/**
+ * Does a formula, or what's within a pair of parentheses of one, take a die away: one of its groups
+ * of terms, parted by a `+`, a `-` or a function's comma between them, coming out negative with a
+ * die of its own, or any parentheses within one, read with that group's sign?
+ * @param {string} text
+ * @param {boolean} negative   It's taken away, or made negative, as a whole.
+ * @returns {boolean}
+ */
+function groupTakesAway(text, negative) {
+  let group = { negative: false, own: "", within: [] };
+  const groups = [group];
+  let depth = 0;
+  // What's within the parentheses being read.
+  let inner = "";
+  // The last character read that isn't a space: a sign after a term parts two groups.
+  let before = "";
+  for ( const char of text ) {
+    if ( "({".includes(char) ) {
+      if ( depth++ > 0 ) inner += char;
+    }
+    else if ( ")}".includes(char) ) {
+      if ( depth > 1 ) inner += char;
+      else if ( depth === 1 ) {
+        group.within.push(inner);
+        inner = "";
+      }
+      depth = Math.max(depth - 1, 0);
+    }
+    else if ( depth > 0 ) inner += char;
+    else if ( "+-,".includes(char) ) {
+      if ( (char === ",") || /[\w.)}]/.test(before) ) {
+        group = { negative: char === "-", own: "", within: [] };
+        groups.push(group);
+      }
+      else if ( char === "-" ) group.negative = !group.negative;
+    }
+    else group.own += char;
+    if ( char.trim() ) before = char;
+  }
+  return groups.some(({ negative: turned, own, within }) => {
+    const sign = negative !== turned;
+    return (sign && /d\d/i.test(own)) || within.some(each => groupTakesAway(each, sign));
+  });
 }
 
 /**
@@ -468,19 +591,20 @@ export function diceForEach(process, index) {
 
 /**
  * The dice damage throws, as its preview has them, changed as its player chose in the app: more of
- * its first roll's first die of its own, as many more as `perDie` says for each, or that die another
- * size. Never a die of a critical hit's critical damage, which dnd5e adds afterwards as it is.
+ * its first roll's first die of its own that it adds, never one it takes away, as many more as
+ * `perDie` says for each, or that die another size. Never a die of a critical hit's critical damage,
+ * which dnd5e adds afterwards as it is.
  * @param {{plannable: boolean, rolls: {dice: object[], perDie?: number}[]}} preview
  * @param {{extra?: number, faces?: number}} [modifiers]
- * @returns {{faces: number, number: number, added?: true}[]|null}   None for damage that can't be
- *   planned; null when there's no such die to change.
+ * @returns {{faces: number, number: number, added?: true, subtracted?: true}[]|null}   None for
+ *   damage that can't be planned; null when there's no such die to change.
  */
 export function modifiedDice(preview, modifiers) {
   const planned = preview.plannable ? preview.rolls.flatMap(roll => roll.dice) : [];
   if ( !reshapes(modifiers) || !preview.plannable ) return planned;
   const [first] = preview.rolls;
   // The first roll's dice come first among them all.
-  const index = (first?.dice ?? []).findIndex(die => !die.added);
+  const index = (first?.dice ?? []).findIndex(die => !die.added && !die.subtracted);
   if ( index === -1 ) return null;
   const die = planned[index];
   const number = die.number + ((modifiers.extra ?? 0) * (first.perDie ?? 1));
@@ -489,16 +613,18 @@ export function modifiedDice(preview, modifiers) {
 
 /**
  * Change the first of a player's damage rolls, built but not yet rolled, as they chose in the app:
- * more of its first die of its own, never one of a critical hit's critical damage, or another size
- * of it; then make a critical hit's dice again, as this world makes them.
+ * more of its first die of its own that it adds, never one of a critical hit's critical damage nor
+ * one it takes away, or another size of it; then make a critical hit's dice again, as this world
+ * makes them.
  * @param {Roll} roll
  * @param {{extra?: number, faces?: number}} [modifiers]
  */
 export function reshapeDamage(roll, modifiers) {
   if ( !reshapes(modifiers) ) return;
   const { DiceTerm } = foundry.dice.terms;
+  const taken = subtractedTerms(roll.terms);
   const term = roll.terms.find(each => (each instanceof DiceTerm) && Number.isInteger(each.number) && (each.number > 0)
-    && !criticalDamageTerm(each));
+    && !criticalDamageTerm(each) && !taken.has(each));
   if ( !term ) return;
   if ( modifiers.faces ) term.faces = modifiers.faces;
   if ( modifiers.extra ) {
@@ -549,10 +675,11 @@ export function changesDamage(modifiers) {
  * The dice damage throws, worked out before it's rolled, as an attack's preview has them: each
  * roll's dice, as this world rolls them, a critical hit's too: its extra dice counted in its first
  * die's number, and the dice it adds as terms of their own, as its critical damage's, marked
- * `added`; and how many it throws for each die of its own. None, for damage that can't be planned.
+ * `added`, and the dice it takes away marked `subtracted`; and how many it throws for each die of
+ * its own. None, for damage that can't be planned.
  * @param {object} process   A damage roll's configuration, with whether it's a critical hit's.
- * @returns {{plannable: boolean, rolls: {dice: {faces: number, number: number, added?: true}[],
- *   perDie: number}[]}}
+ * @returns {{plannable: boolean, rolls: {dice: {faces: number, number: number, added?: true,
+ *   subtracted?: true}[], perDie: number}[]}}
  */
 export function plannedDamage(process) {
   const planned = damageRollsFor(process).map(roll => plannedDice(roll));
@@ -924,13 +1051,16 @@ async function attackSelfTest() {
  * Check that damage a player changes in the app is changed as expected: a critical hit's with a die
  * more, made a d10, throws the dice its changed preview says, however this world and its modules
  * roll critical damage, and takes every one of the player's dice, with extra dice and critical
- * damage of a die too, whose die is never the one changed; damage whose only die is its critical
- * damage's has none to change; and damage at its highest has every die at its highest.
+ * damage of a die too, whose die is never the one changed, and damage that takes a die away, whose
+ * die taken away is never the one changed; damage whose only die is its critical damage's, or one it
+ * takes away, has none to change; and damage at its highest has every die at its highest.
  * @returns {Promise<void>}
  */
 async function modifiersSelfTest() {
   const modifiers = { extra: 1, faces: 10 };
-  for ( const [parts, critical] of [[["1d8", "2"], undefined], [["1d8 + 2"], { bonusDice: 1, bonusDamage: "1d4" }]] ) {
+  for ( const [parts, critical] of [
+    [["1d8", "2"], undefined], [["1d8 + 2"], { bonusDice: 1, bonusDamage: "1d4" }], [["3 - 1d4 + 1d8"], undefined]
+  ] ) {
     const id = `self-test-${foundry.utils.randomID()}`;
     const process = {
       rolls: [{ parts, data: {}, options: { type: "slashing", [ROLL_TAG]: id, ...(critical && { critical }) } }],
@@ -959,6 +1089,17 @@ async function modifiersSelfTest() {
   const flatDice = plannedDice(flatRoll).dice.map(({ faces, number }) => ({ faces, number }));
   check(JSON.stringify(flatDice) === JSON.stringify([{ faces: 6, number: 1 }]),
     `damage with no die of its own, a die more, threw ${flatRoll.formula}`);
+
+  // A number less a die, with critical damage of a die: the die it takes away is never the one
+  // changed, nor is the critical damage's in its place.
+  const taken = { rolls: [{ parts: ["3 - 1d4"], data: {}, options: { critical: { bonusDamage: "1d6" } } }], isCritical: true };
+  check(modifiedDice(plannedDamage(taken), { extra: 1 }) === null, "a die more was planned of a die damage takes away");
+  const [takenRoll] = damageRollsFor(taken);
+  // As this world makes a critical hit's dice: under dnd5e's own rules, 2d4 and 1d6.
+  const built = JSON.stringify(plannedDice(takenRoll).dice.map(({ faces, number }) => ({ faces, number })));
+  reshapeDamage(takenRoll, { extra: 1 });
+  const takenDice = JSON.stringify(plannedDice(takenRoll).dice.map(({ faces, number }) => ({ faces, number })));
+  check(takenDice === built, `damage that takes its only die of its own away, a die more, threw ${takenRoll.formula}`);
 
   const highest = `self-test-${foundry.utils.randomID()}`;
   const [max] = damageRollsFor({ rolls: [{ parts: ["2d6", "1"], data: {}, options: { [ROLL_TAG]: highest } }] });

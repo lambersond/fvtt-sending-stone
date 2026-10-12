@@ -173,7 +173,7 @@ function sourceOf(effect) {
  * @param {ActiveEffect} effect
  * @returns {string|null}
  */
-function durationOf(effect) {
+export function durationOf(effect) {
   const duration = effect.duration ?? {};
   const shown = effect.expirySupportsDuration
     ? !effect.expirySupportsDuration() || Number.isFinite(duration.value)
