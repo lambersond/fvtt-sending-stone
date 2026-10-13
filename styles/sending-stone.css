@@ -84,6 +84,31 @@
   color: var(--color-level-warning, #8a4f00);
 }
 
+/* How a saved campaign's posts and fetches are going, a line each. */
+#sending-stone-campaigns .sending-stone-status {
+  margin: 0.25rem 0 0;
+}
+
+#sending-stone-campaigns .sending-stone-status span {
+  display: block;
+}
+
+#sending-stone-campaigns .sending-stone-status [data-state="ok"] {
+  color: var(--color-level-success, #18520b);
+}
+
+#sending-stone-campaigns .sending-stone-status [data-state="warning"] {
+  color: var(--color-level-warning, #8a4f00);
+}
+
+#sending-stone-campaigns .sending-stone-status [data-state="error"] {
+  color: var(--color-level-error, #6e0000);
+}
+
+#sending-stone-campaigns .sending-stone-status [data-state="idle"] {
+  opacity: 0.75;
+}
+
 /* Chat ------------------------------------------------------------------- */
 
 /* Marks a roll a player made from the Sending Stone app. */
@@ -93,4 +118,11 @@
   margin-inline-end: 0.25rem;
   opacity: 0.75;
   font-size: var(--font-size-11, 0.75rem);
+}
+
+/* Marks one the Gamemaster made there as the character, whose author is the player all the same. */
+.chat-message .sending-stone-badge.sending-stone-gm {
+  gap: 0.125rem;
+  opacity: 1;
+  font-weight: bold;
 }

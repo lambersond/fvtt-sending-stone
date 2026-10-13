@@ -42,7 +42,12 @@
                 </div>
             </div>
             <p class="sending-stone-test-result" data-test-result="{{campaign.index}}" role="status"
-               aria-live="polite"></p>
+               aria-live="polite" {{#if campaign.test}}data-state="{{campaign.test.state}}"{{/if}}>{{campaign.test.text}}</p>
+            {{#if campaign.status}}
+            <p class="sending-stone-status" data-campaign-status="{{campaign.id}}" role="status" aria-live="polite">
+                {{#each campaign.status as |line|}}<span data-state="{{line.state}}">{{line.text}}</span>{{/each}}
+            </p>
+            {{/if}}
 
             <div class="form-group">
                 <label for="sending-stone-rolls-{{campaign.id}}">{{localize "SENDINGSTONE.Campaigns.Rolls"}}</label>

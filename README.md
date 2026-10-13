@@ -29,8 +29,9 @@ event once per user. Only the **active Gamemaster's** browser posts, which means
   over sending and starts by sending the listener the full current state.
 
 Events are posted one per request, in order. Failed posts that might succeed later are retried
-twice; after that the event is dropped and the Gamemaster is warned once. The full wire format is
-in [PROTOCOL.md](PROTOCOL.md).
+twice; after that the event is dropped, and the Gamemaster is told what went wrong and what to do,
+once per cause: once for the app's address, once for each campaign, once for each campaign and kind
+of event. The full wire format is in [PROTOCOL.md](PROTOCOL.md).
 
 ## Setup
 
@@ -40,7 +41,8 @@ in [PROTOCOL.md](PROTOCOL.md).
    Campaigns*. Enter the **Sending Stone Address**, such as `https://sending-stone.vercel.app`.
    Events go to `/api/events` under it; you don't type that part. Then add each campaign with the
    same title and secret as in the app, and tick its player characters. **Test** checks a
-   campaign's connection before saving.
+   campaign's connection before saving. Once saved, each campaign says below it how its events, and
+   its players' rolls, are going, as the browser sending them has it.
 3. **Gamemaster:** switch on **Send Chat Events** and/or **Send Combat Events**. Then share each
    campaign's invite link from the app; players open it and choose their character.
 
@@ -52,7 +54,8 @@ skills, tools, hit points, armor class and the like, as dnd5e shows them, along 
 features, conditions and effects, inventory, spells, traits and biography, and their actions, as
 Tidy 5e's Actions tab lists them, with each one's bonus to hit, saving throw and damage, as are the
 spells, features and inventory items that roll anything, and their favorites, as dnd5e's sheet
-shows them. Each character's sheet goes in a post of its own, after the hello that lists the
+shows them, each old-style resource as the feature it stands for. Each character's sheet goes in
+a post of its own, after the hello that lists the
 campaign's characters, so that a large party's sheets never make one post too large for the app;
 and to an app that expands them, in a smaller shape, each action referring to the item it repeats
 and what every row has left out, which the app puts back as it was. When a character changes, such
@@ -101,7 +104,10 @@ made in Foundry too, with the dice they rolled there: the d20s, and any dice the
 d4 for Bless. So are the hit dice they spend, and a feature's own roll, such as a d4 of luck. dnd5e
 makes each roll, without its dialog, as the character's player, so its card, critical hits, death
 saving throws, the combat tracker, Dice So Nice and Midi-QOL all behave as if they had rolled in
-Foundry. Each card is marked as rolled on Sending Stone.
+Foundry. Each card is marked as rolled on Sending Stone. A campaign's Gamemaster can open any of
+its characters' sheets in the app and roll as them; those rolls are marked GM on their cards, and
+are made as the character's player all the same, so the modules that read a card's author treat
+them as the player's own.
 
 - **Under D&D Fifth Edition only.** The Gamemaster's browser makes the rolls, so a Gamemaster must
   have the game open, as for everything else.
@@ -419,10 +425,11 @@ Gamemaster-only information switched on.
 - **Duplicates are possible.** If the listener received a post but its answer was lost, the post
   is retried with the same envelope `id`. Listeners should ignore an `id` they have already seen.
 - **Every post's size is checked.** The app takes posts of up to 1 MB until it says it takes more,
-  as the Sending Stone app says 4 MB. A larger event is dropped, never sent, and you're warned as for
-  any failure. A sheet too large is withheld rather than cut short: you're warned once for each
-  character and campaign, and the app tells its player why. A hello, sheet or description lost to
-  the app being unreachable for a while is sent again 30 seconds later.
+  as the Sending Stone app says 4 MB. A larger event is dropped, never sent, and you're told once for
+  each campaign and kind of event. A sheet too large is withheld rather than cut short: you're
+  warned once for each character and campaign, Manage Campaigns shows it until it's sent, and the
+  app tells its player why. A hello, sheet or description lost to the app being unreachable for a
+  while is sent again 30 seconds later.
 - **Players' attacks and spells with Midi-QOL set your targets** while each is made, one at a
   time, then put them back.
 - **Only dice are wrapped, and only for players' rolls.** On a Gamemaster's browser under D&D Fifth
@@ -471,7 +478,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/settings.mjs` | Settings and setting menu registration |
 | `scripts/bridge.mjs` | Which browser sends, and the `bridge.hello` state snapshot |
 | `scripts/heartbeat.mjs` | Heartbeats to campaigns sent nothing lately, so the app knows the game is connected |
-| `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status; what the app says it takes of sheets, and no post larger |
+| `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status; what the app says it takes of sheets, and no post larger; why the app refused a post or fetch |
+| `scripts/delivery-status.mjs` | What the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in Manage Campaigns |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
 | `scripts/characters.mjs` | A campaign's characters and who owns them |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
@@ -481,7 +489,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
-| `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites |
+| `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites; and the feature each old-style resource stands for |
 | `scripts/sheet-enchant.mjs` | Which enchant activities the app may use, with their profiles and the items each may enchant, as dnd5e's rules have it; and the enchantments an item carries, and which of them its player may end |
 | `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through; the levels an item may cast its spell at, and their cost; the checks a check activity calls for, and what a forward is used through and spends |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, their links marked, hashed, and sent only when a campaign lacks them |
@@ -490,12 +498,12 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-slim.mjs` | A sheet in the smaller shape the app expands: actions by reference, defaults left out |
 | `scripts/character-sync.mjs` | Sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes; withholding one too large to post; sending again what was lost |
 | `scripts/chat.mjs` | Chat hooks |
-| `scripts/chat-data.mjs` | Chat message serialization and audience |
+| `scripts/chat-data.mjs` | Chat message serialization and audience, and its GM roll |
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
 | `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, and reporting what became of each; what a campaign's hello says it makes |
-| `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time |
+| `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card, as the Gamemaster's where they made it; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time |
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name |
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow |

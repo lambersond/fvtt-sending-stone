@@ -102,6 +102,20 @@ export function failedResult(command, reason, error=null) {
   return { id: command.id, status: "failed", reason, error, messageId: null, visible: false, rolls: [] };
 }
 
+/**
+ * The flags this module puts on a message a command makes: the command's id, under the key that
+ * says what the message is, and from 0.23.0, where the campaign's Gamemaster made the roll in the
+ * app as the character, `by: "gm"`. The message's author is the player's all the same, as the
+ * modules that read it expect: only this mark says who rolled.
+ * @param {object} command
+ * @param {"request"|"use"|"outcome"} [key]   "request" for a roll, "use" for a use's card, and
+ *                                            "outcome" for dnd5e 5.3's message of a death save's.
+ * @returns {object}
+ */
+export function appFlags(command, key="request") {
+  return { [key]: command.id, ...((command.by === "gm") && { by: "gm" }) };
+}
+
 /* -------------------------------------------- */
 
 /**
@@ -181,6 +195,7 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * @returns {string|null}
  */
 export function checkCommand(command) {
+  if ( (command.by !== undefined) && (command.by !== null) && (command.by !== "gm") ) return "by";
   const named = checkItemCommand(command);
   if ( named ) return named;
   if ( ENCHANT_KINDS.includes(command.kind) ) return checkEnchantCommand(command);
@@ -395,11 +410,13 @@ function checkAttackCommand(command) {
 
 /**
  * Why a fetched end of an enchantment isn't one to make, if it isn't: it names the item and the
- * enchantment on it, and throws no dice.
+ * enchantment on it, and throws no dice. Only its player ends one from the app: it's no roll, and
+ * would leave no mark of the Gamemaster's.
  * @param {object} command
  * @returns {string|null}
  */
 function checkEnchantCommand(command) {
+  if ( command.by === "gm" ) return "by";
   const { enchantment } = command;
   if ( !isId(enchantment?.item) || !isId(enchantment?.effect) ) return "enchantment";
   if ( (command.mode !== 0) || (command.explicit !== false) ) return "dice";
@@ -718,7 +735,7 @@ function initiativeTurn(command, actor) {
  */
 async function makeRoll(command, actor) {
   const author = authorFor(actor);
-  const flags = { [MODULE_ID]: { request: command.id } };
+  const flags = { [MODULE_ID]: appFlags(command) };
   // dnd5e takes the first of these as the roll's own configuration, so each call has its own.
   const config = fields => ({ ...fields, rolls: [{ options: { [ROLL_TAG]: command.id } }] });
   const dialog = { configure: false };
@@ -729,11 +746,45 @@ async function makeRoll(command, actor) {
     case "tool": return messageOf(await actor.rollToolCheck(config({ tool: key }), dialog, message));
     case "ability": return messageOf(await actor.rollAbilityCheck(config({ ability: key }), dialog, message));
     case "save": return messageOf(await actor.rollSavingThrow(config({ ability: key }), dialog, message));
-    case "death": return messageOf(await actor.rollDeathSave(config({}), dialog, message));
+    case "death": return rollDeathSave(command, actor, config({}), message);
     case "initiative": return rollInitiative(command, actor, { author, flags });
     case "hitDie": return rollHitDie(command, actor, message);
     case "formula": return rollFormula(command, actor, message);
     default: return null;
+  }
+}
+
+/**
+ * Roll a death saving throw through dnd5e, without its dialog, as the player's own. Under dnd5e
+ * 5.3, a save that revives, steadies or kills the character posts what came of it as a message of
+ * its own, without the roll's flags: one the Gamemaster made in the app has that message marked as
+ * theirs too, before the app is told, under `outcome` rather than `request`, so that the roll is
+ * still the message the command made. dnd5e 6 writes what came of it on the roll's own card.
+ * @param {object} command
+ * @param {Actor} actor
+ * @param {object} config    The roll's configuration, as for any roll.
+ * @param {object} message   The roll's message, as for any roll.
+ * @returns {Promise<ChatMessage|null>}   The roll's message.
+ */
+async function rollDeathSave(command, actor, config, message) {
+  const dialog = { configure: false };
+  if ( command.by !== "gm" ) return messageOf(await actor.rollDeathSave(config, dialog, message));
+  let marking = null;
+  const mark = (rolls, { message: outcome, subject }={}) => {
+    if ( (subject?.id !== actor.id) || (rolls?.[0]?.options?.[ROLL_TAG] !== command.id) ) return;
+    if ( !outcome || outcome.flags?.[MODULE_ID] ) return;
+    marking = outcome.update({ [`flags.${MODULE_ID}`]: appFlags(command, "outcome") }).catch(err => {
+      // The roll was made all the same, and its own card is marked.
+      console.error(`${MODULE_ID} | Could not mark ${actor.name}'s death save as the Gamemaster's`, err);
+    });
+  };
+  Hooks.on("dnd5e.postRollDeathSave", mark);
+  try {
+    const rolls = await actor.rollDeathSave(config, dialog, message);
+    await marking;
+    return messageOf(rolls);
+  } finally {
+    Hooks.off("dnd5e.postRollDeathSave", mark);
   }
 }
 
@@ -773,7 +824,7 @@ async function rollHitDie(command, actor, message) {
  */
 async function spendHitDice(command, actor, campaign, signal) {
   const author = authorFor(actor);
-  const message = { rollMode: PUBLIC, data: { author: author.id, flags: { [MODULE_ID]: { request: command.id } } } };
+  const message = { rollMode: PUBLIC, data: { author: author.id, flags: { [MODULE_ID]: appFlags(command) } } };
   const { hitDice, ...rest } = command;
   const dice = hitDice.flatMap(({ denomination }, index) => {
     const { faces, results } = command.dice[index];
@@ -869,7 +920,7 @@ async function rollFormula(command, actor, message) {
  */
 async function answerPrompt(command, actor, prompt) {
   const author = authorFor(actor);
-  const flags = { [MODULE_ID]: { request: command.id }, dnd5e: { originatingMessage: prompt.messageId } };
+  const flags = { [MODULE_ID]: appFlags(command), dnd5e: { originatingMessage: prompt.messageId } };
   const config = {
     ability: command.key,
     ...(Number.isFinite(prompt.dc) && { target: prompt.dc }),
@@ -902,7 +953,7 @@ async function answerPrompt(command, actor, prompt) {
  */
 async function rollLinkedSave(command, actor, link) {
   const author = authorFor(actor);
-  const flags = { [MODULE_ID]: { request: command.id } };
+  const flags = { [MODULE_ID]: appFlags(command) };
   const target = Number.isInteger(link.dc) ? link.dc : null;
   // dnd5e rolls a concentration check that names no ability with the character's own.
   const ownAbility = (link.kind === "concentration") && !link.abilities?.length;
@@ -938,7 +989,7 @@ async function rollLinkedSave(command, actor, link) {
  */
 async function rollLinkedCheck(command, actor, link, check) {
   const author = authorFor(actor);
-  const flags = { [MODULE_ID]: { request: command.id } };
+  const flags = { [MODULE_ID]: appFlags(command) };
   const target = Number.isInteger(link.dc) ? link.dc : null;
   const tool = link.tool ? { bonus: link.tool.bonus, prof: link.tool.prof, item: link.tool.item } : {};
   const config = {
@@ -1091,20 +1142,28 @@ export function describeResult(command, message, actor, campaign, { rolls=messag
 /* -------------------------------------------- */
 
 /**
- * Mark a roll made from the app on its chat card, for everyone to see.
+ * Mark a roll made from the app on its chat card, for everyone to see; one the Gamemaster made
+ * there as the character, "GM".
  * @param {ChatMessage} message
  * @param {HTMLElement} html
  */
 export function markAppRoll(message, html) {
   const flags = message.flags?.[MODULE_ID];
-  if ( !(flags?.request || flags?.use) || !(html instanceof HTMLElement) ) return;
+  const gm = flags?.by === "gm";
+  if ( !(flags?.request || flags?.use || gm) || !(html instanceof HTMLElement) ) return;
   const header = html.querySelector(".message-header .message-metadata") ?? html.querySelector(".message-header");
   if ( !header || header.querySelector(".sending-stone-badge") ) return;
   const badge = document.createElement("span");
-  badge.className = "sending-stone-badge";
-  const label = game.i18n.localize("SENDINGSTONE.Roll.Badge");
+  badge.className = gm ? "sending-stone-badge sending-stone-gm" : "sending-stone-badge";
+  const label = game.i18n.localize(gm ? "SENDINGSTONE.Roll.BadgeGM" : "SENDINGSTONE.Roll.Badge");
   badge.dataset.tooltip = label;
   badge.setAttribute("aria-label", label);
   badge.innerHTML = '<i class="fa-solid fa-mobile-screen-button" inert></i>';
+  // The author is the player's, so the badge is what says the Gamemaster rolled it.
+  if ( gm ) {
+    const who = document.createElement("span");
+    who.textContent = game.i18n.localize("SENDINGSTONE.Roll.GM");
+    badge.append(who);
+  }
   header.prepend(badge);
 }
