@@ -1,5 +1,6 @@
 import {
-  EVENTS, HELLO_WANTED_HOOK, LISTENER_FEATURES_HOOK, MODULE_ID, PROTOCOL_VERSION, STATUS_HOOK
+  DEFAULT_MAX_BYTES, EVENT_DROPPED_HOOK, EVENTS, HELLO_DELIVERED_HOOK, HELLO_WANTED_HOOK, LISTENER_FEATURES_HOOK,
+  MODULE_ID, PROTOCOL_VERSION, SHEET_TERMS_HOOK, SLIM_SHEETS, STATUS_HOOK
 } from "./constants.mjs";
 import { describeCampaign } from "./campaigns.mjs";
 import { eventsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
@@ -10,7 +11,8 @@ import { eventsUrl, getDestination, getSecret, parseDestination } from "./config
  * Events are posted one at a time, in the order they were raised, so the listener never has to
  * reorder them. A failed post is retried a few times when the failure might be temporary, then
  * dropped: an event about a turn that has long since passed is worth less than keeping the queue
- * moving. Each envelope keeps its id across retries so the listener can discard duplicates.
+ * moving. Each envelope keeps its id across retries so the listener can discard duplicates. No post
+ * is larger than the listener says it takes.
  */
 
 /**
@@ -45,6 +47,12 @@ const queue = [];
 let draining = false;
 
 /**
+ * The envelope being posted, retries and all, if any.
+ * @type {object|null}
+ */
+let posting = null;
+
+/**
  * Identifies this page load, so the listener can tell a reloaded bridge from a gap in sequence.
  * Created on first use: the foundry global need not exist when this file is evaluated.
  * @type {string|null}
@@ -56,6 +64,21 @@ let session = null;
  * @type {Set<string>}
  */
 const ANNOUNCING = new Set([EVENTS.HELLO, EVENTS.HEARTBEAT]);
+
+/**
+ * The events whose answers say what the listener takes of sheets: since 0.22.0, a character's
+ * update's too, so that an app rolled back to one that doesn't expand slim sheets is noticed at
+ * the next sheet it's sent.
+ * @type {Set<string>}
+ */
+const TERMS_FROM = new Set([EVENTS.HELLO, EVENTS.HEARTBEAT, EVENTS.CHARACTER_UPDATED]);
+
+/**
+ * What the listener takes of each campaign's sheets, from its latest answer that says, by
+ * campaign id: see termsOf.
+ * @type {Map<string, {slimSheets: number|null, maxBytes: number}>}
+ */
+const terms = new Map();
 
 /**
  * The sequence number of the last envelope built in this session, for each campaign. Each
@@ -159,8 +182,18 @@ export function currentSession() {
  * @returns {void}
  */
 export function send(type, data, campaign, { sequenced=true }={}) {
-  enqueue(buildEnvelope(type, data, { campaign, sequenced }));
-  lastSent.set(campaign.id, Date.now());
+  post(buildEnvelope(type, data, { campaign, sequenced }));
+}
+
+/**
+ * Queue an envelope already built, as one measured before it's sent, for delivery to the configured
+ * destination.
+ * @param {object} envelope   As `buildEnvelope` builds it, for a campaign.
+ * @returns {void}
+ */
+export function post(envelope) {
+  enqueue(envelope);
+  lastSent.set(envelope.campaign.id, Date.now());
 }
 
 /**
@@ -193,10 +226,60 @@ export function sendLater(type, prepare, campaign) {
 function enqueue(entry) {
   queue.push(entry);
   if ( queue.length > MAX_QUEUE ) {
-    queue.shift();
+    const dropped = queue.shift();
     status.dropped++;
+    // Lost to a listener too slow to keep up, which it may not be later.
+    if ( !dropped.later ) Hooks.callAll(EVENT_DROPPED_HOOK, dropped, { temporary: true });
   }
   drain();
+}
+
+/**
+ * Is a bridge.hello for a campaign waiting to be posted, or being posted?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function helloPending(campaignId) {
+  const hello = envelope => (envelope?.type === EVENTS.HELLO) && (envelope.campaign?.id === campaignId);
+  return hello(posting) || queue.some(hello);
+}
+
+/**
+ * What the listener takes of a campaign's sheets, as its latest answer to a hello, heartbeat or
+ * character's update said: `slimSheets`, the slim format to send them in, or null for the full
+ * shape; and `maxBytes`, the largest post it takes. Until it has said, full sheets of at most
+ * 1,000,000 bytes, as any listener takes.
+ * @param {string} [campaignId]
+ * @returns {{slimSheets: number|null, maxBytes: number}}
+ */
+export function termsOf(campaignId) {
+  return terms.get(campaignId) ?? { slimSheets: null, maxBytes: DEFAULT_MAX_BYTES };
+}
+
+/**
+ * What an answer says the listener takes of sheets: a whole number of at least 1 for
+ * `slimSheets` says it expands slim format 1 (and any later one), and one of at least 1,000,000
+ * for `maxBytes` the largest post it takes. Anything else, or nothing, is what any listener takes.
+ * @param {object|null} features    The answer's `features`.
+ * @returns {{slimSheets: number|null, maxBytes: number}}
+ */
+function termsIn(features) {
+  const { slimSheets, maxBytes } = features ?? {};
+  return {
+    slimSheets: (Number.isInteger(slimSheets) && (slimSheets >= 1)) ? SLIM_SHEETS : null,
+    maxBytes: (Number.isInteger(maxBytes) && (maxBytes >= DEFAULT_MAX_BYTES)) ? maxBytes : DEFAULT_MAX_BYTES
+  };
+}
+
+/**
+ * A size in megabytes, to one decimal, as the Gamemaster and the app are told it.
+ * @param {number} bytes
+ * @param {(n: number) => number} round   Up for a post's size, down for a limit, so that a post
+ *                                        over the limit always reads as larger.
+ * @returns {string}                      Such as "1.1 MB".
+ */
+export function inMegabytes(bytes, round) {
+  return `${(round(bytes / 100_000) / 10).toFixed(1)} MB`;
 }
 
 /**
@@ -233,6 +316,16 @@ export async function deliver(envelope, { destination=getDestination(), secret=g
     body = JSON.stringify(envelope);
   } catch (err) {
     throw new DeliveryError(err.message, { retryable: false, cause: err });
+  }
+
+  // A post larger than the listener takes would be refused, or worse, cut off unread. A test of a
+  // campaign's connection may go elsewhere than its events, so it's held to what any listener takes.
+  const size = new TextEncoder().encode(body).length;
+  const limit = (envelope.type === EVENTS.PING) ? DEFAULT_MAX_BYTES : termsOf(envelope.campaign?.id).maxBytes;
+  if ( size > limit ) {
+    throw new DeliveryError(game.i18n.format("SENDINGSTONE.Error.TooLarge", {
+      size: inMegabytes(size, Math.ceil), limit: inMegabytes(limit, Math.floor)
+    }), { retryable: false });
   }
 
   const headers = { "Content-Type": "application/json" };
@@ -273,7 +366,8 @@ export async function deliver(envelope, { destination=getDestination(), secret=g
  * What the listener said in a successful answer, if anything. A listener that lacks a campaign's
  * full state, such as one that refused its bridge.hello because the campaign was not set up yet,
  * may answer an event for it with `{"resend": "hello"}`; and one that does more than take events
- * says so in `features`, such as `{"features": {"commands": true}}`.
+ * says so in `features`, such as `{"features": {"commands": true}}`, and since 0.22.0 what it takes
+ * of sheets, such as `{"features": {"slimSheets": 1, "maxBytes": 4000000}}`.
  * @param {Response} response
  * @returns {Promise<{resend: "hello"|null, features: object|null}>}
  */
@@ -326,27 +420,51 @@ async function drain() {
  * @returns {Promise<void>}
  */
 async function deliverWithRetry(envelope) {
+  posting = envelope;
   for ( let attempt = 0; ; attempt++ ) {
     try {
       const { answer } = await deliver(envelope);
+      posting = null;
       recordSuccess();
-      const campaignId = envelope.campaign?.id;
-      if ( campaignId && (answer.resend === "hello") ) Hooks.callAll(HELLO_WANTED_HOOK, campaignId);
-      // A listener that says nothing of what more it does, as one before Sending Stone's commands,
-      // does nothing more.
-      if ( campaignId && ANNOUNCING.has(envelope.type) ) {
-        Hooks.callAll(LISTENER_FEATURES_HOOK, campaignId, answer.features);
-      }
+      answered(envelope, answer);
       return;
     } catch (err) {
       const retryable = (err instanceof DeliveryError) && err.retryable;
       if ( !retryable || (attempt >= RETRY_DELAYS.length) ) {
+        posting = null;
         recordFailure(envelope, err);
         return;
       }
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt]));
     }
   }
+}
+
+/**
+ * Act on what the listener said in answer to a post it took. What it takes of sheets is noted
+ * before anything is told of the answer, so that whatever sheets follow are sent as it takes them.
+ * @param {object} envelope
+ * @param {{resend: "hello"|null, features: object|null}} answer
+ * @returns {void}
+ */
+function answered(envelope, answer) {
+  const campaignId = envelope.campaign?.id;
+  if ( !campaignId ) return;
+  let termsChanged = false;
+  if ( TERMS_FROM.has(envelope.type) ) {
+    const before = termsOf(campaignId);
+    const after = termsIn(answer.features);
+    termsChanged = (after.slimSheets !== before.slimSheets) || (after.maxBytes !== before.maxBytes);
+    terms.set(campaignId, after);
+  }
+  if ( answer.resend === "hello" ) Hooks.callAll(HELLO_WANTED_HOOK, campaignId);
+  // A listener that says nothing of what more it does, as one before Sending Stone's commands,
+  // does nothing more.
+  if ( ANNOUNCING.has(envelope.type) ) Hooks.callAll(LISTENER_FEATURES_HOOK, campaignId, answer.features);
+  // The sheets follow the hello they belong to, sent as the listener now takes them; a hello's
+  // sheets are sent as it takes them anyway.
+  if ( envelope.type === EVENTS.HELLO ) Hooks.callAll(HELLO_DELIVERED_HOOK, campaignId);
+  else if ( termsChanged ) Hooks.callAll(SHEET_TERMS_HOOK, campaignId);
 }
 
 /* -------------------------------------------- */
@@ -382,4 +500,8 @@ function recordFailure(envelope, err) {
     ui.notifications.warn(game.i18n.format("SENDINGSTONE.Notify.Failing", { error: message }));
   }
   Hooks.callAll(STATUS_HOOK, status);
+  // What the listener may take later is sent again then; what it refused, as too large or with
+  // the wrong secret, would be refused again.
+  const temporary = (err instanceof DeliveryError) && err.retryable;
+  Hooks.callAll(EVENT_DROPPED_HOOK, envelope, { temporary });
 }

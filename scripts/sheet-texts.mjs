@@ -10,10 +10,11 @@ import { sendLater } from "./transport.mjs";
  * The descriptions on a character's sheet: of its features, its effects and its conditions.
  *
  * They are most of a sheet's size and seldom change, so a sheet refers to each by a hash of where
- * it comes from, and the text itself goes separately in character.texts: once per hello, and
- * after that only when a sheet refers to one the campaign has not been sent. Each is enriched as
- * the character's player would see it in Foundry, links and rolls turned into plain HTML, and
- * those the app can act on into its own spans (see sheet-links.mjs).
+ * it comes from, and the text itself goes separately in character.texts, before the first sheet
+ * after a hello that refers to it, and after that only when a sheet refers to one the campaign has
+ * not been sent. Each is enriched as the character's player would see it in Foundry, links and
+ * rolls turned into plain HTML, and those the app can act on into its own spans (see
+ * sheet-links.mjs).
  */
 
 /**
@@ -23,14 +24,16 @@ import { sendLater } from "./transport.mjs";
  * sheet-links.mjs, since 0.17.0. 3: with their checks, `ss-check`, since 0.18.0. 4: with damage
  * never a critical hit's marked, since 0.19.0. 5: with what a critical hit adds, and damage as
  * resolved, since 0.20.0. 6: with damage whose dice this world can't plan for a player left as
- * text, since 0.21.0, so that no link is numbered as it was.
+ * text, since 0.21.0, so that no link is numbered as it was. 7: with damage and rolls whose dice
+ * have comparisons, such as `2d6r<=2`, as links, since 0.22.0.
  * @type {number}
  */
-const TEXT_FORMAT = 6;
+const TEXT_FORMAT = 7;
 
 /**
- * The most a character.texts payload should hold, in characters of JSON, well within the 1 MB a
- * listener may accept.
+ * The most a character.texts payload should hold, in bytes of JSON, well within the 1 MB any
+ * listener takes. Counted in characters before 0.22.0, which in a script of three bytes a
+ * character could come to more.
  * @type {number}
  */
 const CHUNK = 400_000;
@@ -167,14 +170,19 @@ function enrichedOf(hash, source) {
 /* -------------------------------------------- */
 
 /**
- * Note that a campaign was sent these descriptions with its hello, replacing what it was sent
- * before.
- * @param {Campaign} campaign
- * @param {Iterable<string>} hashes
+ * Forget that a campaign was sent descriptions, so that they go again with the next sheet that
+ * refers to them: every one, as with a hello, or some, as those of a post that was lost.
+ * @param {string} campaignId
+ * @param {Iterable<string>} [hashes]   Those to forget; all, by default.
  * @returns {void}
  */
-export function noteTextsSent(campaign, hashes) {
-  sent.set(campaign.id, new Set(hashes));
+export function forgetSent(campaignId, hashes) {
+  if ( !hashes ) {
+    sent.delete(campaignId);
+    return;
+  }
+  const known = sent.get(campaignId);
+  for ( const hash of hashes ) known?.delete(hash);
 }
 
 /**
@@ -288,8 +296,9 @@ function chunk(texts) {
   const payloads = [];
   let current = {};
   let size = 0;
+  const encoder = new TextEncoder();
   for ( const [hash, html] of Object.entries(texts) ) {
-    const length = hash.length + JSON.stringify(html).length + 4;
+    const length = encoder.encode(hash).length + encoder.encode(JSON.stringify(html)).length + 4;
     if ( size && (size + length > CHUNK) ) {
       payloads.push({ texts: current });
       current = {};

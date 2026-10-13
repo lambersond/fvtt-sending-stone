@@ -1,6 +1,7 @@
 import { EVENTS } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { resendLost } from "./character-sync.mjs";
 import { send, sinceLastSent } from "./transport.mjs";
 
 /**
@@ -9,6 +10,7 @@ import { send, sinceLastSent } from "./transport.mjs";
  * The listener cannot reach the Gamemaster's browser, so it only knows the game is connected
  * while events keep arriving. Between events, each campaign is sent a heartbeat. Any other event
  * says the same, so a heartbeat only goes to a campaign that has been sent nothing for a while.
+ * The same check sends again what was lost to failures that might not last, a while after.
  */
 
 /**
@@ -38,11 +40,13 @@ export function startHeartbeat() {
 }
 
 /**
- * Send a heartbeat to each campaign that has been sent nothing for a while.
+ * Send again what is due to be, then a heartbeat to each campaign that has been sent nothing for a
+ * while.
  * @returns {void}
  */
 export function heartbeat() {
   if ( !canSend() ) return;
+  resendLost();
   for ( const campaign of getCampaigns() ) {
     if ( sinceLastSent(campaign.id) < HEARTBEAT_AFTER ) continue;
     send(EVENTS.HEARTBEAT, {}, campaign, { sequenced: false });

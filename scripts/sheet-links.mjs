@@ -112,10 +112,11 @@ const UNMARKED = ["a", "h1", "h2", "h3", "h4", "h5", "h6", "button", "script", "
 
 /**
  * A formula the app may be sent: the characters of dice, numbers, arithmetic and dice functions,
- * never a reference to data, and no longer than the app accepts.
+ * and of the comparisons dice's modifiers make, as `2d6r<=2` or `6d6cs>=5`, since 0.22.0; never a
+ * reference to data, and no longer than the app accepts.
  * @type {RegExp}
  */
-const SAFE_FORMULA = /^[\w\s+\-*/().,]{1,100}$/;
+const SAFE_FORMULA = /^[\w\s+\-*/().,<>=]{1,100}$/;
 
 /**
  * The most extra dice a critical hit may throw on a part's first die, and the most of a die its

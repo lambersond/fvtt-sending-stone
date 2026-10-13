@@ -52,10 +52,13 @@ skills, tools, hit points, armor class and the like, as dnd5e shows them, along 
 features, conditions and effects, inventory, spells, traits and biography, and their actions, as
 Tidy 5e's Actions tab lists them, with each one's bonus to hit, saving throw and damage, as are the
 spells, features and inventory items that roll anything, and their favorites, as dnd5e's sheet
-shows them.
-When a character
-changes, such as taking damage, levelling up or gaining a condition, its campaigns are sent it again, so players can see their character and roll from it
-in the app. Descriptions, enriched as the player would see them in Foundry, are sent once and
+shows them. Each character's sheet goes in a post of its own, after the hello that lists the
+campaign's characters, so that a large party's sheets never make one post too large for the app;
+and to an app that expands them, in a smaller shape, each action referring to the item it repeats
+and what every row has left out, which the app puts back as it was. When a character changes, such
+as taking damage, levelling up or gaining a condition, its campaigns are sent it again, so players
+can see their character and roll from it in the app. Descriptions, enriched as the player would see
+them in Foundry, are sent once and
 then only when one is new, since they are most of a sheet's size. Their saving throws, checks,
 damage, healing, rolls and conditions are marked for the app to act on, and your own links in
 them, such as Request Roll and Apply Status, are left out.
@@ -106,8 +109,11 @@ Foundry. Each card is marked as rolled on Sending Stone.
   advantage. Choosing advantage, disadvantage or extra dice in the app is the player's say, as in
   dnd5e's roll dialog.
 - **Foundry's dice where the player rolled none.** A Halfling's reroll of a 1, Elven Accuracy's
-  third d20, or a bonus the game applies, such as Bless as an effect, is rolled by Foundry.
-  Foundry's total stands, and is what the player is shown.
+  third d20, or a bonus the game applies, such as Bless as an effect, is rolled by Foundry. So is
+  a die a formula rolls again, as a Great Weapon Fighter's `2d6r<=2` rerolls a 1 or a 2, or `1d6x`
+  explodes on a 6: the player's dice are each die's first throw, and what a formula keeps or counts
+  of them, as `4d6kh3` keeps the highest three, Foundry works out from those. Foundry's total
+  stands, and is what the player is shown.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -143,6 +149,13 @@ attack hit only where the game shows players.
   naming the targets, the attack and the damage, linked to it. You roll the targets' saving throws
   and apply the damage, healing and effects from the cards, as usual. Self-only features, such as
   Second Wind, name their user.
+- **At themselves.** A use whose range is Self that still names a creature, such as a potion or
+  Wild Shape, lets the player pick themselves, Self, among its targets, first for healing and the
+  like. It's then made at their token in the combat, or else at their token on the scene you're
+  viewing, or else at the character, named on the card. Midi-QOL, which can target only a token
+  your canvas draws, uses it then at the other targets or at no one, as before 0.22.0, for you
+  to apply to the character from the card; only where its Requires Targets needs a target is it
+  refused in the app.
 - **With Midi-QOL**, the use goes through Midi's workflow, as if the player had used it in
   Foundry: Midi checks the hit, rolls the targets' saving throws and applies the damage, healing
   and effects as you have it set up. The card is yours, spoken as the character, since Midi asks
@@ -230,7 +243,8 @@ attack hit only where the game shows players.
   Savage Attacks and a weapon's critical damage: the die added to is always the damage's own,
   never its critical damage's nor one it takes away, such as Reduce's or Ray of Enfeeblement's
   −1d4; damage that takes a die away isn't offered at its highest, which would take the most away,
-  even damage the game rolls itself, such as a d3's.
+  even damage the game rolls itself, such as a d3's; nor is damage with a die that explodes, or
+  rerolls on its highest face, as `1d6x`, which Foundry would roll again.
   A description's damage too; see [Descriptions that roll](#descriptions-that-roll).
 - **Nothing asks you, where it can be helped.** An enchantment's profile and item are chosen in the
   app, so dnd5e's usage dialog never opens. Area attacks Midi targets itself around their user,
@@ -325,6 +339,9 @@ description's damage or roll aren't offered yet.
   changed as expected.
 - **Rolls**, such as `[[/r 1d4]]`, are rolled with their dice on a card naming where they're from.
   One with a die the app doesn't roll, such as a d3, is refused.
+- **Dice Foundry rolls again, keeps or counts**, such as `[[/damage 2d6r<=2 + 7]]` or
+  `[[/r 4d6kh3]]`, are links too: the player's dice are each die's first throw, and a reroll or an
+  explosion is Foundry's, as for any roll.
 - **Only what the description says.** The app names a link in a description the module sent it,
   and the module reads its formula and DC from its own copy, as the character's sheet has it now:
   a description that has changed since is refused until the app has the new one. Nothing a player
@@ -337,9 +354,9 @@ description's damage or roll aren't offered yet.
   eyes or the roller's alone (`/gmr`, `/br`, `/sr`), and a check with an ability of your world's
   own.
 
-Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0 and 0.21.0 each send every description again once, in its
-new form. Since 0.20.0 a description with damage links is also sent again when the damage it shows
-changes, as with Rage.
+Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0 and 0.22.0 each send every description again once,
+in its new form. Since 0.20.0 a description with damage links is also sent again when the damage it
+shows changes, as with Rage.
 
 ### The listener must allow cross-origin requests
 
@@ -401,6 +418,11 @@ Gamemaster-only information switched on.
   up to 500 events are held; past that the oldest are dropped.
 - **Duplicates are possible.** If the listener received a post but its answer was lost, the post
   is retried with the same envelope `id`. Listeners should ignore an `id` they have already seen.
+- **Every post's size is checked.** The app takes posts of up to 1 MB until it says it takes more,
+  as the Sending Stone app says 4 MB. A larger event is dropped, never sent, and you're warned as for
+  any failure. A sheet too large is withheld rather than cut short: you're warned once for each
+  character and campaign, and the app tells its player why. A hello, sheet or description lost to
+  the app being unreachable for a while is sent again 30 seconds later.
 - **Players' attacks and spells with Midi-QOL set your targets** while each is made, one at a
   time, then put them back.
 - **Only dice are wrapped, and only for players' rolls.** On a Gamemaster's browser under D&D Fifth
@@ -449,7 +471,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/settings.mjs` | Settings and setting menu registration |
 | `scripts/bridge.mjs` | Which browser sends, and the `bridge.hello` state snapshot |
 | `scripts/heartbeat.mjs` | Heartbeats to campaigns sent nothing lately, so the app knows the game is connected |
-| `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status |
+| `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status; what the app says it takes of sheets, and no post larger |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
 | `scripts/characters.mjs` | A campaign's characters and who owns them |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
@@ -465,7 +487,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, their links marked, hashed, and sent only when a campaign lacks them |
 | `scripts/sheet-links.mjs` | The links in a description the app can act on, marked as its own spans, and finding the one a player's command names |
 | `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON |
-| `scripts/character-sync.mjs` | Sending a character again when it changes |
+| `scripts/sheet-slim.mjs` | A sheet in the smaller shape the app expands: actions by reference, defaults left out |
+| `scripts/character-sync.mjs` | Sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes; withholding one too large to post; sending again what was lost |
 | `scripts/chat.mjs` | Chat hooks |
 | `scripts/chat-data.mjs` | Chat message serialization and audience |
 | `scripts/combat.mjs` | Combat hooks |

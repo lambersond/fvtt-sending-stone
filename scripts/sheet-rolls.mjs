@@ -838,12 +838,14 @@ function forwardCount(item, forward, target) {
 
 /**
  * An activity a player can use from the app, by its id, with whom it's used at: its user alone, an
- * area, or a number of targets, and of what kind, such as allies or enemies; and for an enchant
- * activity, what it may enchant, and with what, as `describeEnchant` has it.
+ * area, or a number of targets, and of what kind, such as allies or enemies; whether its range is
+ * Self, as a potion's or Wild Shape's, which may still name a creature, for the app to offer its
+ * user among them; and for an enchant activity, what it may enchant, and with what, as
+ * `describeEnchant` has it.
  * @param {Item} item
  * @param {Activity} activity
  * @returns {{id: string, type: string, targets: {self: boolean, area: boolean, count: number|null,
- *   perLevel: number|null, affects: string|null}, enchant?: object}}
+ *   perLevel: number|null, affects: string|null, fromSelf: boolean}, enchant?: object}}
  */
 export function describeUse(item, activity) {
   const target = activity.target ?? {};
@@ -858,7 +860,8 @@ export function describeUse(item, activity) {
       area,
       count: (count > 0) ? count : null,
       perLevel: (count > 0) ? countPerLevel(item, activity, count) : null,
-      affects
+      affects,
+      fromSelf: activity.range?.units === "self"
     },
     ...((activity.type === "enchant") && { enchant: describeEnchant(item, activity) })
   };
