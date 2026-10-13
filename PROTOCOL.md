@@ -57,7 +57,7 @@ campaign and kind of event (too large, malformed), which never fails the connect
 told again only once it has been gone ten minutes, since it was told or last cleared, should it
 come back, so one that comes and goes is told once; and when it clears, as the next post gets
 through (for the app's address, the next of each campaign whose posts failed for it), the
-Gamemaster is told so, if they were told of it. Manage Campaigns shows each campaign's status, as
+Gamemaster is told so, if they were told of it. The settings window shows each campaign's status, as
 the browser sending events has it.
 
 The request comes from the Gamemaster's **browser**, so the listener must handle CORS. Answer the
@@ -844,7 +844,7 @@ the destination, the campaigns or any event setting changes.
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Make Players' Attacks and Spells Through Midi-QOL** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). See [Rolls from the app](#rolls-from-the-app). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign: since module 0.22.0 without its `sheet`, which follows in `character.updated`. |
 | `sheetsApart` | `true` since module 0.22.0: the characters carry no sheets, and each follows once the hello is answered. Absent before, when each carried its sheet. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
@@ -909,7 +909,7 @@ sign.
 ### `bridge.ping`
 
 `{ userId, name }` of the Gamemaster testing a campaign's connection. Sent by a campaign's
-**Test** button in Manage Campaigns, with the address, title and secret as typed, which may not
+**Test** button in the settings window, with the address, title and secret as typed, which may not
 have been saved, and from a browser that may not be the one sending events. It names the campaign
 tested: answer `2xx` if the secret is that campaign's, `404` if no campaign with its title is set
 up, and `401` for the wrong secret, or none: since module 0.23.0, **Test** says what the
@@ -947,7 +947,7 @@ rule `"timeout"`.
 
 ### Chat
 
-Sent only while **Send Chat Events** is on.
+Sent only while **Chat messages** is ticked.
 
 | Type | Payload |
 | --- | --- |
@@ -958,7 +958,7 @@ Sent only while **Send Chat Events** is on.
 
 ### Combat
 
-Sent only while **Send Combat Events** is on. Every payload naming a combat carries its full
+Sent only while **Combat tracker** is ticked. Every payload naming a combat carries its full
 [snapshot](#combat).
 
 | Type | Payload |
@@ -1118,7 +1118,7 @@ A prompt:
   its highest. The sheet has [`critical`](#character-sheet), how the world rolls a critical hit's
   damage, for the app to plan its dice by, and is sent again when the world's settings for it
   change. The hello's `modifiers` now also says whether a description's damage may be changed, and
-  is `true` where only it is offered, as with **Make Players' Attacks and Spells Through Midi-QOL**
+  is `true` where only it is offered, as with **Run players' attacks through Midi**
   off while Midi makes items' uses. Damage dnd5e's own link rolls through an activity that allows
   no critical hit, or whose critical hit throws dice the app can't plan, is marked
   [`data-critical="false"`](#links-in-descriptions), and is never one (`"invalid"`, `"critical"`);
@@ -1260,7 +1260,7 @@ A prompt:
   Module 0.23.0 reads a refusal's JSON [`reason`](#transport), or its status and text from an older
   app, and tells the Gamemaster what went wrong and what to do once per cause, rather than once as
   deliveries start failing and again as they recover, which a campaign refused beside one that
-  isn't made alternate; Manage Campaigns shows each campaign's status. Retrying is as before, but
+  isn't made alternate; the settings window shows each campaign's status. Retrying is as before, but
   that a fetch of rolls refused with any status not retried stops. It sends nothing new: no field,
   header or parameter, so a listener that answers in text or with nothing needs no change.
 
@@ -1278,7 +1278,7 @@ A prompt:
 A player can roll a check in the app and have it made in the game, with the dice they rolled, as
 if they had rolled it in Foundry: dnd5e makes the roll, so its card, critical hits, Dice So Nice
 and modules such as Midi-QOL behave as they always do. The Gamemaster turns it on for each
-campaign, with **Let Players Roll from Sending Stone** in Manage Campaigns. It is made for:
+campaign, with **Players roll in the app** on its Player actions tab. It is made for:
 
 | `kind` | The roll | Names |
 | --- | --- | --- |
@@ -1454,7 +1454,7 @@ die, after those spent before it, which stand. Dice a module adds are Foundry's.
 
 ### Attacks
 
-With **Let Players Attack and Cast from Sending Stone** also ticked for the campaign, a player's
+With **Attacks, spells and features** also ticked for the campaign, a player's
 weapon and spell attacks in the app are made in the game too, and so are the spells and features
 they use, as [below](#spells-and-features). The item is used as in Foundry, spending what it
 spends; the attack is made at the target the player picked, with their d20s; and then, once they
@@ -1518,7 +1518,7 @@ or bonus action Midi enforces that's been used; an activity that always opens Mi
 or damage dialog, or has Midi ask which effects to apply; and a target Midi can't target, or no
 target where Midi needs one. Midi targets only tokens the Gamemaster's canvas draws, on the level
 and scene they're viewing: any other is refused (`"scene"`), unless the Gamemaster turns on
-**Allow Targets You Aren't Viewing**. Then the use is made; Midi works only on the targets it can
+**Allow targets off your screen**. Then the use is made; Midi works only on the targets it can
 see, and the card names every target, for the Gamemaster to apply the rest. Its user, picked with
 [`self`](#spells-and-features), is always treated so, whatever the setting, as such a use was made
 at no one before module 0.22.0. What's left may ask
@@ -1569,7 +1569,7 @@ damage roll made with the player's dice is changed and checked; another, as Midi
 is left as it is.
 
 Players' attacks are offered once the self-test has also checked that the player's dice reach an
-attack's damage. If they don't, attacks and uses stay in the app, and Manage Campaigns says why.
+attack's damage. If they don't, attacks and uses stay in the app, and the campaign's Player actions tab says why.
 The self-test then checks that a critical hit's damage with a die more, made another size, throws
 the dice it should, with extra dice and critical damage of a die too since module 0.20.0, whose die
 is never the one changed, and damage that takes a die away since module 0.21.0, whose die taken
@@ -1793,7 +1793,7 @@ that failed once used, `"enchant"` or `"midi"`, has `enchantment` `null`.
 
 ### Saves the game asks for
 
-With **Prompt Players for Saves & Concentration** also ticked for the campaign, its players are
+With **Save and concentration prompts** also ticked for the campaign, its players are
 asked in the app for the saving throws the game asks of their characters, where Foundry waits for
 a player to click a button on a chat card:
 

@@ -1,73 +1,195 @@
 {
   "SENDINGSTONE": {
     "Settings": {
-      "Campaigns": {
-        "Name": "Campaigns",
-        "Label": "Manage Campaigns",
-        "Hint": "The Sending Stone app's address, and each campaign: its title, secret and player characters."
-      },
-      "ChatEvents": {
-        "Name": "Send Chat Events",
-        "Hint": "Post chat messages as they are created, edited and deleted."
-      },
-      "ChatScope": {
-        "Name": "Chat Messages to Send",
-        "Hint": "Send each campaign every chat message its players can read, or only those spoken by one of its characters.",
-        "All": "All messages",
-        "Connected": "Its characters' messages only"
-      },
-      "CombatEvents": {
-        "Name": "Send Combat Events",
-        "Hint": "Post combat tracker changes: encounters starting and ending, turns and rounds, and combatants joining, leaving, rolling initiative and being defeated."
-      },
-      "GmContent": {
-        "Name": "Send Gamemaster-Only Information",
-        "Hint": "Also send what only a Gamemaster can see: whispers no player can read, blind rolls, hidden combatants, the hit points of combatants outside a campaign and the armor class of attack targets. Leave this off if players can see what the destination receives."
-      },
-      "MidiIntegration": {
-        "Name": "Make Players' Attacks and Spells Through Midi-QOL",
-        "Hint": "Players' attacks, spells and features from Sending Stone go through Midi-QOL's workflow, as if they had used them in Foundry: Midi checks the hit, rolls the targets' saving throws, and applies the damage, healing and effects, as you have it set up. Off: while Midi-QOL handles items' uses, players' attacks, spells and features stay in the app."
-      },
-      "OffCanvasTargets": {
-        "Name": "Allow Targets You Aren't Viewing",
-        "Hint": "A player's attack, spell or feature through Midi-QOL is made even at a target on a level or scene you aren't viewing. Its card names every target, but Midi can only check hits, roll saving throws and apply damage, healing and effects for tokens your screen shows; apply the rest from the card. Off: such a use is refused, and its player is told you aren't viewing their target."
+      "Menu": {
+        "Name": "Sending Stone",
+        "Label": "Open Settings",
+        "Hint": "The app's address, what's sent, and each campaign's players and options."
       }
     },
-    "Campaigns": {
-      "Title": "Sending Stone: Campaigns",
-      "Hint": "Set up each campaign in the Sending Stone app first, then give it the same title and secret here. A character can be in more than one campaign.",
-      "Destination": "Sending Stone Address",
-      "CampaignTitle": "Campaign Title",
-      "TitlePlaceholder": "Curse of Strahd",
-      "Secret": "Secret",
-      "Untitled": "New Campaign",
-      "Remove": "Remove Campaign",
-      "InCampaign": "In Campaign",
-      "Character": "Character",
-      "Owners": "Players",
-      "NoOwner": "No player owner",
-      "NoCharacters": "There are no player characters in this world.",
-      "None": "No campaigns yet. Add one, then tick the characters in it.",
-      "Add": "Add Campaign",
-      "Submit": "Save Changes",
+    "Config": {
+      "Title": "Sending Stone",
+      "Save": "Save Changes",
+      "Saved": "Sending Stone settings saved.",
+      "Unsaved": "Unsaved changes",
+      "NoChanges": "No unsaved changes",
+      "Untitled": "Untitled campaign",
       "TitleRequired": "Every campaign needs a title.",
       "TitleTaken": "Each campaign needs a different title.",
-      "Saved": "Sending Stone campaigns saved.",
-      "Rolls": "Let Players Roll from Sending Stone",
-      "RollsHint": "Checks, saving throws, initiative and death saving throws its players roll in the Sending Stone app are made here too, with the dice they rolled, as if they had rolled them in Foundry.",
-      "RollsUnavailable": "Players' rolls from Sending Stone can't be made in this game: {reason}",
-      "RollsReason": {
-        "system": "they need the D&D Fifth Edition system.",
-        "self-test": "this version of Foundry, or a module, rolls dice differently than Sending Stone expects. The browser's console says what went wrong."
+      "Filter": "Filter by character or player",
+      "Show": "Show",
+      "NoMatch": "No characters match.",
+      "NoCharacters": "There are no player characters in this world.",
+      "Count": {
+        "Character": "1 character",
+        "Characters": "{count} characters",
+        "Player": "1 player",
+        "Players": "{count} players"
       },
-      "Prompts": "Prompt Players for Saves & Concentration",
-      "PromptsHint": "When the game asks one of its characters for a saving throw that Foundry waits on its player to click, their player is asked in the Sending Stone app instead, and their roll there is made here, on the card that asked, with their dice: a concentration check after damage, a save that a spell or feature targeting them calls for, and a save you request in chat. They see the DC, and whether they saved, only where dnd5e's Challenge Visibility would show them. A failed concentration check ends their concentration. Where Midi-QOL rolls saves or concentration checks itself, it still does. Needs Let Players Roll from Sending Stone.",
-      "Attacks": "Let Players Attack and Cast from Sending Stone",
-      "AttacksHint": "Attacks its players make in the Sending Stone app, and the spells and features they use there, such as Fireball, Cure Wounds or Second Wind, are made here too, at the targets they pick, with the spell slot, ammunition and attack mode they choose. The item is used as in Foundry, spending ammunition, uses and spell slots, and its damage or healing is rolled on the same use, all with the dice they rolled. Without Midi-QOL, you roll the targets' saving throws and apply the damage from the cards, as in Foundry; with it, Midi does. Needs Let Players Roll from Sending Stone.",
-      "AttacksUnavailable": "Players' attacks and spells from Sending Stone can't be made in this game: {reason}",
-      "AttacksReason": {
-        "self-test": "this version of Foundry, or a module, rolls damage differently than Sending Stone expects. The browser's console says what went wrong.",
-        "midi-off": "Midi-QOL handles items' uses here, and Make Players' Attacks and Spells Through Midi-QOL is off in the module's settings."
+      "Nav": {
+        "Label": "Sending Stone sections",
+        "Setup": "Setup",
+        "General": "General",
+        "Modules": "Modules",
+        "ModulesActive": "Your modules active here: {names}",
+        "Campaigns": "Campaigns",
+        "NewCampaign": "New campaign",
+        "People": "People",
+        "Roster": "Roster"
+      },
+      "State": {
+        "ok": "Delivering",
+        "warning": "Needs attention",
+        "error": "Not delivering",
+        "idle": "Idle",
+        "new": "Not saved"
+      },
+      "General": {
+        "Title": "General",
+        "Subtitle": "Applies to every campaign.",
+        "Address": "App address",
+        "AddressHint": "Where every campaign sends its events.",
+        "Send": "What to send",
+        "Chat": "Chat messages",
+        "ChatHint": "New, edited and deleted messages, and the log being cleared.",
+        "Scope": "Which messages",
+        "ScopeAll": "All its players can read",
+        "ScopeConnected": "Its characters' messages only",
+        "Combat": "Combat tracker",
+        "CombatHint": "Encounters, turns, rounds, initiative and defeats.",
+        "GmContent": "GM-only details",
+        "GmContentHint": "Whispers, blind rolls, hidden combatants, other creatures' hit points and targets' armor class. Keep off if players can see what the app receives.",
+        "Midi": "Midi-QOL",
+        "MidiIntegration": "Run players' attacks through Midi",
+        "MidiIntegrationHint": "Midi checks hits, rolls saves and applies damage and effects, as you have it set up. Off: attacks, spells and features stay in the app.",
+        "OffCanvas": "Allow targets off your screen",
+        "OffCanvasHint": "Midi automates only tokens your screen shows; apply the rest from the card. Off: such uses are refused."
+      },
+      "Tabs": {
+        "Label": "Campaign sections",
+        "Players": "Players",
+        "Actions": "Player actions",
+        "Connection": "Connection"
+      },
+      "Players": {
+        "Add": "Add characters",
+        "AlsoIn": "Also in {campaigns}",
+        "Remove": "Remove {name}",
+        "NoOwner": "No player owner",
+        "Empty": "No characters yet",
+        "EmptyHint": "Only the characters you add appear here.",
+        "Or": "or",
+        "CopyFrom": "Copy from",
+        "Copy": "Copy"
+      },
+      "Picker": {
+        "Title": "Add to {campaign}",
+        "Outside": "Not in campaign · {count}",
+        "Everyone": "Everyone · {count}",
+        "SelectAll": "Select all",
+        "Clear": "Clear",
+        "In": "In {campaigns}",
+        "Nowhere": "In no campaign",
+        "Already": "Already in this campaign",
+        "Selected": "{count} selected",
+        "NoneSelected": "Nothing selected",
+        "Add": "Add Selected",
+        "Cancel": "Cancel",
+        "Empty": "Every character is already in this campaign."
+      },
+      "Actions": {
+        "FromApp": "From the app",
+        "Rolls": "Players roll in the app",
+        "RollsHint": "Checks, saves, initiative, death saves and hit dice use the dice they roll there.",
+        "Attacks": "Attacks, spells and features",
+        "AttacksHint": "Made here at the targets they pick, spending slots, uses and ammunition, with their dice.",
+        "Prompts": "Save and concentration prompts",
+        "PromptsHint": "Saves Foundry would wait on a player to roll are asked in the app instead.",
+        "NeedsRolls": "Both need Players roll in the app.",
+        "Unavailable": "Not available in this game: {reason}",
+        "RollsReason": {
+          "system": "it needs the D&D Fifth Edition system.",
+          "self-test": "Foundry, or a module, rolls dice differently than expected. The browser console says why."
+        },
+        "AttacksReason": {
+          "self-test": "Foundry, or a module, rolls damage differently than expected. The browser console says why.",
+          "midi-off": "Run players' attacks through Midi is off in General."
+        },
+        "Dice": "Who rolls the dice",
+        "DiceApp": "App rolls",
+        "DiceAppHint": "Sending Stone rolls for them.",
+        "DicePlayers": "Players enter results",
+        "DicePlayersHint": "They type in what their own dice show.",
+        "Soon": "Coming soon",
+        "NeedsManualDice": "Needs Manual Dice",
+        "ManualDice": {
+          "active": "Manual Dice is on. Entering results in the app is coming soon.",
+          "off": "Manual Dice is installed but off: enable it in its settings.",
+          "inactive": "Manual Dice is installed but not enabled in this world.",
+          "missing": "Needs the Manual Dice module."
+        },
+        "ViewModules": "View modules"
+      },
+      "Connection": {
+        "Title": "Title",
+        "TitleHint": "Must match the campaign's title in the app.",
+        "TitlePlaceholder": "Curse of Strahd",
+        "Secret": "Secret",
+        "SecretHint": "Same as in the app. Kept in this browser only.",
+        "Show": "Show secret",
+        "Hide": "Hide secret",
+        "Status": "Status",
+        "NoAddress": "not set",
+        "ChangeAddress": "Change in General",
+        "Remove": "Remove Campaign",
+        "RemoveHint": "Characters aren't affected."
+      },
+      "Roster": {
+        "Title": "Roster",
+        "Everyone": "Everyone",
+        "Unassigned": "In no campaign · {count}",
+        "Character": "Character",
+        "Player": "Player",
+        "Toggle": "{name} in {campaign}",
+        "NoCampaigns": "Add a campaign to assign characters to it."
+      }
+    },
+    "Modules": {
+      "Title": "Modules",
+      "Subtitle": "What's installed changes what Sending Stone can do.",
+      "Family": "Our modules",
+      "WorksWith": "Works with",
+      "Required": "Required",
+      "Unlocks": "Unlocks",
+      "State": {
+        "active": "Active",
+        "off": "Off in its settings",
+        "inactive": "Not enabled",
+        "missing": "Not installed",
+        "recommended": "Recommended",
+        "met": "Met",
+        "unmet": "Not met"
+      },
+      "ManualDice": {
+        "Title": "Manual Dice",
+        "Hint": "Players type in what their physical dice show.",
+        "Unlocks": "Players entering their dice results in the app (coming soon)."
+      },
+      "CombatFocus": {
+        "Title": "Combat Focus",
+        "Hint": "Each turn, the view follows the active combatant."
+      },
+      "Midi": {
+        "Title": "Midi-QOL",
+        "Hint": "Players' attacks can run through Midi's workflow; see General."
+      },
+      "LibWrapper": {
+        "Title": "libWrapper",
+        "Hint": "Keeps players' rolls working alongside other dice modules."
+      },
+      "System": {
+        "Title": "D&D Fifth Edition",
+        "Hint": "Needed for players' rolls, attacks and save prompts."
       }
     },
     "Error": {
@@ -81,7 +203,7 @@
       "Problem": "Sending Stone: {problem} {fix}",
       "Reconnected": "Sending Stone reaches the app again.",
       "CampaignRecovered": "Sending Stone delivers {campaign}'s events to the app again.",
-      "RollsStopped": "Sending Stone has stopped fetching {campaign}'s players' rolls: {problem} {fix} Saving Manage Campaigns tries again.",
+      "RollsStopped": "Sending Stone has stopped fetching {campaign}'s players' rolls: {problem} {fix} Saving Sending Stone's settings tries again.",
       "RollsFailing": "{campaign}'s players' rolls aren't reaching the game: {problem} Still trying.",
       "RollsRecovered": "{campaign}'s players' rolls reach the game again.",
       "SheetTooLarge": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes. Its player is told.",
@@ -104,19 +226,19 @@
       "status": "The app at {address} answered HTTP {status}{detail}."
     },
     "Fix": {
-      "unreachable": "Check the address in Manage Campaigns (Test says more) and that the app is up. Events are lost until it answers; characters are sent again once it does.",
-      "timeout": "Check the address in Manage Campaigns (Test says more) and that the app is up. Events are lost until it answers; characters are sent again once it does.",
+      "unreachable": "Check the address in Sending Stone's settings (Test says more) and that the app is up. Events are lost until it answers; characters are sent again once it does.",
+      "timeout": "Check the address in Sending Stone's settings (Test says more) and that the app is up. Events are lost until it answers; characters are sent again once it does.",
       "unavailable": "Each post is tried three times; if this lasts, the app may be down.",
       "rateLimited": "Each post is tried three times; if this lasts, the app may be down.",
       "notForge": "Open the game from its Forge address, such as https://your-game.forge-vtt.com, and set the campaign up in the app with it.",
       "unsupportedProtocol": "Update the Sending Stone module.",
       "badEnvelope": "Update the Sending Stone module; if it keeps happening, report it with the browser console's log.",
-      "noSecret": "Enter its secret in Manage Campaigns here: secrets are kept only in the browser they're entered in.",
+      "noSecret": "Enter its secret in Sending Stone's settings here: secrets are kept only in the browser they're entered in.",
       "wrongSecret": "Enter the secret set for {campaign} in the Sending Stone app, then Test.",
       "notSetUp": "Set it up in the Sending Stone app with this title and this game's Forge address, or rename it here to match the app's, then Test.",
       "tooLarge": "Nothing else is held back.",
       "malformed": "This is a bug in Sending Stone: please report it, with the module's version. Nothing else is held back.",
-      "status": "Check the address in Manage Campaigns."
+      "status": "Check the address in Sending Stone's settings."
     },
     "What": {
       "Hello": "The campaign's character list",

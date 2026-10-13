@@ -67,7 +67,8 @@ export const SETTINGS = Object.freeze({
    *  Midi-QOL is active. */
   OFF_CANVAS_TARGETS: "offCanvasTargets",
 
-  /** Setting menu key for the campaigns dialog. */
+  /** Setting menu key for the settings window, where every setting is edited. The key is from when
+   *  it held the campaigns alone. */
   CAMPAIGNS_MENU: "campaignsMenu",
 
   /** World-scope list of campaigns: {id, title, characters, rolls, attacks, prompts}, characters

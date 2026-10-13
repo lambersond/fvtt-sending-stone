@@ -37,14 +37,15 @@ of event. The full wire format is in [PROTOCOL.md](PROTOCOL.md).
 
 1. **Gamemaster, in the Sending Stone app:** under *Campaigns*, set up each campaign with its
    title, your game's Forge address and a secret.
-2. **Gamemaster, in Foundry:** *Settings → Configure Settings → Sending Stone → Manage
-   Campaigns*. Enter the **Sending Stone Address**, such as `https://sending-stone.vercel.app`.
-   Events go to `/api/events` under it; you don't type that part. Then add each campaign with the
-   same title and secret as in the app, and tick its player characters. **Test** checks a
-   campaign's connection before saving. Once saved, each campaign says below it how its events, and
-   its players' rolls, are going, as the browser sending them has it.
-3. **Gamemaster:** switch on **Send Chat Events** and/or **Send Combat Events**. Then share each
-   campaign's invite link from the app; players open it and choose their character.
+2. **Gamemaster, in Foundry:** *Settings → Configure Settings → Sending Stone → Open Settings*.
+   Under **General**, enter the **App address**, such as `https://sending-stone.vercel.app`.
+   Events go to `/api/events` under it; you don't type that part. Then add each campaign with
+   **New campaign**: on its **Connection** tab, the same title and secret as in the app (**Test**
+   checks them before saving), and on its **Players** tab, **Add characters** to pick its player
+   characters. Once saved, each campaign's dot down the side, and its Connection tab, say how its
+   events, and its players' rolls, are going, as the browser sending them has it.
+3. **Gamemaster:** under **General**, tick **Chat messages** and/or **Combat tracker**. Then share
+   each campaign's invite link from the app; players open it and choose their character.
 
 While a Gamemaster has the game open, each campaign that has been sent nothing else for 30
 seconds is sent a heartbeat, so the app can show players whether the game is connected.
@@ -66,15 +67,25 @@ then only when one is new, since they are most of a sheet's size. Their saving t
 damage, healing, rolls and conditions are marked for the app to act on, and your own links in
 them, such as Request Roll and Apply Status, are left out.
 
-| Setting | Effect |
-| --- | --- |
-| Manage Campaigns | The Sending Stone app's address, and each campaign: its title, its secret (sent as `Authorization: Bearer …` with its events), its player characters, and whether its players' rolls, and attacks and spells, in the app are made here. Each event goes to the campaigns it involves. |
-| Send Chat Events | Chat messages created, edited and deleted, and the log being cleared. |
-| Chat Messages to Send | Every message a campaign's players can read, or only those its characters spoke. |
-| Send Combat Events | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
-| Send Gamemaster-Only Information | Also send what only a Gamemaster can see. Off by default. |
-| Make Players' Attacks and Spells Through Midi-QOL | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
-| Allow Targets You Aren't Viewing | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
+Every setting is in one window, *Settings → Configure Settings → Sending Stone → Open Settings*,
+with its sections down the side: General, Modules, each campaign and the Roster. Only the open
+section is shown, so a world with many players and campaigns never lists every character once per
+campaign. Edits are kept as you move between sections, and nothing is saved until **Save Changes**.
+
+| Section | Setting | Effect |
+| --- | --- | --- |
+| General | App address | The Sending Stone app's address. Each event goes to the campaigns it involves. |
+| General | Chat messages | Chat messages created, edited and deleted, and the log being cleared. |
+| General | Which messages | Every message a campaign's players can read, or only those its characters spoke. |
+| General | Combat tracker | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
+| General | GM-only details | Also send what only a Gamemaster can see. Off by default. |
+| General | Run players' attacks through Midi | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
+| General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
+| Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active; and whether the game system is D&D Fifth Edition. |
+| A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them. **Who rolls the dice** shows that the app rolls them; players entering what their own dice show, with Manual Dice, is coming. |
+| A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
+| Roster | | Every player character against every campaign, to tick who plays in which. |
 
 **Each campaign's secret is stored only in the browser you enter it in.** World settings are sent
 to every connected user, so a secret stored there could be read by players. Enter the secrets in
@@ -98,7 +109,7 @@ campaign titled after the world the first time a Gamemaster loads it.
 
 ### Players' rolls
 
-Tick **Let Players Roll from Sending Stone** for a campaign in Manage Campaigns, and its players'
+Tick **Players roll in the app** on a campaign's **Player actions** tab, and its players'
 skill, tool and ability checks, saving throws, initiative and death saving throws in the app are
 made in Foundry too, with the dice they rolled there: the d20s, and any dice they added, such as a
 d4 for Bless. So are the hit dice they spend, and a feature's own roll, such as a d4 of luck. dnd5e
@@ -131,8 +142,11 @@ them as the player's own.
   at all if they're there already.
 - **A self-test** checks, as the game loads, that the player's dice reach the roll made for them
   and no other. If it fails, as it might with a module that rolls dice its own way, players' rolls
-  stay in the app, and Manage Campaigns says why.
+  stay in the app, and each campaign's Player actions tab says why.
 - **libWrapper** is recommended: with it, the dice are wrapped alongside other modules' wrappers.
+- **Players' own dice.** Players who roll physical dice will be able to type what they show in the
+  app instead, with [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) on. A campaign's
+  Player actions tab shows the choice already, but doesn't offer it yet.
 
 The app's address must be able to answer the module's fetches of players' rolls, which only the
 Sending Stone app, or a listener that says it can, is asked for; see
@@ -140,7 +154,7 @@ Sending Stone app, or a listener that says it can, is asked for; see
 
 ### Players' attacks and spells
 
-Tick **Let Players Attack and Cast from Sending Stone** too, and the campaign's players can attack,
+Tick **Attacks, spells and features** too, and the campaign's players can attack,
 cast their spells and use their features from the app: Fireball, Sacred Flame, Magic Missile, Cure
 Wounds, Second Wind, Bless, Shield or Action Surge, from their actions, spells, features, inventory
 or favorites, wherever the app lists them. They pick their targets from the combat, and
@@ -166,11 +180,11 @@ attack hit only where the game shows players.
   Foundry: Midi checks the hit, rolls the targets' saving throws and applies the damage, healing
   and effects as you have it set up. The card is yours, spoken as the character, since Midi asks
   a card's author to confirm and apply. While it's made, your targets are the player's targets,
-  then they're put back. With **Make Players' Attacks and Spells Through Midi-QOL** off, attacks
+  then they're put back. With **Run players' attacks through Midi** off, attacks
   and spells stay in the app.
 - **Targets you aren't viewing.** Midi can only target tokens your screen shows, on the level and
   scene you're viewing, so a use at any other is refused, and its player is told you aren't
-  viewing their target. With **Allow Targets You Aren't Viewing** on, it's made anyway: the card
+  viewing their target. With **Allow targets off your screen** on, it's made anyway: the card
   names every target, Midi does what it does for those your screen shows, and you apply the rest
   from the card.
 - **Areas are picked, not placed.** No template is placed for an area spell or attack, such as a
@@ -264,7 +278,7 @@ attack hit only where the game shows players.
 
 ### Saves the game asks for
 
-Tick **Prompt Players for Saves & Concentration** too, and the campaign's players are asked in the
+Tick **Save and concentration prompts** too, and the campaign's players are asked in the
 app for the saving throws the game asks of their characters, wherever Foundry waits for a player to
 click one on a chat card. The app shows the request on every tab of the character, and the player
 rolls it there; the game makes it with their dice, as if they had clicked the card's button, so
@@ -289,7 +303,7 @@ the card shows whether they saved.
 
 ### Descriptions that roll
 
-With **Let Players Roll from Sending Stone** ticked, players can act in the app on what their
+With **Players roll in the app** ticked, players can act in the app on what their
 character's descriptions call for: a spell's "DC 15 Dexterity saving throw", a cloak's "DC 15
 Strength (Athletics) check" or "8d6 fire damage", dnd5e's save, check, skill, tool, damage and
 healing links, or a `[[/r 1d4]]` in their biography. The conditions a description names, such as
@@ -320,11 +334,11 @@ description's damage or roll aren't offered yet.
   with both: Foundry rolls the second d20, and the game's total counts. A check activity's own
   check, such as Fast Hands' Sleight of Hand, is rolled the same way, against the activity's DC; see
   [Players' attacks and spells](#players-attacks-and-spells).
-- **Damage and healing**, with **Let Players Attack and Cast from Sending Stone** ticked too, are
+- **Damage and healing**, with **Attacks, spells and features** ticked too, are
   rolled with their dice, on a card naming where they're from, such as "Starry Wisp (Staff of
   Fire)" for a spell an item casts, and no targets: you apply them from the card, as from dnd5e's
   own link. With Midi-QOL, it's the roll alone, outside any workflow, and it's offered even with
-  **Make Players' Attacks and Spells Through Midi-QOL** off. A link whose dice your world can't
+  **Run players' attacks through Midi** off. A link whose dice your world can't
   plan for the player, such as a d3's, is left as text.
 - **A critical hit's, and changed.** A right-click or long-press on a description's damage lets the
   player roll it as a critical hit's, as when they hit with it on a natural 20, or change it as they
@@ -395,7 +409,7 @@ SECRET=hunter2 node tools/echo-listener.mjs   # also require a shared secret
 
 ## What the listener sees
 
-With **Send Gamemaster-Only Information** off, the listener receives what players could see:
+With **GM-only details** off, the listener receives what players could see:
 
 | Information | Sent? |
 | --- | --- |
@@ -427,7 +441,7 @@ Gamemaster-only information switched on.
 - **Every post's size is checked.** The app takes posts of up to 1 MB until it says it takes more,
   as the Sending Stone app says 4 MB. A larger event is dropped, never sent, and you're told once for
   each campaign and kind of event. A sheet too large is withheld rather than cut short: you're
-  warned once for each character and campaign, Manage Campaigns shows it until it's sent, and the
+  warned once for each character and campaign, the campaign's Connection tab shows it until it's sent, and the
   app tells its player why. A hello, sheet or description lost to the app being unreachable for a
   while is sent again 30 seconds later.
 - **Players' attacks and spells with Midi-QOL set your targets** while each is made, one at a
@@ -476,10 +490,11 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/constants.mjs` | Shared identifiers, setting keys and event types |
 | `scripts/config.mjs` | Setting accessors and the destination |
 | `scripts/settings.mjs` | Settings and setting menu registration |
+| `scripts/companions.mjs` | The author's other modules, such as Manual Dice, and whether each is on in the world |
 | `scripts/bridge.mjs` | Which browser sends, and the `bridge.hello` state snapshot |
 | `scripts/heartbeat.mjs` | Heartbeats to campaigns sent nothing lately, so the app knows the game is connected |
 | `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status; what the app says it takes of sheets, and no post larger; why the app refused a post or fetch |
-| `scripts/delivery-status.mjs` | What the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in Manage Campaigns |
+| `scripts/delivery-status.mjs` | What the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
 | `scripts/characters.mjs` | A campaign's characters and who owns them |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
@@ -508,6 +523,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name |
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, planning damage's dice as the world rolls them, critical hits too, and the self-test that it works |
-| `scripts/apps/campaign-config.mjs` | Manage Campaigns: the app's address, and each campaign's title, secret, characters, players' rolls, attacks and spells, and connection test |
+| `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, player actions and connection test, and the Roster |
+| `templates/settings/` | The settings window's templates, one for each kind of section |
 | `tools/echo-listener.mjs` | Stand-in listener for development |
 | `PROTOCOL.md` | Event envelope and payload reference |

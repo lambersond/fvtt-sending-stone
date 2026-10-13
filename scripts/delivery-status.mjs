@@ -5,7 +5,7 @@ import { getDestination, isMixedContent, parseDestination } from "./config.mjs";
 import { inMegabytes, status } from "./transport.mjs";
 
 /**
- * What the Gamemaster is told of posts and fetches that fail, and what Manage Campaigns shows of
+ * What the Gamemaster is told of posts and fetches that fail, and what the settings window shows of
  * them, kept in memory for this page load: the first posts after a reload tell it afresh.
  *
  * Every failure has a reason, which the app and this module share (see transport.mjs), and each
@@ -262,7 +262,7 @@ export function describeProblem(err, { campaign=null, destination=getDestination
 }
 
 /**
- * What Manage Campaigns says of a saved campaign's posts and fetches, a line each: whether its
+ * What the settings window says of a saved campaign's posts and fetches, a line each: whether its
  * events are delivered, its last refused event, its sheets withheld, and whether its players'
  * rolls are fetched. Only the browser sending events knows; any other says whose that is.
  * @param {Campaign} campaign

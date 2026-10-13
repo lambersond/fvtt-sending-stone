@@ -1,0 +1,9 @@
+<footer class="form-footer sending-stone-footer">
+    <span class="sending-stone-dirty" data-dirty="{{dirty}}" role="status" aria-live="polite">
+        {{#if dirty}}{{localize "SENDINGSTONE.Config.Unsaved"}}{{else}}{{localize "SENDINGSTONE.Config.NoChanges"}}{{/if}}
+    </span>
+    <button type="submit">
+        <i class="fa-solid fa-floppy-disk" inert></i>
+        {{localize "SENDINGSTONE.Config.Save"}}
+    </button>
+</footer>
