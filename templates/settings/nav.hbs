@@ -1,0 +1,42 @@
+<nav class="sending-stone-nav" aria-label="{{localize "SENDINGSTONE.Config.Nav.Label"}}">
+    <h3 class="sending-stone-nav-heading">{{localize "SENDINGSTONE.Config.Nav.Setup"}}</h3>
+    <button type="button" class="sending-stone-nav-item" data-action="view" data-section="general"
+            {{#if nav.general}}aria-current="page"{{/if}}>
+        <i class="fa-solid fa-sliders" inert></i>
+        <span class="sending-stone-nav-label">{{localize "SENDINGSTONE.Config.Nav.General"}}</span>
+    </button>
+    <button type="button" class="sending-stone-nav-item" data-action="view" data-section="modules"
+            {{#if nav.modules}}aria-current="page"{{/if}}>
+        <i class="fa-solid fa-puzzle-piece" inert></i>
+        <span class="sending-stone-nav-label">{{localize "SENDINGSTONE.Config.Nav.Modules"}}</span>
+        {{#if nav.family}}
+        <span class="sending-stone-badge" data-tooltip="{{nav.familyTooltip}}">{{nav.family}}</span>
+        <span class="sending-stone-sr">{{nav.familyTooltip}}</span>
+        {{/if}}
+    </button>
+
+    <h3 class="sending-stone-nav-heading">{{localize "SENDINGSTONE.Config.Nav.Campaigns"}}</h3>
+    {{#each nav.campaigns as |campaign|}}
+    <button type="button" class="sending-stone-nav-item" data-action="view" data-section="campaign"
+            data-campaign-id="{{campaign.id}}" {{#if campaign.current}}aria-current="page"{{/if}}>
+        <span class="sending-stone-dot" data-campaign-state="{{campaign.id}}" data-state="{{campaign.state}}"
+              data-tooltip="{{campaign.stateTooltip}}"></span>
+        <span class="sending-stone-nav-label {{#if campaign.untitled}}untitled{{/if}}"
+              data-campaign-title="{{campaign.id}}">{{campaign.title}}</span>
+        <span class="sending-stone-sr" data-campaign-state-label="{{campaign.id}}">{{campaign.stateLabel}}</span>
+        <span class="sending-stone-count" data-campaign-count="{{campaign.id}}">{{campaign.count}}</span>
+    </button>
+    {{/each}}
+    <button type="button" class="sending-stone-nav-item sending-stone-new" data-action="addCampaign">
+        <i class="fa-solid fa-plus" inert></i>
+        <span class="sending-stone-nav-label">{{localize "SENDINGSTONE.Config.Nav.NewCampaign"}}</span>
+    </button>
+
+    <h3 class="sending-stone-nav-heading">{{localize "SENDINGSTONE.Config.Nav.People"}}</h3>
+    <button type="button" class="sending-stone-nav-item" data-action="view" data-section="roster"
+            {{#if nav.roster}}aria-current="page"{{/if}}>
+        <i class="fa-solid fa-table-cells" inert></i>
+        <span class="sending-stone-nav-label">{{localize "SENDINGSTONE.Config.Nav.Roster"}}</span>
+        <span class="sending-stone-count">{{nav.rosterCount}}</span>
+    </button>
+</nav>

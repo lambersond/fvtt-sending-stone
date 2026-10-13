@@ -1,0 +1,279 @@
+<header class="sending-stone-header">
+    <div class="sending-stone-title-row">
+        <h2 tabindex="-1" class="{{#if campaign.untitled}}untitled{{/if}}"
+            data-campaign-title="{{campaign.id}}">{{campaign.heading}}</h2>
+        <span class="sending-stone-pill" data-campaign-state="{{campaign.id}}" data-state="{{campaign.state}}"
+              data-tooltip="{{campaign.stateTooltip}}">
+            <span data-campaign-state-label="{{campaign.id}}">{{campaign.stateLabel}}</span>
+        </span>
+        <span class="sending-stone-subtitle">{{campaign.summary}}</span>
+    </div>
+    <nav class="sending-stone-tabs" aria-label="{{localize "SENDINGSTONE.Config.Tabs.Label"}}">
+        <button type="button" data-action="view" data-section="campaign" data-campaign-id="{{campaign.id}}"
+                data-tab="players" {{#if campaign.tabs.players}}aria-current="page"{{/if}}>
+            {{localize "SENDINGSTONE.Config.Tabs.Players"}}
+        </button>
+        <button type="button" data-action="view" data-section="campaign" data-campaign-id="{{campaign.id}}"
+                data-tab="actions" {{#if campaign.tabs.actions}}aria-current="page"{{/if}}>
+            {{localize "SENDINGSTONE.Config.Tabs.Actions"}}
+        </button>
+        <button type="button" data-action="view" data-section="campaign" data-campaign-id="{{campaign.id}}"
+                data-tab="connection" {{#if campaign.tabs.connection}}aria-current="page"{{/if}}>
+            {{localize "SENDINGSTONE.Config.Tabs.Connection"}}
+        </button>
+    </nav>
+</header>
+
+{{#if campaign.picker}}
+{{!-- The characters that can be added, in place of the campaign's players. --}}
+<div class="sending-stone-picker" data-picker role="group" aria-labelledby="sending-stone-picker-title">
+    <div class="sending-stone-toolbar sending-stone-picker-head">
+        <h3 id="sending-stone-picker-title">{{campaign.picker.title}}</h3>
+        <button type="button" class="icon fa-solid fa-xmark" data-action="closePicker"
+                data-tooltip="SENDINGSTONE.Config.Picker.Cancel"
+                aria-label="{{localize "SENDINGSTONE.Config.Picker.Cancel"}}"></button>
+    </div>
+    <div class="sending-stone-toolbar">
+        <input type="search" data-filter="picker" value="{{campaign.picker.filter}}"
+               placeholder="{{localize "SENDINGSTONE.Config.Filter"}}"
+               aria-label="{{localize "SENDINGSTONE.Config.Filter"}}">
+        <div class="sending-stone-segmented" role="group" aria-label="{{localize "SENDINGSTONE.Config.Show"}}">
+            <button type="button" data-action="filterScope" data-filter-scope="pickerScope" data-value="outside"
+                    aria-pressed="{{#if campaign.picker.everyone}}false{{else}}true{{/if}}">
+                {{campaign.picker.outsideLabel}}
+            </button>
+            <button type="button" data-action="filterScope" data-filter-scope="pickerScope" data-value="everyone"
+                    aria-pressed="{{#if campaign.picker.everyone}}true{{else}}false{{/if}}">
+                {{campaign.picker.everyoneLabel}}
+            </button>
+        </div>
+    </div>
+    <div class="sending-stone-scroll" data-filter-list="picker">
+        {{#each campaign.picker.groups as |group|}}
+        <section class="sending-stone-group" data-filter-group>
+            <div class="sending-stone-group-heading">
+                <span>{{group.label}}</span>
+                <button type="button" class="sending-stone-link" data-action="pickGroup">
+                    {{localize "SENDINGSTONE.Config.Picker.SelectAll"}}
+                </button>
+            </div>
+            {{#each group.entries as |character|}}
+            <label class="sending-stone-row sending-stone-pick" data-search="{{character.search}}"
+                   data-in-campaign="{{character.inCampaign}}">
+                <input type="checkbox" data-pick="{{character.id}}"
+                       {{#if character.inCampaign}}checked disabled{{/if}}>
+                <img src="{{character.img}}" alt="">
+                <span class="sending-stone-row-name">
+                    <span>{{character.name}}</span>
+                    <span class="hint">{{character.where}}</span>
+                </span>
+            </label>
+            {{/each}}
+        </section>
+        {{/each}}
+        <p class="sending-stone-empty" data-filter-empty hidden>
+            {{#if campaign.picker.none}}{{localize "SENDINGSTONE.Config.Picker.Empty"}}{{else}}{{localize "SENDINGSTONE.Config.NoMatch"}}{{/if}}
+        </p>
+    </div>
+    <div class="sending-stone-picker-footer">
+        <span data-pick-count role="status" aria-live="polite"></span>
+        <button type="button" data-action="closePicker">{{localize "SENDINGSTONE.Config.Picker.Cancel"}}</button>
+        <button type="button" data-action="addPicked" disabled>
+            <i class="fa-solid fa-user-plus" inert></i>
+            {{localize "SENDINGSTONE.Config.Picker.Add"}}
+        </button>
+    </div>
+</div>
+
+{{else if campaign.tabs.players}}
+{{#if campaign.groups.length}}
+<div class="sending-stone-toolbar">
+    <input type="search" data-filter="players" value="{{campaign.filter}}"
+           placeholder="{{localize "SENDINGSTONE.Config.Filter"}}"
+           aria-label="{{localize "SENDINGSTONE.Config.Filter"}}">
+    <button type="button" data-action="openPicker">
+        <i class="fa-solid fa-user-plus" inert></i>
+        {{localize "SENDINGSTONE.Config.Players.Add"}}
+    </button>
+</div>
+{{/if}}
+<div class="sending-stone-scroll" data-filter-list="players">
+    {{#each campaign.groups as |group|}}
+    <section class="sending-stone-group" data-filter-group>
+        <h3 class="sending-stone-group-heading">
+            <span>{{group.label}}</span>
+            <span class="sending-stone-count">{{group.count}}</span>
+        </h3>
+        <ul class="sending-stone-list">
+            {{#each group.entries as |character|}}
+            <li class="sending-stone-row" data-search="{{character.search}}">
+                <img src="{{character.img}}" alt="">
+                <span class="sending-stone-row-name">{{character.name}}</span>
+                {{#if character.also}}<span class="sending-stone-chip" data-tooltip="{{character.also}}">{{character.also}}</span>{{/if}}
+                <button type="button" class="icon fa-solid fa-xmark" data-action="removeCharacter"
+                        data-actor-id="{{character.id}}" data-tooltip="{{character.removeLabel}}"
+                        aria-label="{{character.removeLabel}}"></button>
+            </li>
+            {{/each}}
+        </ul>
+    </section>
+    {{else}}
+    <div class="sending-stone-empty-state">
+        <i class="fa-solid fa-users" inert></i>
+        <p class="sending-stone-empty-title">{{localize "SENDINGSTONE.Config.Players.Empty"}}</p>
+        <p class="hint">{{localize "SENDINGSTONE.Config.Players.EmptyHint"}}</p>
+        <div class="sending-stone-empty-actions">
+            <button type="button" data-action="openPicker">
+                <i class="fa-solid fa-user-plus" inert></i>
+                {{localize "SENDINGSTONE.Config.Players.Add"}}
+            </button>
+            {{#if campaign.copySources.length}}
+            <span class="hint">{{localize "SENDINGSTONE.Config.Players.Or"}}</span>
+            <label for="sending-stone-copy">{{localize "SENDINGSTONE.Config.Players.CopyFrom"}}</label>
+            <select id="sending-stone-copy" data-copy-source>
+                {{#each campaign.copySources as |source|}}
+                <option value="{{source.id}}">{{source.label}}</option>
+                {{/each}}
+            </select>
+            <button type="button" data-action="copyCharacters">
+                <i class="fa-solid fa-copy" inert></i>
+                {{localize "SENDINGSTONE.Config.Players.Copy"}}
+            </button>
+            {{/if}}
+        </div>
+    </div>
+    {{/each}}
+    <p class="sending-stone-empty" data-filter-empty hidden>{{localize "SENDINGSTONE.Config.NoMatch"}}</p>
+</div>
+
+{{else if campaign.tabs.actions}}
+<div class="sending-stone-scroll">
+    {{#if campaign.rollsUnavailable}}
+    <p class="sending-stone-warning"><i class="fa-solid fa-triangle-exclamation" inert></i> {{campaign.rollsUnavailable}}</p>
+    {{/if}}
+    <fieldset>
+        <legend>{{localize "SENDINGSTONE.Config.Actions.FromApp"}}</legend>
+        <div class="form-group">
+            <label for="sending-stone-rolls">{{localize "SENDINGSTONE.Config.Actions.Rolls"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-rolls" name="campaign.rolls" {{#if campaign.rolls}}checked{{/if}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.RollsHint"}}</p>
+        </div>
+        <div class="form-group sending-stone-nested {{#unless campaign.rolls}}disabled{{/unless}}">
+            <label for="sending-stone-attacks">{{localize "SENDINGSTONE.Config.Actions.Attacks"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-attacks" name="campaign.attacks"
+                       {{#if campaign.attacks}}checked{{/if}} {{#unless campaign.rolls}}disabled{{/unless}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.AttacksHint"}}</p>
+            {{#if campaign.attacksUnavailable}}
+            <p class="hint sending-stone-warning">{{campaign.attacksUnavailable}}</p>
+            {{/if}}
+        </div>
+        <div class="form-group sending-stone-nested {{#unless campaign.rolls}}disabled{{/unless}}">
+            <label for="sending-stone-prompts">{{localize "SENDINGSTONE.Config.Actions.Prompts"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-prompts" name="campaign.prompts"
+                       {{#if campaign.prompts}}checked{{/if}} {{#unless campaign.rolls}}disabled{{/unless}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.PromptsHint"}}</p>
+        </div>
+        <p class="hint sending-stone-nested" data-needs="campaign.rolls" {{#if campaign.rolls}}hidden{{/if}}>
+            {{localize "SENDINGSTONE.Config.Actions.NeedsRolls"}}
+        </p>
+    </fieldset>
+
+    <fieldset class="sending-stone-dice">
+        <legend>{{localize "SENDINGSTONE.Config.Actions.Dice"}}</legend>
+        <div class="sending-stone-choices" role="radiogroup" aria-label="{{localize "SENDINGSTONE.Config.Actions.Dice"}}">
+            <label class="sending-stone-choice selected">
+                <input type="radio" name="diceEntry" value="app" checked>
+                <span class="sending-stone-choice-text">
+                    <strong><i class="fa-solid fa-dice-d20" inert></i> {{localize "SENDINGSTONE.Config.Actions.DiceApp"}}</strong>
+                    <span class="hint">{{localize "SENDINGSTONE.Config.Actions.DiceAppHint"}}</span>
+                </span>
+            </label>
+            <label class="sending-stone-choice disabled">
+                <input type="radio" name="diceEntry" value="players" disabled>
+                <span class="sending-stone-choice-text">
+                    <strong>
+                        <i class="fa-solid fa-keyboard" inert></i> {{localize "SENDINGSTONE.Config.Actions.DicePlayers"}}
+                        <span class="sending-stone-pill">{{campaign.dice.badge}}</span>
+                    </strong>
+                    <span class="hint">{{localize "SENDINGSTONE.Config.Actions.DicePlayersHint"}}</span>
+                </span>
+            </label>
+        </div>
+        <p class="hint sending-stone-dice-note">
+            <i class="fa-solid {{#if campaign.dice.ready}}fa-check{{else}}fa-lock{{/if}}" inert></i>
+            {{campaign.dice.note}}
+            {{#unless campaign.dice.ready}}
+            <button type="button" class="sending-stone-link" data-action="view" data-section="modules">
+                {{localize "SENDINGSTONE.Config.Actions.ViewModules"}}
+            </button>
+            {{/unless}}
+        </p>
+    </fieldset>
+</div>
+
+{{else if campaign.tabs.connection}}
+<div class="sending-stone-scroll">
+    <div class="form-group">
+        <label for="sending-stone-title">{{localize "SENDINGSTONE.Config.Connection.Title"}}</label>
+        <div class="form-fields">
+            <input type="text" id="sending-stone-title" name="campaign.title" value="{{campaign.title}}" required
+                   placeholder="{{localize "SENDINGSTONE.Config.Connection.TitlePlaceholder"}}" autocomplete="off">
+        </div>
+        <p class="hint">{{localize "SENDINGSTONE.Config.Connection.TitleHint"}}</p>
+    </div>
+
+    <div class="form-group">
+        <label for="sending-stone-secret">{{localize "SENDINGSTONE.Config.Connection.Secret"}}</label>
+        <div class="form-fields">
+            <input type="{{#if campaign.revealed}}text{{else}}password{{/if}}" id="sending-stone-secret"
+                   name="campaign.secret" value="{{campaign.secret}}" spellcheck="false" autocomplete="new-password">
+            {{#if campaign.revealed}}
+            <button type="button" class="icon fa-solid fa-eye-slash" data-action="revealSecret" aria-pressed="true"
+                    data-tooltip="SENDINGSTONE.Config.Connection.Hide"
+                    aria-label="{{localize "SENDINGSTONE.Config.Connection.Hide"}}"></button>
+            {{else}}
+            <button type="button" class="icon fa-solid fa-eye" data-action="revealSecret" aria-pressed="false"
+                    data-tooltip="SENDINGSTONE.Config.Connection.Show"
+                    aria-label="{{localize "SENDINGSTONE.Config.Connection.Show"}}"></button>
+            {{/if}}
+            <button type="button" class="sending-stone-test" data-action="testCampaign">
+                <i class="fa-solid fa-satellite-dish" inert></i>
+                {{localize "SENDINGSTONE.Test.Test"}}
+            </button>
+        </div>
+        <p class="hint">{{localize "SENDINGSTONE.Config.Connection.SecretHint"}}</p>
+    </div>
+    <p class="sending-stone-test-result" data-test-result role="status" aria-live="polite"
+       {{#if campaign.test}}data-state="{{campaign.test.state}}"{{/if}}>{{campaign.test.text}}</p>
+
+    {{#if campaign.status}}
+    <section class="sending-stone-group">
+        <h3 class="sending-stone-group-heading">{{localize "SENDINGSTONE.Config.Connection.Status"}}</h3>
+        <p class="sending-stone-status" data-campaign-status="{{campaign.id}}" role="status" aria-live="polite">
+            {{#each campaign.status as |line|}}<span data-state="{{line.state}}">{{line.text}}</span>{{/each}}
+        </p>
+    </section>
+    {{/if}}
+
+    <p class="hint">
+        {{localize "SENDINGSTONE.Config.General.Address"}}: {{campaign.address}} ·
+        <button type="button" class="sending-stone-link" data-action="view" data-section="general">
+            {{localize "SENDINGSTONE.Config.Connection.ChangeAddress"}}
+        </button>
+    </p>
+
+    <div class="sending-stone-danger">
+        <button type="button" data-action="removeCampaign">
+            <i class="fa-solid fa-trash" inert></i>
+            {{localize "SENDINGSTONE.Config.Connection.Remove"}}
+        </button>
+        <span class="hint">{{localize "SENDINGSTONE.Config.Connection.RemoveHint"}}</span>
+    </div>
+</div>
+{{/if}}

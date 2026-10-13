@@ -1,0 +1,58 @@
+<header class="sending-stone-header sending-stone-header-ruled">
+    <h2 tabindex="-1">{{localize "SENDINGSTONE.Modules.Title"}}</h2>
+    <p class="sending-stone-subtitle">{{localize "SENDINGSTONE.Modules.Subtitle"}}</p>
+</header>
+
+<div class="sending-stone-scroll">
+    <section class="sending-stone-group">
+        <h3 class="sending-stone-group-heading">{{localize "SENDINGSTONE.Modules.Family"}}</h3>
+        {{#each modules.family as |module|}}
+        <article class="sending-stone-card" data-tone="{{module.tone}}">
+            <div class="sending-stone-card-main">
+                <span class="sending-stone-card-icon"><i class="{{module.icon}}" inert></i></span>
+                <div class="sending-stone-card-text">
+                    <strong>{{module.title}}</strong>
+                    {{#if module.hint}}<span class="hint">{{module.hint}}</span>{{/if}}
+                </div>
+                <span class="sending-stone-pill" data-tone="{{module.tone}}">{{module.stateLabel}}</span>
+            </div>
+            {{#if module.unlocks}}
+            <p class="sending-stone-unlocks">
+                <span>{{localize "SENDINGSTONE.Modules.Unlocks"}}</span>
+                {{module.unlocks}}
+            </p>
+            {{/if}}
+        </article>
+        {{/each}}
+    </section>
+
+    <section class="sending-stone-group">
+        <h3 class="sending-stone-group-heading">{{localize "SENDINGSTONE.Modules.WorksWith"}}</h3>
+        {{#each modules.integrations as |module|}}
+        <article class="sending-stone-card">
+            <div class="sending-stone-card-main">
+                <span class="sending-stone-card-icon"><i class="{{module.icon}}" inert></i></span>
+                <div class="sending-stone-card-text">
+                    <strong>{{module.title}}</strong>
+                    <span class="hint">{{module.hint}}</span>
+                </div>
+                <span class="sending-stone-pill" data-tone="{{module.tone}}">{{module.stateLabel}}</span>
+            </div>
+        </article>
+        {{/each}}
+    </section>
+
+    <section class="sending-stone-group">
+        <h3 class="sending-stone-group-heading">{{localize "SENDINGSTONE.Modules.Required"}}</h3>
+        <article class="sending-stone-card">
+            <div class="sending-stone-card-main">
+                <span class="sending-stone-card-icon"><i class="fa-solid fa-book" inert></i></span>
+                <div class="sending-stone-card-text">
+                    <strong>{{modules.system.title}}</strong>
+                    <span class="hint">{{modules.system.hint}}</span>
+                </div>
+                <span class="sending-stone-pill" data-tone="{{modules.system.tone}}">{{modules.system.stateLabel}}</span>
+            </div>
+        </article>
+    </section>
+</div>

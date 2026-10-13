@@ -1,6 +1,6 @@
 import { CHAT_SCOPES, MODULE_ID, SETTINGS } from "./constants.mjs";
 import { announce } from "./bridge.mjs";
-import CampaignConfig from "./apps/campaign-config.mjs";
+import SettingsWindow from "./apps/settings-window.mjs";
 
 const { ArrayField, BooleanField, SchemaField, SetField, StringField } = foundry.data.fields;
 
@@ -13,8 +13,8 @@ export function registerSettings() {
   // several at once sends the listener one fresh state rather than one per setting.
   const reannounce = foundry.utils.debounce(announce, 250);
 
-  // Where events go, and each campaign's secret, are edited in Manage Campaigns, which can test a
-  // campaign's connection before saving. Only the destination's origin is kept.
+  // Every setting is edited in the settings window, which can test a campaign's connection before
+  // saving. Only the destination's origin is kept.
   game.settings.register(MODULE_ID, SETTINGS.DESTINATION, {
     scope: "world",
     config: false,
@@ -43,11 +43,11 @@ export function registerSettings() {
   });
 
   game.settings.registerMenu(MODULE_ID, SETTINGS.CAMPAIGNS_MENU, {
-    name: "SENDINGSTONE.Settings.Campaigns.Name",
-    label: "SENDINGSTONE.Settings.Campaigns.Label",
-    hint: "SENDINGSTONE.Settings.Campaigns.Hint",
-    icon: "fa-solid fa-flag",
-    type: CampaignConfig,
+    name: "SENDINGSTONE.Settings.Menu.Name",
+    label: "SENDINGSTONE.Settings.Menu.Label",
+    hint: "SENDINGSTONE.Settings.Menu.Hint",
+    icon: "fa-solid fa-tower-broadcast",
+    type: SettingsWindow,
     restricted: true
   });
 
@@ -75,57 +75,49 @@ export function registerSettings() {
     default: []
   });
 
+  // What's sent, and how players' attacks are made, are edited in the settings window's General
+  // section rather than Foundry's own list, beside the campaigns they apply to.
   game.settings.register(MODULE_ID, SETTINGS.CHAT_EVENTS, {
-    name: "SENDINGSTONE.Settings.ChatEvents.Name",
-    hint: "SENDINGSTONE.Settings.ChatEvents.Hint",
     scope: "world",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
     onChange: () => reannounce()
   });
 
   game.settings.register(MODULE_ID, SETTINGS.CHAT_SCOPE, {
-    name: "SENDINGSTONE.Settings.ChatScope.Name",
-    hint: "SENDINGSTONE.Settings.ChatScope.Hint",
     scope: "world",
-    config: true,
+    config: false,
     type: String,
     choices: {
-      [CHAT_SCOPES.ALL]: "SENDINGSTONE.Settings.ChatScope.All",
-      [CHAT_SCOPES.CONNECTED]: "SENDINGSTONE.Settings.ChatScope.Connected"
+      [CHAT_SCOPES.ALL]: "SENDINGSTONE.Config.General.ScopeAll",
+      [CHAT_SCOPES.CONNECTED]: "SENDINGSTONE.Config.General.ScopeConnected"
     },
     default: CHAT_SCOPES.ALL,
     onChange: () => reannounce()
   });
 
   game.settings.register(MODULE_ID, SETTINGS.COMBAT_EVENTS, {
-    name: "SENDINGSTONE.Settings.CombatEvents.Name",
-    hint: "SENDINGSTONE.Settings.CombatEvents.Hint",
     scope: "world",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
     onChange: () => reannounce()
   });
 
   game.settings.register(MODULE_ID, SETTINGS.GM_CONTENT, {
-    name: "SENDINGSTONE.Settings.GmContent.Name",
-    hint: "SENDINGSTONE.Settings.GmContent.Hint",
     scope: "world",
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
     onChange: () => reannounce()
   });
 
-  // Only worth showing where Midi-QOL is: without it, attacks and spells always take dnd5e's own
-  // way. Whether they can be made here changes what each campaign is told.
+  // Shown in the settings window only where Midi-QOL is: without it, attacks and spells always take
+  // dnd5e's own way. Whether they can be made here changes what each campaign is told.
   game.settings.register(MODULE_ID, SETTINGS.MIDI_INTEGRATION, {
-    name: "SENDINGSTONE.Settings.MidiIntegration.Name",
-    hint: "SENDINGSTONE.Settings.MidiIntegration.Hint",
     scope: "world",
-    config: game.modules.get("midi-qol")?.active === true,
+    config: false,
     type: Boolean,
     default: true,
     onChange: () => reannounce()
@@ -134,10 +126,8 @@ export function registerSettings() {
   // Midi-QOL targets only tokens the Gamemaster's canvas draws: those on the level and scene they
   // view. Whether a player's use at another is made anyway is checked as it's made.
   game.settings.register(MODULE_ID, SETTINGS.OFF_CANVAS_TARGETS, {
-    name: "SENDINGSTONE.Settings.OffCanvasTargets.Name",
-    hint: "SENDINGSTONE.Settings.OffCanvasTargets.Hint",
     scope: "world",
-    config: game.modules.get("midi-qol")?.active === true,
+    config: false,
     type: Boolean,
     default: false
   });

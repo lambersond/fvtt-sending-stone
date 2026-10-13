@@ -1,112 +1,883 @@
-/* Campaigns dialog ------------------------------------------------------- */
+/* Settings window --------------------------------------------------------- */
 
-/* A world can hold many campaigns and characters; the list scrolls rather than the dialog growing. */
-#sending-stone-campaigns .sending-stone-campaign-list {
-  max-height: 65vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-block: 0.5rem;
+/* Colours follow the theme: tints are the text colour, thinned, so they suit light and dark alike. */
+#sending-stone-settings {
+  --ss-line: color-mix(in srgb, currentColor 16%, transparent);
+  --ss-tint: color-mix(in srgb, currentColor 6%, transparent);
+  --ss-tint-strong: color-mix(in srgb, currentColor 12%, transparent);
+  --ss-accent: var(--color-warm-1, #ee9b3a);
+  /* Accent as text: drawn toward the text colour, so it stays legible on light and dark alike. */
+  --ss-accent-text: color-mix(in srgb, var(--ss-accent) 70%, currentColor);
+  --ss-ok: var(--color-level-success, #3fa860);
+  --ss-warning: var(--color-level-warning, #d9a033);
+  --ss-error: var(--color-level-error, #d9534f);
 }
 
-#sending-stone-campaigns .sending-stone-campaign {
-  margin: 0;
+#sending-stone-settings [hidden] {
+  display: none !important;
 }
 
-#sending-stone-campaigns .sending-stone-characters {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 0.5rem;
+/* The sections down the side, the open one beside them, and Save below both. */
+#sending-stone-settings .window-content {
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
-#sending-stone-campaigns .sending-stone-characters th,
-#sending-stone-campaigns .sending-stone-characters td {
-  padding: 0.25rem 0.5rem;
-  text-align: left;
-  vertical-align: middle;
-}
-
-#sending-stone-campaigns .sending-stone-characters thead th {
-  font-weight: bold;
-  border-bottom: 1px solid var(--color-border-light-tertiary, currentColor);
-}
-
-#sending-stone-campaigns .sending-stone-characters tbody th {
-  font-weight: normal;
-  width: 100%;
-}
-
-#sending-stone-campaigns .sending-stone-characters label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-#sending-stone-campaigns .sending-stone-characters img {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-  border: none;
-  flex: none;
-}
-
-#sending-stone-campaigns .sending-stone-characters td:last-child {
+#sending-stone-settings .sending-stone-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
-/* A campaign's connection test, which can run to several lines of hints. */
-#sending-stone-campaigns .sending-stone-test {
+#sending-stone-settings .untitled {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+#sending-stone-settings .sending-stone-count {
+  font-size: var(--font-size-12, 0.75rem);
+  font-weight: normal;
+  opacity: 0.7;
+}
+
+/* Side ------------------------------------------------------------------- */
+
+#sending-stone-settings .sending-stone-nav {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border-inline-end: 1px solid var(--ss-line);
+  background: var(--ss-tint);
+}
+
+#sending-stone-settings .sending-stone-nav-heading {
+  margin: 0.75rem 0.625rem 0.25rem;
+  padding: 0;
+  border: none;
+  font-size: var(--font-size-11, 0.6875rem);
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+#sending-stone-settings .sending-stone-nav-heading:first-child {
+  margin-top: 0.25rem;
+}
+
+#sending-stone-settings .sending-stone-nav-item {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.625rem;
+  width: 100%;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  margin: 0;
+  padding: 0 0.625rem;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+#sending-stone-settings .sending-stone-nav-item:hover,
+#sending-stone-settings .sending-stone-nav-item[aria-current="page"] {
+  background: var(--ss-tint-strong);
+}
+
+#sending-stone-settings .sending-stone-nav-item[aria-current="page"] {
+  font-weight: bold;
+}
+
+#sending-stone-settings .sending-stone-nav-item > i {
+  width: 1rem;
+  flex: none;
+  margin: 0;
+  text-align: center;
+}
+
+#sending-stone-settings .sending-stone-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sending-stone-settings .sending-stone-new {
+  color: var(--ss-accent-text);
+}
+
+#sending-stone-settings .sending-stone-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ss-ok) 25%, transparent);
+  font-size: var(--font-size-11, 0.6875rem);
+  font-weight: bold;
+}
+
+/* A campaign's state: filled when its events go, a square when they fail, a ring before any are
+   sent, dashed until it's saved. Shapes as well as colours, so neither alone tells them apart. */
+#sending-stone-settings .sending-stone-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0.6;
+}
+
+#sending-stone-settings .sending-stone-dot[data-state="ok"] {
+  border-color: var(--ss-ok);
+  background: var(--ss-ok);
+  opacity: 1;
+}
+
+#sending-stone-settings .sending-stone-dot[data-state="warning"] {
+  border-color: var(--ss-warning);
+  background: var(--ss-warning);
+  opacity: 1;
+}
+
+#sending-stone-settings .sending-stone-dot[data-state="error"] {
+  border-color: var(--ss-error);
+  border-radius: 1px;
+  background: var(--ss-error);
+  opacity: 1;
+}
+
+#sending-stone-settings .sending-stone-dot[data-state="new"] {
+  border-style: dashed;
+  border-color: var(--ss-accent);
+  opacity: 1;
+}
+
+/* The open section ------------------------------------------------------- */
+
+#sending-stone-settings .sending-stone-content {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+#sending-stone-settings .sending-stone-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem 0;
+}
+
+#sending-stone-settings .sending-stone-header-ruled {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--ss-line);
+}
+
+#sending-stone-settings .sending-stone-header h2 {
+  margin: 0;
+  padding: 0;
+  border: none;
+  font-size: var(--font-size-20, 1.25rem);
+}
+
+#sending-stone-settings .sending-stone-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+#sending-stone-settings .sending-stone-subtitle {
+  margin: 0;
+  font-size: var(--font-size-13, 0.8125rem);
+  opacity: 0.75;
+}
+
+#sending-stone-settings .sending-stone-title-row .sending-stone-subtitle {
+  margin-inline-start: auto;
+}
+
+#sending-stone-settings .sending-stone-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--ss-line);
+}
+
+#sending-stone-settings .sending-stone-tabs button {
+  flex: none;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 0 0 -1px;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+#sending-stone-settings .sending-stone-tabs button:hover {
+  opacity: 1;
+}
+
+#sending-stone-settings .sending-stone-tabs button[aria-current="page"] {
+  border-bottom-color: var(--ss-accent);
+  font-weight: bold;
+  opacity: 1;
+}
+
+/* Only the list scrolls, under the section's heading and tools. */
+#sending-stone-settings .sending-stone-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.75rem 1.25rem 1rem;
+}
+
+#sending-stone-settings .sending-stone-scroll > fieldset {
+  margin: 0;
+}
+
+#sending-stone-settings .sending-stone-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem 0;
+}
+
+#sending-stone-settings .sending-stone-toolbar input[type="search"] {
+  flex: 1;
+  min-width: 8rem;
+}
+
+#sending-stone-settings .sending-stone-toolbar > button,
+#sending-stone-settings .sending-stone-empty-actions > button,
+#sending-stone-settings .sending-stone-picker-footer > button,
+#sending-stone-settings .sending-stone-danger > button {
   flex: none;
   width: auto;
   white-space: nowrap;
 }
 
-#sending-stone-campaigns .sending-stone-test-result {
-  white-space: pre-line;
-  margin: 0.25rem 0 0;
+#sending-stone-settings .sending-stone-segmented {
+  display: flex;
+  flex: none;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--ss-tint);
 }
 
-#sending-stone-campaigns .sending-stone-test-result:empty {
-  display: none;
+#sending-stone-settings .sending-stone-segmented button {
+  flex: none;
+  width: auto;
+  height: 1.875rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-13, 0.8125rem);
+  white-space: nowrap;
+  opacity: 0.75;
+  cursor: pointer;
 }
 
-#sending-stone-campaigns .sending-stone-test-result[data-state="ok"] {
-  color: var(--color-level-success, #18520b);
+#sending-stone-settings .sending-stone-segmented button[aria-pressed="true"] {
+  background: var(--ss-tint-strong);
+  font-weight: bold;
+  opacity: 1;
 }
 
-#sending-stone-campaigns .sending-stone-test-result[data-state="error"] {
-  color: var(--color-level-error, #6e0000);
+#sending-stone-settings .sending-stone-link {
+  display: inline;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  color: var(--ss-accent-text);
+  font: inherit;
+  font-weight: bold;
+  line-height: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
-#sending-stone-campaigns .sending-stone-warning {
-  color: var(--color-level-warning, #8a4f00);
+#sending-stone-settings .sending-stone-nested {
+  margin-inline-start: 1.5rem;
 }
 
-/* How a saved campaign's posts and fetches are going, a line each. */
-#sending-stone-campaigns .sending-stone-status {
-  margin: 0.25rem 0 0;
+#sending-stone-settings .form-group.disabled {
+  opacity: 0.55;
 }
 
-#sending-stone-campaigns .sending-stone-status span {
+#sending-stone-settings .sending-stone-warning {
+  margin: 0;
+  color: var(--ss-warning);
+}
+
+#sending-stone-settings .sending-stone-empty {
+  margin: 1rem 0;
+  text-align: center;
+  opacity: 0.75;
+}
+
+/* Pills: a state as words, its colour on a dot beside them. */
+#sending-stone-settings .sending-stone-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--ss-tint-strong);
+  font-size: var(--font-size-12, 0.75rem);
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+#sending-stone-settings .sending-stone-pill:is([data-state], [data-tone])::before {
+  content: "";
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+#sending-stone-settings .sending-stone-pill:is([data-state="ok"], [data-tone="ok"])::before {
+  background: var(--ss-ok);
+  opacity: 1;
+}
+
+#sending-stone-settings .sending-stone-pill:is([data-state="warning"], [data-tone="warning"])::before {
+  background: var(--ss-warning);
+  opacity: 1;
+}
+
+#sending-stone-settings .sending-stone-pill:is([data-state="error"], [data-tone="error"])::before {
+  background: var(--ss-error);
+  opacity: 1;
+}
+
+#sending-stone-settings .sending-stone-pill[data-state="new"]::before {
+  background: var(--ss-accent);
+  opacity: 1;
+}
+
+/* Lists of characters ----------------------------------------------------- */
+
+#sending-stone-settings .sending-stone-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+#sending-stone-settings .sending-stone-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0 0.25rem;
+  border: none;
+  font-size: var(--font-size-13, 0.8125rem);
+  font-weight: bold;
+}
+
+#sending-stone-settings .sending-stone-group-heading > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+#sending-stone-settings .sending-stone-group-heading .sending-stone-count {
+  flex: none;
+}
+
+#sending-stone-settings .sending-stone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#sending-stone-settings .sending-stone-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: 0.25rem 0.375rem 0.25rem 0.5rem;
+  border-radius: 8px;
+  background: var(--ss-tint);
+}
+
+#sending-stone-settings .sending-stone-row img,
+#sending-stone-settings .sending-stone-character img {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  object-fit: cover;
+  border: none;
+  border-radius: 6px;
+}
+
+#sending-stone-settings .sending-stone-row-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#sending-stone-settings .sending-stone-row-name .hint {
+  margin: 0;
+  font-size: var(--font-size-12, 0.75rem);
+}
+
+#sending-stone-settings .sending-stone-chip {
+  max-width: 14rem;
+  overflow: hidden;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ss-tint-strong);
+  font-size: var(--font-size-12, 0.75rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sending-stone-settings .sending-stone-row > button.icon {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+}
+
+#sending-stone-settings .sending-stone-pick {
+  background: none;
+  cursor: pointer;
+}
+
+#sending-stone-settings .sending-stone-pick:hover,
+#sending-stone-settings .sending-stone-pick:has(input:checked:enabled) {
+  background: var(--ss-tint);
+}
+
+#sending-stone-settings .sending-stone-pick input {
+  flex: none;
+  margin: 0;
+}
+
+#sending-stone-settings .sending-stone-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--ss-line);
+  border-radius: 8px;
+  text-align: center;
+}
+
+#sending-stone-settings .sending-stone-empty-state > i {
+  font-size: 1.75rem;
+  opacity: 0.6;
+}
+
+#sending-stone-settings .sending-stone-empty-state p {
+  margin: 0;
+}
+
+#sending-stone-settings .sending-stone-empty-title {
+  font-weight: bold;
+}
+
+#sending-stone-settings .sending-stone-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+#sending-stone-settings .sending-stone-empty-actions select {
+  width: auto;
+}
+
+/* Adding characters: the list in place of the campaign's players, its buttons below. */
+#sending-stone-settings .sending-stone-picker {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#sending-stone-settings .sending-stone-picker-head h3 {
+  flex: 1;
+  margin: 0;
+  border: none;
+  font-size: var(--font-size-16, 1rem);
+}
+
+#sending-stone-settings .sending-stone-picker-head > button.icon {
+  width: 2rem;
+  height: 2rem;
+}
+
+#sending-stone-settings .sending-stone-picker-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-top: 1px solid var(--ss-line);
+}
+
+#sending-stone-settings .sending-stone-picker-footer > span {
+  flex: 1;
+  opacity: 0.8;
+}
+
+/* Roster ----------------------------------------------------------------- */
+
+#sending-stone-settings .sending-stone-roster {
+  width: 100%;
+  margin: 0;
+  border: none;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: none;
+  font-size: var(--font-size-13, 0.8125rem);
+}
+
+#sending-stone-settings .sending-stone-roster :is(th, td) {
+  padding: 0.375rem 0.5rem;
+  border: none;
+  border-bottom: 1px solid var(--ss-line);
+  background: none;
+  text-align: start;
+  vertical-align: middle;
+}
+
+#sending-stone-settings .sending-stone-roster thead th {
+  font-weight: bold;
+  opacity: 0.85;
+}
+
+#sending-stone-settings .sending-stone-roster tbody th {
+  font-weight: normal;
+}
+
+#sending-stone-settings .sending-stone-roster tbody tr:hover > * {
+  background: var(--ss-tint);
+}
+
+#sending-stone-settings .sending-stone-roster .sending-stone-roster-campaign {
+  width: 7.5rem;
+  text-align: center;
+}
+
+#sending-stone-settings .sending-stone-roster-title {
+  display: block;
+  max-width: 7.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sending-stone-settings .sending-stone-roster-campaign .sending-stone-count {
   display: block;
 }
 
-#sending-stone-campaigns .sending-stone-status [data-state="ok"] {
-  color: var(--color-level-success, #18520b);
+#sending-stone-settings .sending-stone-roster .sending-stone-cell {
+  text-align: center;
 }
 
-#sending-stone-campaigns .sending-stone-status [data-state="warning"] {
-  color: var(--color-level-warning, #8a4f00);
+#sending-stone-settings .sending-stone-cell input {
+  margin: 0;
 }
 
-#sending-stone-campaigns .sending-stone-status [data-state="error"] {
-  color: var(--color-level-error, #6e0000);
+#sending-stone-settings .sending-stone-character {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-#sending-stone-campaigns .sending-stone-status [data-state="idle"] {
+#sending-stone-settings .sending-stone-character img {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 4px;
+}
+
+#sending-stone-settings .sending-stone-owner {
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+/* Modules ---------------------------------------------------------------- */
+
+#sending-stone-settings .sending-stone-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--ss-tint);
+}
+
+#sending-stone-settings .sending-stone-card[data-tone="ok"] {
+  border-color: color-mix(in srgb, var(--ss-ok) 40%, transparent);
+}
+
+#sending-stone-settings .sending-stone-card-main {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+#sending-stone-settings .sending-stone-card-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  background: var(--ss-tint-strong);
+  font-size: 1.125rem;
+}
+
+#sending-stone-settings .sending-stone-card-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+#sending-stone-settings .sending-stone-card-text .hint {
+  margin: 0;
+}
+
+#sending-stone-settings .sending-stone-unlocks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: var(--ss-tint);
+  font-size: var(--font-size-13, 0.8125rem);
+}
+
+#sending-stone-settings .sending-stone-unlocks > span:first-child {
+  opacity: 0.7;
+}
+
+/* Player actions: who rolls the dice ------------------------------------- */
+
+#sending-stone-settings .sending-stone-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+#sending-stone-settings .sending-stone-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--ss-line);
+  border-radius: 10px;
+  background: var(--ss-tint);
+  cursor: pointer;
+}
+
+#sending-stone-settings .sending-stone-choice.selected {
+  border-color: var(--ss-accent);
+}
+
+#sending-stone-settings .sending-stone-choice.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#sending-stone-settings .sending-stone-choice input {
+  flex: none;
+  margin: 2px 0 0;
+}
+
+#sending-stone-settings .sending-stone-choice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+#sending-stone-settings .sending-stone-choice-text strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#sending-stone-settings .sending-stone-choice-text .hint,
+#sending-stone-settings .sending-stone-dice-note {
+  margin: 0;
+}
+
+#sending-stone-settings .sending-stone-dice-note {
+  margin-top: 0.625rem;
+}
+
+/* Connection ------------------------------------------------------------- */
+
+/* A campaign's connection test, which can run to several lines of hints. */
+#sending-stone-settings .sending-stone-test {
+  flex: none;
+  width: auto;
+  white-space: nowrap;
+}
+
+#sending-stone-settings .form-fields > button.icon {
+  flex: none;
+}
+
+#sending-stone-settings .sending-stone-test-result {
+  margin: 0;
+  white-space: pre-line;
+}
+
+#sending-stone-settings .sending-stone-test-result:empty {
+  display: none;
+}
+
+#sending-stone-settings .sending-stone-test-result[data-state="ok"] {
+  color: var(--ss-ok);
+}
+
+#sending-stone-settings .sending-stone-test-result[data-state="error"] {
+  color: var(--ss-error);
+}
+
+/* How a saved campaign's posts and fetches are going, a line each. */
+#sending-stone-settings .sending-stone-status {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border-radius: 8px;
+  background: var(--ss-tint);
+}
+
+#sending-stone-settings .sending-stone-status span {
+  display: block;
+}
+
+#sending-stone-settings .sending-stone-status [data-state="ok"] {
+  color: var(--ss-ok);
+}
+
+#sending-stone-settings .sending-stone-status [data-state="warning"] {
+  color: var(--ss-warning);
+}
+
+#sending-stone-settings .sending-stone-status [data-state="error"] {
+  color: var(--ss-error);
+}
+
+#sending-stone-settings .sending-stone-status [data-state="idle"] {
   opacity: 0.75;
+}
+
+#sending-stone-settings .sending-stone-danger {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+#sending-stone-settings .sending-stone-danger > button {
+  color: var(--ss-error);
+}
+
+#sending-stone-settings .sending-stone-danger .hint {
+  margin: 0;
+}
+
+/* Footer ----------------------------------------------------------------- */
+
+#sending-stone-settings .sending-stone-footer {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--ss-line);
+}
+
+#sending-stone-settings .sending-stone-dirty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.7;
+}
+
+#sending-stone-settings .sending-stone-dirty[data-dirty="true"] {
+  opacity: 1;
+}
+
+#sending-stone-settings .sending-stone-dirty[data-dirty="true"]::before {
+  content: "";
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--ss-accent);
+}
+
+#sending-stone-settings .sending-stone-footer > button {
+  flex: none;
+  width: auto;
+  min-width: 10rem;
 }
 
 /* Chat ------------------------------------------------------------------- */

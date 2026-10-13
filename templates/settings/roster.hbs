@@ -1,0 +1,70 @@
+<header class="sending-stone-header">
+    <div class="sending-stone-title-row">
+        <h2 tabindex="-1">{{localize "SENDINGSTONE.Config.Roster.Title"}}</h2>
+        <span class="sending-stone-subtitle">{{roster.summary}}</span>
+    </div>
+</header>
+
+{{#if roster.rows.length}}
+<div class="sending-stone-toolbar">
+    <input type="search" data-filter="roster" value="{{roster.filter}}"
+           placeholder="{{localize "SENDINGSTONE.Config.Filter"}}"
+           aria-label="{{localize "SENDINGSTONE.Config.Filter"}}">
+    <div class="sending-stone-segmented" role="group" aria-label="{{localize "SENDINGSTONE.Config.Show"}}">
+        <button type="button" data-action="filterScope" data-filter-scope="rosterScope" data-value="everyone"
+                aria-pressed="{{#if roster.unassignedOnly}}false{{else}}true{{/if}}">
+            {{localize "SENDINGSTONE.Config.Roster.Everyone"}}
+        </button>
+        <button type="button" data-action="filterScope" data-filter-scope="rosterScope" data-value="unassigned"
+                aria-pressed="{{#if roster.unassignedOnly}}true{{else}}false{{/if}}" data-unassigned-count>
+            {{roster.unassignedLabel}}
+        </button>
+    </div>
+</div>
+{{/if}}
+
+<div class="sending-stone-scroll" data-filter-list="roster">
+    {{#if roster.rows.length}}
+    {{#if roster.campaigns.length}}
+    <table class="sending-stone-roster">
+        <thead>
+            <tr>
+                <th scope="col">{{localize "SENDINGSTONE.Config.Roster.Character"}}</th>
+                <th scope="col">{{localize "SENDINGSTONE.Config.Roster.Player"}}</th>
+                {{#each roster.campaigns as |campaign|}}
+                <th scope="col" class="sending-stone-roster-campaign">
+                    <span class="sending-stone-roster-title" data-campaign-title="{{campaign.id}}"
+                          data-tooltip="{{campaign.title}}">{{campaign.title}}</span>
+                    <span class="sending-stone-count" data-campaign-count="{{campaign.id}}">{{campaign.count}}</span>
+                </th>
+                {{/each}}
+            </tr>
+        </thead>
+        <tbody>
+            {{#each roster.rows as |row|}}
+            <tr data-search="{{row.search}}" data-unassigned="{{row.unassigned}}" data-actor-id="{{row.id}}">
+                <th scope="row">
+                    <span class="sending-stone-character">
+                        <img src="{{row.img}}" alt="">
+                        <span>{{row.name}}</span>
+                    </span>
+                </th>
+                <td class="sending-stone-owner">{{row.group}}</td>
+                {{#each row.cells as |cell|}}
+                <td class="sending-stone-cell">
+                    <input type="checkbox" name="roster.{{cell.campaignId}}.{{row.id}}" aria-label="{{cell.label}}"
+                           {{#if cell.checked}}checked{{/if}}>
+                </td>
+                {{/each}}
+            </tr>
+            {{/each}}
+        </tbody>
+    </table>
+    <p class="sending-stone-empty" data-filter-empty hidden>{{localize "SENDINGSTONE.Config.NoMatch"}}</p>
+    {{else}}
+    <p class="sending-stone-empty">{{localize "SENDINGSTONE.Config.Roster.NoCampaigns"}}</p>
+    {{/if}}
+    {{else}}
+    <p class="sending-stone-empty">{{localize "SENDINGSTONE.Config.NoCharacters"}}</p>
+    {{/if}}
+</div>
