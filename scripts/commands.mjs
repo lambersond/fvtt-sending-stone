@@ -2,6 +2,7 @@ import { ATTACK_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_
 import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
+import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
@@ -9,7 +10,7 @@ import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } fr
 import { diceStatus } from "./dice-plan.mjs";
 import { prompting } from "./prompts.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
-import { currentSession, send } from "./transport.mjs";
+import { currentSession, DeliveryError, refusalError, send } from "./transport.mjs";
 
 /**
  * Fetching what players ask the game to do from the Sending Stone app: their rolls, their attacks,
@@ -21,6 +22,11 @@ import { currentSession, send } from "./transport.mjs";
  * at once, saying how long to wait before fetching again. Only an app that says, in its answer to
  * a campaign's hello or heartbeat, that it has commands is fetched from: an older one would refuse
  * the fetch in a way a browser can't tell from the app being unreachable.
+ *
+ * A fetch the app refuses as the campaign is set up, as for a wrong secret or one it couldn't
+ * read, isn't made again until the settings change or the campaign's hello is sent; one that may
+ * work later, as with the app unreachable, is, after a while. Since 0.23.0 the Gamemaster is told
+ * of either, as delivery-status.mjs tells them of a post's failure.
  */
 
 /**
@@ -68,6 +74,12 @@ const offered = new Set();
 const refused = new Set();
 
 /**
+ * The reasons a fetch fails for that may not last, after which it's made again, after a while.
+ * @type {Set<string>}
+ */
+const PASSING = new Set(["unreachable", "timeout", "unavailable", "rateLimited"]);
+
+/**
  * Each campaign's poller, while it runs, by campaign id.
  * @type {Map<string, Poller>}
  */
@@ -103,16 +115,17 @@ const queues = new Map();
  * activities are made here. And, from module 0.21.0, that more dice and another die change only a
  * die the damage adds, never one it takes away, which previews mark (`signedDice`); from 0.22.0,
  * that a use may be made at its user, `self`, beside those picked, wherever uses are made
- * (`selfTargets`).
+ * (`selfTargets`); and from 0.23.0, that a command may say it's the Gamemaster's, `by`, made as
+ * the character's and marked as theirs, wherever rolls are made (`gmRolls`).
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
- *   selfTargets: boolean}}
+ *   selfTargets: boolean, gmRolls: boolean}}
  */
 export function rollFeatures(campaign) {
   const off = {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
-    signedDice: false, selfTargets: false
+    signedDice: false, selfTargets: false, gmRolls: false
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -131,7 +144,8 @@ export function rollFeatures(campaign) {
     prompts: prompting(campaign),
     activityChecks: checksOffered(),
     signedDice: true,
-    selfTargets: attacks
+    selfTargets: attacks,
+    gmRolls: true
   };
 }
 
@@ -177,6 +191,17 @@ export function syncPollers({ retry=false }={}) {
  */
 export function stopPollers() {
   for ( const poller of pollers.values() ) poller.stop();
+}
+
+/**
+ * Does a fetch that failed for this reason stop fetching for its campaign? Every refusal does
+ * that isn't retried, until the settings change or its hello is sent: as it's set up, the next
+ * fetch would be refused too.
+ * @param {string} reason   One of delivery-status.mjs's REASONS.
+ * @returns {boolean}
+ */
+export function stopsFetching(reason) {
+  return !PASSING.has(reason);
 }
 
 /* -------------------------------------------- */
@@ -232,16 +257,19 @@ class Poller {
       try {
         answer = await this.#fetch(campaign);
         failures = 0;
+        noteFetched(campaign.id);
       } catch (err) {
         if ( this.stopped ) break;
+        failures++;
         // The app won't take this campaign's fetch as it's set up: not until the settings change.
-        if ( [401, 403, 404].includes(err?.status) ) {
-          console.warn(`${MODULE_ID} | The app refused to send ${campaign.title}'s rolls: HTTP ${err.status}`);
+        const stop = stopsFetching(err?.reason);
+        noteFetchFailed(campaign, err, { stopped: stop, failures });
+        if ( stop ) {
+          console.warn(`${MODULE_ID} | The app refused to send ${campaign.title}'s rolls: ${err?.message ?? err}`);
           refused.add(this.campaignId);
           break;
         }
-        await this.#pause(BACKOFF[Math.min(failures, BACKOFF.length - 1)]);
-        failures++;
+        await this.#pause(BACKOFF[Math.min(failures - 1, BACKOFF.length - 1)]);
         continue;
       }
       // The Gamemaster may have changed the campaign while the fetch was held open: its commands are
@@ -257,11 +285,14 @@ class Poller {
    * Fetch the campaign's commands once.
    * @param {Campaign} campaign
    * @returns {Promise<{commands: object[], wait: number}>}
-   * @throws {Error}   With the HTTP `status`, if the app answered with an error.
+   * @throws {DeliveryError}   Saying why, as a post's does.
    */
   async #fetch(campaign) {
     const destination = parseDestination(getDestination());
-    if ( !destination ) throw new Error("No destination");
+    const network = (key, reason, cause) => new DeliveryError(game.i18n.localize(`SENDINGSTONE.Error.${key}`), {
+      retryable: true, reason, cause
+    });
+    if ( !destination ) throw network("InvalidDestination", "unreachable");
     const headers = { "Content-Type": "application/json" };
     const secret = getSecret(campaign.id);
     if ( secret ) headers.Authorization = `Bearer ${secret}`;
@@ -270,21 +301,34 @@ class Poller {
     this.controller = controller;
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
     try {
-      const response = await fetch(commandsUrl(destination), {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          protocol: PROTOCOL_VERSION,
-          session: currentSession(),
-          campaign: describeCampaign(campaign)
-        }),
-        mode: "cors",
-        credentials: "omit",
-        cache: "no-store",
-        signal: controller.signal
-      });
-      if ( !response.ok ) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
-      const answer = await response.json();
+      let response;
+      try {
+        response = await fetch(commandsUrl(destination), {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            protocol: PROTOCOL_VERSION,
+            session: currentSession(),
+            campaign: describeCampaign(campaign)
+          }),
+          mode: "cors",
+          credentials: "omit",
+          cache: "no-store",
+          signal: controller.signal
+        });
+      } catch (err) {
+        // Given up on after 35 seconds, unless it was stopped, which is no failure.
+        const timeout = ["AbortError", "TimeoutError"].includes(err?.name);
+        throw network(timeout ? "Timeout" : "Network", timeout ? "timeout" : "unreachable", err);
+      }
+      if ( !response.ok ) throw await refusalError(response, { secret });
+      let answer;
+      try {
+        answer = await response.json();
+      } catch (err) {
+        // Something other than the app answered, as at a wrong address.
+        throw network("Network", "unreachable", err);
+      }
       const commands = Array.isArray(answer?.commands) ? answer.commands : [];
       return {
         commands: commands.filter(command => command && (typeof command === "object")),

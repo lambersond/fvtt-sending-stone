@@ -25,7 +25,40 @@ Authorization: Bearer <the campaign's secret>     (only when one is configured)
 | `408`, `425`, `429`, any `5xx`, no answer, or no answer within 10 s | Retried after 1 s, then again after 3 s, with the same envelope. Dropped after the third failure. |
 | Any other status, such as `400` or `401` | Dropped immediately. |
 
-The Gamemaster is warned once when deliveries start failing and told when they recover.
+**Refusals.** Since module 0.23.0 the module reads why a post was refused, which the Sending Stone
+app says in a JSON body beside the status: `{"reason": "notSetUp", "message": "No campaign titled
+“Curse of Strahd” is set up for https://my-game.forge-vtt.com in Sending Stone"}`, with what more it
+has to say. It words each reason itself, and uses `message` only for a reason it doesn't know.
+
+| Status | `reason` | `message` | More |
+| --- | --- | --- | --- |
+| `401` | `noSecret` | `Send the campaign’s secret` | |
+| `401` | `wrongSecret` | `The secret isn’t this campaign’s in Sending Stone` | |
+| `403` | `notForge` | `Only games on The Forge are accepted` | |
+| `404` | `notSetUp` | `No campaign titled “<title>” is set up for <origin> in Sending Stone` | |
+| `413` | `tooLarge` | `Larger than the <limit> bytes Sending Stone takes` | `limit`, in bytes |
+| `400` | `badEnvelope` | `Not a Sending Stone envelope`; for a fetch, `Not a Sending Stone fetch` | |
+| `400` | `unsupportedProtocol` | `Unsupported protocol <n>` | `protocol`, the one it takes |
+| `400` | `malformed` | `No campaign for <type>`, or `Malformed <type>` | `type`; `detail`, what was wrong |
+| `500` | `unavailable` | `Sending Stone couldn’t take this just now` | |
+
+The status alone still decides retrying; a listener answering plain text or nothing needs no
+change. Without a reason, the module goes by the status: a `401` is `noSecret` if it sent no
+secret, `wrongSecret` if it did; a `403` or `404` is `notForge` or `notSetUp` if its text says
+nothing else, or starts as the app's did before ("Only games", "No campaign"); a `413` is
+`tooLarge`, a `400` `malformed`, a `408` `timeout`, a `425` or `429` `rateLimited`, and a `5xx`
+`unavailable`; no answer is `unreachable`, or `timeout` after 10 s; and anything else, or a
+reason it doesn't know, is `status`.
+
+The Gamemaster is told what went wrong and what to do once per cause, not once per post: once for
+the app's address, however many campaigns fail (no answer, a `5xx`, a game not on The Forge…);
+once for each campaign (no secret, the wrong one, not set up); and once a page load for each
+campaign and kind of event (too large, malformed), which never fails the connection. A cause is
+told again only once it has been gone ten minutes, since it was told or last cleared, should it
+come back, so one that comes and goes is told once; and when it clears, as the next post gets
+through (for the app's address, the next of each campaign whose posts failed for it), the
+Gamemaster is told so, if they were told of it. Manage Campaigns shows each campaign's status, as
+the browser sending events has it.
 
 The request comes from the Gamemaster's **browser**, so the listener must handle CORS. Answer the
 `OPTIONS` preflight with `Access-Control-Allow-Origin` (the Foundry origin, or `*`),
@@ -298,7 +331,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
     }
   ],
   "favorites": [
-    { "type": "resource", "id": "primary", "name": "Superiority Dice", "uses": { "value": 3, "max": 4, "recovery": "Short Rest" } },
+    { "type": "resource", "id": "primary", "name": "Superiority Dice", "uses": { "value": 3, "max": 4, "recovery": "Short Rest" }, "itemId": null },
     { "type": "item", "id": "hR4cT7mWp2qLs9vB", "itemType": "weapon", "name": "Warhammer", "img": "icons/weapons/hammers/hammer-war.webp" },
     {
       "type": "activity", "id": "cAsTfIrEbAlL0001", "itemId": "sT4fFoFfIrE00001", "itemType": "weapon", "itemName": "Staff of Fire",
@@ -347,7 +380,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `deathSaves` | `{ success, failure }`, or `null`. |
 | `details` | `about`, `{ id, label, value }` for alignment, age and the like that are filled in; `personality`, likewise, for personality traits, ideals, bonds and flaws; `appearance`; `xp`, `{ value, max }`, `max` being `null` at the highest level; and `biography`, a description's hash. |
 | `actions` | What the character can do in a fight, listed as Tidy 5e's Actions tab lists it by default: equipped weapons; equipped equipment and consumables used in a fight, not over minutes or more; spells that can be cast now and deal damage, are cast as a bonus action or reaction, last a minute or a round, or apply effects; and features that are activated. An item a player added to Tidy 5e's list, or took off it, is listed or not as they chose. Since module 0.15.0 the spells an item casts with its Cast activities are cast from the item, and the copies of them dnd5e keeps aren't listed; an item Tidy 5e's rules leave off the list is still listed for the spells it casts, unless the player took it off. Sections are by activation, in Tidy 5e's order: `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"`, `"special"`, `"other"` for any other, then any the player named in Tidy 5e, whose `id` and `label` are its name. Empty sections are left out. Since module 0.15.0 an item is listed in each section for how its activities are activated, such as a staff that strikes as an action and casts Silvery Barbs as a reaction, under `"action"` and under `"reaction"`, each time with the activities activated that way; an activity with no activation of its own, or a special one, used along with another, such as Hex's Bonus Hex Damage, goes with the item's first. An item the player gave a section of its own, or one not identified yet, is listed once, with all its activities, or for one Tidy 5e's rules leave off the list, all the spells it casts. Before, an item was listed once, by its first activity's activation. |
-| `favorites` | What dnd5e's sheet shows under Favorites, and Tidy 5e in its own, in its order: the old-style resources (`"resource"`) that are named and have a maximum, then what the player made a favorite, in their order. Each has a `type` and an `id` that refers to what the sheet lists elsewhere, where it lists it, and a `name`. An `"item"`'s `id` is the item's, as in `inventory`, `spells`, `features` and `actions`, with its `itemType` and `img`. An `"activity"`, one of an item's activities, has the item's `itemId`, `itemType` and `itemName`, its own `name` and `img`, and `activation`, `range`, `target`, `toHit`, `save`, `damage` and `uses` as on an action, for that activity alone, with its own id as `attackId`, and its `attackModes` and `ammunition`, when it's an attack, and itself as `activity` when it's a save, damage, healing or utility activity, or since module 0.21.0 a check or enchant activity, and `consumesSlot`, `check` and `forward` as on an action; an item not identified yet keeps them back, as on an action. An `"effect"`'s `id` is as in `effects`, with its `img`, whether it's `disabled`, and whether it's `suppressed`. A `"skill"`'s `id` is as in `skills`. A `"tool"` has its `ability`, its `total` modifier, `passive` score, `proficiency` and roll `mode`, as a skill has, and as in `tools` since module 0.18.0. A `"slots"`'s `id` is as in `spells`, with `value`, `max` and `level` as a section's `slots`. A `"resource"` has `uses` as on a feature. A favorite that refers to nothing any longer, or to what a player doesn't see, such as an item hidden from the sheet or an effect of an item not yet identified, is left out. |
+| `favorites` | What dnd5e's sheet shows under Favorites, and Tidy 5e in its own, in its order: the old-style resources (`"resource"`) that are named and have a maximum, then what the player made a favorite, in their order. Each has a `type` and an `id` that refers to what the sheet lists elsewhere, where it lists it, and a `name`. An `"item"`'s `id` is the item's, as in `inventory`, `spells`, `features` and `actions`, with its `itemType` and `img`. An `"activity"`, one of an item's activities, has the item's `itemId`, `itemType` and `itemName`, its own `name` and `img`, and `activation`, `range`, `target`, `toHit`, `save`, `damage` and `uses` as on an action, for that activity alone, with its own id as `attackId`, and its `attackModes` and `ammunition`, when it's an attack, and itself as `activity` when it's a save, damage, healing or utility activity, or since module 0.21.0 a check or enchant activity, and `consumesSlot`, `check` and `forward` as on an action; an item not identified yet keeps them back, as on an action. An `"effect"`'s `id` is as in `effects`, with its `img`, whether it's `disabled`, and whether it's `suppressed`. A `"skill"`'s `id` is as in `skills`. A `"tool"` has its `ability`, its `total` modifier, `passive` score, `proficiency` and roll `mode`, as a skill has, and as in `tools` since module 0.18.0. A `"slots"`'s `id` is as in `spells`, with `value`, `max` and `level` as a section's `slots`. A `"resource"` has `uses` as on a feature, and, from module 0.23.0, `itemId`: the feature it stands for, by its id in `features` and `actions`, or `null`: the feature whose name is the resource's, compared without case, spacing or curly apostrophes, preferring one that spends it; or else the only feature whose activity spends it (an `attribute` consumption target `resources.<id>.value`, on an activity its player sees). A feature stands for one resource at most. A favorite that refers to nothing any longer, or to what a player doesn't see, such as an item hidden from the sheet or an effect of an item not yet identified, is left out. |
 | `actions[].actions` | Items, in the order the player keeps them. `activation`, `range` (for a weapon, its reach or range, such as `"reach 5 ft or range 20/60 ft"`) and `target` are dnd5e's labels; `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save` and `damage` are its first activity's, in dnd5e's order, but for a spell, after its other activities its checks that have no activation of their own, such as the 2014 Entangle's Escape Plants; and a forward that repeats an earlier one, used through the same activity for the same cost, of uses they share, is left out (module 0.21.0), as [below](#what-an-item-rolls): `toHit` the bonus to hit of an attack, without any dice in it, as dnd5e's sheets show it; `attackId` the attack activity's id, so that the app can have the attack [made in the game](#attacks), `null` for any other; `activity` the activity itself, for one [used in the game](#spells-and-features) other than by attacking, `{ id, type, targets }`: `type` being `"save"`, `"damage"`, `"heal"` or `"utility"`, or since module 0.21.0 `"check"` or `"enchant"`, and for a forward that of the activity it's used through, and `targets`, `{ self, area, count, perLevel, affects, fromSelf }`, whom it's used at: `self` its user alone, `area` everyone in an area, `count` the most targets it takes, or `null` for no limit, `perLevel` how many more a spell takes for each level it's cast above its own, as Bless does, or `null`, for a spell cast from an item since module 0.20.0 for each level above the one it's cast at, its `cast`'s `level`, and `affects` dnd5e's kind of target, such as `"ally"`, `"enemy"`, `"creature"` or `"willing"`, or `null`, and since module 0.22.0 `fromSelf`, whether its range is Self, as a potion's or Wild Shape's, which may still name a creature, for the app to offer its user among its targets, [`self`](#spells-and-features) (left out before, where an action's `range` of `"Self"` says the same); and for an `"enchant"`, since module 0.21.0, `enchant`, what it may enchant, and with what, as [below](#what-an-item-rolls); `null` for any other; `attackModes` the ways its attack is made, each `{ value, label }`, such as one- or two-handed, or thrown, when there's more than one, otherwise `null`; `ammunition` what its attack fires, each `{ id, name, quantity }` the character has, for a weapon that fires ammunition, otherwise `null`; `save`, `{ ability, dc }`, the saving throw it calls for, `ability` being `"DC"` when the target chooses among several; `damage` its damage or healing as dnd5e labels it, each part `{ formula, type, healing }` with the ability modifier in the formula; `consumesSlot` `false` for a spell's activity used without spending a spell slot, and otherwise left out (module 0.14.0); `attackArea` and `rollFormula` for an attack at an area and a utility with a roll of its own, as [below](#what-an-item-rolls), and otherwise left out (module 0.16.0); `check` and `forward` for a check activity and a forward, as [below](#what-an-item-rolls), and otherwise left out (module 0.21.0); `activities` each of its activities, for an item with more than one (module 0.14.0): since module 0.15.0, those activated as its section has it, and those even when there's one, where the item is listed in other sections too; `uses` as on a feature, the first activity's when the item has none: since module 0.15.0, that of the first activity it's listed for, or for one that casts a spell, those casting it spends; `level` a spell's, `0` for a cantrip, otherwise `null`; `castFrom` as on a spell, `null` for anything but a spell. Since module 0.15.0, an item listed in a section for an activity other than its first names it, `activityName`, such as `"Silvery Barbs"`, and is otherwise without; `activationType` is the kind of action its first activity there is activated with, as a section's `id` names it, `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"` or `"special"`, where it takes just one, Midi-QOL's kinds of reaction being `"reaction"`, or `null` for any other, such as two actions, a Legendary Action that costs two, a minute or a long rest; `consumable` is `true` for one of the consumables: an item dnd5e's inventory has among them, such as a potion, a scroll or a wand, or another whose uses never come back, and otherwise left out; and `cast` and `spellId`, for one that casts a spell, as [below](#what-an-item-rolls). An item not identified yet has no `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save`, `damage`, `attackArea`, `rollFormula`, `check`, `forward`, `activities`, `uses`, `activityName`, `consumable`, `cast` or `spellId`. |
 | `enchantments` | Since module 0.21.0, on an inventory item, a container's contents included, a spell, a feature or an action: the enchantments an [enchant activity](#enchantments) applied to it, the character's own or anyone else's, up to 50, each `{ id, name, source, concentration, duration, expired, endable }`: `id` the enchantment's id on that item; `name` its own, such as `"Magic Weapon, +1"`; `source` the name of the item whose activity applied it, as its player knows it: without its enchantments, such as `"Magic Weapon"`, or for one not identified yet, the name dnd5e gives it then; or `null` where that can't be found, as a magic item's template from a compendium or a used-up scroll; `concentration` whether it lasts as long as a concentration, as one cast with it does; `duration` the time it has left, as an effect's, or `null`; `expired` whether its time has run out, as dnd5e 5 leaves one on its item; and `endable` whether its player may [end it](#enchantments) from the app, as the item's owner may in Foundry: one an enchant activity applied that a player could use from the app, whoever's it is, the character's own or another's, such as an ally's Magic Weapon on their club; or one whose activity is gone, as a used-up scroll's or oil's, that lasts only a while, or as long as a concentration. Not a magic item's template's, a choice made once, or one whose activity is gone that lasts for good. The changes dnd5e makes to the copy of a spell an item casts, which no enchant activity applied, aren't listed. Left out where there are none. One dnd5e hides from players isn't listed, but on an item not identified yet, one the character cast on it from another item of theirs that is, as Darkness on a ring; never one the item applies to itself, which would tell what it is, as a Flame Tongue's Ablaze. The item's `name` is as its enchantments make it, such as `"Longsword, +1"`. |
 | `text` | A [description](#descriptions)'s hash, or `null` if there is none. |
@@ -692,6 +725,7 @@ app](#descriptions-that-roll):
 | `rolls` | Every roll in the message, as below. |
 | `system` | The subtype's data for any `type` other than `"base"`, else `null`. |
 | `dnd5e` | Under dnd5e, what the system recorded about the message, as below. Otherwise `null`. |
+| `gmRoll` | Since module 0.23.0, on a message flagged as made for a roll the campaign's Gamemaster made in the app as a character (`flags["sending-stone"].by` `"gm"`, see [Making a roll](#making-a-roll)), that roll's `id`: the roll it was made for, the use whose card it is, or the death save whose outcome it tells. Left out on any other. The message's author, a player, may change its flags, so it's a claim, which a listener checks against the rolls it handed over as the Gamemaster's. A player can copy a real one onto a message of their own too, so the app takes it only on a message spoken by the character the roll was made as, and only while the roll is being made: the module sends the messages a roll makes before the [`command.result`](#commandresult) that says it was made. |
 
 A roll:
 
@@ -810,7 +844,7 @@ the destination, the campaigns or any event setting changes.
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Make Players' Attacks and Spells Through Midi-QOL** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. See [Rolls from the app](#rolls-from-the-app). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Make Players' Attacks and Spells Through Midi-QOL** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign: since module 0.22.0 without its `sheet`, which follows in `character.updated`. |
 | `sheetsApart` | `true` since module 0.22.0: the characters carry no sheets, and each follows once the hello is answered. Absent before, when each carried its sheet. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
@@ -878,7 +912,9 @@ sign.
 **Test** button in Manage Campaigns, with the address, title and secret as typed, which may not
 have been saved, and from a browser that may not be the one sending events. It names the campaign
 tested: answer `2xx` if the secret is that campaign's, `404` if no campaign with its title is set
-up, and `401` for the wrong secret. Store nothing. Modules before 0.4.0 sent it with
+up, and `401` for the wrong secret, or none: since module 0.23.0, **Test** says what the
+[refusal's](#transport) `reason` (`notSetUp`, `wrongSecret`, `noSecret`, or any other) means, and
+what to do. Store nothing. Modules before 0.4.0 sent it with
 `campaign: null`, testing the one secret they had.
 
 ### `command.result`
@@ -1205,6 +1241,28 @@ A prompt:
   too. A listener before 0.22.0, which takes a hello's characters without sheets as having none, is
   sent every sheet again, full and at most 1,000,000 bytes, in the posts after the hello, with the
   descriptions before each.
+- Module 0.23.0 says which feature each old-style resource stands for: a `"resource"` favorite has
+  `itemId`, the id of the feature in [`features` and `actions`](#character-sheet) it stands for, or
+  `null` for none: one of its name, compared without case, spacing or curly apostrophes, preferring
+  one that spends it, or else the only feature that spends it. A listener that reads no `itemId`
+  shows the resource as before; one that reads it shows the feature's row with the resource's
+  count, and where `itemId` is missing, from an older module, may match names itself. A slim sheet
+  has it as a full one does, and the hello says nothing new: the field is its own sign.
+
+  Module 0.23.0 makes the rolls a campaign's Gamemaster makes from the app as one of its characters
+  where the hello's new `gmRolls` says so (`true` wherever `enabled`). Such a roll says `by: "gm"`
+  and is made as any other, as the same user; every message it makes (dnd5e 5.3's death outcome
+  too, as `outcome`) is flagged `flags["sending-stone"].by` `"gm"`, marked "GM" on its card, and
+  sent with `gmRoll`, the roll's id. Another `by`, or `"gm"` on `endEnchantment`, is `"invalid"`
+  (`error` `"by"`). A module before 0.23.0 ignores `by`, so a listener sends it only to the session
+  whose hello said `gmRolls`; one that sends none needs no change.
+
+  Module 0.23.0 reads a refusal's JSON [`reason`](#transport), or its status and text from an older
+  app, and tells the Gamemaster what went wrong and what to do once per cause, rather than once as
+  deliveries start failing and again as they recover, which a campaign refused beside one that
+  isn't made alternate; Manage Campaigns shows each campaign's status. Retrying is as before, but
+  that a fetch of rolls refused with any status not retried stops. It sends nothing new: no field,
+  header or parameter, so a listener that answers in text or with nothing needs no change.
 
 ## Changes from protocol 1
 
@@ -1268,8 +1326,12 @@ Answer it as an event, CORS included, with the campaign's waiting rolls:
 Hold a fetch open, for up to 30 seconds, while a roll may come, so that it reaches the game at
 once; and otherwise answer at once with a `wait`. The module gives a fetch up after 35 seconds.
 After a failed fetch it waits 2 seconds, then twice as long after each failure in a row, up to a
-minute. A `401`, `403` or `404` stops fetching for the campaign until the settings change or the
-listener asks for a hello.
+minute, when it failed for a reason that may pass: `unreachable`, `timeout`, `unavailable` or
+`rateLimited` (see [Refusals](#transport)), as with no answer, a `408`, `425`, `429` or `5xx`, or a
+`200` that isn't JSON; the Gamemaster is told after three in a row. Any other refusal, such as a
+`400`, `401`, `403`, `404` or `413`, stops fetching for the campaign until the settings change or
+its hello is sent, and the Gamemaster is told. Before module 0.23.0, only a `401`, `403` or `404`
+stopped it, and nothing was told.
 
 **Hand each roll over once.** One whose answer is lost is lost: never a roll made twice. The
 module also makes a roll only once, however often it's handed over, and a character's rolls in
@@ -1284,6 +1346,7 @@ the order they came.
 | `explicit` | Did the player choose how, as in dnd5e's roll dialog? Then the game rolls it that way. Otherwise it rolls as the character's sheet has it, which is where the app's `mode` came from. |
 | `extras` | What the player added, each `{ sign, count, sides }` or `{ sign, flat }`: such as `+1d4` for Bless. At most 10. Made as the roll's situational bonus. |
 | `dice` | Every die thrown, in order: the d20s, one or two (`mode` not `0`), then each added term's dice; for a hit die, its one die; for hit dice, one entry per `hitDice` entry, in the same order, with `count` results; for a formula or a description's roll, each of its dice terms'. Each `{ faces, results }`, every result one of the die's faces. |
+| `by` | `"gm"` for a roll the campaign's Gamemaster made in the app as the character (module 0.23.0), where the hello says `gmRolls`; absent for its player's, as is `null`. Anything else, or `"gm"` on an `endEnchantment`, is refused (`"invalid"`, `error` `"by"`) with nothing posted. Any kind may have it: an attack, a use, their damage, an ask and a prompt's answer too. |
 
 ### Making a roll
 
@@ -1299,6 +1362,15 @@ explosion (`x`, `xo`) is Foundry's, and what the term keeps, drops, raises, lowe
 `kh`, `kl`, `d`, `dh`, `dl`, `min`, `max`, `cs`, `cf`), Foundry works out from those.
 Foundry's total is the roll's total. The roll's message is flagged
 `flags["sending-stone"].request` with the roll's `id`, and marked on its card.
+
+Since module 0.23.0, a roll the campaign's Gamemaster made in the app as the character, `by:
+"gm"`, is made as any other, as the same user: its author, speaker, flavor and roll mode are the
+player's, as dnd5e's *Challenge Visibility*, Midi-QOL and Dice So Nice expect, and what the app is
+told is the same. Every message it makes is flagged `flags["sending-stone"].by` `"gm"` besides, and
+its card's mark says "GM": the roll's own, a use's card, its damage, an ask's card, each hit die's
+card, and under dnd5e 5.3 the message telling a death save's outcome, which dnd5e posts apart and
+which is flagged `outcome` with the roll's `id`, never `request`. dnd5e 6 writes that outcome on the
+roll's own card. Chat events send such a message with [`gmRoll`](#chat-message).
 
 It then sends [`command.result`](#commandresult). A roll made blind, as Midi-QOL can make a
 player's check, is reported as made, with `visible: false` and no rolls, so that the app tells

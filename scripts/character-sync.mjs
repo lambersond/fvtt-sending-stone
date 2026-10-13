@@ -2,6 +2,7 @@ import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend, resendHello } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, rosterEntry, summarizeCharacter } from "./characters.mjs";
+import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
 import { slimSheet } from "./sheet-slim.mjs";
 import { forgetSent, sendTexts, SheetTexts, takeUnsent } from "./sheet-texts.mjs";
 import { buildEnvelope, helloPending, inMegabytes, post, termsOf } from "./transport.mjs";
@@ -212,6 +213,7 @@ function sendSheet(campaign, actor) {
       built.set(key, json);
       sendTexts(campaign, takeUnsent(campaign, texts));
       post(envelope);
+      noteSheetSent(campaign.id, actor.id);
       return;
     }
     const { sheet, ...entry } = character;
@@ -228,7 +230,8 @@ function sendSheet(campaign, actor) {
 
 /**
  * Tell the Gamemaster, once a page load for each character and campaign, that a sheet was too large
- * to send; and whether its player is told why, as an app that expands slim sheets tells them.
+ * to send; and whether its player is told why, as an app that expands slim sheets tells them. Manage
+ * Campaigns shows it withheld until it's sent.
  * @param {Campaign} campaign
  * @param {Actor} actor
  * @param {number} bytes    The post's size.
@@ -238,6 +241,7 @@ function sendSheet(campaign, actor) {
 function warnTooLarge(campaign, actor, bytes, limit) {
   const key = `${campaign.id}.${actor.id}`;
   const size = inMegabytes(bytes, Math.ceil);
+  noteWithheld(campaign.id, actor.id, { name: actor.name, bytes, limit });
   console.warn(`${MODULE_ID} | The sheet of ${actor.name} came to ${size}, more than ${campaign.title} takes`);
   if ( warned.has(key) ) return;
   warned.add(key);

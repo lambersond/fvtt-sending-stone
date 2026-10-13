@@ -1,6 +1,6 @@
 import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import { sendCharacter } from "./character-sync.mjs";
-import { authorFor, describeResult, failedResult, PUBLIC, visibleTo } from "./command-rolls.mjs";
+import { appFlags, authorFor, describeResult, failedResult, PUBLIC, visibleTo } from "./command-rolls.mjs";
 import { castFromItem, commandRefusal, currentTargets, setTargets, workflowSettled } from "./command-uses.mjs";
 import {
   availableProfiles, canTake, effectsOf, endable, goingAway, listedOn, originOf, ownName
@@ -95,7 +95,7 @@ export async function dnd5eEnchant(command, campaign, actor, use) {
   const author = authorFor(actor);
   const results = await activity.use(usage, { configure: false }, {
     rollMode: PUBLIC,
-    data: { author: author.id, flags: { dnd5e: { targets: [] }, [MODULE_ID]: { use: command.id } } }
+    data: { author: author.id, flags: { dnd5e: { targets: [] }, [MODULE_ID]: appFlags(command, "use") } }
   });
   castFromItem(use, results);
   if ( !results ) return failedResult(command, "cancelled");
@@ -151,7 +151,7 @@ export async function midiEnchantNow(command, campaign, actor, use) {
     };
     const results = await activity.use(midiUsage, { configure: false }, {
       rollMode: PUBLIC,
-      data: { flags: { dnd5e: { targets: [] }, [MODULE_ID]: { use: command.id } } }
+      data: { flags: { dnd5e: { targets: [] }, [MODULE_ID]: appFlags(command, "use") } }
     });
     castFromItem(use, results);
     if ( !results ) return failedResult(command, "midi");

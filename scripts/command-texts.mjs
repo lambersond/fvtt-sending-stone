@@ -1,6 +1,6 @@
 import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import { askFlavor } from "./chat-data.mjs";
-import { authorFor, checkCommand, describeResult, failedResult, PUBLIC } from "./command-rolls.mjs";
+import { appFlags, authorFor, checkCommand, describeResult, failedResult, PUBLIC } from "./command-rolls.mjs";
 import {
   changesDamage, damageRollsFor, diceStatus, matchesDice, modifiedDice, plannedDamage, plannedDice, readModifiers,
   takesAway, unmaximizable, withPlan
@@ -221,7 +221,7 @@ async function postAsk(command, actor, origin, link) {
     flavor: askFlavor(origin.name),
     content,
     flags: {
-      [MODULE_ID]: { request: command.id, ask: { actorId: actor.id, text: command.text, link: command.link } },
+      [MODULE_ID]: { ...appFlags(command), ask: { actorId: actor.id, text: command.text, link: command.link } },
       ...(origin.item && { dnd5e: { item: itemFlag(origin.item) } })
     }
   });
@@ -450,7 +450,7 @@ function rollMessage(command, actor, origin, flavor, type) {
           targets: [],
           ...((origin.item && !origin.spell) && { item: itemFlag(origin.item) })
         },
-        [MODULE_ID]: { request: command.id }
+        [MODULE_ID]: appFlags(command)
       }
     }
   };

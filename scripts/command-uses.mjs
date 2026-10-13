@@ -1,6 +1,6 @@
 import { MODULE_ID, ROLL_TAG, SETTINGS } from "./constants.mjs";
 import {
-  authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
+  appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
 import {
   damageRollsFor, diceForEach, diceStatus, matchesDice, modifiedDice, plannedDice, readModifiers, takesAway,
@@ -641,7 +641,7 @@ async function dnd5eAttack(command, campaign, actor, use) {
   // A forward has the activity it names used, as dnd5e's forward does; the attack is that activity's.
   const results = await (use.forward ?? activity).use(usage, { configure: false }, {
     rollMode: PUBLIC,
-    data: { author: author.id, flags: { dnd5e: { targets }, [MODULE_ID]: { use: command.id } } }
+    data: { author: author.id, flags: { dnd5e: { targets }, [MODULE_ID]: appFlags(command, "use") } }
   });
   castFromItem(use, results);
   const card = results?.message;
@@ -661,7 +661,7 @@ async function dnd5eAttack(command, campaign, actor, use) {
       rollMode: PUBLIC,
       data: {
         author: author.id,
-        flags: { dnd5e: { originatingMessage: card.id, targets }, [MODULE_ID]: { request: command.id } }
+        flags: { dnd5e: { originatingMessage: card.id, targets }, [MODULE_ID]: appFlags(command) }
       }
     }
   ));
@@ -702,7 +702,7 @@ async function dnd5eUse(command, campaign, actor, use) {
   // A forward has the activity it names used, as dnd5e's forward does: the card is that activity's.
   const results = await (use.forward ?? activity).use(usage, { configure: false }, {
     rollMode: PUBLIC,
-    data: { author: author.id, flags: { dnd5e: { targets }, [MODULE_ID]: { use: command.id } } }
+    data: { author: author.id, flags: { dnd5e: { targets }, [MODULE_ID]: appFlags(command, "use") } }
   });
   castFromItem(use, results);
   const card = results?.message;
@@ -1018,7 +1018,7 @@ async function midiUseNow(command, campaign, actor, use) {
     const state = await withPlan(command, async () => {
       const results = await activity.use(midiCall, { configure: false }, {
         rollMode: PUBLIC,
-        data: { flags: { [MODULE_ID]: { use: command.id } } }
+        data: { flags: { [MODULE_ID]: appFlags(command, "use") } }
       }).finally(() => Hooks.off("dnd5e.preCreateUsageMessage", nameAll));
       castFromItem(use, results);
       card = results?.message ?? null;
@@ -1277,7 +1277,7 @@ async function dnd5eDamage(command, card, stored, actor, made) {
         rollMode: PUBLIC,
         data: {
           author: author.id,
-          flags: { dnd5e: { originatingMessage: card.id, targets: stored.targets }, [MODULE_ID]: { request: command.id } }
+          flags: { dnd5e: { originatingMessage: card.id, targets: stored.targets }, [MODULE_ID]: appFlags(command) }
         }
       }
     );

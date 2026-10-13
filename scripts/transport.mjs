@@ -1,9 +1,10 @@
 import {
   DEFAULT_MAX_BYTES, EVENT_DROPPED_HOOK, EVENTS, HELLO_DELIVERED_HOOK, HELLO_WANTED_HOOK, LISTENER_FEATURES_HOOK,
-  MODULE_ID, PROTOCOL_VERSION, SHEET_TERMS_HOOK, SLIM_SHEETS, STATUS_HOOK
+  MODULE_ID, PROTOCOL_VERSION, SHEET_TERMS_HOOK, SLIM_SHEETS
 } from "./constants.mjs";
 import { describeCampaign } from "./campaigns.mjs";
 import { eventsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
+import { noteDelivered, noteFailed, REASONS } from "./delivery-status.mjs";
 
 /**
  * Delivering events to the listener.
@@ -13,6 +14,10 @@ import { eventsUrl, getDestination, getSecret, parseDestination } from "./config
  * dropped: an event about a turn that has long since passed is worth less than keeping the queue
  * moving. Each envelope keeps its id across retries so the listener can discard duplicates. No post
  * is larger than the listener says it takes.
+ *
+ * Since 0.23.0 every failure has a reason, which an app from then says, beside the status, in a
+ * refusal's JSON body, and which an older app's status, and its words, are read for: what the
+ * Gamemaster is told, and when, is delivery-status.mjs's. The status alone still decides retrying.
  */
 
 /**
@@ -118,12 +123,20 @@ export class DeliveryError extends Error {
    * @param {boolean} options.retryable       Might the same post succeed if tried again?
    * @param {number} [options.status]         The HTTP status, if the listener responded at all.
    * @param {unknown} [options.cause]         The underlying error.
+   * @param {string} [options.reason]         Why, one of delivery-status.mjs's REASONS.
+   * @param {string|null} [options.detail]    What more the listener said, or the module knows.
+   * @param {number|null} [options.limit]     For a post too large, the most the listener takes,
+   * @param {number|null} [options.size]      and the post's size, in bytes.
    */
-  constructor(message, { retryable, status, cause }={}) {
+  constructor(message, { retryable, status, cause, reason, detail, limit, size }={}) {
     super(message, { cause });
     this.name = "DeliveryError";
     this.retryable = retryable === true;
     this.status = status ?? null;
+    this.reason = reason ?? "status";
+    this.detail = detail ?? null;
+    this.limit = limit ?? null;
+    this.size = size ?? null;
   }
 }
 
@@ -307,7 +320,9 @@ export function sinceLastSent(campaignId) {
 export async function deliver(envelope, { destination=getDestination(), secret=getSecret(envelope.campaign?.id) }={}) {
   const parsed = parseDestination(destination);
   if ( !parsed ) {
-    throw new DeliveryError(game.i18n.localize("SENDINGSTONE.Error.InvalidDestination"), { retryable: false });
+    throw new DeliveryError(game.i18n.localize("SENDINGSTONE.Error.InvalidDestination"), {
+      retryable: false, reason: "unreachable"
+    });
   }
   const target = eventsUrl(parsed);
 
@@ -315,7 +330,7 @@ export async function deliver(envelope, { destination=getDestination(), secret=g
   try {
     body = JSON.stringify(envelope);
   } catch (err) {
-    throw new DeliveryError(err.message, { retryable: false, cause: err });
+    throw new DeliveryError(err.message, { retryable: false, cause: err, reason: "malformed", detail: err.message });
   }
 
   // A post larger than the listener takes would be refused, or worse, cut off unread. A test of a
@@ -325,7 +340,7 @@ export async function deliver(envelope, { destination=getDestination(), secret=g
   if ( size > limit ) {
     throw new DeliveryError(game.i18n.format("SENDINGSTONE.Error.TooLarge", {
       size: inMegabytes(size, Math.ceil), limit: inMegabytes(limit, Math.floor)
-    }), { retryable: false });
+    }), { retryable: false, reason: "tooLarge", size, limit });
   }
 
   const headers = { "Content-Type": "application/json" };
@@ -346,20 +361,106 @@ export async function deliver(envelope, { destination=getDestination(), secret=g
   } catch (err) {
     // The browser deliberately does not say why a request failed outright: an unreachable host,
     // a refused CORS preflight and blocked mixed content all surface as the same TypeError.
-    const key = err?.name === "TimeoutError" ? "SENDINGSTONE.Error.Timeout" : "SENDINGSTONE.Error.Network";
-    throw new DeliveryError(game.i18n.localize(key), { retryable: true, cause: err });
+    const timeout = err?.name === "TimeoutError";
+    throw new DeliveryError(game.i18n.localize(timeout ? "SENDINGSTONE.Error.Timeout" : "SENDINGSTONE.Error.Network"), {
+      retryable: true, cause: err, reason: timeout ? "timeout" : "unreachable"
+    });
   }
   const elapsed = Math.round(performance.now() - started);
 
   if ( response.ok ) return { status: response.status, elapsed, answer: await readAnswer(response) };
+  throw await refusalError(response, { secret, size, limit });
+}
 
+/**
+ * Why a listener refused a post or fetch, as an error to throw.
+ * @param {Response} response                 The refusal.
+ * @param {object} [options]
+ * @param {string} [options.secret]           The secret it was sent with, if any.
+ * @param {number|null} [options.size]        Its size, and the most the listener was taken to take,
+ * @param {number|null} [options.limit]       in bytes, for one refused as too large.
+ * @returns {Promise<DeliveryError>}
+ */
+export async function refusalError(response, { secret, size=null, limit=null }={}) {
+  const refusal = await readRefusal(response);
+  const { reason, detail } = reasonFor(response.status, refusal, { secret });
   // A listener that is overloaded or restarting may accept the same post later. One that
   // rejected it outright, a wrong secret for instance, will not.
   const retryable = (response.status >= 500) || [408, 425, 429].includes(response.status);
-  const message = game.i18n.format("SENDINGSTONE.Error.Status", {
-    status: `${response.status} ${response.statusText}`.trim()
+  const status = game.i18n.format("SENDINGSTONE.Error.Status", {
+    status: `${response.status} ${response.statusText ?? ""}`.trim()
   });
-  throw new DeliveryError(message, { retryable, status: response.status });
+  const tooLarge = reason === "tooLarge";
+  return new DeliveryError(refusal.message ? `${status}: ${refusal.message}` : status, {
+    retryable, status: response.status, reason, detail,
+    size: tooLarge ? size : null, limit: tooLarge ? (refusal.limit ?? limit) : null
+  });
+}
+
+/**
+ * What a listener said in refusing a post or fetch, as far as it can be read: since 0.23.0's app,
+ * JSON with its `reason`, `message`, and what more it says, such as `detail` or `limit`; from an
+ * older one, a line of text, or nothing. Never throws, whatever the answer lacks.
+ * @param {Response} response
+ * @returns {Promise<{reason?: string, message?: string, detail?: string, limit?: number,
+ *   protocol?: number}>}
+ */
+export async function readRefusal(response) {
+  const line = value => String(value).trim().slice(0, 300);
+  try {
+    if ( String(response?.headers?.get?.("content-type") ?? "").includes("application/json") ) {
+      const body = await response.json();
+      if ( !body || (typeof body !== "object") ) return {};
+      const refusal = {};
+      if ( (typeof body.reason === "string") && /^[A-Za-z]{1,40}$/.test(body.reason) ) refusal.reason = body.reason;
+      for ( const key of ["message", "detail"] ) {
+        if ( (typeof body[key] === "string") && line(body[key]) ) refusal[key] = line(body[key]);
+      }
+      for ( const key of ["limit", "protocol"] ) {
+        if ( Number.isInteger(body[key]) ) refusal[key] = body[key];
+      }
+      return refusal;
+    }
+    if ( typeof response?.text !== "function" ) return {};
+    const first = line(String(await response.text()).trim().split(/\r?\n/)[0]);
+    return first ? { message: first } : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Why a listener refused a post or fetch. A reason the app gives that this module knows wins; an
+ * unknown one is a status, its message said. Otherwise the status, and an older app's words, say:
+ * a 401 is no secret when none was sent, the wrong one when one was; a 403 or 404 is a game not on
+ * The Forge, or a campaign not set up, when it says nothing else or says so as the app before
+ * 0.23.0 did; a 400 is an event the app couldn't read.
+ * @param {number} status
+ * @param {{reason?: string, message?: string, detail?: string}} refusal   As readRefusal reads it.
+ * @param {object} [options]
+ * @param {string} [options.secret]   The secret sent, if any.
+ * @returns {{reason: string, detail: string|null}}
+ */
+export function reasonFor(status, refusal={}, { secret }={}) {
+  const { reason, message, detail } = refusal;
+  if ( reason !== undefined ) {
+    return Object.hasOwn(REASONS, reason) ? { reason, detail: detail ?? null }
+      : { reason: "status", detail: message ?? detail ?? null };
+  }
+  const text = message ?? "";
+  if ( status === 401 ) return { reason: secret ? "wrongSecret" : "noSecret", detail: null };
+  if ( (status === 403) || (status === 404) ) {
+    if ( !text || text.startsWith("Only games") || text.startsWith("No campaign") ) {
+      return { reason: (status === 403) ? "notForge" : "notSetUp", detail: null };
+    }
+    return { reason: "status", detail: text };
+  }
+  if ( status === 413 ) return { reason: "tooLarge", detail: null };
+  if ( status === 400 ) return { reason: "malformed", detail: text || null };
+  if ( status === 408 ) return { reason: "timeout", detail: null };
+  if ( (status === 425) || (status === 429) ) return { reason: "rateLimited", detail: null };
+  if ( status >= 500 ) return { reason: "unavailable", detail: null };
+  return { reason: "status", detail: text || null };
 }
 
 /**
@@ -425,7 +526,7 @@ async function deliverWithRetry(envelope) {
     try {
       const { answer } = await deliver(envelope);
       posting = null;
-      recordSuccess();
+      recordSuccess(envelope);
       answered(envelope, answer);
       return;
     } catch (err) {
@@ -470,36 +571,33 @@ function answered(envelope, answer) {
 /* -------------------------------------------- */
 
 /**
- * Note a successful delivery, telling the Gamemaster if the listener has just come back.
+ * Note a successful delivery, which tells the Gamemaster if what failed works again, and calls
+ * STATUS_HOOK with the status.
+ * @param {object} envelope   The envelope delivered.
  * @returns {void}
  */
-function recordSuccess() {
-  const recovered = status.state === "error";
+function recordSuccess(envelope) {
   status.state = "ok";
   status.delivered++;
   status.lastDelivered = Date.now();
-  if ( recovered ) ui.notifications.info("SENDINGSTONE.Notify.Recovered", { localize: true });
-  Hooks.callAll(STATUS_HOOK, status);
+  noteDelivered(envelope);
 }
 
 /**
- * Note a dropped event. The Gamemaster is warned once when deliveries start failing rather than
- * once per event; every failure is still logged to the console.
+ * Note a dropped event. The Gamemaster is told what went wrong and what to do once per cause
+ * rather than once per event, and STATUS_HOOK called; every failure is still logged to the console.
  * @param {object} envelope   The envelope that could not be delivered.
  * @param {unknown} err       Why it could not be delivered.
  * @returns {void}
  */
 function recordFailure(envelope, err) {
-  const firstFailure = status.state !== "error";
   const message = err instanceof Error ? err.message : String(err);
   status.state = "error";
   status.dropped++;
   status.lastError = { message, at: Date.now() };
-  console.warn(`${MODULE_ID} | Could not deliver ${envelope.type} #${envelope.sequence}: ${message}`, err);
-  if ( firstFailure ) {
-    ui.notifications.warn(game.i18n.format("SENDINGSTONE.Notify.Failing", { error: message }));
-  }
-  Hooks.callAll(STATUS_HOOK, status);
+  const detail = err?.detail ? `\n${err.detail}` : "";
+  console.warn(`${MODULE_ID} | Could not deliver ${envelope.type} #${envelope.sequence}: ${message}${detail}`, err);
+  noteFailed(envelope, err);
   // What the listener may take later is sent again then; what it refused, as too large or with
   // the wrong secret, would be refused again.
   const temporary = (err instanceof DeliveryError) && err.retryable;

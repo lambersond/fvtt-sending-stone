@@ -78,23 +78,79 @@
       "TooLarge": "the event came to {size}, more than the {limit} the app takes"
     },
     "Notify": {
-      "Failing": "Sending Stone cannot deliver events to the app: {error}. Events are being dropped until it recovers.",
-      "Recovered": "Sending Stone is delivering events to the app again.",
+      "Problem": "Sending Stone: {problem} {fix}",
+      "Reconnected": "Sending Stone reaches the app again.",
+      "CampaignRecovered": "Sending Stone delivers {campaign}'s events to the app again.",
+      "RollsStopped": "Sending Stone has stopped fetching {campaign}'s players' rolls: {problem} {fix} Saving Manage Campaigns tries again.",
+      "RollsFailing": "{campaign}'s players' rolls aren't reaching the game: {problem} Still trying.",
+      "RollsRecovered": "{campaign}'s players' rolls reach the game again.",
       "SheetTooLarge": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes. Its player is told.",
       "SheetTooLargeUntold": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes."
+    },
+    "Problem": {
+      "unreachable": "Sending Stone can't reach the app at {address}.",
+      "offline": "This computer is offline, so Sending Stone can't reach the app.",
+      "timeout": "The app at {address} didn't answer in time.",
+      "unavailable": "The app at {address} had a problem of its own (HTTP {status}).",
+      "rateLimited": "The app at {address} asked Sending Stone to slow down (HTTP {status}).",
+      "notForge": "The app takes games hosted on The Forge only, and this game's address, {origin}, isn't one.",
+      "unsupportedProtocol": "The app doesn't read what this version of Sending Stone sends{detail}.",
+      "badEnvelope": "The app couldn't read what Sending Stone sent{detail}.",
+      "noSecret": "This browser has no secret for {campaign}.",
+      "wrongSecret": "The app refused {campaign}'s secret.",
+      "notSetUp": "The app has no campaign titled “{campaign}” for this game, {origin}.",
+      "tooLarge": "{what} for {campaign} came to {size}, more than the {limit} the app takes, and wasn't sent.",
+      "malformed": "The app couldn't read {what} for {campaign}{detail}, and dropped it.",
+      "status": "The app at {address} answered HTTP {status}{detail}."
+    },
+    "Fix": {
+      "unreachable": "Check the address in Manage Campaigns (Test says more) and that the app is up. Events are lost until it answers; characters are sent again once it does.",
+      "timeout": "Check the address in Manage Campaigns (Test says more) and that the app is up. Events are lost until it answers; characters are sent again once it does.",
+      "unavailable": "Each post is tried three times; if this lasts, the app may be down.",
+      "rateLimited": "Each post is tried three times; if this lasts, the app may be down.",
+      "notForge": "Open the game from its Forge address, such as https://your-game.forge-vtt.com, and set the campaign up in the app with it.",
+      "unsupportedProtocol": "Update the Sending Stone module.",
+      "badEnvelope": "Update the Sending Stone module; if it keeps happening, report it with the browser console's log.",
+      "noSecret": "Enter its secret in Manage Campaigns here: secrets are kept only in the browser they're entered in.",
+      "wrongSecret": "Enter the secret set for {campaign} in the Sending Stone app, then Test.",
+      "notSetUp": "Set it up in the Sending Stone app with this title and this game's Forge address, or rename it here to match the app's, then Test.",
+      "tooLarge": "Nothing else is held back.",
+      "malformed": "This is a bug in Sending Stone: please report it, with the module's version. Nothing else is held back.",
+      "status": "Check the address in Manage Campaigns."
+    },
+    "What": {
+      "Hello": "The campaign's character list",
+      "Sheet": "A character's sheet",
+      "Texts": "Descriptions",
+      "Chat": "A chat message",
+      "Combat": "A combat update",
+      "Prompt": "A save request",
+      "Result": "A player's roll result",
+      "Event": "An event"
+    },
+    "Status": {
+      "Delivered": "Delivered at {time}.",
+      "Idle": "Nothing sent yet.",
+      "Failing": "Not delivered since {time}: {problem}",
+      "Refused": "Last refused at {time}: {problem}",
+      "Withheld": "{name}'s sheet is withheld: it came to {size}, more than the {limit} the app takes.",
+      "RollsFetched": "Players' rolls fetched at {time}.",
+      "RollsStopped": "Players' rolls stopped at {time}: {problem}",
+      "RollsFailing": "Players' rolls failing since {time}: {problem}",
+      "OtherBrowser": "Events go from {name}'s browser, the active Gamemaster's, which is told of any problem."
     },
     "Test": {
       "Test": "Test",
       "Testing": "Sending a test event…",
       "Ok": "Delivered: the app answered HTTP {status} in {elapsed} ms.",
-      "Failed": "Not delivered: {error}",
       "HintNetwork": "Check that the address is right and the app is reachable from this computer, and that it answers the browser's CORS preflight (OPTIONS) request with Access-Control-Allow-Origin, and Access-Control-Allow-Headers covering Content-Type and Authorization.",
       "HintMixedContent": "Foundry is served over https but the app's address is plain http, which browsers block for any host other than localhost. Use the app's https address.",
-      "HintAuth": "The app refused the secret. Enter the secret set for this campaign in the Sending Stone app.",
-      "HintNotSetUp": "The app has no campaign with this title for this game. Set it up in the Sending Stone app with this game's address and the same title, then test again."
+      "Unsaved": "Save Changes for events to use what you typed."
     },
     "Roll": {
-      "Badge": "Rolled on Sending Stone"
+      "Badge": "Rolled on Sending Stone",
+      "BadgeGM": "Rolled on Sending Stone by the Gamemaster",
+      "GM": "GM"
     }
   }
 }

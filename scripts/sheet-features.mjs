@@ -47,27 +47,64 @@ function hitDiceOf(item) {
  * @returns {object[]}
  */
 export function featureSections(actor, texts) {
+  const { groups, sorted } = featureGroups(actor);
+  const sections = new Map(groups.map(group => [group, {
+    id: group.id,
+    label: group.label,
+    text: group.from ? texts.add({ html: group.from.system?.description?.value, relativeTo: group.from }) : null,
+    features: []
+  }]));
+  // Described in the order they're sorted in, whatever group each is in, which is the order their
+  // descriptions are collected in.
+  for ( const [item, group] of sorted ) sections.get(group).features.push(describeFeature(item, texts));
+  return [...sections.values()].filter(section => section.features.length);
+}
+
+/**
+ * The features the sheet's `features` lists, in the order it lists them, group by group: for what
+ * refers to a feature by its place on the sheet, such as the resource a favorite stands for.
+ * @param {Actor} actor
+ * @returns {Item[]}
+ */
+export function listedFeatures(actor) {
+  return featureGroups(actor).groups.flatMap(group => group.features);
+}
+
+/**
+ * @typedef {object} FeatureGroup
+ * @property {string} id        Its section's id, such as a class's identifier, or "other".
+ * @property {string} label
+ * @property {Item|null} from   The class, species or background it's named for, if any.
+ * @property {Item[]} features
+ */
+
+/**
+ * The groups `featureSections` lists features in, each with the item it's named for, if any, and
+ * its features; and every feature, in the order the player keeps them, then by name, with its group.
+ * @param {Actor} actor
+ * @returns {{groups: FeatureGroup[], sorted: [Item, FeatureGroup][]}}
+ */
+function featureGroups(actor) {
   const types = actor.itemTypes ?? {};
   const classes = [...(types.class ?? [])].sort((a, b) => (b.system?.levels ?? 0) - (a.system?.levels ?? 0));
   const details = actor.system?.details ?? {};
-  const origin = (id, label, item) => ({
-    id, label, text: item ? texts.add({ html: item.system?.description?.value, relativeTo: item }) : null, features: []
-  });
-  const sections = [
-    ...classes.map(item => origin(item.identifier, game.i18n.format("DND5E.FeaturesClass", { class: item.name }), item)),
-    isItem(details.race) ? origin("species", localize("DND5E.Species.Features"), details.race) : null,
-    isItem(details.background) ? origin("background", localize("DND5E.FeaturesBackground"), details.background) : null,
-    origin("other", localize("DND5E.FeaturesOther"))
+  const group = (id, label, from=null) => ({ id, label, from, features: [] });
+  const groups = [
+    ...classes.map(item => group(item.identifier, game.i18n.format("DND5E.FeaturesClass", { class: item.name }), item)),
+    isItem(details.race) ? group("species", localize("DND5E.Species.Features"), details.race) : null,
+    isItem(details.background) ? group("background", localize("DND5E.FeaturesBackground"), details.background) : null,
+    group("other", localize("DND5E.FeaturesOther"))
   ].filter(Boolean);
 
   const features = [...(types.feat ?? []), ...(types.subclass ?? [])]
     .sort((a, b) => ((a.sort ?? 0) - (b.sort ?? 0)) || a.name.localeCompare(b.name, game.i18n.lang));
-  for ( const item of features ) {
+  const sorted = features.map(item => {
     const id = originOf(actor, item);
-    const section = sections.find(s => s.id === id) ?? sections.at(-1);
-    section.features.push(describeFeature(item, texts));
-  }
-  return sections.filter(section => section.features.length);
+    const found = groups.find(g => g.id === id) ?? groups.at(-1);
+    found.features.push(item);
+    return [item, found];
+  });
+  return { groups, sorted };
 }
 
 /**
