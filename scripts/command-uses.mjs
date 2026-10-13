@@ -3,7 +3,8 @@ import {
   authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
 import {
-  damageRollsFor, diceForEach, diceStatus, matchesDice, modifiedDice, plannedDice, readModifiers, takesAway, withPlan
+  damageRollsFor, diceForEach, diceStatus, matchesDice, modifiedDice, plannedDice, readModifiers, takesAway,
+  unmaximizable, withPlan
 } from "./dice-plan.mjs";
 import { dnd5eEnchant, enchantChoice, midiEnchantNow } from "./command-enchant.mjs";
 import { DND5E_ACTIVITIES, ownDamageConfig } from "./sheet-links.mjs";
@@ -189,10 +190,11 @@ export function commandRefusal(command, campaign) {
 /**
  * What a use needs, and whether it can be made, as dnd5e's usage dialog would have it used: with
  * the spell slot, ammunition and attack mode the player chose, or else the dialog's own, at the
- * targets they picked, and with what it consumes. A forward is used through the activity it names,
- * spending what the forward spends rather than that activity's own, and never a slot: at the level
- * dnd5e casts it at by default, whatever slot the player chose. An enchant activity is used with
- * the profile and item the player chose, as `enchantChoice` has them.
+ * targets they picked, and at its user too where they chose, counted among them, and with what it
+ * consumes. A forward is used through the activity it names, spending what the forward spends
+ * rather than that activity's own, and never a slot: at the level dnd5e casts it at by default,
+ * whatever slot the player chose. An enchant activity is used with the profile and item the player
+ * chose, as `enchantChoice` has them.
  * @param {object} command
  * @param {Actor} actor
  * @returns {Promise<object>}   `{refusal, error}`, or what the use is made with.
@@ -249,18 +251,23 @@ async function prepareUse(command, actor) {
   if ( !enchants && (command.enchant !== undefined) && (command.enchant !== null) ) {
     return { refusal: "invalid", error: "enchant" };
   }
+  // Its user, where the player chose them beside those they picked (module 0.22.0); one used on its
+  // user alone is used at them all the same, and an enchantment at no one.
+  const self = (command.self === true) && (mostTargets(activity) > 0);
+  if ( self && enchants ) return { refusal: "target" };
   const enchanting = enchants ? enchantChoice(command, actor, activity, scaledActivity(activity, slot)) : null;
   if ( enchanting?.refusal ) return enchanting;
   if ( enchanting ) usage.enchantmentProfile = enchanting.profile;
 
-  const targets = [];
+  const targets = self ? [{ ...selfTarget(actor), picked: { self: true } }] : [];
   for ( const picked of ((attack && !command.targets) ? [command.target] : (command.targets ?? [])) ) {
     if ( !picked ) continue;
     const target = targetOf(picked);
-    if ( !target || targets.some(other => other.token.id === target.token.id) ) return { refusal: "target" };
+    if ( !target || targets.some(other => other.token?.id === target.token.id) ) return { refusal: "target" };
     targets.push({ ...target, picked: { combatId: picked.combatId, combatantId: picked.combatantId } });
   }
-  // As many as it takes at the level it's cast at, as a spell may take more for each level higher.
+  // As many as it takes at the level it's cast at, as a spell may take more for each level higher,
+  // its user among them.
   if ( (!attack || area) && (targets.length > mostTargets(scaledActivity(activity, slot))) ) {
     return { refusal: "target" };
   }
@@ -581,6 +588,19 @@ export function targetOf({ combatId, combatantId }) {
 }
 
 /**
+ * The character as a target of their own use: by their token, their combatant's in the combat the
+ * Gamemaster has up, else their own on the scene the Gamemaster views; else by no token, the actor
+ * alone, which the card names all the same, but Midi-QOL can't target.
+ * @param {Actor} actor
+ * @returns {{combatant: Combatant|null, token: TokenDocument|null, actor: Actor}}
+ */
+function selfTarget(actor) {
+  const combatant = game.combat?.combatants?.find?.(each => (each.actor?.id ?? each.actorId) === actor.id) ?? null;
+  const token = combatant?.token ?? actor.getActiveTokens?.(true, true)?.[0] ?? null;
+  return { combatant, token, actor: token?.actor ?? actor };
+}
+
+/**
  * A target as dnd5e describes it on a card, as its own `getTargetDescriptors` would from the
  * Gamemaster's targets. Total cover leaves it no armor class to hit.
  * @param {{token: TokenDocument|null, actor: Actor}} target
@@ -843,8 +863,8 @@ function midiQueued(run) {
  * would: Active Defence, which has an attack's target roll instead; an area attack whose targets
  * Midi picks itself; an activity that always opens Midi's dialogs, asks which of its effects to
  * apply, or prompts for its roll; a target that can't be targeted; a target the Gamemaster's canvas
- * doesn't draw, unless they allow it; none Midi can target where one is needed; or a reaction or
- * bonus action already used this round, where they're enforced.
+ * doesn't draw, unless they allow it, though never its user; none Midi can target where one is
+ * needed; or a reaction or bonus action already used this round, where they're enforced.
  * @param {object} use   What `prepareUse` found.
  * @param {Actor} actor
  * @returns {string|null}
@@ -862,8 +882,12 @@ function midiRefusal({ activity, targets, attack, area }, actor) {
   if ( always || properties.chooseEffects || prompts ) return "midi-dialog";
 
   // Midi targets only tokens the Gamemaster's canvas draws: those on the level and scene they view.
-  const drawn = targets.filter(target => target.token.object);
-  if ( (drawn.length < targets.length) && !offCanvasTargets() ) return "scene";
+  // Its user with none drawn, or none at all, as out of a fight in the theatre of the mind, is named
+  // on the card alone and the use made at the others, or at no one, as before a player could pick
+  // themselves: refused only where Midi needs a target anyway, below.
+  const drawn = targets.filter(target => target.token?.object);
+  const unseen = targets.filter(target => !target.token?.object && !target.picked?.self);
+  if ( unseen.length && !offCanvasTargets() ) return "scene";
   for ( const target of drawn ) {
     if ( MidiQOL.isTargetable && !MidiQOL.isTargetable(target.token.object) ) return "target";
   }
@@ -939,9 +963,9 @@ function rollsDamage(activity) {
  */
 async function midiUseNow(command, campaign, actor, use) {
   const { activity, usage, prepared, attackMode, ammunition, attack } = use;
-  // Midi works on the targets the Gamemaster's canvas draws; any other, where they allow it, is
-  // only named on the card, for them to apply what it does.
-  const tokens = use.targets.map(target => target.token.object).filter(Boolean);
+  // Midi works on the targets the Gamemaster's canvas draws; any other, where they allow it, and its
+  // user with no token drawn, is only named on the card, for them to apply what it does.
+  const tokens = use.targets.map(target => target.token?.object).filter(Boolean);
   const targets = use.targets.map(targetDescriptor);
   const offCanvas = tokens.length < use.targets.length;
   if ( attack && ammunition ) await fireAmmunition(activity, ammunition);
@@ -1024,7 +1048,7 @@ async function midiUseNow(command, campaign, actor, use) {
     const settings = globalThis.MidiQOL.configSettings?.() ?? {};
     const shown = (tokens.length > 0) && (settings.autoCheckHit === "all") && !workflow.whisperAttackCard;
     const outcome = target => {
-      const token = target.token.object;
+      const token = target.token?.object;
       if ( !shown || !token ) return null;
       return (workflow.hitTargets?.has(token) || workflow.hitTargetsEC?.has(token)) ? "hit" : "miss";
     };
@@ -1166,7 +1190,8 @@ function typeChoices(types) {
 /**
  * Roll a player's damage or healing, with their dice, on the use it follows: once, only with the
  * dice the use said it would throw, changed as they chose, and at its highest only where it takes
- * no die away, and as the kinds of damage they chose.
+ * no die away and has no die Foundry would roll again, as one that explodes, and as the kinds of
+ * damage they chose.
  * Damage that, once built and changed, can't take every die they rolled, as where a die more was
  * chosen of a part whose only dice are its critical damage's, or a module changed it since its
  * preview, is refused as the dice not its own, and nothing is rolled, so they may roll it again.
@@ -1189,7 +1214,12 @@ export async function runDamageCommand(command, campaign) {
   if ( !stored.preview ) return failedResult(command, "not-waiting");
   const modifiers = readModifiers(command.modifiers);
   if ( modifiers === null ) return failedResult(command, "invalid", "modifiers");
-  if ( modifiers?.maximize && takesAway(stored.preview) ) return failedResult(command, "invalid", "modifiers");
+  // At its highest, damage that takes a die away would take the most away, and a die Foundry rolls
+  // again, as one that explodes, wouldn't be at its highest.
+  const formulas = stored.preview.rolls.map(roll => roll.formula);
+  if ( modifiers?.maximize && (takesAway(stored.preview) || unmaximizable(formulas)) ) {
+    return failedResult(command, "invalid", "modifiers");
+  }
   const expected = modifiedDice(stored.preview, modifiers);
   if ( !expected || !matchesDice(command.dice, expected) ) return failedResult(command, "invalid", "dice");
   if ( !offersTypes(command.types, stored.preview) ) return failedResult(command, "type");

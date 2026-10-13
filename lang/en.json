@@ -74,11 +74,14 @@
       "InvalidDestination": "The Sending Stone address must be a web address, such as https://sending-stone.vercel.app.",
       "Network": "the app could not be reached",
       "Timeout": "the app did not answer in time",
-      "Status": "the app answered HTTP {status}"
+      "Status": "the app answered HTTP {status}",
+      "TooLarge": "the event came to {size}, more than the {limit} the app takes"
     },
     "Notify": {
       "Failing": "Sending Stone cannot deliver events to the app: {error}. Events are being dropped until it recovers.",
-      "Recovered": "Sending Stone is delivering events to the app again."
+      "Recovered": "Sending Stone is delivering events to the app again.",
+      "SheetTooLarge": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes. Its player is told.",
+      "SheetTooLargeUntold": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes."
     },
     "Test": {
       "Test": "Test",

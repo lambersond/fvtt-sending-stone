@@ -2,7 +2,8 @@ import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import { askFlavor } from "./chat-data.mjs";
 import { authorFor, checkCommand, describeResult, failedResult, PUBLIC } from "./command-rolls.mjs";
 import {
-  changesDamage, diceStatus, matchesDice, modifiedDice, plannedDamage, plannedDice, readModifiers, takesAway, withPlan
+  changesDamage, damageRollsFor, diceStatus, matchesDice, modifiedDice, plannedDamage, plannedDice, readModifiers,
+  takesAway, unmaximizable, withPlan
 } from "./dice-plan.mjs";
 import { findLink, linkCritical } from "./sheet-links.mjs";
 
@@ -239,15 +240,16 @@ async function postAsk(command, actor, origin, link) {
  * such as a melee weapon's extra dice and an attack's critical damage, and never where it allows
  * none; and changed as they chose in the app, as an attack's damage is: more of its first part's
  * first die of its own that it adds, never one it takes away, as many more as a critical hit throws
- * of each, that die another size, or every die at its highest, where it takes no die away. Its card
- * names where it comes from, and no target: the Gamemaster applies it from the card. Offered only
- * under dnd5e 5.x where the campaign's players' rolls are made (`off`), the Gamemaster lets them
- * attack (`attacks-off`) and damage takes their dice (`self-test`), and changed only where it
- * changes as expected (`self-test`); refused for a description no longer on the sheet (`gone`), a
- * link that isn't damage (`link`), healing or damage never a critical hit's rolled as one, and
- * damage that takes a die away at its highest (`invalid`), a kind of damage a part doesn't offer
- * (`type`), and dice that aren't the ones it throws, changed or a critical hit's, or that it can't
- * take once built (`dice`).
+ * of each, that die another size, or every die at its highest, where it takes no die away and has
+ * none Foundry would roll again, as one that explodes. Its card names where it comes from, and no
+ * target: the Gamemaster applies it from the card. Offered only under dnd5e 5.x where the
+ * campaign's players' rolls are made (`off`), the Gamemaster lets them attack (`attacks-off`) and
+ * damage takes their dice (`self-test`), and changed only where it changes as expected
+ * (`self-test`); refused for a description no longer on the sheet (`gone`), a link that isn't
+ * damage (`link`), healing or damage never a critical hit's rolled as one, and damage at its
+ * highest that takes a die away or has one Foundry would roll again (`invalid`), a kind of damage
+ * a part doesn't offer (`type`), and dice that aren't the ones it throws, changed or a critical
+ * hit's, or that it can't take once built (`dice`).
  * @param {object} command      The player's roll, as fetched from the app.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @returns {Promise<CommandResult>}
@@ -280,8 +282,13 @@ export async function runTextDamageCommand(command, campaign) {
   }
   // The dice its rolls throw, as this world makes them, then as the player changed them.
   const planned = plannedDamage(damageProcess(command, link, types, critical, live));
-  // At its highest, damage that takes a die away would take the most away.
-  if ( modifiers?.maximize && takesAway(planned) ) return failed("invalid", "modifiers");
+  // At its highest, damage that takes a die away would take the most away, and a die Foundry rolls
+  // again, as one that explodes, wouldn't be at its highest: read in its rolls as this world builds
+  // them.
+  if ( modifiers?.maximize && (takesAway(planned)
+    || unmaximizable(damageRollsFor(damageProcess(command, link, types, critical, live)).map(roll => roll.formula))) ) {
+    return failed("invalid", "modifiers");
+  }
   const expected = planned.plannable ? modifiedDice(planned, modifiers) : null;
   if ( !expected || !matchesDice(command.dice, expected) ) return failed("dice");
 

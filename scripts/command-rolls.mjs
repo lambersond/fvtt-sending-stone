@@ -347,11 +347,12 @@ function isPromptId(value) {
  * Why a fetched attack, use or damage isn't one to make, if it isn't. An attack names the item and
  * activity it's made with, and the combatant it's made at, if any, or for an area attack those in
  * its area, but not both, and has its d20s and any dice the player added; it may name the spell
- * slot, ammunition and attack mode it's made with. A use names the item and activity, the
- * combatants it's used at, and the spell slot, if any, and for an enchantment the profile chosen
- * and the item, if any, and has no dice. Damage names the use it
- * follows and has the dice that use's damage throws, if any, which are checked against them when
- * it's made, and the kind of damage chosen for each of its rolls.
+ * slot, ammunition and attack mode it's made with, but never its user as a target. A use names the
+ * item and activity, the combatants it's used at, whether it's used at its user too, `self`, and
+ * the spell slot, if any, and for an enchantment the profile chosen and the item, if any, and has
+ * no dice. Damage names the use it follows and has the dice that use's damage throws, if any,
+ * which are checked against them when it's made, and the kind of damage chosen for each of its
+ * rolls.
  * @param {object} command
  * @returns {string|null}
  */
@@ -372,9 +373,11 @@ function checkAttackCommand(command) {
   if ( command.kind === "use" ) {
     const { targets } = command;
     if ( !Array.isArray(targets) || (targets.length > 20) || !targets.every(isTarget) ) return "target";
+    if ( !isOptional(command.self, self => typeof self === "boolean") ) return "self";
     if ( !isOptional(command.enchant, isEnchant) ) return "enchant";
     return null;
   }
+  if ( !isOptional(command.self, self => self === false) ) return "self";
   const { target, targets } = command;
   if ( (target !== null) && (target !== undefined) && !isTarget(target) ) return "target";
   if ( (targets !== null) && (targets !== undefined) ) {

@@ -70,31 +70,39 @@ export function charactersSeenBy(userIds, campaign) {
 /* -------------------------------------------- */
 
 /**
- * Describe a character for the listener.
+ * A character as a campaign's roster lists it: who it is and who plays it, without its sheet.
  * @param {Actor} actor
- * @param {SheetTexts} [texts]  Collects the descriptions its sheet refers to.
- * @returns {object}
+ * @returns {{id: string, uuid: string, name: string, img: string, type: string, owners: object[]}}
  */
-export function summarizeCharacter(actor, texts) {
+export function rosterEntry(actor) {
   return {
     id: actor.id,
     uuid: actor.uuid,
     name: actor.name,
     img: actor.img,
     type: actor.type,
-    owners: playerOwners(actor).map(user => ({ id: user.id, name: user.name })),
-    sheet: characterSheet(actor, texts)
+    owners: playerOwners(actor).map(user => ({ id: user.id, name: user.name }))
   };
 }
 
 /**
- * Describe every character in a campaign for the listener.
+ * Describe a character for the listener, sheet included.
+ * @param {Actor} actor
+ * @param {SheetTexts} [texts]  Collects the descriptions its sheet refers to.
+ * @returns {object}
+ */
+export function summarizeCharacter(actor, texts) {
+  return { ...rosterEntry(actor), sheet: characterSheet(actor, texts) };
+}
+
+/**
+ * Every character in a campaign, as its roster lists them: since 0.22.0, a bridge.hello's
+ * characters, their sheets following it, each in a post of its own.
  * @param {Campaign} campaign
- * @param {SheetTexts} [texts]  Collects the descriptions their sheets refer to.
  * @returns {object[]}
  */
-export function roster(campaign, texts) {
-  return campaignActors(campaign).map(actor => summarizeCharacter(actor, texts));
+export function roster(campaign) {
+  return campaignActors(campaign).map(actor => rosterEntry(actor));
 }
 
 /**

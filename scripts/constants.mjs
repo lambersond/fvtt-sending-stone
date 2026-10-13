@@ -217,3 +217,40 @@ export const HELLO_WANTED_HOOK = "sendingStone.helloWanted";
  * @type {string}
  */
 export const LISTENER_FEATURES_HOOK = "sendingStone.listenerFeatures";
+
+/**
+ * The name of the hook called when a campaign's bridge.hello is answered with a 2xx, for its
+ * characters' sheets to follow it, each in a post of its own. Called with the campaign's id.
+ * @type {string}
+ */
+export const HELLO_DELIVERED_HOOK = "sendingStone.helloDelivered";
+
+/**
+ * The name of the hook called when what the listener takes of a campaign's sheets changes, as an
+ * answer says it: the slim format it expands, or the largest post it takes. Called with the
+ * campaign's id.
+ * @type {string}
+ */
+export const SHEET_TERMS_HOOK = "sendingStone.sheetTerms";
+
+/**
+ * The name of the hook called when an event is dropped: called with its envelope and
+ * `{temporary}`, whether it was lost to failures that might not last, such as the app being
+ * unreachable for a while, rather than refused.
+ * @type {string}
+ */
+export const EVENT_DROPPED_HOOK = "sendingStone.eventDropped";
+
+/**
+ * The slim format of sheets this module sends to a listener that says it expands it, in its
+ * answers' `features.slimSheets`: see sheet-slim.mjs.
+ * @type {number}
+ */
+export const SLIM_SHEETS = 1;
+
+/**
+ * The largest post a listener takes, in bytes, until it says otherwise in its answers'
+ * `features.maxBytes`: the least the protocol asks of one.
+ * @type {number}
+ */
+export const DEFAULT_MAX_BYTES = 1_000_000;

@@ -9,6 +9,9 @@ import { DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from "./constants.mjs";
  * is being made, each die it throws takes the next value the player rolled for that kind of die.
  * A die the player didn't roll, such as a third d20 for Elven Accuracy, a d4 for Bless, or a
  * Halfling's reroll of a 1, is rolled by Foundry as usual, and Foundry's total is the roll's total.
+ * So is a die a formula's own modifiers roll again, as `2d6r<=2` rerolls a 1 or a 2 and `1d6x`
+ * explodes on a 6: the player's dice are each die's first throw, and what Foundry keeps, drops or
+ * counts of them, as `4d6kh3` keeps the highest three, it works out from those.
  */
 
 /**
@@ -155,6 +158,8 @@ function planFor(tag) {
 /**
  * Give a die of a tagged roll the next value the player rolled for it. Only a die's first roll is
  * the player's: a reroll or an explosion is Foundry's, so a player can't stock values for them.
+ * Foundry rolls one with `reroll` or `explode`, as its `r`, `rr`, `x` and `xo` modifiers do, which
+ * the self-test checks.
  * @this {DiceTerm}
  * @param {Function} wrapped   Foundry's own roll of the die.
  * @param {...any} args
@@ -328,7 +333,8 @@ function takesPlayersDice(roll, dice) {
 /**
  * Can rolls made together, as a damage roll's parts, take every die the player rolled for them:
  * have they at least as many dice of each size as they rolled, among their own, outside any
- * function or parentheses? A die more of theirs, such as a d4 for Bless, is Foundry's to roll.
+ * function or parentheses? A die more of theirs, such as a d4 for Bless, is Foundry's to roll. A
+ * die with modifiers counts as its number, its first throw: what they roll again is Foundry's.
  * @param {Roll[]} rolls   Built, not yet rolled.
  * @param {{faces: number, results: number[]}[]} dice
  * @returns {boolean}
@@ -388,9 +394,11 @@ export function extrasFormula(extras=[]) {
  * The dice a roll will throw, before it's rolled, for a player to roll them in the app: each die
  * term's faces and number, in order, those of a critical hit's critical damage, which dnd5e adds
  * after the roll's own, marked `added`, and those the roll takes away, as Reduce's −1d4, marked
- * `subtracted`; a die may be both. A roll can't be planned when one of its dice can't be known
- * beforehand: dice inside parentheses or a function, a number of dice still to be worked out, or a
- * die a player can't roll, such as a d3. Foundry then rolls all of them.
+ * `subtracted`; a die may be both. A die with modifiers, such as `2d6r<=2`, `1d6x` or `4d6kh3`, is
+ * planned as its number, the first throw the player rolls; a die its modifiers roll again is
+ * Foundry's. A roll can't be planned when one of its dice can't be known beforehand: dice inside
+ * parentheses or a function, a number of dice still to be worked out, or a die a player can't
+ * roll, such as a d3. Foundry then rolls all of them.
  * @param {Roll} roll   Built, not yet evaluated.
  * @returns {{plannable: boolean, dice: {faces: number, number: number, added?: true, subtracted?: true}[]}}
  */
@@ -533,6 +541,102 @@ function groupTakesAway(text, negative) {
 }
 
 /**
+ * Would damage at its highest still have Foundry roll a die of it again: one that explodes, as
+ * `1d6x`, or rerolls on its highest face, as `1d6r6`? The player's dice are each die's first throw,
+ * and a die Foundry rolls again isn't at its highest, so such damage isn't rolled at its highest.
+ * Its formulas are read as Foundry reads them, each die's modifiers as Foundry splits and applies
+ * them, at each depth of parentheses and within functions; one Foundry can't read is taken to
+ * explode where a die is followed by an `x` among its modifiers, as the app reads it.
+ * @param {string[]} formulas   Each roll's formula, as built.
+ * @returns {boolean}
+ */
+export function unmaximizable(formulas) {
+  return (formulas ?? []).some(formula => {
+    if ( typeof formula !== "string" ) return false;
+    let terms;
+    try {
+      terms = new foundry.dice.Roll(formula).terms;
+    } catch {
+      return /d\d+[a-z\d<>=]*x/i.test(formula);
+    }
+    const { DiceTerm } = foundry.dice.terms;
+    return terms.some(term => {
+      if ( term instanceof DiceTerm ) return rethrownAtHighest(term);
+      // Parentheses hold a formula of their own, and a function or a pool one for each argument,
+      // each shorter than the formula they're in, which a term of text isn't.
+      const inner = [term.term, ...(Array.isArray(term.terms) ? term.terms : [])];
+      return unmaximizable(inner.filter(each => (typeof each === "string") && (each.length < formula.length)));
+    });
+  });
+}
+
+/**
+ * Does a die, at its highest, have Foundry roll it again: does one of its modifiers explode it, or
+ * reroll it on its highest face? Each modifier is the command Foundry reads it as, or for one it
+ * doesn't know as a whole, such as `kx`, each it starts with in turn, as Foundry applies them.
+ * @param {DiceTerm} term
+ * @returns {boolean}
+ */
+function rethrownAtHighest(term) {
+  const commands = term.constructor.MODIFIERS ?? {};
+  const known = Object.keys(commands).sort((a, b) => b.length - a.length);
+  const again = ([command, text]) => {
+    const method = commands[command];
+    if ( ["explode", "explodeOnce"].includes(method) ) return true;
+    return ["reroll", "rerollRecursive"].includes(method) && rerollsOn(text, term.faces);
+  };
+  return (term.modifiers ?? []).some(modifier => modifierCommands(String(modifier), known).some(again));
+}
+
+/**
+ * The commands Foundry applies a die's modifier as, each with the text it's applied with: the
+ * modifier's own letters, as `r` for `r<=2`, where they're a command; or else each command its
+ * letters start with in turn, longest first, applied bare.
+ * @param {string} modifier
+ * @param {string[]} known   The die's commands, longest first.
+ * @returns {[string, string][]}
+ */
+function modifierCommands(modifier, known) {
+  let letters = /[a-z]+/i.exec(modifier)?.[0]?.toLowerCase() ?? "";
+  if ( known.includes(letters) ) return [[letters, modifier]];
+  const found = [];
+  while ( letters ) {
+    const command = known.find(each => letters.startsWith(each));
+    if ( !command ) break;
+    found.push([command, command]);
+    letters = letters.slice(command.length);
+  }
+  return found;
+}
+
+/**
+ * Does a reroll modifier reroll a die showing this face, as Foundry reads it: `r` a 1, `rN` an N,
+ * `r<=N` and the like what meets its comparison, and `rM…` none once M is 0?
+ * @param {string} modifier   Such as "r<=2" or "rr1".
+ * @param {number} face
+ * @returns {boolean}
+ */
+function rerollsOn(modifier, face) {
+  const match = /rr?([0-9]+)?([<>=]+)?([0-9]+)?/i.exec(modifier);
+  if ( !match ) return false;
+  let [, most, comparison, target] = match;
+  if ( most && !(target || comparison) ) {
+    target = most;
+    most = undefined;
+  }
+  if ( (most !== undefined) && (Number(most) <= 0) ) return false;
+  const value = (target !== undefined) ? Number(target) : 1;
+  switch ( comparison || "=" ) {
+    case "=": return face === value;
+    case "<": return face < value;
+    case "<=": return face <= value;
+    case ">": return face > value;
+    case ">=": return face >= value;
+    default: return false;
+  }
+}
+
+/**
  * Is a term one dnd5e added to a critical hit's damage as its critical damage, as an attack's
  * critical damage or a damage activity's: marked so, for it to be taken off when the roll is made
  * again? Midi-QOL marks the dice its rules add beside each die so too.
@@ -545,7 +649,7 @@ function criticalDamageTerm(term) {
 
 /**
  * Are these the dice a roll throws, as planned: the same dice, in order? None, for one that can't
- * be planned or has no dice.
+ * be planned or has no dice. A die with modifiers throws its number of them first, the player's.
  * @param {{faces: number, results: number[]}[]} dice
  * @param {{faces: number, number: number}[]} planned
  * @returns {boolean}
@@ -1007,9 +1111,10 @@ async function hitDieSelfTest() {
 
 /**
  * Check that a player's dice reach an attack's damage: each part of it, which dnd5e rolls apart,
- * takes its own dice, in order; and a critical hit's damage takes every die planned for it,
- * however this world and its modules roll critical damage. What a module then does to a die, as
- * Midi-QOL's critical rules can maximize it, is its own.
+ * takes its own dice, in order; a critical hit's damage takes every die planned for it, however
+ * this world and its modules roll critical damage; and dice with modifiers take them as their first
+ * throw alone. What a module then does to a die, as Midi-QOL's critical rules can maximize it, is
+ * its own.
  * @returns {Promise<void>}
  */
 async function attackSelfTest() {
@@ -1045,6 +1150,42 @@ async function attackSelfTest() {
     const left = critDice.filter(({ faces }) => plan.remaining(faces) > 0);
     check(!left.length, `a critical hit's damage, ${critical.formula}, left the player's dice unused`);
   });
+  await modifiedDiceSelfTest();
+}
+
+/**
+ * Check that dice with modifiers take the player's dice as their first throw, and only that:
+ * damage of a d6 rerolled on a 2 or less, a d8, an exploding d6 and four d6s the highest three of
+ * which are kept, with the player's 1 and 5, 3, 6, and 1 to 4. Foundry must roll the reroll of the
+ * 1 and the explosion of the 6 itself; one that rolled them as first throws would give them the
+ * player's next dice, which belong to the dice after, and its totals would be the app's no longer.
+ * @returns {Promise<void>}
+ */
+async function modifiedDiceSelfTest() {
+  const id = `self-test-${foundry.utils.randomID()}`;
+  const [roll] = damageRollsFor({
+    rolls: [{ parts: ["2d6r<=2 + 1d8 + 1d6x + 4d6kh3"], data: {}, options: { type: "slashing", [ROLL_TAG]: id } }],
+    isCritical: false
+  });
+  const dice = [
+    { faces: 6, results: [1, 5] }, { faces: 8, results: [3] }, { faces: 6, results: [6] },
+    { faces: 6, results: [1, 2, 3, 4] }
+  ];
+  const planned = plannedDice(roll);
+  check(planned.plannable && matchesDice(dice, planned.dice),
+    `damage with modifiers, ${roll.formula}, can't be planned`);
+  await withPlan({ id, kind: "damage", dice }, async plan => {
+    await roll.evaluate();
+    check([6, 8].every(faces => plan.remaining(faces) === 0), `${roll.formula} left the player's dice unused`);
+  });
+  const [rerolled, , exploded, kept] = roll.dice;
+  const firsts = (die, count) => JSON.stringify((die?.results ?? []).slice(0, count).map(({ result }) => result));
+  check((firsts(rerolled, 2) === "[1,5]") && (rerolled.results[0].rerolled === true) && (rerolled.results.length === 3),
+    `${roll.formula} threw ${firsts(rerolled, 3)} for its rerolled d6, not the player's 1, rerolled, and 5`);
+  check((firsts(exploded, 1) === "[6]") && (exploded.results[0].exploded === true) && (exploded.results.length >= 2),
+    `${roll.formula} threw ${firsts(exploded, 2)} for its exploding d6, not the player's 6, exploded`);
+  check((firsts(kept, 4) === "[1,2,3,4]") && (kept.total === 9),
+    `${roll.formula} threw ${firsts(kept, 4)} for the d6s it keeps three of, coming to ${kept?.total}, not 9`);
 }
 
 /**

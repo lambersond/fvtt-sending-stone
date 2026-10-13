@@ -101,15 +101,18 @@ const queues = new Map();
  * game asks of them. And whether a check their check activities call for, such as Fast Hands'
  * Sleight of Hand, may be rolled for the activity, against its DC, under dnd5e 5.x, where check
  * activities are made here. And, from module 0.21.0, that more dice and another die change only a
- * die the damage adds, never one it takes away, which previews mark (`signedDice`).
+ * die the damage adds, never one it takes away, which previews mark (`signedDice`); from 0.22.0,
+ * that a use may be made at its user, `self`, beside those picked, wherever uses are made
+ * (`selfTargets`).
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
- *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean}}
+ *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
+ *   selfTargets: boolean}}
  */
 export function rollFeatures(campaign) {
   const off = {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
-    signedDice: false
+    signedDice: false, selfTargets: false
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -127,7 +130,8 @@ export function rollFeatures(campaign) {
     areaAttacks: attacks,
     prompts: prompting(campaign),
     activityChecks: checksOffered(),
-    signedDice: true
+    signedDice: true,
+    selfTargets: attacks
   };
 }
 
