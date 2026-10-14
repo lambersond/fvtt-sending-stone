@@ -16,7 +16,8 @@ import { inMegabytes, status } from "./transport.mjs";
  * once. A failing connection clears with the next post that gets through, or for the app's
  * address, once a post of each campaign that failed for it has, which tells the Gamemaster so if
  * they were told of the failure; a refused event never fails the connection, but is shown as the
- * campaign's last refusal until the next.
+ * campaign's last refusal until the next, or until a post of the same type gets through, for the
+ * same character where it's about one.
  */
 
 /**
@@ -67,9 +68,10 @@ const FAILING_AFTER = 3;
 const connection = new Map();
 
 /**
- * Each campaign's latest refused event, by campaign id.
- * @type {Map<string, {reason: string, type: string, detail: string|null, size: number|null,
- *   limit: number|null, at: number}>}
+ * Each campaign's latest refused event, by campaign id: why, and which post it was, by its type and,
+ * for a sheet, its character's actor id.
+ * @type {Map<string, {reason: string, type: string, actorId: string|null, detail: string|null,
+ *   size: number|null, limit: number|null, at: number}>}
  */
 const lastRefused = new Map();
 
@@ -101,6 +103,9 @@ const toldAt = new Map();
  * failed for its address has had one delivered, the app's address works again. One campaign's
  * posts getting through says nothing of another's that keep failing.
  * A delivered hello starts the campaign's sheets afresh, so none is withheld until one is again.
+ * The campaign's last refusal goes once a post of the same type gets through, for a sheet once
+ * that character's next does: the app takes such posts again. That says nothing of what it refused,
+ * which isn't sent again, though a character's next sheet stands in for one refused.
  * @param {object} envelope
  * @returns {void}
  */
@@ -119,6 +124,10 @@ export function noteDelivered(envelope) {
     recover(`events:${campaign.id}`,
       () => game.i18n.format("SENDINGSTONE.Notify.CampaignRecovered", { campaign: campaign.title }));
     if ( envelope.type === EVENTS.HELLO ) dropWithheld(campaign.id);
+    const refused = lastRefused.get(campaign.id);
+    if ( (refused?.type === envelope.type) && [null, characterOf(envelope)].includes(refused.actorId) ) {
+      lastRefused.delete(campaign.id);
+    }
   }
   changed();
 }
@@ -139,8 +148,8 @@ export function noteFailed(envelope, err) {
   if ( scope === "event" ) {
     if ( id ) {
       lastRefused.set(id, {
-        reason, type: envelope.type, detail: err?.detail ?? null, size: err?.size ?? null,
-        limit: err?.limit ?? null, at: Date.now()
+        reason, type: envelope.type, actorId: characterOf(envelope), detail: err?.detail ?? null,
+        size: err?.size ?? null, limit: err?.limit ?? null, at: Date.now()
       });
     }
     tell(`${id}:${reason}:${envelope?.type}`, text, { once: true });
@@ -332,6 +341,18 @@ function whatOf(type) {
   if ( kind.startsWith("roll.prompt.") ) return "Prompt";
   if ( kind === EVENTS.COMMAND_RESULT ) return "Result";
   return "Event";
+}
+
+/**
+ * The character a post is about, for one about one: a sheet's, by its actor id, as its envelope
+ * carries it. Descriptions are shared between sheets, so they're about none.
+ * @param {object} envelope
+ * @returns {string|null}
+ */
+function characterOf(envelope) {
+  if ( envelope?.type !== EVENTS.CHARACTER_UPDATED ) return null;
+  const id = envelope.data?.character?.id;
+  return (typeof id === "string") ? id : null;
 }
 
 /**

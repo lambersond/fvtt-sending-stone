@@ -114,11 +114,12 @@ export function serializeMessage(message, campaign, audience=chatAudience(messag
  * The roll a message says the campaign's Gamemaster made from the app as a character, by its id,
  * as `gmRoll`: the roll it was made for, the use whose card it is, or the death save whose outcome
  * it tells. Its author may change its flags, so this is a claim, which the app checks against the
- * rolls it handed over; a message that makes none has no `gmRoll`.
+ * rolls it handed over, and since 0.25.0 against the messages each roll's result lists; a message
+ * that makes none has no `gmRoll`.
  * @param {ChatMessage} message
  * @returns {{gmRoll?: string}}
  */
-function gmRollOf(message) {
+export function gmRollOf(message) {
   const flags = message.flags?.[MODULE_ID];
   if ( flags?.by !== "gm" ) return {};
   const id = [flags.request, flags.use, flags.outcome].find(value => typeof value === "string");
