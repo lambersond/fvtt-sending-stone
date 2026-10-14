@@ -1,4 +1,6 @@
 import { MODULE_ID, SETTINGS } from "./constants.mjs";
+import { manualDiceEnabled } from "./companions.mjs";
+import { diceStatus } from "./dice-plan.mjs";
 
 /**
  * Campaigns: groups of player characters, each with a title, that events are sent to.
@@ -24,6 +26,9 @@ import { MODULE_ID, SETTINGS } from "./constants.mjs";
  *                                    asks of their characters, such as concentration checks, to roll
  *                                    them there? Off until the Gamemaster turns it on, and only with
  *                                    `rolls`.
+ * @property {boolean} manualDice     May its players enter what their own dice show in the app?
+ *                                    Off until the Gamemaster turns it on, and counted only with
+ *                                    `rolls` while Manual Dice is on: see manualDiceOn.
  */
 
 /**
@@ -32,14 +37,28 @@ import { MODULE_ID, SETTINGS } from "./constants.mjs";
  */
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
-  return stored.map(({ id, title, characters, rolls, attacks, prompts }) => ({
+  return stored.map(({ id, title, characters, rolls, attacks, prompts, manualDice }) => ({
     id,
     title,
     characters: new Set(characters),
     rolls: rolls === true,
     attacks: attacks === true,
-    prompts: prompts === true
+    prompts: prompts === true,
+    manualDice: manualDice === true
   }));
+}
+
+/**
+ * May a campaign's players enter their own dice results in the app? Only while its players' rolls
+ * in the app are made here, so not under another system or after a failed self-test, and Manual
+ * Dice is on. A choice saved while Manual Dice was on is kept once it isn't, but counts for nothing
+ * until it is again. Nothing is entered in the app yet: this only tells the app, and shows each
+ * character's switch, coming soon.
+ * @param {{rolls: boolean, manualDice: boolean}} campaign
+ * @returns {boolean}
+ */
+export function manualDiceOn(campaign) {
+  return (campaign.rolls === true) && diceStatus.ready && (campaign.manualDice === true) && manualDiceEnabled();
 }
 
 /**

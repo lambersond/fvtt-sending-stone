@@ -1,5 +1,7 @@
 import { CHAT_SCOPES, MODULE_ID, SETTINGS } from "./constants.mjs";
 import { announce } from "./bridge.mjs";
+import { getCampaigns } from "./campaigns.mjs";
+import { MANUAL_DICE } from "./companions.mjs";
 import SettingsWindow from "./apps/settings-window.mjs";
 
 const { ArrayField, BooleanField, SchemaField, SetField, StringField } = foundry.data.fields;
@@ -61,11 +63,22 @@ export function registerSettings() {
       characters: new ArrayField(new StringField({ blank: false })),
       rolls: new BooleanField({ initial: false }),
       attacks: new BooleanField({ initial: false }),
-      prompts: new BooleanField({ initial: false })
+      prompts: new BooleanField({ initial: false }),
+      manualDice: new BooleanField({ initial: false })
     })),
     default: [],
     onChange: () => reannounce()
   });
+
+  // Whether a campaign's players may enter their own dice results counts only while Manual Dice
+  // is on, so switching it on or off in its own settings tells the campaigns that allow it afresh.
+  // Enabling or disabling the module reloads the world, which tells every campaign anyway.
+  const allowed = () => getCampaigns().some(campaign => campaign.rolls && campaign.manualDice);
+  for ( const hook of ["createSetting", "updateSetting"] ) {
+    Hooks.on(hook, setting => {
+      if ( (setting?.key === `${MANUAL_DICE}.enabled`) && allowed() ) reannounce();
+    });
+  }
 
   // Kept only so connected characters chosen before campaigns can be moved into one.
   game.settings.register(MODULE_ID, SETTINGS.CHARACTERS, {

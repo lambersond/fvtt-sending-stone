@@ -1,6 +1,6 @@
 import { ATTACK_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_KINDS } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
-import { describeCampaign, getCampaigns } from "./campaigns.mjs";
+import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
@@ -132,16 +132,17 @@ const made = new Map();
  * (`selfTargets`); and from 0.23.0, that a command may say it's the Gamemaster's, `by`, made as
  * the character's and marked as theirs, wherever rolls are made (`gmRolls`); from 0.25.0, that
  * the result of such a command lists the chat messages it made (`gmRollMessages`), so that only
- * those are taken as the Gamemaster's.
+ * those are taken as the Gamemaster's; and from 0.26.0, whether its players may enter their own
+ * dice results in the app, with Manual Dice (`manualDice`), which the app doesn't offer yet.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
- *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean}}
+ *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean, manualDice: boolean}}
  */
 export function rollFeatures(campaign) {
   const off = {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
-    signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false
+    signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -162,7 +163,8 @@ export function rollFeatures(campaign) {
     signedDice: true,
     selfTargets: attacks,
     gmRolls: true,
-    gmRollMessages: true
+    gmRollMessages: true,
+    manualDice: manualDiceOn(campaign)
   };
 }
 
