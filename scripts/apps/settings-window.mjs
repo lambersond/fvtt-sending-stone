@@ -1,5 +1,5 @@
 import { CHAT_SCOPES, EVENTS, MODULE_ID, SETTINGS, STATUS_HOOK } from "../constants.mjs";
-import { getCampaigns } from "../campaigns.mjs";
+import { getCampaigns, manualDiceOn } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
 import { attacksUnavailable } from "../command-uses.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
@@ -35,7 +35,7 @@ const GENERAL = Object.freeze({
  * @type {Readonly<Record<string, string[]>>}
  */
 const DEPENDENTS = Object.freeze({
-  "campaign.rolls": ["campaign.attacks", "campaign.prompts"],
+  "campaign.rolls": ["campaign.attacks", "campaign.prompts", "campaign.manualDice"],
   chatEvents: ["chatScope"],
   midiIntegration: ["offCanvasTargets"]
 });
@@ -125,7 +125,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   /**
    * The campaigns as being edited, each with the secret this browser holds for it.
    * @type {{id: string, title: string, secret: string, characters: Set<string>, rolls: boolean,
-   *   attacks: boolean, prompts: boolean}[]}
+   *   attacks: boolean, prompts: boolean, manualDice: boolean}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({ ...campaign, secret: getSecret(campaign.id) }));
 
@@ -219,7 +219,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         characters: Array.from(campaign.characters).filter(id => game.actors.has(id)).sort(),
         rolls: campaign.rolls,
         attacks: campaign.attacks,
-        prompts: campaign.prompts
+        prompts: campaign.prompts,
+        manualDice: campaign.manualDice
       }))
     });
   }
@@ -251,7 +252,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     if ( campaign ) {
       if ( has("campaign.title") ) campaign.title = String(data["campaign.title"] ?? "");
       if ( has("campaign.secret") ) campaign.secret = String(data["campaign.secret"] ?? "");
-      for ( const name of ["rolls", "attacks", "prompts"] ) {
+      for ( const name of ["rolls", "attacks", "prompts", "manualDice"] ) {
         if ( has(`campaign.${name}`) ) campaign[name] = data[`campaign.${name}`] === true;
       }
     }
@@ -541,13 +542,16 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       };
     }
     else if ( tab === "players" ) {
+      // Each character's own switch for entering its dice results, while its players may: coming soon.
+      const manualDice = manualDiceOn(campaign);
       Object.assign(context, {
         groups: this.#groups(members.map(entry => {
           const also = others.filter(other => other.characters.has(entry.id));
           return {
             ...entry,
             also: also.length ? game.i18n.format("SENDINGSTONE.Config.Players.AlsoIn", { campaigns: titles(also) }) : null,
-            removeLabel: game.i18n.format("SENDINGSTONE.Config.Players.Remove", { name: entry.name })
+            removeLabel: game.i18n.format("SENDINGSTONE.Config.Players.Remove", { name: entry.name }),
+            manualDice: manualDice ? game.i18n.format("SENDINGSTONE.Config.Players.ManualDice", { name: entry.name }) : null
           };
         })),
         filter: this.#filters.players,
@@ -573,7 +577,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
 
   /**
    * A campaign's Player actions tab: what its players may do from the app, why any of it can't be
-   * done in this game, and who rolls their dice.
+   * done in this game, and whether they may enter their own dice results, which needs Manual Dice.
    * @param {SettingsWindow["#campaigns"][number]} campaign
    * @returns {object}
    */
@@ -589,15 +593,17 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       rolls: campaign.rolls,
       attacks: campaign.attacks,
       prompts: campaign.prompts,
+      manualDice: campaign.manualDice,
       rollsUnavailable,
       attacksUnavailable: (attacksReason && (attacksReason !== "pending"))
         ? game.i18n.format("SENDINGSTONE.Config.Actions.Unavailable", {
           reason: game.i18n.localize(`SENDINGSTONE.Config.Actions.AttacksReason.${attacksReason}`)
         }) : null,
-      // Players entering their own dice in the app isn't offered yet; it will need Manual Dice.
+      // Allowed only while Manual Dice is on. A choice saved while it was is shown as saved, and
+      // kept, but can't be changed until it's on again.
       dice: {
         ready: manualDice === "active",
-        badge: game.i18n.localize(`SENDINGSTONE.Config.Actions.${(manualDice === "active") ? "Soon" : "NeedsManualDice"}`),
+        enabled: campaign.rolls && (manualDice === "active"),
         note: game.i18n.localize(`SENDINGSTONE.Config.Actions.ManualDice.${manualDice}`)
       }
     };
@@ -674,8 +680,10 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     for ( const name of DEPENDENTS[target.name] ?? [] ) {
       const field = this.element.querySelector(`[name="${name}"]`);
       if ( !field ) continue;
-      field.disabled = !target.checked;
-      field.closest(".form-group")?.classList.toggle("disabled", !target.checked);
+      // One that can't be changed for a reason of its own, as without Manual Dice, stays so.
+      const off = !target.checked || ("locked" in field.dataset);
+      field.disabled = off;
+      field.closest(".form-group")?.classList.toggle("disabled", off);
     }
     for ( const note of this.element.querySelectorAll(`[data-needs="${target.name}"]`) ) note.hidden = target.checked;
     if ( target.name === "campaign.title" ) this.#showTitles();
@@ -858,7 +866,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   static async #onAddCampaign() {
     const campaign = {
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), rolls: false, attacks: false,
-      prompts: false
+      prompts: false, manualDice: false
     };
     this.#campaigns.push(campaign);
     await this.#show({ section: "campaign", campaignId: campaign.id, tab: "connection" }, "[name='campaign.title']");
@@ -1107,7 +1115,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       characters: campaign.characters,
       rolls: campaign.rolls,
       attacks: campaign.attacks,
-      prompts: campaign.prompts
+      prompts: campaign.prompts,
+      manualDice: campaign.manualDice
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {
       const value = this.#general[name];

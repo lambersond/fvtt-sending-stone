@@ -483,6 +483,19 @@
   white-space: nowrap;
 }
 
+/* A character's own switch for entering its dice results, coming soon. */
+#sending-stone-settings .sending-stone-manual-dice {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.375rem;
+  opacity: 0.75;
+}
+
+#sending-stone-settings .sending-stone-manual-dice input {
+  margin: 0;
+}
+
 #sending-stone-settings .sending-stone-row > button.icon {
   flex: none;
   width: 2rem;
@@ -714,58 +727,8 @@
 
 /* Player actions: who rolls the dice ------------------------------------- */
 
-#sending-stone-settings .sending-stone-choices {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.625rem;
-}
-
-#sending-stone-settings .sending-stone-choice {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border: 1px solid var(--ss-line);
-  border-radius: 10px;
-  background: var(--ss-tint);
-  cursor: pointer;
-}
-
-#sending-stone-settings .sending-stone-choice.selected {
-  border-color: var(--ss-accent);
-}
-
-#sending-stone-settings .sending-stone-choice.disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-#sending-stone-settings .sending-stone-choice input {
-  flex: none;
-  margin: 2px 0 0;
-}
-
-#sending-stone-settings .sending-stone-choice-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-width: 0;
-}
-
-#sending-stone-settings .sending-stone-choice-text strong {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-#sending-stone-settings .sending-stone-choice-text .hint,
 #sending-stone-settings .sending-stone-dice-note {
-  margin: 0;
-}
-
-#sending-stone-settings .sending-stone-dice-note {
-  margin-top: 0.625rem;
+  margin: 0.625rem 0 0;
 }
 
 /* Connection ------------------------------------------------------------- */

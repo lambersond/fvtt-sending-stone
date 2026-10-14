@@ -82,8 +82,8 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Run players' attacks through Midi | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active; and whether the game system is D&D Fifth Edition. |
-| A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them. **Who rolls the dice** shows that the app rolls them; players entering what their own dice show, with Manual Dice, is coming. |
+| A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character has a switch for it, coming soon. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; the app says it's coming soon. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -148,8 +148,10 @@ while the roll is being made.
   stay in the app, and each campaign's Player actions tab says why.
 - **libWrapper** is recommended: with it, the dice are wrapped alongside other modules' wrappers.
 - **Players' own dice.** Players who roll physical dice will be able to type what they show in the
-  app instead, with [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) on. A campaign's
-  Player actions tab shows the choice already, but doesn't offer it yet.
+  app instead, with [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) on. With it on,
+  **Allow Players to enter dice results manually** on a campaign's Player actions tab tells the app,
+  which shows the setting as coming soon, and its Players tab shows each character's switch for it,
+  coming soon too. Nothing is entered in the app yet.
 
 The app's address must be able to answer the module's fetches of players' rolls, which only the
 Sending Stone app, or a listener that says it can, is asked for; see

@@ -97,12 +97,14 @@ export function summarizeCharacter(actor, texts) {
 
 /**
  * Every character in a campaign, as its roster lists them: since 0.22.0, a bridge.hello's
- * characters, their sheets following it, each in a post of its own.
+ * characters, their sheets following it, each in a post of its own. Since 0.26.0 each says whether
+ * its player enters its dice results in the app, `manualDice`: none does yet, since nothing per
+ * character is set up for it.
  * @param {Campaign} campaign
  * @returns {object[]}
  */
 export function roster(campaign) {
-  return campaignActors(campaign).map(actor => rosterEntry(actor));
+  return campaignActors(campaign).map(actor => ({ ...rosterEntry(actor), manualDice: false }));
 }
 
 /**

@@ -80,7 +80,9 @@
         "EmptyHint": "Only the characters you add appear here.",
         "Or": "or",
         "CopyFrom": "Copy from",
-        "Copy": "Copy"
+        "Copy": "Copy",
+        "ManualDice": "Enter {name}'s dice results manually",
+        "Soon": "Coming soon"
       },
       "Picker": {
         "Title": "Add to {campaign}",
@@ -116,12 +118,9 @@
           "midi-off": "Run players' attacks through Midi is off in General."
         },
         "Dice": "Who rolls the dice",
-        "DiceApp": "App rolls",
-        "DiceAppHint": "Sending Stone rolls for them.",
-        "DicePlayers": "Players enter results",
+        "DicePlayers": "Allow Players to enter dice results manually",
         "DicePlayersHint": "They type in what their own dice show.",
-        "Soon": "Coming soon",
-        "NeedsManualDice": "Needs Manual Dice",
+        "DiceNeedsRolls": "Needs Players roll in the app.",
         "ManualDice": {
           "active": "Manual Dice is on. Entering results in the app is coming soon.",
           "off": "Manual Dice is installed but off: enable it in its settings.",

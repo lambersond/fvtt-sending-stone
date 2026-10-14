@@ -110,6 +110,13 @@
                 <img src="{{character.img}}" alt="">
                 <span class="sending-stone-row-name">{{character.name}}</span>
                 {{#if character.also}}<span class="sending-stone-chip" data-tooltip="{{character.also}}">{{character.also}}</span>{{/if}}
+                {{#if character.manualDice}}
+                <span class="sending-stone-manual-dice" data-tooltip="{{character.manualDice}}">
+                    <i class="fa-solid fa-keyboard" inert></i>
+                    <input type="checkbox" data-manual-dice="{{character.id}}" aria-label="{{character.manualDice}}" disabled>
+                    <span class="sending-stone-pill">{{localize "SENDINGSTONE.Config.Players.Soon"}}</span>
+                </span>
+                {{/if}}
                 <button type="button" class="icon fa-solid fa-xmark" data-action="removeCharacter"
                         data-actor-id="{{character.id}}" data-tooltip="{{character.removeLabel}}"
                         aria-label="{{character.removeLabel}}"></button>
@@ -186,25 +193,18 @@
 
     <fieldset class="sending-stone-dice">
         <legend>{{localize "SENDINGSTONE.Config.Actions.Dice"}}</legend>
-        <div class="sending-stone-choices" role="radiogroup" aria-label="{{localize "SENDINGSTONE.Config.Actions.Dice"}}">
-            <label class="sending-stone-choice selected">
-                <input type="radio" name="diceEntry" value="app" checked>
-                <span class="sending-stone-choice-text">
-                    <strong><i class="fa-solid fa-dice-d20" inert></i> {{localize "SENDINGSTONE.Config.Actions.DiceApp"}}</strong>
-                    <span class="hint">{{localize "SENDINGSTONE.Config.Actions.DiceAppHint"}}</span>
-                </span>
-            </label>
-            <label class="sending-stone-choice disabled">
-                <input type="radio" name="diceEntry" value="players" disabled>
-                <span class="sending-stone-choice-text">
-                    <strong>
-                        <i class="fa-solid fa-keyboard" inert></i> {{localize "SENDINGSTONE.Config.Actions.DicePlayers"}}
-                        <span class="sending-stone-pill">{{campaign.dice.badge}}</span>
-                    </strong>
-                    <span class="hint">{{localize "SENDINGSTONE.Config.Actions.DicePlayersHint"}}</span>
-                </span>
-            </label>
+        <div class="form-group {{#unless campaign.dice.enabled}}disabled{{/unless}}">
+            <label for="sending-stone-manual-dice">{{localize "SENDINGSTONE.Config.Actions.DicePlayers"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-manual-dice" name="campaign.manualDice"
+                       {{#if campaign.manualDice}}checked{{/if}} {{#unless campaign.dice.enabled}}disabled{{/unless}}
+                       {{#unless campaign.dice.ready}}data-locked{{/unless}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.DicePlayersHint"}}</p>
         </div>
+        <p class="hint" data-needs="campaign.rolls" {{#if campaign.rolls}}hidden{{/if}}>
+            {{localize "SENDINGSTONE.Config.Actions.DiceNeedsRolls"}}
+        </p>
         <p class="hint sending-stone-dice-note">
             <i class="fa-solid {{#if campaign.dice.ready}}fa-check{{else}}fa-lock{{/if}}" inert></i>
             {{campaign.dice.note}}
