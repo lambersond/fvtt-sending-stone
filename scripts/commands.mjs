@@ -7,6 +7,7 @@ import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
+import { gmRollOf } from "./chat-data.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { prompting } from "./prompts.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
@@ -97,6 +98,19 @@ const taken = [];
  */
 const queues = new Map();
 
+/**
+ * The most chat messages a Gamemaster's roll's result lists.
+ * @type {number}
+ */
+const MOST_MESSAGES = 20;
+
+/**
+ * The chat messages each of the Gamemaster's rolls being made has made, by the roll's id, in the
+ * order made: the messages flagged as theirs that this client created for it, or marked for it.
+ * @type {Map<string, string[]>}
+ */
+const made = new Map();
+
 /* -------------------------------------------- */
 
 /**
@@ -116,16 +130,18 @@ const queues = new Map();
  * die the damage adds, never one it takes away, which previews mark (`signedDice`); from 0.22.0,
  * that a use may be made at its user, `self`, beside those picked, wherever uses are made
  * (`selfTargets`); and from 0.23.0, that a command may say it's the Gamemaster's, `by`, made as
- * the character's and marked as theirs, wherever rolls are made (`gmRolls`).
+ * the character's and marked as theirs, wherever rolls are made (`gmRolls`); from 0.25.0, that
+ * the result of such a command lists the chat messages it made (`gmRollMessages`), so that only
+ * those are taken as the Gamemaster's.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
- *   selfTargets: boolean, gmRolls: boolean}}
+ *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean}}
  */
 export function rollFeatures(campaign) {
   const off = {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
-    signedDice: false, selfTargets: false, gmRolls: false
+    signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -145,8 +161,21 @@ export function rollFeatures(campaign) {
     activityChecks: checksOffered(),
     signedDice: true,
     selfTargets: attacks,
-    gmRolls: true
+    gmRolls: true,
+    gmRollMessages: true
   };
+}
+
+/**
+ * Register the hooks that note which chat messages the Gamemaster's rolls make.
+ * @returns {void}
+ */
+export function registerCommandHooks() {
+  Hooks.on("createChatMessage", (message, _options, userId) => noteMessageMade(message, userId));
+  // dnd5e 5.3's message of a death save's outcome is marked as the Gamemaster's once made.
+  Hooks.on("updateChatMessage", (message, changed, _options, userId) => {
+    if ( changed?.flags?.[MODULE_ID] ) noteMessageMade(message, userId);
+  });
 }
 
 /**
@@ -386,12 +415,14 @@ function take(command, campaign) {
  * Make a command, and tell the app what became of it. One that takes too long is reported as such,
  * and the character's next roll goes ahead; if it's made after all, as once the Gamemaster has
  * answered what a module asked them, the app is told so too; and so it is of hit dice spent at
- * once, some of which were spent before they stopped for it.
+ * once, some of which were spent before they stopped for it. A Gamemaster's roll's result lists
+ * the chat messages it has made, by then.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {Promise<void>}
  */
 async function make(command, campaign) {
+  if ( command.by === "gm" ) made.set(command.id, []);
   let timer;
   const watchdog = new AbortController();
   const timeout = new Promise(resolve => {
@@ -406,17 +437,48 @@ async function make(command, campaign) {
   });
   try {
     const result = await Promise.race([running, timeout]);
-    send(EVENTS.COMMAND_RESULT, result, campaign, { sequenced: false });
+    send(EVENTS.COMMAND_RESULT, withMessages(command, result), campaign, { sequenced: false });
     if ( watchdog.signal.aborted ) {
       void running.then(late => {
         if ( (late.status === "done") || (late.spent?.made > 0) ) {
-          send(EVENTS.COMMAND_RESULT, late, campaign, { sequenced: false });
+          send(EVENTS.COMMAND_RESULT, withMessages(command, late), campaign, { sequenced: false });
         }
       });
     }
   } finally {
     clearTimeout(timer);
+    // One that took too long may make more messages, for its late result; after that, none.
+    void running.finally(() => made.delete(command.id));
   }
+}
+
+/**
+ * A result as the app is told it: a Gamemaster's roll's with the ids of the chat messages it has
+ * made, in the order made, none if it made none; a player's as it is.
+ * @param {object} command
+ * @param {CommandResult} result
+ * @returns {CommandResult}
+ */
+function withMessages(command, result) {
+  if ( command.by !== "gm" ) return result;
+  return { ...result, messages: [...(made.get(command.id) ?? [])] };
+}
+
+/**
+ * Note a chat message as made by the Gamemaster's roll it's flagged for, while that roll is being
+ * made: only one this client created or marked, as the module does, never one a player's browser
+ * did, as their own message with a roll's flags copied onto it. A module that creates messages on
+ * this client for players, as Midi-QOL's createChatMessage socket does, could have such a copy
+ * listed while the roll is made. Its speaker can't narrow it: dnd5e posts a utility's formula with
+ * none.
+ * @param {ChatMessage} message
+ * @param {string} userId   Who created or changed it.
+ * @returns {void}
+ */
+function noteMessageMade(message, userId) {
+  if ( userId !== game.user?.id ) return;
+  const list = made.get(gmRollOf(message).gmRoll);
+  if ( list && !list.includes(message.id) && (list.length < MOST_MESSAGES) ) list.push(message.id);
 }
 
 /**

@@ -1,7 +1,7 @@
 import { checkBridge, resendHello } from "./bridge.mjs";
 import { eventDropped, helloDelivered, registerCharacterHooks, sheetTermsChanged } from "./character-sync.mjs";
 import { markAppRoll } from "./command-rolls.mjs";
-import { noteListenerFeatures } from "./commands.mjs";
+import { noteListenerFeatures, registerCommandHooks } from "./commands.mjs";
 import {
   EVENT_DROPPED_HOOK, HELLO_DELIVERED_HOOK, HELLO_WANTED_HOOK, LISTENER_FEATURES_HOOK, SHEET_TERMS_HOOK
 } from "./constants.mjs";
@@ -19,6 +19,7 @@ Hooks.once("init", () => {
   registerCombatHooks();
   registerCharacterHooks();
   registerPromptHooks();
+  registerCommandHooks();
 });
 
 // Every client registers the hooks, but only the active Gamemaster's posts anything. That role can

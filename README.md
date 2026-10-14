@@ -118,7 +118,10 @@ saving throws, the combat tracker, Dice So Nice and Midi-QOL all behave as if th
 Foundry. Each card is marked as rolled on Sending Stone. A campaign's Gamemaster can open any of
 its characters' sheets in the app and roll as them; those rolls are marked GM on their cards, and
 are made as the character's player all the same, so the modules that read a card's author treat
-them as the player's own.
+them as the player's own. Each tells the app which chat messages it made, so the app marks those
+alone as yours, never a copy a player posts from their own browser. A module that posts chat
+messages from your browser for players, as Midi-QOL does, could still let a player have one marked
+while the roll is being made.
 
 - **Under D&D Fifth Edition only.** The Gamemaster's browser makes the rolls, so a Gamemaster must
   have the game open, as for everything else.
@@ -444,6 +447,9 @@ Gamemaster-only information switched on.
   warned once for each character and campaign, the campaign's Connection tab shows it until it's sent, and the
   app tells its player why. A hello, sheet or description lost to the app being unreachable for a
   while is sent again 30 seconds later.
+- **A refusal shows until a post of the same kind gets through.** A campaign's Connection tab shows
+  the last post the app refused until a post of the same kind reaches it, for a sheet that
+  character's next, or until the app refuses another. The refused post itself isn't sent again.
 - **Players' attacks and spells with Midi-QOL set your targets** while each is made, one at a
   time, then put them back.
 - **Only dice are wrapped, and only for players' rolls.** On a Gamemaster's browser under D&D Fifth
@@ -517,7 +523,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
-| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, and reporting what became of each; what a campaign's hello says it makes |
+| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes |
 | `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card, as the Gamemaster's where they made it; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time |
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name |
