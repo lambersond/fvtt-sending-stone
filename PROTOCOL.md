@@ -755,6 +755,45 @@ them, such as dnd5e's `D20Roll`. A dnd5e `DamageRoll` also carries `damageType`.
 result is one that was discarded, such as the lower die of a roll with advantage. Success or
 failure against a DC is deliberately not included.
 
+Since module 0.28.0 a roll also says what it is among its message's rolls, so that a listener can
+show a message's damage as one, as dnd5e's damage card and Midi-QOL's item card do. Each is left
+out where it doesn't apply, never `null` or `false`:
+
+| Field | Meaning |
+| --- | --- |
+| `damage` | `true` for a dnd5e `DamageRoll` (`CONFIG.Dice.DamageRoll`), with a type or without one. |
+| `damageLabel` | Where `damageType` is sent, the words dnd5e's damage card names it by, in the game's language: its short label, else its label, from dnd5e's damage types or else its healing types, such as `"Piercing"` or `"Temp HP"`. Left out for a type not among them. Midi-QOL adds types of its own to them, `none`, `midi-none` and `vitality`, with its labels, so where Midi is active those have one too. |
+| `section` | On Midi-QOL's item card, the part of the card a roll belongs to, by the tag Midi gives it (`options["midi-qol"].rollType`): `"damage"` for the item's own damage (`"defaultDamage"`), `"bonus"` for a bonus macro's, such as Sneak Attack's (`"bonusDamage"`), and `"other"` for its other damage, such as poison on a failed save (`"otherDamage"`). Left out for Midi's attack and utility rolls, and for any roll Midi didn't tag. A bonus macro's own plain `Roll`, which Midi keeps as it is, has `section` `"bonus"` but no `damage`. |
+| `flavor` | For `"bonus"` damage only, the bonus's name from the roll's flavor, trimmed, such as `"Sneak Attack"`. Midi gives a bonus whose macro names none its type as its flavor, so a flavor that is the roll's type, or any of dnd5e's damage or healing types in any case, is left out. |
+| `attack` | `true` for the attack: the roll Midi tags `"attack"` on its card, or one whose dnd5e kind of roll, `options.rollType`, is `"attack"`, which dnd5e copies to each roll of an attack from its message's `roll.type`. |
+
+A bonus macro's damage on Midi-QOL's item card:
+
+```json
+{
+  "class": "DamageRoll",
+  "formula": "3d6",
+  "total": 11,
+  "dice": [{ "expression": "3d6", "faces": 6, "number": 3, "results": [{ "result": 4, "active": true }, { "result": 2, "active": true }, { "result": 5, "active": true }] }],
+  "critical": false,
+  "damage": true,
+  "damageType": "piercing",
+  "damageLabel": "Piercing",
+  "section": "bonus",
+  "flavor": "Sneak Attack"
+}
+```
+
+Each is read from the roll alone, from the options Foundry keeps with a message's rolls, so a
+message sent again, after a reload or by a Gamemaster's client that never ran Midi's workflow, says
+the same. Midi's `useOther`, which draws a card's own damage in its other damage section, is never
+followed, and such a card's own damage has `section` `"damage"`, a known limit: in Midi's source it
+is only declared and read, never set; it isn't kept with the card, so a workflow rebuilt from its
+card, or a Gamemaster's client for a player's workflow, lacks it; the flags it changes,
+`damageTotal` and `damageDetail`, are written elsewhere too; and only the card's own HTML shows it,
+which is Midi's own and is written over where the card has other damage. The same fields are on
+[`command.result`](#commandresult)'s `rolls`.
+
 The `dnd5e` object:
 
 ```json
@@ -933,7 +972,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | `error` | What went wrong, for `"invalid"` and `"error"`, what dnd5e said for `"consume"`, and why for `"prompt"`; otherwise `null`. |
 | `messageId` | The chat message the roll made; for hit dice, the last of their cards. Since module 0.21.0, an enchant activity's use that failed once used, `"enchant"` or `"midi"`, has its card's while the card is there, with `visible`, for the Gamemaster to apply it from; one with no card, as a module stopped dnd5e posting it or Midi-QOL deleted it, or with a card no one can apply it from, as one naming a concentration that has since ended, has `null`, with `visible` `true`, and so does the end of an enchantment. Since module 0.27.0, an answer to a [Midi prompt](#midi-qols-own-saves) has `null` where Midi makes no message for the roll, as when the Gamemaster's browser rolls it and Midi doesn't show saves, with `visible` `true`: its dice are the player's own. |
 | `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check; for hit dice, `false` unless they may see every card. |
-| `rolls` | The [rolls](#chat-message) as made, Foundry's total and every die, when `visible`; otherwise empty. For hit dice, every roll of every card, in order. A roll's `total` is Foundry's: damage that takes dice away may come below 0, where dnd5e's card shows each kind of damage at least 0. |
+| `rolls` | The [rolls](#chat-message) as made, Foundry's total and every die, when `visible`; otherwise empty. For hit dice, every roll of every card, in order. A roll's `total` is Foundry's: damage that takes dice away may come below 0, where dnd5e's card shows each kind of damage at least 0. Since module 0.28.0 each has the marks a chat message's roll has, `damage`, `damageLabel`, `section`, `flavor` and `attack`, where they apply: a player's damage through Midi-QOL has `section` `"damage"`. |
 | `healed` | For a hit die or hit dice: the hit points gained; see [Hit dice and formulas](#hit-dice-and-formulas). |
 | `spent` | For hit dice (module 0.20.0), once past the checks made before any is spent: `{ count, made }`, how many were asked for, and how many were rolled, a card each. Hit dice that stopped part way, with `made` below `count`, are `"failed"` with the reason they stopped, and still carry `messageId`, `visible`, `rolls` and `healed` for those made, where any were; see [Hit dice and formulas](#hit-dice-and-formulas). Left out otherwise. |
 | `attack` | For an attack: `{ critical, fumble, outcome }`, and for an area attack `targets`, when `visible`; see [Attacks](#attacks). |
@@ -1312,6 +1351,9 @@ A prompt:
   result sent once its workflow waits on such a prompt. A listener before 0.27.0, saying neither,
   is sent no Midi prompt, and Midi goes its own way, as before; one with an older module, which
   never sends one, needs nothing of it.
+- Module 0.28.0 adds `damage`, `damageLabel`, `section`, `flavor` and `attack` to every
+  [roll summary](#chat-message), in chat messages' `rolls` and `command.result`'s `rolls`, each
+  left out where it doesn't apply. A listener that doesn't read them needs no change.
 
 ## Changes from protocol 1
 

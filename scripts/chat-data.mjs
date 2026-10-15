@@ -2,6 +2,7 @@ import { MODULE_ID } from "./constants.mjs";
 import { includeGmContent } from "./config.mjs";
 import { campaignActors, campaignCharacterId, charactersSeenBy } from "./characters.mjs";
 import { traitLabel } from "./sheet-details.mjs";
+import { localize } from "./sheet-values.mjs";
 
 /**
  * Turning chat messages into plain data for the listener.
@@ -32,6 +33,14 @@ const CHECK_KEY = /^[A-Za-z][\w-]{0,31}$/;
  * @type {RegExp}
  */
 const CONTENT_LINK = /@\w{1,50}\[[^\]@]{0,500}\]\{([^}@]{0,500})\}/g;
+
+/**
+ * The part of Midi-QOL's item card a damage roll on it belongs to, by the tag Midi gives the roll
+ * (`options["midi-qol"].rollType`), as the listener is told it: the item's own damage, a bonus
+ * macro's, or its other damage, as on a failed save.
+ * @type {Record<string, string>}
+ */
+const MIDI_SECTIONS = { defaultDamage: "damage", bonusDamage: "bonus", otherDamage: "other" };
 
 /**
  * Which players can read a message, and which of a campaign's characters those players own.
@@ -369,7 +378,15 @@ function readFlag(roll, property) {
 }
 
 /**
- * Describe a roll: its formula, total and every die result.
+ * Describe a roll: its formula, total and every die result; and since module 0.28.0, what it is
+ * among the rolls of a message, so that a listener can show a message's damage as one: whether
+ * it's damage, the words for its type, its part of Midi-QOL's item card and a bonus's name, and
+ * whether it's the attack.
+ *
+ * Each of those is read from the roll alone, never from a Midi-QOL workflow, so a message sent
+ * again after a reload, or by a Gamemaster's client that never ran the workflow, says the same:
+ * Foundry keeps a roll's options in the message. Midi's `useOther`, which draws a card's own
+ * damage as its other damage, lives only on the live workflow, so it's never followed.
  *
  * Success and failure against a target are deliberately left out: they reveal the difficulty,
  * which D&D Fifth Edition lets the Gamemaster keep from players.
@@ -401,8 +418,57 @@ export function summarizeRoll(roll) {
     if ( value !== undefined ) summary[key] = value;
   }
   const DamageRoll = CONFIG.Dice.DamageRoll;
-  if ( DamageRoll && (roll instanceof DamageRoll) && roll.options?.type ) summary.damageType = roll.options.type;
+  const damage = Boolean(DamageRoll) && (roll instanceof DamageRoll);
+  if ( damage ) summary.damage = true;
+  if ( damage && roll.options?.type ) {
+    summary.damageType = roll.options.type;
+    const label = damageLabel(roll.options.type);
+    if ( label ) summary.damageLabel = label;
+  }
+
+  const options = roll.options ?? {};
+  const midiType = options["midi-qol"]?.rollType;
+  const section = Object.hasOwn(MIDI_SECTIONS, midiType) ? MIDI_SECTIONS[midiType] : null;
+  if ( section ) summary.section = section;
+  const flavor = (section === "bonus") ? bonusFlavor(options) : null;
+  if ( flavor ) summary.flavor = flavor;
+  // Midi's tag on the attack it writes on its card, or dnd5e's own kind of roll, which it copies
+  // from its attack message's flags to each roll.
+  if ( (midiType === "attack") || (options.rollType === "attack") ) summary.attack = true;
   return summary;
+}
+
+/**
+ * The words dnd5e's damage card names a kind of damage or healing by, such as "Piercing" or "Temp
+ * HP": its short label where it has one, as the card's breakdown has it, in the game's language.
+ * Empty for a type dnd5e doesn't have, never one named after what any object answers to.
+ * @param {string} type   dnd5e's key for it, such as "piercing" or "temphp".
+ * @returns {string}
+ */
+function damageLabel(type) {
+  if ( typeof type !== "string" ) return "";
+  const own = list => (Object.hasOwn(list ?? {}, type) ? list[type] : undefined);
+  const config = own(CONFIG.DND5E?.damageTypes) ?? own(CONFIG.DND5E?.healingTypes);
+  const key = config?.labelShort ?? config?.label;
+  if ( typeof key !== "string" ) return "";
+  const label = localize(key);
+  return (typeof label === "string") ? label.trim() : "";
+}
+
+/**
+ * The name of the bonus a macro added to damage on Midi-QOL's card, such as "Sneak Attack", from
+ * the roll's flavor. Midi fills in the damage's type where the macro names none, which is no name:
+ * a flavor that is its own type, or any of dnd5e's damage or healing types, is left out.
+ * @param {object} options   The roll's options.
+ * @returns {string|null}
+ */
+function bonusFlavor(options) {
+  const flavor = (typeof options.flavor === "string") ? options.flavor.trim() : "";
+  if ( !flavor ) return null;
+  const key = flavor.toLowerCase();
+  const types = [CONFIG.DND5E?.damageTypes, CONFIG.DND5E?.healingTypes];
+  if ( (key === options.type) || types.some(list => Object.hasOwn(list ?? {}, key)) ) return null;
+  return flavor;
 }
 
 /**
