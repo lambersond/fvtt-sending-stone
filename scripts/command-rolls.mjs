@@ -4,6 +4,10 @@ import {
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
+import {
+  claimMidiPrompt, midiAnswerAuthor, midiAnswerConfig, midiAnswerFailed, midiAnswerFlags, midiOutcome,
+  midiPromptAnswered
+} from "./midi-prompts.mjs";
 import { findPrompt, outcomeOf } from "./prompts.mjs";
 import { findLink, MOST_LINKS } from "./sheet-links.mjs";
 import { castSpellOf, checkOf, forwardTarget, shownActivity } from "./sheet-rolls.mjs";
@@ -13,7 +17,8 @@ import { castFrom } from "./sheet-spells.mjs";
  * Making a player's roll from the Sending Stone app: a check, saving throw, death saving throw or
  * initiative, a hit die spent, or several at once, or a utility's own roll, such as a d4 of luck,
  * through dnd5e, as if the player had rolled it in Foundry, with the dice they rolled; a saving
- * throw the game asked them for, on the card that asked; a saving throw or check a description
+ * throw the game asked them for, on the card that asked, or since 0.27.0 one Midi-QOL asked them
+ * for, a check or skill check among them, as Midi rolls it; a saving throw or check a description
  * of theirs calls for, against its DC; and a check one of their check activities calls for, as its
  * card's button rolls it.
  */
@@ -31,6 +36,13 @@ export const PUBLIC = "public";
  * @type {Set<string>}
  */
 const KEYED = new Set(["skill", "tool", "ability", "save"]);
+
+/**
+ * The rolls that may answer a prompt: a saving throw, and since 0.27.0 an ability check or skill
+ * check Midi-QOL asks for.
+ * @type {Set<string>}
+ */
+const PROMPTED = new Set(["save", "ability", "skill"]);
 
 /**
  * The kind of check each roll of a check is, as a description's check names its choices.
@@ -155,9 +167,14 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   }
   let prompt = null;
   if ( command.prompt ) {
-    const found = findPrompt(command.prompt, actor, campaign);
+    const found = findPrompt(command.prompt, actor, campaign, command);
     if ( found.refusal ) return failed("prompt", found.refusal);
-    if ( !found.prompt.abilities.includes(command.key) ) return failed("prompt", "ability");
+    // Midi waits on it: made at once, and told of with no message where Midi makes none.
+    if ( found.midi ) return answerMidiPrompt(command, found.midi);
+    // A card's asks for a saving throw alone.
+    if ( (command.kind !== "save") || !found.prompt.abilities.includes(command.key) ) {
+      return failed("prompt", "ability");
+    }
     prompt = found.prompt;
   }
 
@@ -208,7 +225,7 @@ export function checkCommand(command) {
   if ( KEYED.has(command.kind) !== (typeof command.key === "string") ) return "key";
   if ( (command.kind === "initiative") !== (typeof command.combatId === "string") ) return "combat";
   if ( ![-1, 0, 1].includes(command.mode) || (typeof command.explicit !== "boolean") ) return "mode";
-  if ( !isOptional(command.prompt, isPromptId) || (command.prompt && (command.kind !== "save")) ) return "prompt";
+  if ( !isOptional(command.prompt, isPromptId) || (command.prompt && !PROMPTED.has(command.kind)) ) return "prompt";
   const linked = (command.text !== undefined) && (command.text !== null);
   if ( linked && (!KEYED.has(command.kind) || !isTextHash(command.text)) ) return "text";
   if ( linked ? !isLinkIndex(command.link) : ((command.link !== undefined) && (command.link !== null)) ) return "link";
@@ -936,6 +953,87 @@ async function answerPrompt(command, actor, prompt) {
   const failed = made[0]?.isFailure === true;
   if ( concentration && failed && (game.modules.get("midi-qol")?.active !== true) ) await actor.endConcentration();
   return { message: messageOf(made), outcome: outcomeOf(prompt, made) };
+}
+
+/**
+ * Answer a save, check or skill check Midi-QOL asked a character for, with the player's dice: taken
+ * at once, so nothing else answers it meanwhile; rolled as Midi would roll it, its rolls then
+ * Midi's; and told of once Midi has decided whether it saved, or ten seconds on. Made where Midi
+ * would make a roll message, so may have none, as when the Gamemaster's client rolls it while
+ * Midi doesn't show saves: done all the same, its dice being the player's own. One that fails, or
+ * that a module calls off, leaves the save to Midi.
+ * @param {object} command
+ * @param {object} entry     The Midi prompt it answers.
+ * @returns {Promise<CommandResult>}
+ */
+async function answerMidiPrompt(command, entry) {
+  const claim = claimMidiPrompt(entry);
+  if ( claim.refusal ) return failedResult(command, "prompt", claim.refusal);
+  let plan;
+  let rolls;
+  try {
+    rolls = await withPlan(command, planned => {
+      plan = planned;
+      return rollMidiAnswer(command, entry);
+    });
+  } catch (err) {
+    console.error(`${MODULE_ID} | Could not make ${entry.actor.name}'s save for Midi-QOL from Sending Stone`, err);
+    midiAnswerFailed(entry, claim);
+    return failedResult(command, "error", err instanceof Error ? err.message : String(err));
+  }
+  const made = (Array.isArray(rolls) ? rolls : [rolls]).filter(Boolean);
+  if ( !made.length ) {
+    midiAnswerFailed(entry, claim);
+    return failedResult(command, plan?.refusal ?? "cancelled");
+  }
+  midiPromptAnswered(entry, made, command.key);
+  const outcome = await midiOutcome(entry, made);
+  return {
+    id: command.id,
+    status: "done",
+    reason: null,
+    error: null,
+    messageId: messageOf(made)?.id ?? null,
+    // The dice are the player's own, whatever the message's mode.
+    visible: true,
+    rolls: made.map(summarizeRoll),
+    outcome
+  };
+}
+
+/**
+ * Roll the answer to a Midi prompt on the character asked, as the token Midi asks has it: a save,
+ * which Midi makes a concentration check where it asks for one, an ability check or a skill
+ * check, with Midi's options, its message as Midi's own roll for the target would have it; or for
+ * Midi's concentration card, the check Midi would roll on the Gamemaster's client, against the
+ * card's DC, its message whispered to the Gamemaster, as Midi's is. Midi's hook for a
+ * concentration check then ends the concentration of one failed, as Midi has it.
+ * @param {object} command
+ * @param {object} entry
+ * @returns {Promise<Roll[]|null>}
+ */
+function rollMidiAnswer(command, entry) {
+  const { actor } = entry;
+  // Where Midi has the player's roll dialog open in Foundry too, the message is theirs, as Midi's
+  // own roll would be, and says which save it answers, for their client to close the dialog.
+  const data = {
+    author: (midiAnswerAuthor(entry) ?? authorFor(actor)).id,
+    flags: { [MODULE_ID]: { ...appFlags(command), ...midiAnswerFlags(entry) } }
+  };
+  const rolls = [{ options: { [ROLL_TAG]: command.id } }];
+  const dialog = { configure: false };
+  if ( entry.card ) {
+    return actor.rollConcentration({ legacy: false, target: entry.rollTarget, rolls }, dialog, {
+      create: true, rollMode: "gm", data
+    });
+  }
+  const config = { ...midiAnswerConfig(entry, command.key), rolls };
+  const message = { create: entry.create, rollMode: entry.rollMode, data };
+  switch ( entry.rollType ) {
+    case "skill": return actor.rollSkill(config, dialog, message);
+    case "check": return actor.rollAbilityCheck(config, dialog, message);
+    default: return actor.rollSavingThrow(config, dialog, message);
+  }
 }
 
 /**

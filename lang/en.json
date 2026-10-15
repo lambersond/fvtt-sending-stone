@@ -106,7 +106,7 @@
         "Attacks": "Attacks, spells and features",
         "AttacksHint": "Made here at the targets they pick, spending slots, uses and ammunition, with their dice.",
         "Prompts": "Save and concentration prompts",
-        "PromptsHint": "Saves Foundry would wait on a player to roll are asked in the app instead.",
+        "PromptsHint": "Saves Foundry would wait on a player to roll are asked in the app instead. With Midi-QOL checking saves, its saves, concentration and turn saves are asked in the app too, while the character is open there.",
         "NeedsRolls": "Both need Players roll in the app.",
         "Unavailable": "Not available in this game: {reason}",
         "RollsReason": {
@@ -180,7 +180,8 @@
       },
       "Midi": {
         "Title": "Midi-QOL",
-        "Hint": "Players' attacks can run through Midi's workflow; see General."
+        "Hint": "Players' attacks can run through Midi's workflow; see General.",
+        "Prompts": "Midi prompts in the app: isn't supported by this Midi-QOL version ({version})"
       },
       "LibWrapper": {
         "Title": "libWrapper",

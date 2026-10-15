@@ -991,7 +991,7 @@ export function installDicePlans() {
  * @param {string} name         The method's name.
  * @param {Function} wrapper    Called with the original method, bound, then the arguments.
  */
-function wrap(target, name, wrapper) {
+export function wrap(target, name, wrapper) {
   const original = target[name];
   target[name] = function(...args) {
     return wrapper.call(this, original.bind(this), ...args);

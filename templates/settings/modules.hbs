@@ -38,6 +38,9 @@
                 </div>
                 <span class="sending-stone-pill" data-tone="{{module.tone}}">{{module.stateLabel}}</span>
             </div>
+            {{#if module.note}}
+            <p class="sending-stone-unlocks sending-stone-module-note">{{module.note}}</p>
+            {{/if}}
         </article>
         {{/each}}
     </section>

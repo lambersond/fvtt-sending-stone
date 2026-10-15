@@ -67,6 +67,10 @@ export const SETTINGS = Object.freeze({
    *  Midi-QOL is active. */
   OFF_CANVAS_TARGETS: "offCanvasTargets",
 
+  /** World-scope wait, in milliseconds, before Midi-QOL's own way is taken with a save asked in
+   *  the app (see midi-prompts.mjs). Never shown: only tests shorten it. */
+  MIDI_PROMPT_WAIT: "midiPromptWait",
+
   /** Setting menu key for the settings window, where every setting is edited. The key is from when
    *  it held the campaigns alone. */
   CAMPAIGNS_MENU: "campaignsMenu",

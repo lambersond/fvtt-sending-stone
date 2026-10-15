@@ -21,7 +21,7 @@ Authorization: Bearer <the campaign's secret>     (only when one is configured)
 
 | Your answer | What the module does |
 | --- | --- |
-| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). In answer to a `bridge.hello` or `bridge.heartbeat`, `{"features": {"commands": true}}` says the listener has players' rolls for the module to fetch; see [Rolls from the app](#rolls-from-the-app). Since module 0.22.0, in answer to those and to a `character.updated`, `features`' `slimSheets` and `maxBytes` say what the listener takes of sheets and posts; see [below](#post-size-and-slim-sheets). All may be in one body. Anything else is ignored. |
+| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). In answer to a `bridge.hello` or `bridge.heartbeat`, `{"features": {"commands": true}}` says the listener has players' rolls for the module to fetch; see [Rolls from the app](#rolls-from-the-app). Since module 0.22.0, in answer to those and to a `character.updated`, `features`' `slimSheets` and `maxBytes` say what the listener takes of sheets and posts; see [below](#post-size-and-slim-sheets). Since module 0.27.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `midiPrompts` says the listener reads [Midi-QOL's prompts](#midi-qols-own-saves). All may be in one body. Anything else is ignored. |
 | `408`, `425`, `429`, any `5xx`, no answer, or no answer within 10 s | Retried after 1 s, then again after 3 s, with the same envelope. Dropped after the third failure. |
 | Any other status, such as `400` or `401` | Dropped immediately. |
 
@@ -846,11 +846,11 @@ Dice is switched on or off while a campaign allows its players to enter their di
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls, gmRollMessages, manualDice } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). And since module 0.25.0 `gmRollMessages`, `true` wherever `gmRolls` is: such a roll's [`command.result`](#commandresult) lists the chat messages it made, `messages`. And since module 0.26.0 `manualDice`, whether the campaign's players may enter what their own dice show in the app: `true` only while players' rolls are made (`enabled`), the Gamemaster allows it and [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) is on, else `false`. Nothing is entered yet: a listener may show that it's coming. See [Rolls from the app](#rolls-from-the-app). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls, gmRollMessages, manualDice, midiPrompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). And since module 0.25.0 `gmRollMessages`, `true` wherever `gmRolls` is: such a roll's [`command.result`](#commandresult) lists the chat messages it made, `messages`. And since module 0.26.0 `manualDice`, whether the campaign's players may enter what their own dice show in the app: `true` only while players' rolls are made (`enabled`), the Gamemaster allows it and [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) is on, else `false`. Nothing is entered yet: a listener may show that it's coming. And since module 0.27.0 `midiPrompts`: `true` where `prompts` is and this Midi-QOL has what [asking its own saves](#midi-qols-own-saves) needs, else `false`; a listener needs nothing from it, as Midi prompts are sent only to one that says it reads them. See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign: since module 0.22.0 without its `sheet`, which follows in `character.updated`; since module 0.26.0 each with `manualDice`, whether its player enters its dice results in the app, always `false` for now. |
 | `sheetsApart` | `true` since module 0.22.0: the characters carry no sheets, and each follows once the hello is answered. Absent before, when each carried its sheet. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
-| `prompts` | Every [prompt](#prompts) open for the campaign's players, read afresh from the chat log: any the campaign was told of that isn't among them has closed. Empty while its players aren't asked for their saves. |
+| `prompts` | Every [prompt](#prompts) open for the campaign's players, read afresh from the chat log, and since module 0.27.0 every [Midi prompt](#midi-qols-own-saves) waiting on them: any the campaign was told of that isn't among them has closed. Empty while its players aren't asked for their saves. |
 
 Since module 0.22.0 nothing comes before it, and once it's answered `2xx`, each character follows
 in the order listed, each in a [`character.updated`](#characterupdated) of its own after the
@@ -931,7 +931,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | `status` | `"done"`, or `"failed"` when it wasn't made. |
 | `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for hit dice spent at once (module 0.20.0), those and `"full-hp"` (the character is at full hit points); for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). Since module 0.21.0, for an enchant activity's use, also `"profile"`, `"enchant-target"`, `"applied"` and `"enchant"`, and for ending an enchantment, `"enchantment"`, besides those of a use; see [Enchantments](#enchantments). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). For an ask, a description's roll, damage or healing, or a save or check rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). `null` when done. |
 | `error` | What went wrong, for `"invalid"` and `"error"`, what dnd5e said for `"consume"`, and why for `"prompt"`; otherwise `null`. |
-| `messageId` | The chat message the roll made; for hit dice, the last of their cards. Since module 0.21.0, an enchant activity's use that failed once used, `"enchant"` or `"midi"`, has its card's while the card is there, with `visible`, for the Gamemaster to apply it from; one with no card, as a module stopped dnd5e posting it or Midi-QOL deleted it, or with a card no one can apply it from, as one naming a concentration that has since ended, has `null`, with `visible` `true`, and so does the end of an enchantment. |
+| `messageId` | The chat message the roll made; for hit dice, the last of their cards. Since module 0.21.0, an enchant activity's use that failed once used, `"enchant"` or `"midi"`, has its card's while the card is there, with `visible`, for the Gamemaster to apply it from; one with no card, as a module stopped dnd5e posting it or Midi-QOL deleted it, or with a card no one can apply it from, as one naming a concentration that has since ended, has `null`, with `visible` `true`, and so does the end of an enchantment. Since module 0.27.0, an answer to a [Midi prompt](#midi-qols-own-saves) has `null` where Midi makes no message for the roll, as when the Gamemaster's browser rolls it and Midi doesn't show saves, with `visible` `true`: its dice are the player's own. |
 | `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check; for hit dice, `false` unless they may see every card. |
 | `rolls` | The [rolls](#chat-message) as made, Foundry's total and every die, when `visible`; otherwise empty. For hit dice, every roll of every card, in order. A roll's `total` is Foundry's: damage that takes dice away may come below 0, where dnd5e's card shows each kind of damage at least 0. |
 | `healed` | For a hit die or hit dice: the hit points gained; see [Hit dice and formulas](#hit-dice-and-formulas). |
@@ -941,7 +941,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | `damage` | For an attack or a use: the dice its damage or healing will throw, or `null`; see [Attacks](#attacks). |
 | `enchantment` | For an enchant activity's use and the end of an enchantment (module 0.21.0): `{ enchanted, ended }`, the enchantment applied and the one ended, each or both `null`; `null` for a use that failed once made. See [Enchantments](#enchantments). |
 | `messages` | For a roll the campaign's Gamemaster made in the app, `by` `"gm"` (module 0.25.0): the `id`s of the chat messages it made, in the order made, at most 20. They're the messages it flagged `by` `"gm"` and sent with [`gmRoll`](#chat-message), dnd5e 5.3's message of a death save's outcome among them, and only those the Gamemaster's client made or marked for it while it was made, never one a player's browser made or marked with its flags copied. A module that creates chat messages on the Gamemaster's browser for players, as Midi-QOL's `createChatMessage` socket does, could still have a copy listed while the roll is being made. Empty when it made none, as when it failed first; on a result after a `"timeout"`, every one made by then. Left out for a player's roll, and by modules before 0.25.0. |
-| `outcome` | For a save answering a prompt: `"success"` or `"failure"`, where its player may see whether they saved, as the card would show them; since module 0.17.0, for a save rolled for a [description's link](#descriptions-that-roll), and since 0.18.0 a check, whether it met the DC it was rolled against, as its card shows the player, when `visible`; otherwise `null`. |
+| `outcome` | For a save answering a prompt: `"success"` or `"failure"`, where its player may see whether they saved, as the card would show them; since module 0.27.0, for an answer to a [Midi prompt](#midi-qols-own-saves), Midi's own verdict, where its DC was sent and Midi shows players whether they saved; since module 0.17.0, for a save rolled for a [description's link](#descriptions-that-roll), and since 0.18.0 a check, whether it met the DC it was rolled against, as its card shows the player, when `visible`; otherwise `null`. |
 
 A roll made after the module reported its `"timeout"`, as once the Gamemaster has answered what a
 module asked them, is reported again when it's made, `"done"`; for hit dice, also when some were
@@ -996,20 +996,24 @@ Sent only for a campaign whose players are asked for their saves; see
 | Type | Payload |
 | --- | --- |
 | `roll.prompt.opened` | `{ prompt }`: the game asks one of the campaign's characters for a saving throw. |
-| `roll.prompt.closed` | `{ id, reason }`: a prompt no longer waits on its player. `reason` is `"answered"` (rolled from the app), `"rolled"` (rolled from its card in Foundry), `"gone"` (its card was deleted) or `"expired"` (left ten minutes). |
+| `roll.prompt.closed` | `{ id, reason }`: a prompt no longer waits on its player. `reason` is `"answered"` (rolled from the app), `"rolled"` (rolled from its card in Foundry), `"gone"` (its card was deleted) or `"expired"` (left ten minutes). For a [Midi prompt](#midi-qols-own-saves) (module 0.27.0), exactly one of: `"answered"` (an answer from the app was made), `"rolled"` (answered in Foundry first, where Midi asks there too), `"expired"` (the wait ended, or the character is no longer open in the app, so Midi's own way is taken) or `"gone"` (Midi's workflow was aborted). |
 
 A prompt:
 
 | Field | Meaning |
 | --- | --- |
-| `id` | The card's id and the character's, joined by `-`. |
+| `id` | The card's id and the character's, joined by `-`; for a Midi prompt, a key of its own, never a card's, and the character's. Either matches `^[A-Za-z0-9]{1,64}-[A-Za-z0-9]{1,64}$`. |
 | `actorId` | The character asked. |
-| `messageId` | The chat card that asks. |
-| `type` | `"save"`, or `"concentration"` for a concentration check. |
-| `abilities` | The abilities it may be rolled with, such as `["dex"]`, or `["str", "dex"]` for a choice; one for a concentration check. |
+| `messageId` | The chat card that asks; for a Midi prompt, Midi's item card, or its concentration card, or where neither has an id the app takes, the prompt's own key. |
+| `type` | `"save"`, or `"concentration"` for a concentration check; since module 0.27.0, for a Midi prompt only, `"check"` for an ability check or `"skill"` for a skill check. |
+| `abilities` | The abilities it may be rolled with, such as `["dex"]`, or `["str", "dex"]` for a choice; one for a concentration check or an ability check; `[]` for a `"skill"`. At most 10. |
+| `skills` | A Midi prompt's of `type` `"skill"` only: the skills it may be rolled with, dnd5e's keys, such as `["ath", "acr"]` for a choice. At most 10. |
 | `dc` | The DC, where dnd5e's *Challenge Visibility* lets the character's player see it on the card; otherwise `null`, as also for a card that shows it no one, such as a request for a link whose author hid its DC (module 0.17.0). |
 | `label` | What asks: the spell or feature whose card it is, or what the character is concentrating on; or `null`. |
-| `openedAt`, `expiresAt` | When its card was posted, and when it stops waiting, ten minutes later. |
+| `openedAt`, `expiresAt` | When its card was posted, and when it stops waiting, ten minutes later; for a Midi prompt, when it was sent, and when Midi's own way is taken, at most a minute later, by the game's clock: a listener may put it on its own once, as it first stores it, counting what's left from the envelope's `time`, as a hello may be the first to carry one; a post held up in the module's queue isn't counted. |
+| `source` | Since module 0.27.0, a Midi prompt's only: `"midi"` for a save, check or skill check a Midi-QOL workflow asks, `"concentration"` for a concentration check Midi asks, in its "item" mode or on its own card, and `"overtime"` for an OverTime effect's turn save. Absent from every other prompt, whose rules are as before. |
+| `advantage` | A Midi prompt's: how Midi has decided each choice is rolled, such as `{ "str": "adv", "dex": "dis" }`, each key one offered and each value `"adv"` or `"dis"`; a choice not named is rolled normally. `{}` for none. |
+| `askedInFoundry` | A Midi prompt's: `true` where Midi asks the player in Foundry at once too, in its chat request or a roll dialog on their screen; else `false`. |
 
 ## Additions within protocol 2
 
@@ -1293,6 +1297,21 @@ A prompt:
   for now. A change to the choice, or Manual Dice switched on or off in its settings while a
   campaign allows it, sends the campaigns their hellos again, as other roll settings do. Modules
   before 0.26.0 send neither; a listener that reads neither needs no change.
+- Module 0.27.0 asks in the app for the saves Midi-QOL asks of a campaign's characters, while the
+  character is open there: [Midi-QOL's own saves](#midi-qols-own-saves). Only of a listener that
+  says, among its answers' `features` to a hello or heartbeat, `"midiPrompts": 1`, the format of
+  Midi prompts it reads, and lists in each [fetch](#fetching-rolls)'s answer which of the
+  campaign's characters are `open`. Such a [prompt](#prompts) has `source`, which no other has, its
+  `type` may also be `"check"` or `"skill"`, with `skills` for a skill, and it has `advantage` and
+  `askedInFoundry`; it waits a minute at most, and closes as `"answered"`, `"rolled"`, `"expired"`
+  or `"gone"`. It's answered with a `save`, an `ability` or a `skill` naming it, `explicit` `false`
+  and no `extras`, made at once, whose [`command.result`](#commandresult) may have no `messageId`,
+  and is refused as `"mode"` besides. The hello's `features.rolls` says `midiPrompts`, informational
+  only. A card of Midi's workflow asks no prompt, Midi's activities on or off, and nor does an
+  OverTime effect's action save card. A Midi `use` with no attack, damage or healing has its
+  result sent once its workflow waits on such a prompt. A listener before 0.27.0, saying neither,
+  is sent no Midi prompt, and Midi goes its own way, as before; one with an older module, which
+  never sends one, needs nothing of it.
 
 ## Changes from protocol 1
 
@@ -1312,10 +1331,10 @@ campaign, with **Players roll in the app** on its Player actions tab. It is made
 
 | `kind` | The roll | Names |
 | --- | --- | --- |
-| `skill` | A skill check, such as Perception. | `key`: dnd5e's skill key, such as `"prc"`; since module 0.18.0, `text` and `link`, the [check in a description](#descriptions-that-roll) it's rolled for, if any. |
+| `skill` | A skill check, such as Perception. | `key`: dnd5e's skill key, such as `"prc"`; since module 0.18.0, `text` and `link`, the [check in a description](#descriptions-that-roll) it's rolled for, if any; or since module 0.27.0 `prompt`, the [Midi prompt](#midi-qols-own-saves) of `type` `"skill"` it answers. |
 | `tool` | A tool check. | `key`: dnd5e's tool key, such as `"thief"`; or for a check in a description, a kind of vehicle, such as `"water"`; `text` and `link` as for a skill. |
-| `ability` | An ability check. | `key`: the ability, such as `"str"`; `text` and `link` as for a skill. |
-| `save` | A saving throw. | `key`: the ability; `prompt`, the [prompt](#saves-the-game-asks-for) it answers, if any; or since module 0.17.0 `text` and `link`, the [saving throw in a description](#descriptions-that-roll) it's rolled for, if any. |
+| `ability` | An ability check. | `key`: the ability, such as `"str"`; `text` and `link` as for a skill; or since module 0.27.0 `prompt`, the [Midi prompt](#midi-qols-own-saves) of `type` `"check"` it answers. |
+| `save` | A saving throw. | `key`: the ability; `prompt`, the [prompt](#saves-the-game-asks-for) it answers, if any, a Midi prompt's of `type` `"save"` or `"concentration"` among them; or since module 0.17.0 `text` and `link`, the [saving throw in a description](#descriptions-that-roll) it's rolled for, if any. |
 | `death` | A death saving throw, while the character is dying. | |
 | `initiative` | Initiative, while the character has none in the combat the Gamemaster has up. | `combatId` |
 | `hitDie` | A [hit die](#hit-dice-and-formulas) spent, healing the character. Module 0.16.0. | `denomination`: its size, such as `"d10"`. |
@@ -1352,6 +1371,7 @@ Answer it as an event, CORS included, with the campaign's waiting rolls:
 | --- | --- |
 | `commands` | The rolls to make, oldest first; may be empty. |
 | `wait` | How long to wait before fetching again, in milliseconds. Absent or `0`: fetch again at once. |
+| `open` | Since module 0.27.0: the campaign's characters open in the app, by actor id, whose player's page asked for the table lately (the Sending Stone app: within 15 seconds), at most 200, each matching `^[A-Za-z0-9]{1,64}$`; may be `[]`. Send it in every answer. The module asks [Midi's saves](#midi-qols-own-saves) only of a character an answer within the last 45 seconds listed; one absent or not an array lists none, as from an older listener, and entries that aren't ids are dropped. A listener holding a fetch open may answer early, with no commands, when the list changes, so that the module learns of a character closed within seconds. |
 
 Hold a fetch open, for up to 30 seconds, while a roll may come, so that it reaches the game at
 once; and otherwise answer at once with a `wait`. The module gives a fetch up after 35 seconds.
@@ -1365,7 +1385,8 @@ stopped it, and nothing was told.
 
 **Hand each roll over once.** One whose answer is lost is lost: never a roll made twice. The
 module also makes a roll only once, however often it's handed over, and a character's rolls in
-the order they came.
+the order they came; but for an answer to a [Midi prompt](#midi-qols-own-saves), made at once
+(module 0.27.0), as Midi may be waiting on it inside the character's own roll before it.
 
 | Roll field | Meaning |
 | --- | --- |
@@ -1638,7 +1659,10 @@ area's targets are those the player picked. Then:
   which roll their saving throws as Midi has them roll, and which it applies the damage, healing
   and effects to. While it's used, and while an area's damage is rolled, the Gamemaster's targets
   are the player's targets; then they're put back. A utility's own roll, such as a formula, is
-  Midi's.
+  Midi's. Since module 0.27.0, a use with no attack, damage or healing, such as Hold Person, is
+  made, and its `command.result` sent, once its workflow waits on the app for a target's
+  [save asked there](#midi-qols-own-saves), rather than once its saves are in: the targets are
+  Midi's by then, and other Midi uses from the app aren't held behind it for that save's minute.
 
 A spell cast from an item, by its Cast activity's id, is cast as dnd5e's Cast activity casts it:
 through the activity of the copy of the spell dnd5e keeps for it, at the level the Cast activity
@@ -1839,9 +1863,13 @@ a player to click a button on a chat card:
 A card its character's player can't read asks no one, and nor does a roll request a player
 [asked for from the app](#descriptions-that-roll), whoever it's posted as. Where Midi-QOL rolls the
 saves itself, as
-its *Auto Check Saves* has it, or posts and rolls its own concentration card, it still does, and
-no one is asked; with its *Concentration Check* at "chat only", it posts dnd5e's card, and the
-player is asked.
+its *Auto Check Saves* has it, or posts and rolls its own concentration card, no card asks, and
+since module 0.27.0 its saves are asked as [Midi prompts](#midi-qols-own-saves) instead, while the
+character is open in the app; no card of Midi's workflow asks, even where Midi's activities aren't
+in place of dnd5e's, so a save is never asked twice. With its *Concentration Check* at "chat only",
+it posts dnd5e's card, and the player is asked. Since module 0.27.0, an OverTime effect's card
+asking a character to use their action to save (`actionSave`) asks no one: an answer from the app
+couldn't count for it.
 
 Each is sent as [`roll.prompt.opened`](#prompts). It stays open for up to ten minutes: until its
 character rolls the save from its card, or the card is deleted. [`roll.prompt.closed`](#prompts)
@@ -1860,8 +1888,79 @@ concentration check ends the character's concentration, which the player can't f
 Midi-QOL, Midi ends it, where its Gamemaster has it remove concentration. Refused as `"prompt"`,
 with why in `error`: `"off"` (the campaign doesn't ask its players now), `"character"` (another
 character's), `"gone"` (its card is gone, or asks no save of the character), `"expired"`,
-`"answered"` (the character has rolled it), or `"ability"` (one the prompt doesn't offer).
-`command.result` adds `outcome`.
+`"answered"` (the character has rolled it), or `"ability"` (one the prompt doesn't offer, or since
+module 0.27.0 a roll of another kind than a `save`). `command.result` adds `outcome`.
+
+### Midi-QOL's own saves
+
+Since module 0.27.0, with **Save and concentration prompts** ticked and Midi-QOL checking saves,
+the saves Midi asks of a campaign's characters are asked in the app too, while the character is
+open there, the app said it reads them, `"midiPrompts": 1` among its answers' `features`, and its
+fetches list the character as `open`; the hello's `features.rolls.midiPrompts` says the game can.
+Each is sent as [`roll.prompt.opened`](#prompts), with `source`, to every campaign that has the
+character, asks for its players' saves and reads Midi's prompts; the game waits if the character
+is open in any of them. One not open isn't asked, and Midi goes its own way at once, as it's set up.
+
+- **What's asked.** A save, ability check or skill check a Midi workflow on the bridge's browser
+  asks of the character (`"midi"`): an NPC's or the Gamemaster's attack, spell or feature, or one a
+  player uses from the app, which the bridge makes; a concentration check, in Midi's "item" mode,
+  made there too, or on Midi's own concentration card in its "chat" mode, posted there, as when the
+  Gamemaster's browser applies the damage (`"concentration"`); and an OverTime effect's turn save,
+  check or skill check (`"overtime"`). Not a workflow on a player's browser, as a player's spell
+  cast in Foundry, nor on another Gamemaster's; nor a concentration card posted on a player's; nor
+  a tool check, a check with no ability, Midi's simulations, or a target Midi has Monk's TokenBar,
+  Flash Rolls or Epic Rolls ask, whose requests go once Midi has asked every target; nor an
+  OverTime action save's card.
+- **Midi decides how it's rolled.** A save Midi fails or passes by itself, by its trackers or for a
+  friendly target, isn't asked; of several choices, those Midi fails are left out. The prompt's
+  `advantage` is Midi's; for a concentration check, with what Midi adds as it rolls one: the
+  character's Midi flags for concentration and dnd5e's own mode for it, and on Midi's card, for
+  which nothing is worked out beforehand, the flags and mode of the ability's saves too, each flag
+  evaluated as Midi evaluates it. The app rolls that many d20s and offers no other way: the answer
+  has `explicit` `false`, no `extras`, and `mode` `1`, `-1` or `0` as `advantage` says, with two
+  d20s for `1` or `-1`. Midi works advantage out again as it rolls, so a d20 the player didn't
+  roll, where it then rolls more, is Foundry's.
+- **The DC**, and whether they saved, only where Midi shows players them: not for saves Midi
+  whispers or shows the Gamemaster alone, and only as dnd5e's *Challenge Visibility* has it for
+  the workflow's actor; for Midi's concentration card, as for dnd5e's. The roll is made against
+  Midi's own DC either way.
+- **Answered in the app**, the answer is a `save` (for `"save"` or `"concentration"`), `ability`
+  (for `"check"`) or `skill` (for `"skill"`) naming the prompt and one of its choices. It's made at
+  once, rolled as Midi rolls a save itself, with its own options, bonuses and the advantage it
+  works out, with only the choice made to choose from, the player's dice, and Midi's DC; a skill
+  with its own ability unless the check names one; on the token Midi asks of, as the player's.
+  Its message is made where Midi's own roll would make one, and shown as that would be; Midi's
+  concentration card's check is made as Midi's Gamemaster would, its message whispered to the
+  Gamemaster. The rolls are Midi's, and what Midi makes of them is its own: the damage, the effects,
+  concentration ended, an OverTime effect removed. The prompt closes as `"answered"`, then once
+  Midi has decided whether they saved, or ten seconds on, the result follows: `"done"`, with
+  `messageId` `null` where no message was made, `visible` `true`, and `outcome` Midi's verdict,
+  where the DC was sent and Midi shows players whether they saved. Refused as `"prompt"`, with
+  why in `error`: as for any prompt, `"expired"` once the wait is over or the save went Midi's
+  way, `"answered"` once answered, being answered or rolled in Foundry, `"character"` for another
+  character's or in a campaign not told of it, `"ability"` for another kind of roll or a choice not
+  offered, and `"mode"` for one with `explicit` or `extras`.
+- **Asked in Foundry too.** Where Midi asks the player in Foundry at once, in its chat request
+  ("chat" *Player Roll Saves*) or a roll dialog on their screen ("dialog" ones), the prompt says
+  `askedInFoundry`, and both are asked: the first answer is the one Midi takes, and the other
+  closes, as `"rolled"` in the app, and in Foundry, Midi's request card deleted, or Midi's roll
+  dialog closed on the player's screen, unrolled, by the module in their browser: the answer's
+  message is made as theirs, the player Midi asked, and names the workflow and the character. So
+  Midi's own *Player Save Timeout* on their screen doesn't roll the save again and post it; an
+  answer made just as that timeout is up may still meet Midi's roll there, which Midi then ignores,
+  though it's posted. The wait is Midi's *Player Save Timeout* where that's shorter. An answer that fails, or
+  that a module calls off, gives Midi's chat request back, its *Player Save Timeout* with it,
+  counted from when Midi asked, which rolls the save once it's up, as Midi's would have; a roll in
+  Foundry before then is the save. Anywhere else, as for a player not in Foundry, Midi waits on
+  the app, and asks as it's set up only once the app's wait is over.
+- **The wait** is a minute: then, or once the character is no longer open, or the bridge or the
+  campaign no longer asks, the save goes Midi's way, closed as `"expired"`; an aborted workflow's
+  closes as `"gone"`. Midi's concentration card held for the app is marked so; held when the
+  Gamemaster reloads, it's rolled as Midi would once their browser is the bridge again, so no
+  check is lost. Where several Gamemasters are connected, Midi may route a roll left to it to its
+  preferred one, as it's set up.
+- **Known Midi behaviour.** In its chat request, Midi takes any roll message whose speaker is the
+  target's token as the save, another workflow's request for the same token among them.
 
 ### Descriptions that roll
 

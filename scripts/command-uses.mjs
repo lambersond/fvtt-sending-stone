@@ -7,6 +7,7 @@ import {
   unmaximizable, withPlan
 } from "./dice-plan.mjs";
 import { dnd5eEnchant, enchantChoice, midiEnchantNow } from "./command-enchant.mjs";
+import { midiPromptWaits } from "./midi-prompts.mjs";
 import { DND5E_ACTIVITIES, ownDamageConfig } from "./sheet-links.mjs";
 import { enchantInPlay } from "./sheet-enchant.mjs";
 import {
@@ -954,7 +955,8 @@ function rollsDamage(activity) {
 /**
  * Use the item through Midi-QOL, at the targets the player picked, and wait for its workflow: for an
  * attack, until the attack it rolls with the player's dice is rolled; then until it waits for the
- * damage or healing, or ends.
+ * damage or healing, or ends; or, with no attack, damage or healing, until it waits on the app for
+ * a target's save asked there, since 0.27.0.
  * @param {object} command
  * @param {Campaign} campaign
  * @param {Actor} actor
@@ -1016,10 +1018,22 @@ async function midiUseNow(command, campaign, actor, use) {
     };
     if ( offCanvas ) Hooks.on("dnd5e.preCreateUsageMessage", nameAll);
     const state = await withPlan(command, async () => {
-      const results = await activity.use(midiCall, { configure: false }, {
+      const using = activity.use(midiCall, { configure: false }, {
         rollMode: PUBLIC,
         data: { flags: { [MODULE_ID]: appFlags(command, "use") } }
       }).finally(() => Hooks.off("dnd5e.preCreateUsageMessage", nameAll));
+      // A use with nothing more of the player's to roll that has its workflow wait on a save asked in
+      // the app is made: the rest goes on without holding the uses after it.
+      const asking = (!attack && !rollsDamage(activity)) ? await askingSaves(using, midiCall) : null;
+      if ( asking ) {
+        using.then(results => castFromItem(use, results)).catch(err => {
+          console.error(`${MODULE_ID} | Midi-QOL's use of ${activity.item?.name} from Sending Stone failed`, err);
+        });
+        workflow = asking;
+        card = workflow.chatCard ?? null;
+        return card ? "saves" : "aborted";
+      }
+      const results = await using;
       castFromItem(use, results);
       card = results?.message ?? null;
       if ( !card ) return "aborted";
@@ -1107,6 +1121,26 @@ export async function workflowSettled(workflow) {
     if ( Date.now() >= until ) return "late";
     await new Promise(resolve => setTimeout(resolve, CHECK_EVERY));
   }
+}
+
+/**
+ * Wait for a Midi-QOL use to return, or for its workflow to wait on the app for a save it asked
+ * there, whichever is first. Midi's use returns once its workflow waits for its damage or ends:
+ * through its targets' saves, where it has no damage to wait for; and a save asked in the app may
+ * wait a minute, every Midi use from the app waiting behind this one meanwhile. Its targets are
+ * the workflow's by then.
+ * @param {Promise<object>} using   The use.
+ * @param {object} usage            What it's used with, on which Midi puts its workflow.
+ * @returns {Promise<Workflow|null>}   The workflow, waiting on the app; or null, the use returned.
+ */
+async function askingSaves(using, usage) {
+  let returned = false;
+  const used = using.then(() => { returned = true; }, () => { returned = true; });
+  while ( !returned ) {
+    if ( midiPromptWaits(usage.workflow) ) return usage.workflow;
+    await Promise.race([used, new Promise(resolve => setTimeout(resolve, CHECK_EVERY))]);
+  }
+  return null;
 }
 
 /**

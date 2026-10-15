@@ -5,6 +5,7 @@ import { campaignCharacterId, playerOwners } from "./characters.mjs";
 import { askedSave, chatAudience } from "./chat-data.mjs";
 import { midiActivities } from "./command-uses.mjs";
 import { diceStatus } from "./dice-plan.mjs";
+import { findMidiPrompt, midiOpenPrompts } from "./midi-prompts.mjs";
 import { send } from "./transport.mjs";
 
 /**
@@ -12,7 +13,9 @@ import { send } from "./transport.mjs";
  * where Foundry waits for a player to click one on a chat card: dnd5e's concentration check after
  * damage, a save that a spell or feature calls for at them, and a save the Gamemaster requests in
  * chat. The player rolls it in the app, and it's made here with their dice, linked to the card, as
- * if they had clicked it. Where Midi-QOL rolls saves itself, it still does, and no one is asked.
+ * if they had clicked it. Where Midi-QOL rolls saves itself, it still does, and no one is asked
+ * here: since 0.27.0 midi-prompts.mjs asks for those Midi asks, while the character is open in the
+ * app.
  *
  * Whether a prompt is open is read from the chat log: its card is there, less than ten minutes
  * old, and its character hasn't rolled the save from it. So a prompt can still be answered, and a
@@ -80,14 +83,31 @@ export function prompting(campaign) {
 /**
  * Does Midi-QOL roll the saves this card asks for itself? It does a save's, as items' uses go
  * through its workflow, unless the Gamemaster has it leave saves to the card's buttons; and with
- * the setting unreadable, it's assumed to. It leaves dnd5e's concentration card, which it posts
- * only to leave the check to the player, and requests in chat to the player.
+ * the setting unreadable, it's assumed to. Since 0.27.0, so it does a card of its own workflow's,
+ * even where its activities aren't in place of dnd5e's: the save is asked in the app as Midi's,
+ * if at all, never twice. It leaves dnd5e's concentration card, which it posts only to leave the
+ * check to the player, and requests in chat to the player.
  * @param {AskedSave} save
+ * @param {ChatMessage} message
  * @returns {boolean}
  */
-function leftToMidi(save) {
-  if ( (save.source !== "save") || !midiActivities() ) return false;
+function leftToMidi(save, message) {
+  if ( save.source !== "save" ) return false;
+  const workflowCard = (game.modules.get("midi-qol")?.active === true)
+    && (typeof message.flags?.["midi-qol"]?.messageType === "string");
+  if ( !midiActivities() && !workflowCard ) return false;
   return globalThis.MidiQOL?.configSettings?.()?.autoCheckSaves !== "none";
+}
+
+/**
+ * Is this one of Midi-QOL's OverTime cards asking a character to use their action to save? An
+ * answer from the app couldn't count for it, lacking what Midi marks a roll clicked on it with, so
+ * it asks no one.
+ * @param {ChatMessage} message
+ * @returns {boolean}
+ */
+function overTimeAction(message) {
+  return (typeof message.content === "string") && message.content.includes("data-midi-overtime-actor-uuid");
 }
 
 /**
@@ -141,9 +161,9 @@ function actorOf(uuid) {
  * @returns {RollPrompt[]}
  */
 export function promptsOf(message, campaign) {
-  if ( !prompting(campaign) || message.flags?.[MODULE_ID]?.ask ) return [];
+  if ( !prompting(campaign) || message.flags?.[MODULE_ID]?.ask || overTimeAction(message) ) return [];
   const save = askedSave(message);
-  if ( !save || leftToMidi(save) ) return [];
+  if ( !save || leftToMidi(save, message) ) return [];
   return askedOf(message, save, campaign).flatMap(actorId => {
     const actor = game.actors.get(actorId);
     const prompt = actor ? describePrompt(message, save, actor) : null;
@@ -159,7 +179,8 @@ export function promptsOf(message, campaign) {
  * @returns {RollPrompt|null}   Null for a save with no ability to roll.
  */
 function describePrompt(message, save, actor) {
-  const abilities = (save.type === "concentration") ? [concentrationAbility(actor, save)] : save.abilities;
+  const abilities = (save.type === "concentration") ? [save.abilities[0] ?? ownConcentrationAbility(actor)]
+    : save.abilities;
   if ( !abilities.length ) return null;
   const openedAt = Number.isFinite(message.timestamp) ? message.timestamp : Date.now();
   return {
@@ -178,14 +199,12 @@ function describePrompt(message, save, actor) {
 }
 
 /**
- * The ability a character's concentration check is rolled with: the one the card names, or else
- * the character's own, as dnd5e rolls it.
+ * The ability a character's concentration check is rolled with where its card names none: the
+ * character's own, as dnd5e rolls it.
  * @param {Actor} actor
- * @param {AskedSave} save
  * @returns {string}
  */
-function concentrationAbility(actor, save) {
-  if ( save.abilities.length ) return save.abilities[0];
+export function ownConcentrationAbility(actor) {
   const own = actor.system.attributes?.concentration?.ability;
   return (own in CONFIG.DND5E.abilities) ? own : (CONFIG.DND5E.defaultAbilities?.concentration ?? "con");
 }
@@ -197,7 +216,7 @@ function concentrationAbility(actor, save) {
  * @param {Actor} actor
  * @returns {boolean}
  */
-function showsChallenge(message, actor) {
+export function showsChallenge(message, actor) {
   const author = message.author;
   if ( author && playerOwners(actor).some(user => user.id === author.id) ) return true;
   let visibility;
@@ -228,7 +247,15 @@ function labelOf(message, save, actor) {
       return null;
     }
   }
-  if ( save.type !== "concentration" ) return null;
+  return (save.type === "concentration") ? concentratingOn(actor) : null;
+}
+
+/**
+ * What a character is concentrating on, as a prompt's label: the names of the items, or null.
+ * @param {Actor} actor
+ * @returns {string|null}
+ */
+export function concentratingOn(actor) {
   const names = Array.from(actor.concentration?.items ?? [], item => item.name).filter(Boolean);
   return names.length ? names.join(", ") : null;
 }
@@ -288,19 +315,23 @@ function summarizePrompt(prompt) {
 /* -------------------------------------------- */
 
 /**
- * The open prompt a player's save answers, read from its card; or why it can't be answered: the
- * campaign doesn't ask its players for their saves (`off`), it's another character's
- * (`character`), its card is gone or asks no save of the character (`gone`), it waited too long
- * (`expired`), or the character has rolled it (`answered`).
- * @param {string} id       The prompt's id, as the app has it.
- * @param {Actor} actor     The character whose save it is.
+ * The open prompt a player's save answers: since 0.27.0 one Midi-QOL asked, from midi-prompts.mjs,
+ * first; or else read from its card. Or why it can't be answered: the campaign doesn't ask its
+ * players for their saves (`off`), it's another character's (`character`), its card is gone or
+ * asks no save of the character (`gone`), it waited too long (`expired`), or the character has
+ * rolled it (`answered`); for Midi's, also as findMidiPrompt says.
+ * @param {string} id         The prompt's id, as the app has it.
+ * @param {Actor} actor       The character whose save it is.
  * @param {Campaign} campaign
- * @returns {{prompt?: RollPrompt, refusal?: string}}
+ * @param {object} command    The answer.
+ * @returns {{prompt?: RollPrompt, midi?: object, refusal?: string}}
  */
-export function findPrompt(id, actor, campaign) {
+export function findPrompt(id, actor, campaign, command) {
   if ( !prompting(campaign) ) return { refusal: "off" };
   const [messageId, actorId] = id.split("-");
   if ( actorId !== actor.id ) return { refusal: "character" };
+  const midi = findMidiPrompt(id, campaign, command);
+  if ( midi ) return midi;
   const message = game.messages.get(messageId);
   const prompt = message ? promptsOf(message, campaign).find(each => each.actorId === actor.id) : null;
   if ( !prompt ) return { refusal: "gone" };
@@ -420,5 +451,5 @@ export function openPrompts(campaign) {
     open.delete(id);
   }
   for ( const prompt of found ) remember(prompt, campaign);
-  return found.map(summarizePrompt);
+  return [...found.map(summarizePrompt), ...(prompting(campaign) ? midiOpenPrompts(campaign) : [])];
 }

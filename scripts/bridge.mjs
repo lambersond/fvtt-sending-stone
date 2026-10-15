@@ -6,6 +6,7 @@ import { getCampaigns } from "./campaigns.mjs";
 import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { roster } from "./characters.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
+import { releaseHeldCards } from "./midi-prompts.mjs";
 import { openPrompts } from "./prompts.mjs";
 import { forgetSent } from "./sheet-texts.mjs";
 import { send } from "./transport.mjs";
@@ -110,12 +111,17 @@ export function announce({ campaignId }={}) {
 
 /**
  * Announce when this client takes over as the bridge: on load, or when the Gamemaster who held
- * the role disconnects. A client that is no longer the bridge stops fetching players' rolls.
+ * the role disconnects; and since 0.27.0, roll as Midi-QOL would the concentration checks held for
+ * the app that no client asks any more, as after a reload. A client that is no longer the bridge
+ * stops fetching players' rolls.
  * @returns {void}
  */
 export function checkBridge() {
   const bridge = isBridge();
-  if ( bridge && !wasBridge ) announce();
+  if ( bridge && !wasBridge ) {
+    announce();
+    releaseHeldCards();
+  }
   if ( !bridge && wasBridge ) stopPollers();
   wasBridge = bridge;
 }
