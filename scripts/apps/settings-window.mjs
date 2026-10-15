@@ -6,6 +6,7 @@ import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
 import { getDestination, getSecret, isMixedContent, parseDestination } from "../config.mjs";
 import { campaignStatus, describeProblem } from "../delivery-status.mjs";
 import { diceStatus } from "../dice-plan.mjs";
+import { midiPromptStatus } from "../midi-prompts.mjs";
 import { buildEnvelope, deliver, DeliveryError } from "../transport.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -448,6 +449,11 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       };
     };
     const midi = module("midi-qol", "Midi", "fa-solid fa-wand-sparkles");
+    // Since 0.27.0 the saves Midi asks are asked in the app, where this Midi has what that needs.
+    if ( (midi.state === "active") && (game.system.id === "dnd5e") && !midiPromptStatus.workflow ) {
+      const version = game.modules.get("midi-qol")?.version ?? "?";
+      midi.note = game.i18n.format("SENDINGSTONE.Modules.Midi.Prompts", { version });
+    }
     const wrapper = module("lib-wrapper", "LibWrapper", "fa-solid fa-link");
     // libWrapper is only recommended, so not having it isn't a fault.
     if ( wrapper.state !== "active" ) Object.assign(wrapper, { stateLabel: label("recommended"), tone: "warning" });

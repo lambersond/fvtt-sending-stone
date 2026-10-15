@@ -144,4 +144,13 @@ export function registerSettings() {
     type: Boolean,
     default: false
   });
+
+  // How long Midi-QOL waits on a save asked in the app before going its own way. Never shown in
+  // the settings window: a minute is what players get, and only tests make it shorter.
+  game.settings.register(MODULE_ID, SETTINGS.MIDI_PROMPT_WAIT, {
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 60_000
+  });
 }

@@ -81,9 +81,9 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | GM-only details | Also send what only a Gamemaster can see. Off by default. |
 | General | Run players' attacks through Midi | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
-| Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active; and whether the game system is D&D Fifth Edition. |
+| Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character has a switch for it, coming soon. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; the app says it's coming soon. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; the app says it's coming soon. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -299,10 +299,32 @@ the card shows whether they saved.
   player on the card, and the DC never where the card hides it from everyone, as a request for a
   link with `hideDC` does.
 - **A failed concentration check ends concentration**, which the player can't do from the app.
-- **With Midi-QOL**, saves Midi rolls itself, as its Auto Check Saves has it, and its own
-  concentration checks stay Midi's, and no one is asked; with its Concentration Check at "chat
-  only", dnd5e's card is posted, and the player is asked. Midi ends concentration after a failed
-  check, as you have it set up.
+- **With Midi-QOL** checking saves, the saves it asks of a character are asked in the app while
+  the character is open there: a monster's or your spell's save, check or skill check, a player's
+  own spell from the app that catches them, a concentration check in Midi's "chat" or "item" mode,
+  and an OverTime effect's turn save or check, such as Athletics to escape. Midi decides how it's
+  rolled: the app shows Midi's advantage and DC, as Midi would show them, a concentration check's
+  with Midi's own flags for concentration, and the player rolls it with their dice, Midi's bonuses
+  with it; a save Midi fails or passes by itself isn't asked. What Midi makes of it, the damage,
+  ending concentration or removing the effect, is Midi's as ever.
+  - **Not open in the app?** Midi goes its own way at once, as you have it set up. Open, it waits a
+    minute for the answer, then goes its own way; it waits as long as Midi's Player Save Timeout
+    where that's shorter and Midi asks the player in Foundry too.
+  - **Asked in Foundry too.** With Midi's Player Roll Saves at "chat", or a dialog setting, a player
+    in Foundry is asked there as well: whichever they answer first counts. Answered in the app,
+    Midi's chat request is deleted, or its roll dialog closed on their screen, so that Midi's Player
+    Save Timeout doesn't roll the save again there. An answer from the app that fails leaves the
+    save to Midi, its Player Save Timeout still counting from when Midi asked.
+  - **A spell from the app** with no attack or damage, such as Hold Person, is made once a save it
+    asks waits on the app, so other players' Midi spells from the app aren't held up a minute.
+  - **Only on your browser.** Saves of a workflow on a player's browser, such as their spell cast in
+    Foundry at another character, or on another Gamemaster's, aren't asked; nor a concentration card
+    Midi posts on a player's browser; nor what Midi has Monk's TokenBar, Flash Rolls or Epic Rolls
+    ask, or an OverTime effect's action save. A concentration card held for the app when you reload
+    is rolled as Midi would once you're back.
+  - With its Concentration Check at "chat only", dnd5e's card is posted, and the player is asked as
+    for any card; Midi ends concentration after a failed check, as you have it set up. A save card
+    of Midi's own workflow never asks as a card too.
 - **Ten minutes.** A request waits ten minutes, or until its card is deleted or the save is rolled
   from it in Foundry.
 
@@ -454,6 +476,10 @@ Gamemaster-only information switched on.
   character's next, or until the app refuses another. The refused post itself isn't sent again.
 - **Players' attacks and spells with Midi-QOL set your targets** while each is made, one at a
   time, then put them back.
+- **Midi-QOL's request for a target's save is wrapped** on Gamemasters' browsers, its workflow's
+  `queueTargetSaveRoll`, through libWrapper when it's active, so that a save for a character open
+  in the app can be asked there; any other is Midi's own at once. A Midi-QOL without it is left
+  as before, and the Modules section names its version.
 - **Only dice are wrapped, and only for players' rolls.** On a Gamemaster's browser under D&D Fifth
   Edition, Foundry's `Roll#evaluate` and `DiceTerm#_roll` are wrapped, through libWrapper when it's
   active, so that a roll made for a player from the app takes their dice. Every other roll is left alone. No core
@@ -525,8 +551,10 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
-| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes |
-| `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card, as the Gamemaster's where they made it; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time |
+| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, with which characters it has open, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes |
+| `scripts/prompts.mjs` | The saves the game asks of a campaign's characters on chat cards, told to the app as prompts, and closed as they're answered |
+| `scripts/midi-prompts.mjs` | Midi-QOL's own saves, concentration checks and OverTime turn saves, asked in the app while the character is open there, answered with the player's dice, or left to Midi |
+| `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card, as the Gamemaster's where they made it; a prompt's save on its card, or Midi-QOL's as Midi rolls it; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time |
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name |
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow |

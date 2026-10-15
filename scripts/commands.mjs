@@ -9,6 +9,7 @@ import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mj
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
 import { gmRollOf } from "./chat-data.mjs";
 import { diceStatus } from "./dice-plan.mjs";
+import { answersMidiPrompt, midiPromptsOffered, noteMidiReader, noteOpen } from "./midi-prompts.mjs";
 import { prompting } from "./prompts.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
 import { currentSession, DeliveryError, refusalError, send } from "./transport.mjs";
@@ -132,17 +133,20 @@ const made = new Map();
  * (`selfTargets`); and from 0.23.0, that a command may say it's the Gamemaster's, `by`, made as
  * the character's and marked as theirs, wherever rolls are made (`gmRolls`); from 0.25.0, that
  * the result of such a command lists the chat messages it made (`gmRollMessages`), so that only
- * those are taken as the Gamemaster's; and from 0.26.0, whether its players may enter their own
- * dice results in the app, with Manual Dice (`manualDice`), which the app doesn't offer yet.
+ * those are taken as the Gamemaster's; from 0.26.0, whether its players may enter their own dice
+ * results in the app, with Manual Dice (`manualDice`), which the app doesn't offer yet; and from
+ * 0.27.0, whether the saves Midi-QOL asks of them are asked in the app too (`midiPrompts`).
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
- *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean, manualDice: boolean}}
+ *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean, manualDice: boolean,
+ *   midiPrompts: boolean}}
  */
 export function rollFeatures(campaign) {
   const off = {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
-    signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false
+    signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false,
+    midiPrompts: false
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -164,7 +168,8 @@ export function rollFeatures(campaign) {
     selfTargets: attacks,
     gmRolls: true,
     gmRollMessages: true,
-    manualDice: manualDiceOn(campaign)
+    manualDice: manualDiceOn(campaign),
+    midiPrompts: midiPromptsOffered(campaign)
   };
 }
 
@@ -181,7 +186,8 @@ export function registerCommandHooks() {
 }
 
 /**
- * Note what the app said it does beyond taking events, answering a campaign's hello or heartbeat.
+ * Note what the app said it does beyond taking events, answering a campaign's hello or heartbeat:
+ * since 0.27.0, whether it reads Midi-QOL's prompts too.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @returns {void}
@@ -189,6 +195,7 @@ export function registerCommandHooks() {
 export function noteListenerFeatures(campaignId, features) {
   if ( features?.commands === true ) offered.add(campaignId);
   else offered.delete(campaignId);
+  noteMidiReader(campaignId, features);
   syncPollers();
 }
 
@@ -303,6 +310,8 @@ class Poller {
         await this.#pause(BACKOFF[Math.min(failures - 1, BACKOFF.length - 1)]);
         continue;
       }
+      // Which of its characters the app has open decides whether Midi-QOL's saves wait on it.
+      noteOpen(this.campaignId, answer.open);
       // The Gamemaster may have changed the campaign while the fetch was held open: its commands are
       // made as it now is.
       const current = getCampaigns().find(({ id }) => id === this.campaignId) ?? campaign;
@@ -313,9 +322,10 @@ class Poller {
   }
 
   /**
-   * Fetch the campaign's commands once.
+   * Fetch the campaign's commands once, and since 0.27.0 which of its characters the app has open,
+   * `open`, as it lists them; none where it lists none, as an older app.
    * @param {Campaign} campaign
-   * @returns {Promise<{commands: object[], wait: number}>}
+   * @returns {Promise<{commands: object[], wait: number, open: unknown}>}
    * @throws {DeliveryError}   Saying why, as a post's does.
    */
   async #fetch(campaign) {
@@ -363,7 +373,8 @@ class Poller {
       const commands = Array.isArray(answer?.commands) ? answer.commands : [];
       return {
         commands: commands.filter(command => command && (typeof command === "object")),
-        wait: Number.isFinite(answer?.wait) ? answer.wait : 0
+        wait: Number.isFinite(answer?.wait) ? answer.wait : 0,
+        open: answer?.open
       };
     } finally {
       clearTimeout(timer);
@@ -393,7 +404,9 @@ class Poller {
 
 /**
  * Take a command to make: once, however often it's fetched, and after the same character's
- * earlier rolls, in the order they were made.
+ * earlier rolls, in the order they were made. An answer to a save Midi-QOL asked is made at once:
+ * Midi waits on it, perhaps inside one of those earlier rolls, as a player's spell from the app
+ * that asks them for a save.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -402,6 +415,12 @@ function take(command, campaign) {
   if ( (typeof command.id !== "string") || taken.includes(command.id) ) return;
   taken.push(command.id);
   if ( taken.length > REMEMBERED ) taken.shift();
+  if ( answersMidiPrompt(command) ) {
+    void make(command, campaign).catch(err => {
+      console.error(`${MODULE_ID} | Could not report a roll from Sending Stone`, err);
+    });
+    return;
+  }
 
   const actorId = String(command.actorId);
   const made = (queues.get(actorId) ?? Promise.resolve())
