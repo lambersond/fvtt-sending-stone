@@ -547,7 +547,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-slim.mjs` | A sheet in the smaller shape the app expands: actions by reference, defaults left out |
 | `scripts/character-sync.mjs` | Sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes; withholding one too large to post; sending again what was lost |
 | `scripts/chat.mjs` | Chat hooks |
-| `scripts/chat-data.mjs` | Chat message serialization and audience, and its GM roll |
+| `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack |
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
