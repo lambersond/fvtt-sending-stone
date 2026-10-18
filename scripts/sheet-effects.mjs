@@ -56,6 +56,32 @@ export function conditionsOf(actor, texts) {
 }
 
 /**
+ * What the character concentrates on, since module 0.29.0, so that its player may end each from the
+ * app: each of dnd5e's concentration effects on them, in dnd5e's order, by the id dnd5e ends it by;
+ * named for its item as dnd5e prepares it, with the name its player knows it by, an unidentified
+ * scroll's as unidentified, never the name the effect keeps of the item's source; and that item's
+ * id, while it's on the character, as a scroll spent to cast it isn't. None while the character
+ * can't concentrate on anything, as dnd5e has it.
+ * @param {Actor} actor
+ * @returns {{effects: {id: string, name: string, item: string|null}[]}}
+ */
+export function concentrationOf(actor) {
+  const { effects, items } = actor.concentration ?? {};
+  const prepared = Array.from(items ?? []);
+  return {
+    effects: Array.from(effects ?? [], effect => {
+      const id = (effect.getFlag?.("dnd5e", "item") ?? effect.flags?.dnd5e?.item)?.id;
+      const item = (typeof id === "string") ? prepared.find(each => each?.id === id) : undefined;
+      return {
+        id: effect.id,
+        name: item?.name || localizeFirst("DND5E.CONCENTRATION.NoSource", "DND5E.ConcentratingItemless"),
+        item: ((typeof id === "string") && (actor.items?.has?.(id) === true)) ? id : null
+      };
+    })
+  };
+}
+
+/**
  * How the game describes a status, from CONFIG.statusEffects: a list under dnd5e 5, and an
  * object keyed by id under dnd5e 6.
  * @param {string} id

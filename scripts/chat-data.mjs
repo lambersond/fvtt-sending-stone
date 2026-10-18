@@ -1,6 +1,8 @@
 import { MODULE_ID } from "./constants.mjs";
 import { includeGmContent } from "./config.mjs";
 import { campaignActors, campaignCharacterId, charactersSeenBy } from "./characters.mjs";
+import { outcomeOf as attackOutcome } from "./command-uses.mjs";
+import { midiChallengeShown, OUTCOME_SHOWN } from "./midi-prompts.mjs";
 import { traitLabel } from "./sheet-details.mjs";
 import { localize } from "./sheet-values.mjs";
 
@@ -91,6 +93,7 @@ export function isAudienceShared(audience) {
 export function serializeMessage(message, campaign, audience=chatAudience(message, campaign)) {
   const author = message.author;
   const speaker = message.speaker ?? {};
+  const content = sharedContent(message);
   return {
     id: message.id,
     uuid: message.uuid,
@@ -107,14 +110,14 @@ export function serializeMessage(message, campaign, audience=chatAudience(messag
     character: campaignCharacterId(message.speakerActor, campaign),
     title: message.title || null,
     flavor: message.flavor ?? "",
-    content: message.content ?? "",
-    text: htmlToText(message.content, { challenge: challengeShown(message) }),
+    content,
+    text: htmlToText(content, { challenge: challengeShown(message) }),
     ask: askOf(message),
     blind: message.blind,
     audience,
     rolls: message.rolls.map(summarizeRoll),
     system: systemData(message),
-    dnd5e: dnd5eData(message),
+    dnd5e: dnd5eData(message, campaign),
     ...gmRollOf(message)
   };
 }
@@ -177,15 +180,50 @@ function htmlToText(html, { challenge=true }={}) {
  * @returns {boolean}
  */
 function challengeShown(message) {
-  let visibility;
-  try {
-    visibility = game.settings.get("dnd5e", "challengeVisibility");
-  } catch {
-    return false;
-  }
+  const visibility = readSetting("dnd5e", "challengeVisibility");
   if ( visibility === "all" ) return true;
   if ( visibility === "player" ) return !message.author?.isGM;
   return false;
+}
+
+/**
+ * A setting of the game's or of another module's, as it's set now; undefined where it can't be
+ * read, as where its module isn't there, which counts as keeping from players what it would show.
+ * @param {string} namespace
+ * @param {string} key
+ * @returns {unknown}
+ */
+function readSetting(namespace, key) {
+  try {
+    return game.settings.get(namespace, key);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A message's content as the listener is told it, since module 0.29.0: unless Gamemaster-only
+ * information is being sent, without what dnd5e's and Midi-QOL's cards keep from players, which
+ * the content holds for the Gamemaster's client to show and players' clients to hide. Parsed into
+ * an inert document, as `htmlToText` parses it: Midi's sections of hits and saves are emptied,
+ * being drawn on the client that ran its workflow, often the Gamemaster's, with armor classes and
+ * DCs; every button's DC, `data-dc`, goes; and so do dnd5e's labels with DCs, where players may not
+ * see them, as `challengeShown` has it. The module reads every card it acts on from the message
+ * itself, never this.
+ * @param {ChatMessage} message
+ * @returns {string}
+ */
+function sharedContent(message) {
+  const content = message.content ?? "";
+  if ( (typeof content !== "string") || !content || includeGmContent() ) return content;
+  const body = new DOMParser().parseFromString(content, "text/html").body;
+  if ( !body ) return "";
+  for ( const section of body.querySelectorAll(".midi-qol-hits-display, .midi-qol-saves-display") ) {
+    section.replaceChildren();
+  }
+  body.querySelectorAll("[data-dc]").forEach(element => element.removeAttribute("data-dc"));
+  if ( !challengeShown(message) ) body.querySelectorAll(".visible-dc").forEach(label => label.remove());
+  return body.innerHTML;
 }
 
 /* -------------------------------------------- */
@@ -432,10 +470,19 @@ export function summarizeRoll(roll) {
   if ( section ) summary.section = section;
   const flavor = (section === "bonus") ? bonusFlavor(options) : null;
   if ( flavor ) summary.flavor = flavor;
-  // Midi's tag on the attack it writes on its card, or dnd5e's own kind of roll, which it copies
-  // from its attack message's flags to each roll.
-  if ( (midiType === "attack") || (options.rollType === "attack") ) summary.attack = true;
+  if ( isAttackRoll(roll) ) summary.attack = true;
   return summary;
+}
+
+/**
+ * Is a roll the attack among a message's rolls: by Midi-QOL's tag on the attack it writes on its
+ * card, or dnd5e's own kind of roll, which it copies from its attack message's flags to each roll?
+ * @param {Roll} roll
+ * @returns {boolean}
+ */
+function isAttackRoll(roll) {
+  const options = roll?.options ?? {};
+  return (options["midi-qol"]?.rollType === "attack") || (options.rollType === "attack");
 }
 
 /**
@@ -488,11 +535,16 @@ function systemData(message) {
 
 /**
  * What D&D Fifth Edition records about where a message came from: the kind of roll, and the item,
- * activity and targets involved. Null under any other system, or for a message it did not create.
+ * activity and targets involved; and since module 0.29.0, whether an attack hit each target, and
+ * whether each saved against Midi-QOL's card, and for a save rolled from dnd5e's card, whose save it
+ * is and whether it succeeded, as `targetResults` and `saveResult` have them: each only where
+ * players see it in Foundry, unless Gamemaster-only information is being sent. Null under any other
+ * system, or for a message it did not create.
  * @param {ChatMessage} message
+ * @param {Campaign} campaign
  * @returns {object|null}
  */
-function dnd5eData(message) {
+function dnd5eData(message, campaign) {
   if ( game.system.id !== "dnd5e" ) return null;
   const flags = message.flags?.dnd5e;
   if ( !flags ) return null;
@@ -509,9 +561,13 @@ function dnd5eData(message) {
 
   // A target's armor class is shown only to the Gamemaster unless the world chooses otherwise.
   const gmContent = includeGmContent();
-  const targets = (flags.targets ?? []).map(({ name, uuid, ac }) => {
-    return gmContent ? { name, uuid, ac: ac ?? null } : { name, uuid };
-  });
+  const described = flags.targets ?? [];
+  const results = targetResults(message, described, activity, gmContent);
+  const targets = described.map(({ name, uuid, ac }, index) => ({
+    ...(gmContent ? { name, uuid, ac: ac ?? null } : { name, uuid }),
+    ...results[index]
+  }));
+  const save = saveResult(message, campaign, gmContent);
 
   return {
     messageType: flags.messageType ?? null,
@@ -529,6 +585,258 @@ function dnd5eData(message) {
       name: activity?.name ?? null
     } : null,
     targets,
-    originatingMessage: flags.originatingMessage ?? null
+    originatingMessage: flags.originatingMessage ?? null,
+    ...(save && { save })
   };
+}
+
+/* -------------------------------------------- */
+/*  Hits, misses and saves                      */
+/* -------------------------------------------- */
+
+/**
+ * Whether players may see what Foundry decided of a message's targets, by the kind of check:
+ * what's decided is sent only where it's so, and only where players see it in Foundry, unless
+ * Gamemaster-only information is being sent, when everything decided is, as armor class is. The
+ * settings are read as the message is sent: one changed later sends no message again.
+ *
+ * Each target of the message's own, in the order it names them: dnd5e's attack's, hit or missed,
+ * `outcome`, as the app's own attacks are judged; or on Midi-QOL's card, hit or missed, and saved
+ * or not, `save`, as Midi decided them. Nothing on a roll Midi shows players as "??".
+ * @param {ChatMessage} message
+ * @param {object[]} targets   The message's, as dnd5e's flags describe them.
+ * @param {Activity|null} activity   The message's.
+ * @param {boolean} gmContent
+ * @returns {object[]}   For each target, `{outcome?, save?}`.
+ */
+function targetResults(message, targets, activity, gmContent) {
+  const none = targets.map(() => ({}));
+  if ( !targets.length || (!gmContent && obscured(message)) ) return none;
+  if ( !midiCard(message) ) return attackResults(message, targets, gmContent) ?? none;
+  const hits = midiHits(message, targets, gmContent);
+  const saves = midiSaves(message, targets, activity, gmContent);
+  return targets.map((_, index) => ({ ...hits?.[index], ...saves?.[index] }));
+}
+
+/**
+ * Whether a dnd5e attack hit each of its targets, as `outcomeOf` has it: a critical hit always
+ * does; a fumble, or a total under its armor class, misses; and one under total cover, of no armor
+ * class, misses. dnd5e's card differs there alone: comparing the total with null, it draws that
+ * target as hit, of armor class ∞, unless the attack is a fumble. Seen by players only while
+ * dnd5e's Attack Result Visibility shows them, "Show only results" or "Show results & target ACs"
+ * (hideAC or all), as dnd5e's card draws its
+ * targets for them.
+ * @param {ChatMessage} message
+ * @param {object[]} targets
+ * @param {boolean} gmContent
+ * @returns {object[]|null}   Null where nothing is told.
+ */
+function attackResults(message, targets, gmContent) {
+  const [roll] = message.rolls ?? [];
+  const D20Roll = CONFIG.Dice?.D20Roll;
+  if ( (message.flags?.dnd5e?.roll?.type !== "attack") || !D20Roll || !(roll instanceof D20Roll) ) return null;
+  if ( !Number.isFinite(roll.total) ) return null;
+  const visibility = readSetting("dnd5e", "attackRollVisibility");
+  if ( !gmContent && ((typeof visibility !== "string") || (visibility === "none")) ) return null;
+  return targets.map(({ ac }) => {
+    return ((ac === null) || Number.isFinite(ac)) ? { outcome: attackOutcome(roll, { ac }) } : {};
+  });
+}
+
+/**
+ * Whom Midi-QOL's attack hit, as its card records it once it has checked: its hits, and the targets
+ * it checked, by their tokens, each taken for its actor, as the card's targets are. Only once Midi
+ * has checked hits, by its Auto Check Hits, at all, and its card says so, it having written them
+ * once before it checked (`GMOnlyAttackRoll`); and where the card has its attack, a use with none
+ * listing every target as hit. Seen by players only where Midi shows them, Auto Check Hits "all",
+ * on a card everyone may read. Nothing for a target that can't be found by its token, as one deleted
+ * since, nor where two tokens of one actor came out differently.
+ * @param {ChatMessage} message
+ * @param {object[]} targets
+ * @param {boolean} gmContent
+ * @returns {object[]|null}   Null where nothing is told.
+ */
+function midiHits(message, targets, gmContent) {
+  const flags = message.flags["midi-qol"];
+  const check = midiSettings().autoCheckHit;
+  if ( (flags.GMOnlyAttackRoll !== false) || (typeof check !== "string") || (check === "none") ) return null;
+  if ( !(message.rolls ?? []).some(isAttackRoll) ) return null;
+  if ( !gmContent && ((check !== "all") || !publicMessage(message)) ) return null;
+  const hit = new Set([...tokenUuids(flags.hitTargetUuids), ...tokenUuids(flags.hitECTargetUuids)]);
+  const aimed = tokenUuids((Array.isArray(flags.targets) ? flags.targets : []).map(target => target?.uuid));
+  const verdicts = verdictsByActor([...hit, ...aimed], token => (hit.has(token) ? "hit" : "miss"));
+  return targets.map(({ uuid }) => {
+    const verdict = verdicts.get(uuid)?.verdict;
+    return verdict ? { outcome: verdict } : {};
+  });
+}
+
+/**
+ * Who saved against Midi-QOL's card, as its card records it once it has checked: by the tokens it
+ * records as saved, or as failed, each taken for its actor, never by the card's targets' `saved`,
+ * which a check made again leaves as it was. Only once Midi has checked saves, by its Auto Check
+ * Saves, at all, and shown them, which alone marks a target `saved`: until then, it lists every
+ * target as failed. Seen by players only where Midi shows them whether they saved, by the card's
+ * activity's own Save Display or else Auto Check Saves, and its DC, as Challenge Visibility has it
+ * for the card's speaker; on a card everyone may read; and a target no player owns only under
+ * Challenge Visibility "Show all", as Midi keeps an NPC's save from players otherwise.
+ * @param {ChatMessage} message
+ * @param {object[]} targets
+ * @param {Activity|null} activity
+ * @param {boolean} gmContent
+ * @returns {object[]|null}   Null where nothing is told.
+ */
+function midiSaves(message, targets, activity, gmContent) {
+  const flags = message.flags["midi-qol"];
+  const check = midiSettings().autoCheckSaves;
+  if ( (typeof check !== "string") || (check === "none") || !Array.isArray(flags.saveUuids) ) return null;
+  if ( !targets.some(target => typeof target?.saved === "boolean") ) return null;
+  let seen = () => true;
+  if ( !gmContent ) {
+    const own = activity?.saveDisplay;
+    const display = ((own ?? "default") === "default") ? check : own;
+    if ( !OUTCOME_SHOWN.has(display) || !midiChallengeShown(message.speakerActor) ) return null;
+    if ( !publicMessage(message) ) return null;
+    const all = readSetting("dnd5e", "challengeVisibility") === "all";
+    seen = actor => all || (actor?.hasPlayerOwner === true);
+  }
+  const saved = new Set(tokenUuids(flags.saveUuids));
+  const failed = tokenUuids(flags.failedSaveUuids);
+  const verdicts = verdictsByActor([...saved, ...failed], token => (saved.has(token) ? "success" : "failure"));
+  return targets.map(({ uuid }) => {
+    const found = verdicts.get(uuid);
+    return (found?.verdict && seen(found.actor)) ? { save: found.verdict } : {};
+  });
+}
+
+/**
+ * Whose save a save rolled from dnd5e's card is, and whether it succeeded, as dnd5e highlights it
+ * for those who see it: `{target, outcome?, readers?}`, `target` the uuid of its creature's actor,
+ * as the card names its targets, `outcome` "success" or "failure", and `readers` the campaign's
+ * characters whose players alone see it. Only for a save of a save activity's card, not Midi-QOL's,
+ * which shows its own, nor dnd5e's concentration card or a request in chat. Its outcome only once
+ * decided, against a DC, of one d20 dnd5e doesn't count otherwise, a legendary resistance's forced
+ * success a success. Seen by players as the card's Challenge Visibility has it: by everyone, on
+ * every card or on players'; or by its author's players alone; or by none.
+ * @param {ChatMessage} message
+ * @param {Campaign} campaign
+ * @param {boolean} gmContent
+ * @returns {{target: string, outcome?: string, readers?: string[]}|null}
+ */
+function saveResult(message, campaign, gmContent) {
+  const flags = message.flags.dnd5e;
+  if ( flags.roll?.type !== "save" ) return null;
+  const card = flags.originatingMessage ? (game.messages?.get(flags.originatingMessage) ?? null) : null;
+  if ( !card || (card.id === message.id) || midiCard(card) ) return null;
+  let activity = null;
+  try {
+    activity = card.getAssociatedActivity?.() ?? null;
+  } catch {
+    activity = null;
+  }
+  const target = message.speakerActor?.uuid;
+  if ( (activity?.type !== "save") || (typeof target !== "string") ) return null;
+  const outcome = saveOutcome(message);
+  if ( !outcome ) return { target };
+  if ( gmContent ) return { target, outcome };
+  if ( obscured(message) ) return { target };
+  const visibility = readSetting("dnd5e", "challengeVisibility");
+  const byGM = card.author?.isGM === true;
+  if ( (visibility === "all") || ((visibility === "player") && !byGM) ) return { target, outcome };
+  if ( byGM || !card.author?.id ) return { target };
+  const readers = charactersSeenBy([card.author.id], campaign);
+  return readers.length ? { target, outcome, readers } : { target };
+}
+
+/**
+ * Whether a save succeeded, as dnd5e highlights it: its first roll a d20 roll against a DC, whose
+ * first die is one d20, unmodified, as dnd5e tests it; a legendary resistance's forced success a
+ * success. Null for any other.
+ * @param {ChatMessage} message
+ * @returns {"success"|"failure"|null}
+ */
+function saveOutcome(message) {
+  const [roll] = message.rolls ?? [];
+  const D20Roll = CONFIG.Dice?.D20Roll;
+  if ( !D20Roll || !(roll instanceof D20Roll) || !Number.isNumeric(roll.options?.target) ) return null;
+  const die = roll.dice?.[0];
+  if ( (die?.faces !== 20) || (die.values?.length !== 1) ) return null;
+  const first = die.results?.[0];
+  if ( !first || ("success" in first) || die.options?.marginSuccess || die.options?.marginFailure ) return null;
+  return (roll.isSuccess || (message.flags.dnd5e.roll.forceSuccess === true)) ? "success" : "failure";
+}
+
+/**
+ * Is a message one of Midi-QOL's workflow cards, as Midi marks it?
+ * @param {ChatMessage} message
+ * @returns {boolean}
+ */
+function midiCard(message) {
+  return typeof message.flags?.["midi-qol"]?.messageType === "string";
+}
+
+/**
+ * Does Midi-QOL show players a message's roll as "??", as it does a blind save or check it keeps
+ * public?
+ * @param {ChatMessage} message
+ * @returns {boolean}
+ */
+function obscured(message) {
+  return message.flags?.["midi-qol"]?.obscureRoll === true;
+}
+
+/**
+ * May every player read a message: whispered to no one, and not blind?
+ * @param {ChatMessage} message
+ * @returns {boolean}
+ */
+function publicMessage(message) {
+  return !Array.from(message.whisper ?? []).length && !message.blind;
+}
+
+/**
+ * Midi-QOL's settings, as it reads them; none where it isn't there, or they can't be read.
+ * @returns {object}
+ */
+function midiSettings() {
+  try {
+    return globalThis.MidiQOL?.configSettings?.() ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * The uuids of tokens a Midi-QOL card lists.
+ * @param {unknown} list
+ * @returns {string[]}
+ */
+function tokenUuids(list) {
+  return Array.isArray(list) ? list.filter(uuid => typeof uuid === "string") : [];
+}
+
+/**
+ * What Midi-QOL decided of each target, by its actor's uuid, as dnd5e's flags name targets, with
+ * that actor; its verdict null where two of its tokens came out differently. A token that can't be
+ * found, as one deleted since, counts for no one.
+ * @param {string[]} tokens
+ * @param {(token: string) => string} verdictOf
+ * @returns {Map<string, {actor: Actor, verdict: string|null}>}
+ */
+function verdictsByActor(tokens, verdictOf) {
+  const verdicts = new Map();
+  for ( const token of new Set(tokens) ) {
+    let actor = null;
+    try {
+      actor = fromUuidSync(token)?.actor ?? null;
+    } catch {
+      actor = null;
+    }
+    if ( typeof actor?.uuid !== "string" ) continue;
+    const verdict = verdictOf(token);
+    const known = verdicts.get(actor.uuid);
+    if ( !known ) verdicts.set(actor.uuid, { actor, verdict });
+    else if ( known.verdict !== verdict ) known.verdict = null;
+  }
+  return verdicts;
 }

@@ -3,7 +3,7 @@ import { describeTool } from "./sheet-details.mjs";
 import { castFrom, hiddenCopy } from "./sheet-spells.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
 import { listedFeatures } from "./sheet-features.mjs";
-import { finite, limitedUses, localize } from "./sheet-values.mjs";
+import { countedUses, finite, limitedUses, localize } from "./sheet-values.mjs";
 
 /**
  * A character's favorites, as dnd5e's sheet shows them under Favorites, and Tidy 5e in its own:
@@ -161,8 +161,9 @@ function slotsFavorite(actor, id) {
 
 /**
  * The old-style resources dnd5e lists first among the favorites: each that's named and has a
- * maximum, with its uses left and when it's recovered, and the feature it stands for, as
- * `resourceLinks` finds it, or null.
+ * maximum, with its uses left and when it's recovered, since 0.29.0 that they're the resource's,
+ * which its player may spend directly, and the feature it stands for, as `resourceLinks` finds it,
+ * or null.
  * @param {Actor} actor
  * @returns {object[]}
  */
@@ -176,7 +177,7 @@ function resourcesOf(actor) {
       type: "resource",
       id,
       name: resource.label,
-      uses: limitedUses({ max, value: finite(resource.value) ?? 0, recovery }),
+      uses: countedUses(limitedUses({ max, value: finite(resource.value) ?? 0, recovery }), { resource: id }),
       itemId: linkOf(id, resource.label)
     }];
   });

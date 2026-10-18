@@ -281,6 +281,41 @@ attack hit only where the game shows players.
 - **Dice So Nice** doesn't animate a Midi attack while your tab is hidden, which would hold Midi's
   workflow until you came back.
 
+### Concentration, charges and Heroic Inspiration
+
+- **Ending concentration.** With **Players roll in the app** ticked, attacks or not, a player can
+  end one of their character's concentrations from the app, as dnd5e's Break Concentration does:
+  through dnd5e, so a module may still keep it, and what depends on it, such as Bless on their
+  allies, ends too, deleted by your browser. Nothing is posted in chat, as dnd5e posts nothing, so
+  the Gamemaster's page in the app doesn't offer it.
+- **Spending charges.** With **Attacks, spells and features** ticked too, a player can spend a
+  feature's, item's or activity's uses, or an old-style resource, directly, such as two Sorcery
+  Points, a Luck point or a staff's charge, as they would on dnd5e's sheet, whether or not their
+  attacks can be made now. Never a spell's own uses, which casting it spends, an item not identified
+  yet, or a potion's, scroll's or other item's that's used up as it runs out, which only using it
+  should spend. Nothing is given back from the app: a mis-tap is yours to put right on the sheet.
+- **Heroic Inspiration.** With the same switch, a player can use or gain Heroic Inspiration, as
+  dnd5e's sheet header toggles it.
+- **A line in chat.** dnd5e posts nothing for what's changed on its sheet, so each spend, and each
+  use or gain of Heroic Inspiration, posts a line as the character, such as "Spends 2 · Sorcery
+  Points" or "Gains Heroic Inspiration", never how many are left. One you make from the app's
+  Gamemaster page is marked "GM" on its card, as your rolls there are.
+
+### Hit, miss and save results
+
+The app shows whether an attack hit each target, and whether each target saved, only where Foundry
+shows players: on dnd5e's attacks, while dnd5e's **Attack Result Visibility** is "Show only results"
+or "Show results & target ACs"; on a save rolled from dnd5e's card, as its **Challenge Visibility**
+has it for that card (both under **Configure Visibility** in dnd5e's system settings); and
+on Midi-QOL's card, once Midi has checked them, with Midi's **Auto Check Hits** "all", and **Auto
+Check Saves** "all", "allNoRoll" or "allShow" and Challenge Visibility showing the DC, an NPC
+target's save only under "Show all". Out of the box, dnd5e's Attack Result Visibility ("Hide all") and
+Midi's Auto Check Hits and Auto Check Saves ("none") show players no hits or misses and none of
+Midi's saves, so turn those on to see them in the app. dnd5e's default Challenge Visibility ("Show
+only from other players") already shows everyone whether each creature saved against a save card a
+player posted, and so does the app. With **GM-only details** on, every result is sent, whatever
+Foundry shows players, as armor class is.
+
 ### Saves the game asks for
 
 Tick **Save and concentration prompts** too, and the campaign's players are asked in the
@@ -298,7 +333,12 @@ the card shows whether they saved.
   whether they saved, are shown in the app only where dnd5e's Challenge Visibility would show the
   player on the card, and the DC never where the card hides it from everyone, as a request for a
   link with `hideDC` does.
-- **A failed concentration check ends concentration**, which the player can't do from the app.
+- **A failed concentration check ends concentration**, all of it, as dnd5e's card does. Players can
+  also end a concentration from the app themselves; see [Concentration, charges and Heroic
+  Inspiration](#concentration-charges-and-heroic-inspiration). Once a character no longer
+  concentrates on what dnd5e's concentration card asked about, however it ended, the card asks
+  them nothing more, even once they concentrate on something new. Midi-QOL's own concentration
+  cards are left to Midi.
 - **With Midi-QOL** checking saves, the saves it asks of a character are asked in the app while
   the character is open there: a monster's or your spell's save, check or skill check, a player's
   own spell from the app that catches them, a concentration check in Midi's "chat" or "item" mode,
@@ -448,9 +488,10 @@ With **GM-only details** off, the listener receives what players could see:
 | Hidden combatants | No. Their turns are reported with no combatant. Revealing one reports it joining; hiding one reports it leaving. |
 | Hit points | The campaign's own characters only. |
 | Character sheets | The campaign's own characters only: what their players can already see in Foundry. |
-| Attack targets | Name only; armor class is withheld. |
-| Success or failure against a DC | Left out of roll summaries, so a hidden DC is not revealed. |
-| DCs on chat cards | A card's text, and a roll request's DC, as dnd5e's *Challenge Visibility* shows players: of the two labels its buttons have, with the DC and without, only the one players see; never a DC the card shows no one, as a request for a link with `hideDC`. |
+| Attack targets | Name only; armor class is withheld. Whether an attack hit each, only where Foundry shows players: dnd5e's *Attack Result Visibility*, or Midi-QOL's *Auto Check Hits* "all" on a card everyone can read. |
+| Success or failure against a DC | Left out of roll summaries, so a hidden DC is not revealed. A save rolled from dnd5e's card says whether it succeeded only as its *Challenge Visibility* shows players, to its author's characters alone where it shows only them; Midi-QOL's card says who saved only where Midi shows players it, an NPC's only under "Show all". |
+| DCs on chat cards | A card's text, and a roll request's DC, as dnd5e's *Challenge Visibility* shows players: of the two labels its buttons have, with the DC and without, only the one players see; never a DC the card shows no one, as a request for a link with `hideDC`. A card's content goes with no button's DC, without labels with DCs players don't see, and with Midi-QOL's sections of hits and saves, drawn for you with armor classes and DCs, emptied. |
+| Token dispositions | Friendly, neutral or hostile, as players see a token's border; never Secret, nor a hidden token's. |
 
 Every chat message carries an `audience` listing which players, and which of the campaign's
 characters, can read it. That lets the listener route each message to the right player even with
@@ -533,31 +574,33 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/characters.mjs` | A campaign's characters and who owns them |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
-| `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player |
+| `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player, and what it concentrates on |
 | `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
 | `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites; and the feature each old-style resource stands for |
 | `scripts/sheet-enchant.mjs` | Which enchant activities the app may use, with their profiles and the items each may enchant, as dnd5e's rules have it; and the enchantments an item carries, and which of them its player may end |
-| `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through; the levels an item may cast its spell at, and their cost; the checks a check activity calls for, and what a forward is used through and spends |
+| `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through; the levels an item may cast its spell at, and their cost; the checks a check activity calls for, and what a forward is used through and spends; what each use spends |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, their links marked, hashed, and sent only when a campaign lacks them |
 | `scripts/sheet-links.mjs` | The links in a description the app can act on, marked as its own spans, and finding the one a player's command names |
-| `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON |
+| `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON; which counter a count is, and whether its player may spend it |
 | `scripts/sheet-slim.mjs` | A sheet in the smaller shape the app expands: actions by reference, defaults left out |
 | `scripts/character-sync.mjs` | Sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes; withholding one too large to post; sending again what was lost |
 | `scripts/chat.mjs` | Chat hooks |
-| `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack |
+| `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack; whether an attack hit each target and who saved, where Foundry shows players; its content without what cards keep from players |
 | `scripts/combat.mjs` | Combat hooks |
-| `scripts/combat-data.mjs` | Combat and combatant serialization |
+| `scripts/combat-data.mjs` | Combat and combatant serialization, each combatant's token's disposition as players see it |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
 | `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, with which characters it has open, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes |
-| `scripts/prompts.mjs` | The saves the game asks of a campaign's characters on chat cards, told to the app as prompts, and closed as they're answered |
+| `scripts/prompts.mjs` | The saves the game asks of a campaign's characters on chat cards, told to the app as prompts, and closed as they're answered, or a concentration card's once its character no longer concentrates on what it asked about |
 | `scripts/midi-prompts.mjs` | Midi-QOL's own saves, concentration checks and OverTime turn saves, asked in the app while the character is open there, answered with the player's dice, or left to Midi |
 | `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card, as the Gamemaster's where they made it; a prompt's save on its card, or Midi-QOL's as Midi rolls it; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time |
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name |
-| `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow |
+| `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow; sending a character's sheet ahead of what a command changed |
+| `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
+| `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, planning damage's dice as the world rolls them, critical hits too, and the self-test that it works |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, player actions and connection test, and the Roster |
 | `templates/settings/` | The settings window's templates, one for each kind of section |

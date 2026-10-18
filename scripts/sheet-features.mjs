@@ -1,5 +1,5 @@
 import { enchantmentsOf } from "./sheet-enchant.mjs";
-import { finite, limitedUses, localize } from "./sheet-values.mjs";
+import { countedUses, finite, limitedUses, localize } from "./sheet-values.mjs";
 import { rollsIfAny, usageOf } from "./sheet-rolls.mjs";
 
 /**
@@ -169,12 +169,14 @@ function usableFields(item, texts) {
 }
 
 /**
- * An item's limited uses: how many are left of how many, and when they come back.
+ * An item's limited uses: how many are left of how many, and when they come back; and since
+ * 0.29.0, that they're the item's, and whether its player may spend them directly, as
+ * `countedUses` has it.
  * @param {Item} item
- * @returns {{value: number, max: number, recovery: string|null}|null}
+ * @returns {{value: number, max: number, recovery: string|null, counter?: object, spendable?: true}|null}
  */
 export function usesOf(item) {
-  return limitedUses(item.system?.uses, item.labels);
+  return countedUses(limitedUses(item.system?.uses, item.labels), { item });
 }
 
 /* -------------------------------------------- */

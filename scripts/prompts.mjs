@@ -64,6 +64,9 @@ const open = new Map();
 export function registerPromptHooks() {
   Hooks.on("createChatMessage", onCreateMessage);
   Hooks.on("deleteChatMessage", onDeleteMessage);
+  // On every client, whoever deleted it, unlike dnd5e's endConcentration hook, which is the
+  // caller's alone.
+  Hooks.on("deleteActiveEffect", onDeleteEffect);
 }
 
 /**
@@ -112,8 +115,9 @@ function overTimeAction(message) {
 
 /**
  * The campaign's characters a card asks a save of, of those whose players can read it: the one
- * concentrating, for dnd5e's concentration card; the targets of a save's card; and, for a request
- * a Gamemaster posts in chat, every one.
+ * concentrating, for dnd5e's concentration card, while they still concentrate on what it asked
+ * about, as `concentratesSince` has it; the targets of a save's card; and, for a request a
+ * Gamemaster posts in chat, every one.
  * @param {ChatMessage} message
  * @param {AskedSave} save
  * @param {Campaign} campaign
@@ -124,7 +128,9 @@ function askedOf(message, save, campaign) {
   let ids = [];
   switch ( save.source ) {
     case "concentration":
-      ids = [campaignCharacterId(message.speakerActor, campaign)];
+      if ( concentratesSince(message.speakerActor, message) ) {
+        ids = [campaignCharacterId(message.speakerActor, campaign)];
+      }
       break;
     case "save":
       ids = (message.flags?.dnd5e?.targets ?? []).map(target => campaignCharacterId(actorOf(target?.uuid), campaign));
@@ -134,6 +140,24 @@ function askedOf(message, save, campaign) {
       break;
   }
   return Array.from(new Set(ids.filter(id => id && readers.has(id))));
+}
+
+/**
+ * Does a character still concentrate on what a concentration card asked them about, since module
+ * 0.29.0: on something they began concentrating on no later than the card was posted, as both
+ * documents' server clocks have it? Ended, as from the app, it asks them no more; and nor does it
+ * once they concentrate on something new instead, which the card never asked about. An effect, or
+ * a card, whose time can't be read is taken to be what the card asked about.
+ * @param {Actor|null|undefined} actor
+ * @param {ChatMessage} message   dnd5e's concentration card.
+ * @returns {boolean}
+ */
+export function concentratesSince(actor, message) {
+  const asked = message._stats?.createdTime;
+  return Array.from(actor?.concentration?.effects ?? []).some(effect => {
+    const begun = effect._stats?.createdTime;
+    return !Number.isFinite(begun) || !Number.isFinite(asked) || (begun <= asked);
+  });
 }
 
 /**
@@ -318,8 +342,9 @@ function summarizePrompt(prompt) {
  * The open prompt a player's save answers: since 0.27.0 one Midi-QOL asked, from midi-prompts.mjs,
  * first; or else read from its card. Or why it can't be answered: the campaign doesn't ask its
  * players for their saves (`off`), it's another character's (`character`), its card is gone or
- * asks no save of the character (`gone`), it waited too long (`expired`), or the character has
- * rolled it (`answered`); for Midi's, also as findMidiPrompt says.
+ * asks no save of the character, as a concentration card of one who no longer concentrates on what
+ * it asked about (`gone`), it waited too long (`expired`), or the character has rolled it
+ * (`answered`); for Midi's, also as findMidiPrompt says.
  * @param {string} id         The prompt's id, as the app has it.
  * @param {Actor} actor       The character whose save it is.
  * @param {Campaign} campaign
@@ -395,6 +420,26 @@ function onDeleteMessage(message) {
 }
 
 /**
+ * Close the concentration checks dnd5e's cards ask of a character who no longer concentrates on what
+ * they asked about, once a concentration effect of theirs is deleted: ended from the app, or in
+ * Foundry by anyone, or gone with what it was on. Midi-QOL's own are left to it, released by
+ * nothing here: midi-prompts.mjs would have Midi roll one released.
+ * @param {ActiveEffect} effect
+ */
+function onDeleteEffect(effect) {
+  if ( !canSend() ) return;
+  const actor = effect?.parent;
+  if ( actor?.documentName !== "Actor" ) return;
+  if ( !effect.statuses?.has?.(CONFIG.specialStatusEffects?.CONCENTRATING) ) return;
+  for ( const [id, { prompt }] of open ) {
+    if ( (prompt.type !== "concentration") || (prompt.actorId !== actor.id) ) continue;
+    const card = game.messages.get(prompt.messageId);
+    const asks = card && ((askedSave(card)?.source !== "concentration") || concentratesSince(actor, card));
+    if ( !asks ) closePrompt(id, "gone");
+  }
+}
+
+/**
  * Remember that a campaign has been told a prompt is open, until it closes.
  * @param {RollPrompt} prompt
  * @param {Campaign} campaign
@@ -414,7 +459,8 @@ function remember(prompt, campaign) {
 
 /**
  * Tell each campaign told of a prompt that it's closed, and why: its character rolled it from the
- * app (`answered`) or in Foundry (`rolled`), its card was deleted (`gone`), or it waited too long
+ * app (`answered`) or in Foundry (`rolled`), its card was deleted, or since 0.29.0 its character no
+ * longer concentrates on what a concentration card asked about (`gone`), or it waited too long
  * (`expired`).
  * @param {string} id
  * @param {"answered"|"rolled"|"gone"|"expired"} reason

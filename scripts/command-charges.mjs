@@ -1,0 +1,189 @@
+import { MODULE_ID } from "./constants.mjs";
+import { sheetFirst } from "./command-enchant.mjs";
+import { appFlags, authorFor, checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
+import { diceStatus } from "./dice-plan.mjs";
+import { activityName, shownActivity } from "./sheet-rolls.mjs";
+import { finite, limitedUses, RESOURCES, spendsDirectly } from "./sheet-values.mjs";
+
+/**
+ * Spending a character's charges from the Sending Stone app, since module 0.29.0, as a player
+ * would on dnd5e's sheet: so many of a feature's or an item's uses, an activity's own, or an
+ * old-style resource's, such as two Sorcery Points or a Luck point, of a counter the sheet names
+ * and says may be spent so; and using or gaining Heroic Inspiration, as dnd5e's sheet header does.
+ * Nothing is ever given back from the app: a mistake is the Gamemaster's to put right.
+ *
+ * dnd5e posts nothing for what's changed on its sheet, so each posts a line in chat saying what
+ * the character did, as the character, such as "Spends 2 · Sorcery Points": never how many are
+ * left, which other players don't see in Foundry. One the Gamemaster made in the app as the
+ * character is marked as theirs, as their rolls are.
+ *
+ * Offered wherever the Gamemaster lets the campaign's players attack and cast from the app, and its
+ * players' rolls are made here, whether or not attacks can be made here now: neither throws dice or
+ * goes through Midi-QOL. The character's sheet as it then stands goes ahead of the result, which
+ * says nothing of the counts: the sheet does.
+ */
+
+/* -------------------------------------------- */
+/*  Spending                                    */
+/* -------------------------------------------- */
+
+/**
+ * Spend so many of a character's charges, as fetched from the app, if they may be spent directly
+ * and there are that many left, as they now are; then post the line that says so.
+ * @param {object} command      `{counter, count}`, as fetched from the app.
+ * @param {Campaign} campaign
+ * @returns {Promise<CommandResult>}
+ */
+export async function runSpendCommand(command, campaign) {
+  const refusal = chargeRefusal(command, campaign);
+  if ( refusal ) return failedResult(command, refusal.reason, refusal.error);
+  const actor = game.actors.get(command.actorId);
+  if ( !actor || !campaign.characters.has(actor.id) ) return failedResult(command, "unknown");
+  const found = counterOf(actor, command.counter);
+  if ( found.refusal ) return failedResult(command, found.refusal);
+  const { uses, name, spend } = found;
+  if ( command.count > uses.value ) return failedResult(command, "short");
+  await spend(uses.value - command.count);
+  const text = game.i18n.format("SENDINGSTONE.Chat.Spends", {
+    count: command.count, name: foundry.utils.escapeHTML(name)
+  });
+  return lineResult(command, actor, campaign, await postLine(command, actor, text));
+}
+
+/**
+ * The counter a spend names, live, with its uses as `limitedUses` has them, the name the line says
+ * it by and how to leave so many of them: an item's own uses, by its id; one of its activities'
+ * own, by both ids, of one its player can see; or an old-style resource's, by its key. Or why not:
+ * the item or activity isn't the character's (`item`); or it's not one to spend directly, as
+ * `spendsDirectly` has it, or has no limited uses, or the resource has no name or maximum, as the
+ * sheet leaves out (`uses`).
+ * @param {Actor} actor
+ * @param {{item?: string, activity?: string, resource?: string}} counter
+ * @returns {{refusal: string}|{uses: {value: number, max: number}, name: string,
+ *   spend: (left: number) => Promise<unknown>}}
+ */
+function counterOf(actor, counter) {
+  if ( counter.resource !== undefined ) {
+    const key = counter.resource;
+    const resource = RESOURCES.includes(key) ? actor.system?.resources?.[key] : null;
+    const max = finite(resource?.max);
+    if ( !resource?.label || !max ) return { refusal: "uses" };
+    return {
+      uses: { value: finite(resource.value) ?? 0, max },
+      name: String(resource.label),
+      spend: left => actor.update({ [`system.resources.${key}.value`]: left })
+    };
+  }
+  const item = actor.items?.get(counter.item);
+  if ( !item ) return { refusal: "item" };
+  if ( counter.activity !== undefined ) {
+    const activity = item.system?.activities?.get?.(counter.activity);
+    if ( !activity || !shownActivity(activity) ) return { refusal: "item" };
+    const uses = spendsDirectly(item) ? limitedUses(activity.uses, activity.labels) : null;
+    if ( !uses ) return { refusal: "uses" };
+    return {
+      uses,
+      name: `${item.name}: ${activityName(activity)}`,
+      // As dnd5e's sheet writes an activity's uses left: as so many spent of its maximum.
+      spend: left => item.updateActivity(activity.id, { "uses.spent": uses.max - left })
+    };
+  }
+  const uses = spendsDirectly(item) ? limitedUses(item.system?.uses, item.labels) : null;
+  if ( !uses ) return { refusal: "uses" };
+  return {
+    uses,
+    name: String(item.name ?? ""),
+    spend: left => item.update({ "system.uses.spent": uses.max - left })
+  };
+}
+
+/* -------------------------------------------- */
+/*  Heroic Inspiration                          */
+/* -------------------------------------------- */
+
+/**
+ * Use or gain a character's Heroic Inspiration, as fetched from the app, as dnd5e's sheet header
+ * does: used only while they have it (`not-inspired`), gained only while they haven't
+ * (`inspired`); then post the line that says so.
+ * @param {object} command      `{inspiration: "use"|"gain"}`, as fetched from the app.
+ * @param {Campaign} campaign
+ * @returns {Promise<CommandResult>}
+ */
+export async function runInspirationCommand(command, campaign) {
+  const refusal = chargeRefusal(command, campaign);
+  if ( refusal ) return failedResult(command, refusal.reason, refusal.error);
+  const actor = game.actors.get(command.actorId);
+  if ( !actor || !campaign.characters.has(actor.id) ) return failedResult(command, "unknown");
+  const gain = command.inspiration === "gain";
+  const inspired = actor.system?.attributes?.inspiration === true;
+  if ( !gain && !inspired ) return failedResult(command, "not-inspired");
+  if ( gain && inspired ) return failedResult(command, "inspired");
+  await actor.update({ "system.attributes.inspiration": gain });
+  const text = game.i18n.localize(gain ? "SENDINGSTONE.Chat.InspirationGained" : "SENDINGSTONE.Chat.InspirationUsed");
+  return lineResult(command, actor, campaign, await postLine(command, actor, text));
+}
+
+/* -------------------------------------------- */
+/*  Both                                        */
+/* -------------------------------------------- */
+
+/**
+ * Why charges or Heroic Inspiration aren't to be changed, before looking at the character: the
+ * campaign's players' rolls aren't made here, or the self-test hasn't passed (`off`); its
+ * Gamemaster doesn't let them attack and cast from the app (`attacks-off`); or the command isn't
+ * one to make (`invalid`). Whether attacks can be made here now, as the attack self-test and
+ * Midi-QOL decide, doesn't matter: neither throws dice or goes through Midi.
+ * @param {object} command
+ * @param {Campaign} campaign
+ * @returns {{reason: string, error?: string}|null}
+ */
+function chargeRefusal(command, campaign) {
+  if ( !campaign.rolls || !diceStatus.ready ) return { reason: "off" };
+  if ( !campaign.attacks ) return { reason: "attacks-off" };
+  const invalid = checkCommand(command);
+  if ( invalid ) return { reason: "invalid", error: invalid };
+  return null;
+}
+
+/**
+ * Post the line that says what a character did, as the character, for everyone: the text given,
+ * whose names are escaped already, being what players may write. One the Gamemaster made in the
+ * app is flagged theirs, and so listed in their result. One that can't be posted is no failure of
+ * what it tells of, which is done: it's left unsaid.
+ * @param {object} command
+ * @param {Actor} actor
+ * @param {string} text
+ * @returns {Promise<ChatMessage|null>}
+ */
+async function postLine(command, actor, text) {
+  try {
+    return await ChatMessage.implementation.create({
+      author: authorFor(actor).id,
+      speaker: ChatMessage.implementation.getSpeaker({ actor }),
+      content: `<p>${text}</p>`,
+      flags: { [MODULE_ID]: appFlags(command) }
+    }) ?? null;
+  } catch (err) {
+    console.error(`${MODULE_ID} | Could not post what ${actor.name} did from Sending Stone`, err);
+    return null;
+  }
+}
+
+/**
+ * What the app is told of charges spent or Heroic Inspiration changed: its line, and whether its
+ * player may see it; the character's sheet as it now stands going first, as `sheetFirst` has it.
+ * @param {object} command
+ * @param {Actor} actor
+ * @param {Campaign} campaign
+ * @param {ChatMessage|null} line
+ * @returns {CommandResult}
+ */
+function lineResult(command, actor, campaign, line) {
+  sheetFirst(actor);
+  return {
+    id: command.id, status: "done", reason: null, error: null,
+    messageId: line?.id ?? null,
+    visible: line ? visibleTo(line, actor, campaign) : true,
+    rolls: []
+  };
+}

@@ -32,7 +32,8 @@ export function involvesCampaign(combat, campaign, leaving) {
  * Describe a combatant for a campaign.
  *
  * Hit points are included for the campaign's characters, whose players can see them anyway, and
- * for everyone else only when Gamemaster-only information is being sent.
+ * for everyone else only when Gamemaster-only information is being sent. Since 0.29.0 its token's
+ * disposition is included, as `dispositionOf` has it.
  * @param {Combatant} combatant
  * @param {Campaign} campaign
  * @returns {object}
@@ -52,11 +53,32 @@ export function summarizeCombatant(combatant, campaign) {
     initiative: combatant.initiative ?? null,
     defeated: combatant.isDefeated,
     character,
-    playerOwned: actor?.hasPlayerOwner ?? false
+    playerOwned: actor?.hasPlayerOwner ?? false,
+    disposition: dispositionOf(combatant)
   };
   if ( gmContent ) summary.hidden = combatant.hidden;
   if ( character || gmContent ) summary.hp = hitPoints(actor);
   return summary;
+}
+
+/**
+ * A combatant's token's disposition, as players see its border in Foundry: "friendly", "neutral"
+ * or "hostile". Null for a Secret one, which Foundry draws for players as no disposition at all,
+ * and so for any other; for a token hidden from players; and for a combatant with no token. The
+ * same whether or not Gamemaster-only information is being sent: never Secret, nor its number.
+ * @param {Combatant} combatant
+ * @returns {"friendly"|"neutral"|"hostile"|null}
+ */
+function dispositionOf(combatant) {
+  const token = combatant.token;
+  const dispositions = CONST.TOKEN_DISPOSITIONS;
+  if ( !token || (token.hidden === true) || !dispositions || !Number.isInteger(token.disposition) ) return null;
+  switch ( token.disposition ) {
+    case dispositions.FRIENDLY: return "friendly";
+    case dispositions.NEUTRAL: return "neutral";
+    case dispositions.HOSTILE: return "hostile";
+    default: return null;
+  }
 }
 
 /**

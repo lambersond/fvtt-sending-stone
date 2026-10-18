@@ -182,6 +182,32 @@ export const ATTACK_KINDS = Object.freeze(["attack", "use", "damage"]);
 export const ENCHANT_KINDS = Object.freeze(["endEnchantment"]);
 
 /**
+ * What a player can have done here from the app to a concentration of their character's: end it,
+ * as dnd5e's Break Concentration does, with what depends on it, such as Bless on their allies.
+ * Offered wherever their rolls are made, as their concentration checks are: it throws no dice and
+ * uses nothing.
+ * @type {readonly string[]}
+ */
+export const CONCENTRATION_KINDS = Object.freeze(["endConcentration"]);
+
+/**
+ * What a player, or their Gamemaster as them, can have done here from the app to what their
+ * character spends: spend charges of a feature, an item, an activity or a resource directly, as
+ * they would on dnd5e's sheet, such as two Sorcery Points; and use or gain Heroic Inspiration.
+ * Each posts a line in chat saying so. Offered wherever the Gamemaster lets the campaign's players
+ * attack and cast from the app, whether or not those can be made here now: neither throws dice or
+ * goes through Midi-QOL.
+ * @type {readonly string[]}
+ */
+export const CHARGE_KINDS = Object.freeze(["spend", "inspiration"]);
+
+/**
+ * The most charges a player can spend at once from the app.
+ * @type {number}
+ */
+export const MOST_SPENT = 999;
+
+/**
  * The roll option naming the player's roll a roll is made for, so that its dice can be the ones
  * the player rolled.
  * @type {string}

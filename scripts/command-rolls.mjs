@@ -1,5 +1,6 @@
 import {
-  ATTACK_KINDS, DIE_FACES, ENCHANT_KINDS, MODULE_ID, MOST_HIT_DICE, ROLL_KINDS, ROLL_TAG
+  ATTACK_KINDS, CONCENTRATION_KINDS, DIE_FACES, ENCHANT_KINDS, MODULE_ID, MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS,
+  ROLL_TAG
 } from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
@@ -207,7 +208,8 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * game is checked again here: only dice a player can roll, and only values those dice show. A
  * check or saving throw may name the link in a description it's rolled for, but not while
  * answering a prompt; and a check may name the item and check activity it's rolled for instead.
- * Only a use names the enchantment it applies.
+ * Only a use names the enchantment it applies. Ending a concentration, spending charges and Heroic
+ * Inspiration each name what they end, spend or change, and nothing else.
  * @param {object} command
  * @returns {string|null}
  */
@@ -216,6 +218,9 @@ export function checkCommand(command) {
   const named = checkItemCommand(command);
   if ( named ) return named;
   if ( ENCHANT_KINDS.includes(command.kind) ) return checkEnchantCommand(command);
+  if ( CONCENTRATION_KINDS.includes(command.kind) ) return checkConcentrationCommand(command);
+  if ( command.kind === "spend" ) return checkSpendCommand(command);
+  if ( command.kind === "inspiration" ) return checkInspirationCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);
@@ -440,6 +445,101 @@ function checkEnchantCommand(command) {
   const none = list => (list === undefined) || (list === null) || (Array.isArray(list) && !list.length);
   if ( !none(command.extras) || !none(command.dice) ) return "dice";
   return null;
+}
+
+/**
+ * The fields a command names its item, activity, targets, prompt or link by, none of which ending
+ * a concentration, spending charges or Heroic Inspiration names.
+ * @type {string[]}
+ */
+const ROLL_FIELDS = [
+  "enchant", "item", "activity", "target", "targets", "self", "slot", "prompt", "text", "link", "key"
+];
+
+/**
+ * Does a command name anything it's no roll at, as ROLL_FIELDS has them?
+ * @param {object} command
+ * @returns {boolean}
+ */
+function namesRollFields(command) {
+  return ROLL_FIELDS.some(field => (command[field] !== undefined) && (command[field] !== null));
+}
+
+/**
+ * Is a command one that throws no dice: with no advantage, nothing added and no dice?
+ * @param {object} command
+ * @returns {boolean}
+ */
+function throwsNoDice(command) {
+  if ( (command.mode !== 0) || (command.explicit !== false) ) return false;
+  const none = list => (list === undefined) || (list === null) || (Array.isArray(list) && !list.length);
+  return none(command.extras) && none(command.dice);
+}
+
+/**
+ * Why a fetched end of a concentration isn't one to make, if it isn't: it names the concentration's
+ * effect, and nothing a roll names, and throws no dice. Only its player ends one from the app: it
+ * posts nothing, so would leave no mark of the Gamemaster's.
+ * @param {object} command
+ * @returns {string|null}
+ */
+function checkConcentrationCommand(command) {
+  if ( command.by === "gm" ) return "by";
+  if ( namesRollFields(command) || !isObject(command.concentration) || !isId(command.concentration.effect) ) {
+    return "concentration";
+  }
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Why a fetched spend of charges isn't one to make, if it isn't: it names the counter, as the sheet
+ * names it, an item's uses, one of its activities' or a resource, and how many, from 1 to
+ * MOST_SPENT, and nothing a roll names, and throws no dice.
+ * @param {object} command
+ * @returns {string|null}
+ */
+function checkSpendCommand(command) {
+  if ( namesRollFields(command) || !isCounter(command.counter) ) return "counter";
+  const { count } = command;
+  if ( !Number.isInteger(count) || (count < 1) || (count > MOST_SPENT) ) return "count";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Why a fetched use or gain of Heroic Inspiration isn't one to make, if it isn't: it says which,
+ * and names nothing a roll names, and throws no dice.
+ * @param {object} command
+ * @returns {string|null}
+ */
+function checkInspirationCommand(command) {
+  if ( namesRollFields(command) || !["use", "gain"].includes(command.inspiration) ) return "inspiration";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Is this a counter as the sheet names one: an item's uses, `{item}`, one of its activities',
+ * `{item, activity}`, or an old-style resource, `{resource}`, and nothing else?
+ * @param {unknown} counter
+ * @returns {boolean}
+ */
+function isCounter(counter) {
+  if ( !isObject(counter) ) return false;
+  const keys = Object.keys(counter);
+  if ( Object.hasOwn(counter, "resource") ) {
+    return (keys.length === 1) && ["primary", "secondary", "tertiary"].includes(counter.resource);
+  }
+  if ( !isId(counter.item) ) return false;
+  if ( keys.length === 1 ) return true;
+  return (keys.length === 2) && isId(counter.activity);
+}
+
+/**
+ * Is this a plain object, rather than null or an array?
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isObject(value) {
+  return Boolean(value) && (typeof value === "object") && !Array.isArray(value);
 }
 
 /**
@@ -927,9 +1027,10 @@ async function rollFormula(command, actor, message) {
 /**
  * Answer a saving throw the game asked a character for, through dnd5e, without its dialog, as the
  * player's own: on the card that asked, as if they had clicked it there, against its DC. A
- * concentration check is rolled as one; failed, it ends the character's concentration, which the
- * player can't from the app, unless Midi-QOL is there to, as it does after a failed check when its
- * Gamemaster has it remove concentration.
+ * concentration check is rolled as one; failed, it ends the character's concentration, all of it,
+ * as the player would on dnd5e's card, unless Midi-QOL is there to, as it does after a failed check
+ * when its Gamemaster has it remove concentration. Since 0.29.0 a player may end one concentration
+ * of several from the app themselves, as command-concentration.mjs does.
  * @param {object} command
  * @param {Actor} actor
  * @param {RollPrompt} prompt

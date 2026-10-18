@@ -1,7 +1,7 @@
 import { describeEnchant, enchantInPlay } from "./sheet-enchant.mjs";
 import { formulaRoll } from "./dice-plan.mjs";
 import { challenge, checkOptions } from "./sheet-links.mjs";
-import { finite, limitedUses, localize } from "./sheet-values.mjs";
+import { countedUses, finite, limitedUses, localize, RESOURCES } from "./sheet-values.mjs";
 
 /**
  * What an item rolls, or is used through, as the sheet tells the app: its bonus to hit and the
@@ -343,16 +343,18 @@ export function ownLabels(item, activity) {
 /**
  * An activity's uses, or for a Cast activity, those casting its spell spends, such as the item's
  * charges, as dnd5e's sheet shows them by the spell; for a forward, those it spends, such as a
- * spell's own once a day.
+ * spell's own once a day. Since 0.29.0 an activity's own say they're its, and whether its player
+ * may spend them directly, as `countedUses` has it; those a Cast or forward spends say neither,
+ * being another counter's, shown by it.
  * @param {Item} item
  * @param {Activity} [activity]
- * @returns {{value: number, max: number, recovery: string|null}|null}
+ * @returns {{value: number, max: number, recovery: string|null, counter?: object, spendable?: true}|null}
  */
 export function activityUses(item, activity) {
   if ( !activity ) return null;
   const cost = (activity.type === "cast") ? castCost(item, activity)
     : (activity.type === "forward") ? forwardCost(item, activity) : null;
-  return cost?.uses || limitedUses(activity.uses, activity.labels);
+  return cost?.uses || countedUses(limitedUses(activity.uses, activity.labels), { item, activity });
 }
 
 /* -------------------------------------------- */
@@ -411,7 +413,9 @@ function castRolls(item, cast, texts) {
   return {
     ...rolls,
     attackId: rolls.attackId && cast.id,
-    activity: rolls.activity && { ...rolls.activity, id: cast.id },
+    // What it spends is the Cast activity's, of the item, never the spell's copy's.
+    activity: rolls.activity && withSpends({ ...rolls.activity, id: cast.id },
+      (lead.consumption?.spellSlot === false) ? [] : spendsOf(item, cast)),
     ...copy,
     cast: {
       level: Math.max(finite(spell.system?.level) ?? 0, finite(cast.spell?.level) ?? 0),
@@ -546,11 +550,8 @@ export function castCost(item, cast, level) {
  *   short: boolean, never: boolean}|null}
  */
 function usesCost(item, activity, above=0) {
-  const costs = (activity.consumption?.targets ?? []).flatMap(target => {
-    const uses = (target.type === "itemUses") ? usesOfItem(item, target.target)
-      : (target.type === "activityUses") ? limitedUses(activity.uses, activity.labels) : undefined;
+  const costs = consumedBy(item, activity, above).flatMap(({ amount, uses }) => {
     if ( uses === undefined ) return [];
-    const amount = scaledCost(target, above);
     return ((amount !== null) && (amount > 0) && uses) ? [{ amount, uses }] : [];
   });
   if ( !costs.length ) return null;
@@ -562,14 +563,61 @@ function usesCost(item, activity, above=0) {
 }
 
 /**
- * The uses of an item a Cast activity spends: its own, or the other item it names.
+ * What an activity's consumption targets spend, each as its counter, as the sheet names counters:
+ * the uses of the item, or of another it names, `{item}`, with that item, `source`; the activity's
+ * own, `{item, activity}`; or since 0.29.0 one of the old-style resources, `{resource}`, as an
+ * attribute target of its value, which has no `uses` here. Each with how much it spends, scaled for
+ * a spell cast so many levels higher, as `scaledCost` has it, null for a formula. Other kinds of
+ * target are left out.
  * @param {Item} item
- * @param {string} [id]
- * @returns {{value: number, max: number, recovery: string|null}|null}
+ * @param {Activity} activity
+ * @param {number} [above]   How many levels above its own a spell is cast at.
+ * @returns {{counter: object, amount: number|null, source?: Item|null,
+ *   uses?: {value: number, max: number, recovery: string|null}|null}[]}
  */
-function usesOfItem(item, id) {
-  const source = id ? item.actor?.items?.get(id) : item;
-  return limitedUses(source?.system?.uses, source?.labels);
+function consumedBy(item, activity, above=0) {
+  return Array.from(activity.consumption?.targets ?? []).flatMap(target => {
+    const amount = scaledCost(target, above);
+    if ( target.type === "itemUses" ) {
+      const source = (target.target ? item.actor?.items?.get(target.target) : item) ?? null;
+      const uses = limitedUses(source?.system?.uses, source?.labels);
+      return [{ counter: { item: target.target || item.id }, amount, source, uses }];
+    }
+    if ( target.type === "activityUses" ) {
+      const uses = limitedUses(activity.uses, activity.labels);
+      return [{ counter: { item: item.id, activity: activity.id }, amount, source: item, uses }];
+    }
+    const resource = (target.type === "attribute") ? /^resources\.(\w+)\.value$/.exec(target.target ?? "")?.[1] : null;
+    return RESOURCES.includes(resource) ? [{ counter: { resource }, amount }] : [];
+  });
+}
+
+/**
+ * What using an activity spends, as the sheet tells the app since 0.29.0: each counter it spends,
+ * as `consumedBy` finds them, with how much, null for a formula, at the level it's cast at now;
+ * never an item's not identified yet, which keeps its uses to itself.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {{counter: object, amount: number|null}[]}
+ */
+function spendsOf(item, activity) {
+  return consumedBy(item, activity)
+    // A resource has no item; another item gone, or not identified, is left out.
+    .filter(({ source }) => (source === undefined) || (Boolean(source) && (source.system?.identified !== false)))
+    .map(({ counter, amount }) => ({ counter, amount }));
+}
+
+/**
+ * An activity as the app is told it, with what it spends, `spends`, where it spends anything.
+ * @param {object} described   As `describeUse` has it.
+ * @param {{counter: object, amount: number|null}[]} spends
+ * @returns {object}
+ */
+function withSpends(described, spends) {
+  const shown = { ...described };
+  delete shown.spends;
+  if ( spends.length ) shown.spends = spends;
+  return shown;
 }
 
 /**
@@ -770,10 +818,13 @@ function forwardRolls(item, forward, texts) {
   const count = forwardCount(item, forward, target);
   const atLevel = targets => (targets && { ...targets, count: (count ?? targets.count), perLevel: null });
   const cost = forwardCost(item, forward, target);
+  // What it spends is the forward's, in place of the activity's, as dnd5e spends it.
+  const spends = forwardSpendsNothing(item, forward, target) ? [] : spendsOf(item, forward);
   return {
     ...rolls,
     attackId: rolls.attackId && forward.id,
-    activity: rolls.activity && { ...rolls.activity, id: forward.id, targets: atLevel(rolls.activity.targets) },
+    activity: rolls.activity
+      && withSpends({ ...rolls.activity, id: forward.id, targets: atLevel(rolls.activity.targets) }, spends),
     ...(rolls.attackArea && { attackArea: atLevel(rolls.attackArea) }),
     ...(spendsNoSlot(item, forward) && { consumesSlot: false }),
     forward: {
@@ -840,12 +891,14 @@ function forwardCount(item, forward, target) {
  * An activity a player can use from the app, by its id, with whom it's used at: its user alone, an
  * area, or a number of targets, and of what kind, such as allies or enemies; whether its range is
  * Self, as a potion's or Wild Shape's, which may still name a creature, for the app to offer its
- * user among them; and for an enchant activity, what it may enchant, and with what, as
- * `describeEnchant` has it.
+ * user among them; for an enchant activity, what it may enchant, and with what, as
+ * `describeEnchant` has it; and since 0.29.0, what using it spends, `spends`, as `spendsOf` has it,
+ * where it spends anything, so that the app can tell a count it shows is the one using it spends.
  * @param {Item} item
  * @param {Activity} activity
  * @returns {{id: string, type: string, targets: {self: boolean, area: boolean, count: number|null,
- *   perLevel: number|null, affects: string|null, fromSelf: boolean}, enchant?: object}}
+ *   perLevel: number|null, affects: string|null, fromSelf: boolean}, enchant?: object,
+ *   spends?: {counter: object, amount: number|null}[]}}
  */
 export function describeUse(item, activity) {
   const target = activity.target ?? {};
@@ -863,7 +916,8 @@ export function describeUse(item, activity) {
       affects,
       fromSelf: activity.range?.units === "self"
     },
-    ...((activity.type === "enchant") && { enchant: describeEnchant(item, activity) })
+    ...((activity.type === "enchant") && { enchant: describeEnchant(item, activity) }),
+    ...withSpends({}, spendsOf(item, activity))
   };
 }
 
