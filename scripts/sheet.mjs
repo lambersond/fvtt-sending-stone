@@ -3,7 +3,7 @@ import { enchantingSheet } from "./sheet-enchant.mjs";
 import { criticalRule } from "./dice-plan.mjs";
 import { actionSections } from "./sheet-actions.mjs";
 import { deathSavesOf, describeTool, detailsOf, traitsOf } from "./sheet-details.mjs";
-import { conditionsOf, effectSections } from "./sheet-effects.mjs";
+import { concentrationOf, conditionsOf, effectSections } from "./sheet-effects.mjs";
 import { favoritesOf } from "./sheet-favorites.mjs";
 import { classesOf, featureSections } from "./sheet-features.mjs";
 import { inventoryOf } from "./sheet-inventory.mjs";
@@ -68,6 +68,7 @@ function sheetOf(actor, texts) {
       .map(([id, tool]) => describeTool(actor, id, tool))
       .sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang)),
     conditions: conditionsOf(actor, texts),
+    concentration: concentrationOf(actor),
     features: featureSections(actor, texts),
     effects: effectSections(actor, texts),
     inventory: inventoryOf(actor, texts),

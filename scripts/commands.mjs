@@ -1,9 +1,13 @@
-import { ATTACK_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_KINDS } from "./constants.mjs";
+import {
+  ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_KINDS
+} from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
+import { runEndConcentrationCommand } from "./command-concentration.mjs";
+import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
@@ -134,8 +138,12 @@ const made = new Map();
  * the character's and marked as theirs, wherever rolls are made (`gmRolls`); from 0.25.0, that
  * the result of such a command lists the chat messages it made (`gmRollMessages`), so that only
  * those are taken as the Gamemaster's; from 0.26.0, whether its players may enter their own dice
- * results in the app, with Manual Dice (`manualDice`), which the app doesn't offer yet; and from
- * 0.27.0, whether the saves Midi-QOL asks of them are asked in the app too (`midiPrompts`).
+ * results in the app, with Manual Dice (`manualDice`), which the app doesn't offer yet; from
+ * 0.27.0, whether the saves Midi-QOL asks of them are asked in the app too (`midiPrompts`); and
+ * from 0.29.0, among the kinds, ending a concentration of theirs, wherever their rolls are made,
+ * and spending their charges directly and using or gaining Heroic Inspiration, wherever the
+ * Gamemaster lets them attack and cast from the app, whether or not those can be made here now,
+ * as neither throws dice or goes through Midi-QOL.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
@@ -156,7 +164,9 @@ export function rollFeatures(campaign) {
     enabled: true,
     kinds: [
       ...ROLL_KINDS.filter(kind => !HIT_DICE_KINDS.includes(kind) || diceStatus.hitDice),
+      ...CONCENTRATION_KINDS,
       ...(attacks ? [...ATTACK_KINDS, ...ENCHANT_KINDS] : []),
+      ...(campaign.attacks ? CHARGE_KINDS : []),
       ...texts
     ],
     reason: null,
@@ -515,6 +525,9 @@ function runCommand(command, campaign, signal) {
     case "use": return runUseCommand(command, campaign, { signal });
     case "damage": return runDamageCommand(command, campaign);
     case "endEnchantment": return runEndEnchantmentCommand(command, campaign);
+    case "endConcentration": return runEndConcentrationCommand(command, campaign);
+    case "spend": return runSpendCommand(command, campaign);
+    case "inspiration": return runInspirationCommand(command, campaign);
     case "ask": return runAskCommand(command, campaign);
     case "textDamage": return runTextDamageCommand(command, campaign);
     case "textRoll": return runTextRollCommand(command, campaign);

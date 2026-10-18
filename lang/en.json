@@ -51,14 +51,14 @@
         "AddressHint": "Where every campaign sends its events.",
         "Send": "What to send",
         "Chat": "Chat messages",
-        "ChatHint": "New, edited and deleted messages, and the log being cleared.",
+        "ChatHint": "New, edited and deleted messages, and the log being cleared. Hits, misses and saves show where Foundry shows players them: dnd5e's Attack Result Visibility and Challenge Visibility (its Configure Visibility settings), and Midi-QOL's Auto Check Hits and Auto Check Saves.",
         "Scope": "Which messages",
         "ScopeAll": "All its players can read",
         "ScopeConnected": "Its characters' messages only",
         "Combat": "Combat tracker",
         "CombatHint": "Encounters, turns, rounds, initiative and defeats.",
         "GmContent": "GM-only details",
-        "GmContentHint": "Whispers, blind rolls, hidden combatants, other creatures' hit points and targets' armor class. Keep off if players can see what the app receives.",
+        "GmContentHint": "Whispers, blind rolls, hidden combatants, other creatures' hit points, targets' armor class, and every hit, miss and save. Keep off if players can see what the app receives.",
         "Midi": "Midi-QOL",
         "MidiIntegration": "Run players' attacks through Midi",
         "MidiIntegrationHint": "Midi checks hits, rolls saves and applies damage and effects, as you have it set up. Off: attacks, spells and features stay in the app.",
@@ -273,6 +273,11 @@
       "Badge": "Rolled on Sending Stone",
       "BadgeGM": "Rolled on Sending Stone by the Gamemaster",
       "GM": "GM"
+    },
+    "Chat": {
+      "Spends": "Spends {count} · {name}",
+      "InspirationUsed": "Uses Heroic Inspiration",
+      "InspirationGained": "Gains Heroic Inspiration"
     }
   }
 }

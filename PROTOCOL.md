@@ -252,6 +252,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
     { "id": "exhaustion", "name": "Exhaustion", "img": "systems/dnd5e/icons/svg/statuses/exhaustion.svg", "level": 2, "detail": null, "text": "0c41a7d2e9b3f5" },
     { "id": "concentrating", "name": "Concentrating", "img": "systems/dnd5e/icons/svg/statuses/concentrating.svg", "level": null, "detail": "Bless", "text": null }
   ],
+  "concentration": { "effects": [{ "id": "cOnCbLeSs0000001", "name": "Bless", "item": "bLeSs00000000001" }] },
   "features": [
     {
       "id": "fighter", "label": "Fighter Features", "text": "1b7e04c2d9a8f3",
@@ -259,7 +260,8 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
         {
           "id": "kQ1bW7sYp3Xc0RtE", "name": "Second Wind", "img": "icons/magic/life/heart-cross-green.webp",
           "kind": "Class Feature", "requirements": "Fighter 1", "activation": "1 Bonus Action", "passive": false,
-          "uses": { "value": 1, "max": 1, "recovery": "Short Rest, Long Rest" }, "text": "05d2e8a1c7b94f"
+          "uses": { "value": 1, "max": 1, "recovery": "Short Rest, Long Rest", "counter": { "item": "kQ1bW7sYp3Xc0RtE" }, "spendable": true },
+          "text": "05d2e8a1c7b94f"
         }
       ]
     }
@@ -332,7 +334,7 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
     }
   ],
   "favorites": [
-    { "type": "resource", "id": "primary", "name": "Superiority Dice", "uses": { "value": 3, "max": 4, "recovery": "Short Rest" }, "itemId": null },
+    { "type": "resource", "id": "primary", "name": "Superiority Dice", "uses": { "value": 3, "max": 4, "recovery": "Short Rest", "counter": { "resource": "primary" }, "spendable": true }, "itemId": null },
     { "type": "item", "id": "hR4cT7mWp2qLs9vB", "itemType": "weapon", "name": "Warhammer", "img": "icons/weapons/hammers/hammer-war.webp" },
     {
       "type": "activity", "id": "cAsTfIrEbAlL0001", "itemId": "sT4fFoFfIrE00001", "itemType": "weapon", "itemName": "Staff of Fire",
@@ -363,8 +365,9 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `tools` | The tools the character has, as dnd5e keeps them with their proficiency, sorted by `name`, as dnd5e names the tool: each with its `ability`, and `total`, `passive`, `proficiency` and `mode` as a skill has them. A tool the character doesn't have can still be checked, with the ability's `check`, as dnd5e does. Module 0.18.0; left out before. |
 | `checkMode`, `saveMode`, `mode` | Whether that roll is made with advantage (`1`) or disadvantage (`-1`) from the character's conditions and features, else `0`. A skill's or tool's combines its ability's, as dnd5e does. |
 | `conditions` | The character's statuses that the game names, by `name`: conditions such as Poisoned, and others such as Concentrating or Dead. `level` is Exhaustion's level, otherwise `null`; `detail`, for Concentrating, what the character is concentrating on. `text` is the rules for it. |
+| `concentration` | Since module 0.29.0, what the character concentrates on, for its player to [end](#concentration-charges-and-heroic-inspiration) from the app: `{ effects }`, each of dnd5e's concentration effects on them, in dnd5e's order, `{ id, name, item }`. `id` is the effect's, the one `endConcentration` names; `name` the name of the item it's on as dnd5e prepares it, so as its player knows it, an unidentified scroll's by its unidentified name, never the name the effect keeps of a spent item's source; or else dnd5e's words for a concentration with no item, such as "Concentration With No Source"; `item` that item's `id` while it's on the character, else `null`, as for a scroll spent to cast it. `{ "effects": [] }` while the character concentrates on nothing, or can't concentrate at all (dnd5e's limit `0`). Always there from 0.29.0; left out before. |
 | `features` | Grouped as dnd5e's Features tab groups them: a section for each class (with `id` its identifier), then `"species"`, `"background"` and `"other"`, each with its `label` and the `text` of the class, species or background. Empty sections are left out. |
-| `features[].features` | In the order the player keeps them in Foundry. `kind`, such as Class Feature; `requirements`, such as Fighter 1; `activation`, such as 1 Bonus Action; `passive` for a trait or anything with nothing to use; `uses`, if limited, as `{ value, max, recovery }`, with `value` the uses left and `recovery` when they come back, such as Short Rest, Long Rest or Recharge [5–6]. A feature that rolls or is used through anything also has [what it rolls](#what-an-item-rolls), with its `range`, `target` and `concentration`, as an action's. |
+| `features[].features` | In the order the player keeps them in Foundry. `kind`, such as Class Feature; `requirements`, such as Fighter 1; `activation`, such as 1 Bonus Action; `passive` for a trait or anything with nothing to use; `uses`, if limited, as `{ value, max, recovery }`, with `value` the uses left and `recovery` when they come back, such as Short Rest, Long Rest or Recharge [5–6]; and since module 0.29.0 `counter` and `spendable`, as [below](#counters). A feature that rolls or is used through anything also has [what it rolls](#what-an-item-rolls), with its `range`, `target` and `concentration`, as an action's. |
 | `effects` | Grouped as dnd5e's Effects tab groups them, by `id`: `"temporary"`, `"passive"`, `"inactive"` (turned off or expired) and `"suppressed"` (unavailable, as from an unequipped item). Empty groups are left out. Conditions are listed in `conditions` instead, except concentration under dnd5e 6. |
 | `effects[].effects` | `source` names what it comes from, such as the item that carries it or the spell another character cast; `duration` is the time it has left, such as `"9 Rounds"` or `"End of Source's Next Turn"`, or `null`; `disabled` whether it's turned off. An `id` is unique within the sheet. |
 | `inventory.sections` | Items by type, in dnd5e's order: weapons, equipment, consumables, tools, loot. Only items in no container; empty sections are left out. |
@@ -385,6 +388,22 @@ Bless or Guidance, are not included; dnd5e adds those only when it rolls.
 | `actions[].actions` | Items, in the order the player keeps them. `activation`, `range` (for a weapon, its reach or range, such as `"reach 5 ft or range 20/60 ft"`) and `target` are dnd5e's labels; `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save` and `damage` are its first activity's, in dnd5e's order, but for a spell, after its other activities its checks that have no activation of their own, such as the 2014 Entangle's Escape Plants; and a forward that repeats an earlier one, used through the same activity for the same cost, of uses they share, is left out (module 0.21.0), as [below](#what-an-item-rolls): `toHit` the bonus to hit of an attack, without any dice in it, as dnd5e's sheets show it; `attackId` the attack activity's id, so that the app can have the attack [made in the game](#attacks), `null` for any other; `activity` the activity itself, for one [used in the game](#spells-and-features) other than by attacking, `{ id, type, targets }`: `type` being `"save"`, `"damage"`, `"heal"` or `"utility"`, or since module 0.21.0 `"check"` or `"enchant"`, and for a forward that of the activity it's used through, and `targets`, `{ self, area, count, perLevel, affects, fromSelf }`, whom it's used at: `self` its user alone, `area` everyone in an area, `count` the most targets it takes, or `null` for no limit, `perLevel` how many more a spell takes for each level it's cast above its own, as Bless does, or `null`, for a spell cast from an item since module 0.20.0 for each level above the one it's cast at, its `cast`'s `level`, and `affects` dnd5e's kind of target, such as `"ally"`, `"enemy"`, `"creature"` or `"willing"`, or `null`, and since module 0.22.0 `fromSelf`, whether its range is Self, as a potion's or Wild Shape's, which may still name a creature, for the app to offer its user among its targets, [`self`](#spells-and-features) (left out before, where an action's `range` of `"Self"` says the same); and for an `"enchant"`, since module 0.21.0, `enchant`, what it may enchant, and with what, as [below](#what-an-item-rolls); `null` for any other; `attackModes` the ways its attack is made, each `{ value, label }`, such as one- or two-handed, or thrown, when there's more than one, otherwise `null`; `ammunition` what its attack fires, each `{ id, name, quantity }` the character has, for a weapon that fires ammunition, otherwise `null`; `save`, `{ ability, dc }`, the saving throw it calls for, `ability` being `"DC"` when the target chooses among several; `damage` its damage or healing as dnd5e labels it, each part `{ formula, type, healing }` with the ability modifier in the formula; `consumesSlot` `false` for a spell's activity used without spending a spell slot, and otherwise left out (module 0.14.0); `attackArea` and `rollFormula` for an attack at an area and a utility with a roll of its own, as [below](#what-an-item-rolls), and otherwise left out (module 0.16.0); `check` and `forward` for a check activity and a forward, as [below](#what-an-item-rolls), and otherwise left out (module 0.21.0); `activities` each of its activities, for an item with more than one (module 0.14.0): since module 0.15.0, those activated as its section has it, and those even when there's one, where the item is listed in other sections too; `uses` as on a feature, the first activity's when the item has none: since module 0.15.0, that of the first activity it's listed for, or for one that casts a spell, those casting it spends; `level` a spell's, `0` for a cantrip, otherwise `null`; `castFrom` as on a spell, `null` for anything but a spell. Since module 0.15.0, an item listed in a section for an activity other than its first names it, `activityName`, such as `"Silvery Barbs"`, and is otherwise without; `activationType` is the kind of action its first activity there is activated with, as a section's `id` names it, `"action"`, `"bonus"`, `"reaction"`, `"legendary"`, `"mythic"`, `"lair"`, `"crew"` or `"special"`, where it takes just one, Midi-QOL's kinds of reaction being `"reaction"`, or `null` for any other, such as two actions, a Legendary Action that costs two, a minute or a long rest; `consumable` is `true` for one of the consumables: an item dnd5e's inventory has among them, such as a potion, a scroll or a wand, or another whose uses never come back, and otherwise left out; and `cast` and `spellId`, for one that casts a spell, as [below](#what-an-item-rolls). An item not identified yet has no `toHit`, `attackId`, `activity`, `attackModes`, `ammunition`, `save`, `damage`, `attackArea`, `rollFormula`, `check`, `forward`, `activities`, `uses`, `activityName`, `consumable`, `cast` or `spellId`. |
 | `enchantments` | Since module 0.21.0, on an inventory item, a container's contents included, a spell, a feature or an action: the enchantments an [enchant activity](#enchantments) applied to it, the character's own or anyone else's, up to 50, each `{ id, name, source, concentration, duration, expired, endable }`: `id` the enchantment's id on that item; `name` its own, such as `"Magic Weapon, +1"`; `source` the name of the item whose activity applied it, as its player knows it: without its enchantments, such as `"Magic Weapon"`, or for one not identified yet, the name dnd5e gives it then; or `null` where that can't be found, as a magic item's template from a compendium or a used-up scroll; `concentration` whether it lasts as long as a concentration, as one cast with it does; `duration` the time it has left, as an effect's, or `null`; `expired` whether its time has run out, as dnd5e 5 leaves one on its item; and `endable` whether its player may [end it](#enchantments) from the app, as the item's owner may in Foundry: one an enchant activity applied that a player could use from the app, whoever's it is, the character's own or another's, such as an ally's Magic Weapon on their club; or one whose activity is gone, as a used-up scroll's or oil's, that lasts only a while, or as long as a concentration. Not a magic item's template's, a choice made once, or one whose activity is gone that lasts for good. The changes dnd5e makes to the copy of a spell an item casts, which no enchant activity applied, aren't listed. Left out where there are none. One dnd5e hides from players isn't listed, but on an item not identified yet, one the character cast on it from another item of theirs that is, as Darkness on a ring; never one the item applies to itself, which would tell what it is, as a Flame Tongue's Ablaze. The item's `name` is as its enchantments make it, such as `"Longsword, +1"`. |
 | `text` | A [description](#descriptions)'s hash, or `null` if there is none. |
+
+#### Counters
+
+Since module 0.29.0 a sheet's `uses` say which counter they are, so that a listener can have a
+player [spend some](#concentration-charges-and-heroic-inspiration) directly, and tell whether a use
+spends the same: `counter`, and `spendable` where they may be spent so. Both are added wherever
+`uses` are `{ value, max, recovery }`, and left out by modules before; an item not identified yet
+still has `uses` `null`.
+
+| Field | Meaning |
+| --- | --- |
+| `counter` | `{ item }`, an item's own uses: a feature's, an inventory item's or a spell's, by the row's `id`, and an action's where its count is its item's; `{ item, activity }`, an activity's own, on an `activities` entry, an activity favorite, or an action whose count is its lead activity's; or `{ resource }`, an old-style resource's, `"primary"`, `"secondary"` or `"tertiary"`, on a resource favorite. Left out where the count is what a Cast activity or a forward spends of another counter, which is shown by that counter. |
+| `spendable` | `true` where a player may spend them directly: an item's or activity's uses, of an item identified that isn't a spell, a spell's own uses being spent by casting it, and whose uses don't use it up as they run out (dnd5e's `autoDestroy`), as a potion's or a scroll's; and every resource's, as only those named with a maximum are listed. Left out otherwise, never `false`. |
+
+An action and its row build them alike, so a [slim](#slim-sheets) action whose `uses` are its row's
+leaves them to the row, as before; neither key is among an action's keys of its own.
 
 #### What an item rolls
 
@@ -535,6 +554,16 @@ Spells', a magic item's template, which isn't a spell's or a feature's, enchants
 and names no kind of item, as a Shield's +1, +2 or +3, or one with no profile to apply, for anything
 but a leveled spell none at its level now, has no `activity`: it's used in Foundry. A forward used
 through an enchant activity rolls nothing, as before.
+
+Since module 0.29.0 an `activity` says what using it spends, `spends`, where it spends anything:
+each of its consumption targets that spends uses, `{ counter, amount }`, `counter` named as
+[above](#counters), `{ item }` for an item's uses, its own or another item's it names, `{ item,
+activity }` for its own, `{ resource }` for a resource's value; and `amount` how many, at the level
+it's cast at, or `null` for a formula. Other kinds of target are left out, and so is one of an item
+not identified yet. A Cast activity's are the Cast activity's own, of its item, never its spell
+copy's; a forward's are the forward's, in place of the activity it's used through, and none where
+that's a spell's that spends no slot, as dnd5e spends them. Left out where it spends nothing, and by
+modules before; it goes with `activity` in slim sheets.
 
 Any number dnd5e doesn't provide is `null`. Labels are in the Gamemaster's language. The sheet
 shows what the character's player would see in Foundry: effects dnd5e hides from players, such as
@@ -718,8 +747,8 @@ app](#descriptions-that-roll):
 | `speaker` | `{ alias, actorId, tokenId, sceneId }`. The ids are `null` when not spoken by an actor. |
 | `character` | The campaign character's actor id if one spoke it, else `null`. |
 | `title` | The pop-out title, or `null`. |
-| `flavor`, `content` | As stored, in HTML. Content links are not yet rendered: they appear as `@UUID[…]{Label}`. |
-| `text` | `content` as plain text, with content links reduced to their labels. dnd5e's cards, such as a roll request or a spell's saving throw, give each button two labels, with its DC and without, and show one; since module 0.17.0, only the one players see is kept, as `ask`'s `dc` below. Before, both were. |
+| `flavor`, `content` | As stored, in HTML. Content links are not yet rendered: they appear as `@UUID[…]{Label}`. Since module 0.29.0, unless Gamemaster-only information is on, `content` is cleaned of what cards keep from players there, parsed into an inert document and written back: every element's `data-dc` is removed; dnd5e's labels with DCs (`.visible-dc`) are removed where its *Challenge Visibility* doesn't show players the card's DC, as `ask`'s `dc` below; and Midi-QOL's sections of hits and saves (`.midi-qol-hits-display`, `.midi-qol-saves-display`), which the client that ran its workflow, often the Gamemaster's, draws with armor classes and DCs, are emptied. With it on, `content` is as stored. Read results from `dnd5e` below, never from `content`. |
+| `text` | `content` as plain text, with content links reduced to their labels. dnd5e's cards, such as a roll request or a spell's saving throw, give each button two labels, with its DC and without, and show one; since module 0.17.0, only the one players see is kept, as `ask`'s `dc` below. Before, both were. Since module 0.29.0 it's made from `content` as sent, so without Midi's sections' words either, unless Gamemaster-only information is on. |
 | `ask` | The save, or since module 0.18.0 the check, a roll request card asks the table for, or `null` for any other message: the Gamemaster's, posted from a `/save`, `/concentration`, `/check`, `/skill` or `/tool` enricher's request link, or a player's [asked from the app](#descriptions-that-roll). For a save, `{ type, abilities, dc, label }`: `type` is `"save"`, or `"concentration"` for a concentration check; `abilities` the abilities its buttons offer, as dnd5e's keys, or for a concentration check the one it names, if any. For a check, `{ type: "check", checks, dc, label }`: `checks` the checks its buttons offer, from 1 to 10, each `{ type, ability }` with `type` `"check"` for an ability check, `{ type: "skill", ability, skill }`, or `{ type: "tool", ability, tool, name }`, with the tool's `name` as dnd5e names it, never as the card labels it; each check once, each ability one of the six, its button's or else the skill's or tool's own, and each skill and tool one dnd5e has, a tool or a kind of vehicle; a card that offers none of them, or more than 10, has `null`. For either, `dc` its DC, only where dnd5e's *Challenge Visibility* shows players the card's DC: *Show all*, or *Show only from other players* for a card a player posted; and never for a card that shows it no one, as dnd5e's request for a link whose author hid its DC, or any card that labels its buttons alike with the DC and without; otherwise left out; `label`, for a player's, where the save or check comes from, such as their item, and otherwise left out. dnd5e 6's requests, which are messages of their own kind, have `null`. Module 0.17.0; checks, 0.18.0, before which a check's request card has `null`. |
 | `blind` | Was it a blind roll? |
 | `audience` | Who can read it. See [Visibility](#visibility). |
@@ -753,7 +782,8 @@ A roll:
 `advantage`, `disadvantage`, `critical` and `fumble` appear only for roll classes that define
 them, such as dnd5e's `D20Roll`. A dnd5e `DamageRoll` also carries `damageType`. An inactive
 result is one that was discarded, such as the lower die of a roll with advantage. Success or
-failure against a DC is deliberately not included.
+failure against a DC is deliberately not included in a roll: since module 0.29.0, where players see
+it in Foundry, it's in the message's `dnd5e`, below.
 
 Since module 0.28.0 a roll also says what it is among its message's rolls, so that a listener can
 show a message's damage as one, as dnd5e's damage card and Midi-QOL's item card do. Each is left
@@ -812,8 +842,24 @@ The `dnd5e` object:
 | `messageType` | dnd5e's own classification, such as `"roll"` or `"usage"`. |
 | `roll` | What was rolled, exactly as dnd5e records it. `type` is one of `"skill"` (with `skillId`), `"tool"` (with `toolId`), `"ability"` or `"save"` (with `ability`), `"attack"`, `"damage"`, `"death"`, `"hitDie"`, `"concentration"` or `"generic"`. `null` if not a roll. |
 | `item`, `activity` | The item and activity used, or `null`. |
-| `targets` | What was targeted when the item was used. `ac` is added only when Gamemaster-only information is on. |
+| `targets` | What was targeted when the item was used, each `{ name, uuid }`, `uuid` the target's actor's. `ac` is added only when Gamemaster-only information is on. Since module 0.29.0 each may have `outcome` and `save`, as below. |
 | `originatingMessage` | For a roll made from an item's chat card, the id of that card's message. |
+| `save` | Since module 0.29.0, on a saving throw rolled from a save activity's card of dnd5e's: `{ target, outcome, readers }`, as below. Left out on any other message. |
+
+**Hits, misses and saves** (module 0.29.0). What Foundry decided of a message's targets is told
+only once it's decided, and only where Foundry shows players it: unless Gamemaster-only information
+is on, when everything decided is told, as `ac` is, and `readers` never is. The settings are read as
+the message is sent, each that can't be read counting as hiding it; one changed later sends no
+message again. A message Midi-QOL shows players as "??" (`flags["midi-qol"].obscureRoll`) tells
+none, unless Gamemaster-only information is on. Each field is left out where it isn't told.
+
+| Field | Meaning |
+| --- | --- |
+| `targets[].outcome` | `"hit"` or `"miss"`. On dnd5e's attack (`roll.type` `"attack"`, its first roll a `D20Roll`), judged for each target as the app's own attacks are (`attack.outcome` in a command's result): a critical hit hits, a fumble or a total under the target's `ac` misses, and one under total cover (`ac` `null`) misses. dnd5e's card differs there alone: it draws a target under total cover as hit, of armor class ∞, unless the attack is a fumble, as it compares the total with `null`. Told while dnd5e's *Attack Result Visibility* is "Show only results" or "Show results & target ACs" (its `attackRollVisibility` setting, `hideAC` or `all`), never under "Hide all" (`none`); nothing for a target with no `ac` at all. On Midi-QOL's card (one whose `flags["midi-qol"].messageType` is a string), from the tokens Midi records as hit (`hitTargetUuids`, `hitECTargetUuids`) and as aimed at (its `targets`), each taken for its actor, as `uuid` names targets: only once Midi has checked hits, its *Auto Check Hits* not "none" and the card marked so (`GMOnlyAttackRoll` `false`, which Midi writes `true` before it checks), on a card with an attack roll (so not a use whose every target Midi lists as hit); told where *Auto Check Hits* is "all" and the card is whispered to no one and not blind. Nothing for a target whose token can't be found, as one deleted since, nor for an actor two of whose tokens came out differently. |
+| `targets[].save` | `"success"` or `"failure"`, on Midi-QOL's card only, from the tokens Midi records as saved (`saveUuids`) and as failed (`failedSaveUuids`), each taken for its actor, never from `saved`: only once Midi has checked saves, its *Auto Check Saves* not "none", and shown them, some target marked `saved` `true` or `false` (Midi lists every target as failed before anyone rolls); told where Midi shows players whether they saved, the card's activity's *Save Display* where it isn't "default", else *Auto Check Saves*, being "all", "allNoRoll" or "allShow", where dnd5e's *Challenge Visibility* is "Show all", or "Show only from other players" for a card whose speaker a player owns, on a card whispered to no one and not blind; and for a target no player owns, only under "Show all", as Midi keeps an NPC's save from players otherwise. Nothing for a target Midi decided nothing of. |
+| `save.target` | The `uuid` of the actor who saved, as the card's `targets` name it: the message's speaker's. Sent whenever that resolves, on a save whose `originatingMessage` is a save activity's card still in the chat log, never Midi-QOL's card, which tells its own in `targets`, nor dnd5e's concentration card or a request in chat. |
+| `save.outcome` | `"success"` or `"failure"`, as dnd5e highlights it: its first roll a `D20Roll` against a DC (`options.target`), whose first die is one d20 dnd5e counts no otherwise (no success counting or margins); a legendary resistance's forced success (`roll.forceSuccess`) a success. Told as the card's *Challenge Visibility* shows it: under "Show all", or "Show only from other players" for a card a player posted, to everyone; otherwise, for a card a player posted, to its author's characters alone, with `readers`, and not at all where they have none; otherwise not at all. |
+| `save.readers` | The ids of the campaign's characters whose players alone may see `outcome`: those the card's author owns. Absent where everyone who can read the message may. |
 
 ### Combat
 
@@ -857,6 +903,7 @@ would not match the list and would reveal how many were left out.
   "defeated": false,
   "character": "thorin",
   "playerOwned": true,
+  "disposition": "friendly",
   "hp": { "value": 30, "max": 40, "temp": 0 }
 }
 ```
@@ -869,6 +916,13 @@ with any temporary change to it, such as Aid's or a wraith's Life Drain, which d
 from the maximum itself. Before, it left that change out, so a character at their lowered maximum
 was sent as short of it.
 `hidden` is present only when Gamemaster-only information is on.
+`disposition`, since module 0.29.0, is its token's, as players see its border: `"friendly"`,
+`"neutral"` or `"hostile"`; `null` for a Secret one, which players see as none, for a token hidden
+from players, for a combatant with no token, and for any other. The same whether or not
+Gamemaster-only information is on: never Secret, nor the number Foundry keeps it as. Hostile may
+be no more than Foundry's default, for a token whose disposition no one chose. A change is sent with the next combat event that
+carries the combatant, such as `combat.turn`, or the next hello. Always there from 0.29.0; left out
+before.
 
 ## Events
 
@@ -885,7 +939,7 @@ Dice is switched on or off while a campaign allows its players to enter their di
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls, gmRollMessages, manualDice, midiPrompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). And since module 0.25.0 `gmRollMessages`, `true` wherever `gmRolls` is: such a roll's [`command.result`](#commandresult) lists the chat messages it made, `messages`. And since module 0.26.0 `manualDice`, whether the campaign's players may enter what their own dice show in the app: `true` only while players' rolls are made (`enabled`), the Gamemaster allows it and [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) is on, else `false`. Nothing is entered yet: a listener may show that it's coming. And since module 0.27.0 `midiPrompts`: `true` where `prompts` is and this Midi-QOL has what [asking its own saves](#midi-qols-own-saves) needs, else `false`; a listener needs nothing from it, as Midi prompts are sent only to one that says it reads them. See [Rolls from the app](#rolls-from-the-app). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls, gmRollMessages, manualDice, midiPrompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; since module 0.29.0 `"endConcentration"` wherever players' rolls are made, and `"spend"` and `"inspiration"` wherever the Gamemaster lets them attack and cast, whether or not the game can make their attacks now, as while the attack self-test fails or **Run players' attacks through Midi** is off; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). And since module 0.25.0 `gmRollMessages`, `true` wherever `gmRolls` is: such a roll's [`command.result`](#commandresult) lists the chat messages it made, `messages`. And since module 0.26.0 `manualDice`, whether the campaign's players may enter what their own dice show in the app: `true` only while players' rolls are made (`enabled`), the Gamemaster allows it and [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) is on, else `false`. Nothing is entered yet: a listener may show that it's coming. And since module 0.27.0 `midiPrompts`: `true` where `prompts` is and this Midi-QOL has what [asking its own saves](#midi-qols-own-saves) needs, else `false`; a listener needs nothing from it, as Midi prompts are sent only to one that says it reads them. See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign: since module 0.22.0 without its `sheet`, which follows in `character.updated`; since module 0.26.0 each with `manualDice`, whether its player enters its dice results in the app, always `false` for now. |
 | `sheetsApart` | `true` since module 0.22.0: the characters carry no sheets, and each follows once the hello is answered. Absent before, when each carried its sheet. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
@@ -968,9 +1022,9 @@ What became of a player's roll, attack or use fetched from the listener; see
 | --- | --- |
 | `id` | The roll's `id`, as fetched. |
 | `status` | `"done"`, or `"failed"` when it wasn't made. |
-| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for hit dice spent at once (module 0.20.0), those and `"full-hp"` (the character is at full hit points); for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). Since module 0.21.0, for an enchant activity's use, also `"profile"`, `"enchant-target"`, `"applied"` and `"enchant"`, and for ending an enchantment, `"enchantment"`, besides those of a use; see [Enchantments](#enchantments). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). For an ask, a description's roll, damage or healing, or a save or check rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). `null` when done. |
+| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for hit dice spent at once (module 0.20.0), those and `"full-hp"` (the character is at full hit points); for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). Since module 0.21.0, for an enchant activity's use, also `"profile"`, `"enchant-target"`, `"applied"` and `"enchant"`, and for ending an enchantment, `"enchantment"`, besides those of a use; see [Enchantments](#enchantments). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). Since module 0.29.0, for ending a concentration, also `"concentration"` and `"cancelled"`; for spending charges, `"attacks-off"`, `"item"`, `"uses"` and `"short"`; and for Heroic Inspiration, `"attacks-off"`, `"not-inspired"` and `"inspired"`; see [Concentration, charges and Heroic Inspiration](#concentration-charges-and-heroic-inspiration). For an ask, a description's roll, damage or healing, or a save or check rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). `null` when done. |
 | `error` | What went wrong, for `"invalid"` and `"error"`, what dnd5e said for `"consume"`, and why for `"prompt"`; otherwise `null`. |
-| `messageId` | The chat message the roll made; for hit dice, the last of their cards. Since module 0.21.0, an enchant activity's use that failed once used, `"enchant"` or `"midi"`, has its card's while the card is there, with `visible`, for the Gamemaster to apply it from; one with no card, as a module stopped dnd5e posting it or Midi-QOL deleted it, or with a card no one can apply it from, as one naming a concentration that has since ended, has `null`, with `visible` `true`, and so does the end of an enchantment. Since module 0.27.0, an answer to a [Midi prompt](#midi-qols-own-saves) has `null` where Midi makes no message for the roll, as when the Gamemaster's browser rolls it and Midi doesn't show saves, with `visible` `true`: its dice are the player's own. |
+| `messageId` | The chat message the roll made; for hit dice, the last of their cards. Since module 0.21.0, an enchant activity's use that failed once used, `"enchant"` or `"midi"`, has its card's while the card is there, with `visible`, for the Gamemaster to apply it from; one with no card, as a module stopped dnd5e posting it or Midi-QOL deleted it, or with a card no one can apply it from, as one naming a concentration that has since ended, has `null`, with `visible` `true`, and so does the end of an enchantment, and since module 0.29.0 the end of a concentration. Charges spent and Heroic Inspiration have the line they posted, and `null`, with `visible` `true`, where it couldn't be posted. Since module 0.27.0, an answer to a [Midi prompt](#midi-qols-own-saves) has `null` where Midi makes no message for the roll, as when the Gamemaster's browser rolls it and Midi doesn't show saves, with `visible` `true`: its dice are the player's own. |
 | `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check; for hit dice, `false` unless they may see every card. |
 | `rolls` | The [rolls](#chat-message) as made, Foundry's total and every die, when `visible`; otherwise empty. For hit dice, every roll of every card, in order. A roll's `total` is Foundry's: damage that takes dice away may come below 0, where dnd5e's card shows each kind of damage at least 0. Since module 0.28.0 each has the marks a chat message's roll has, `damage`, `damageLabel`, `section`, `flavor` and `attack`, where they apply: a player's damage through Midi-QOL has `section` `"damage"`. |
 | `healed` | For a hit die or hit dice: the hit points gained; see [Hit dice and formulas](#hit-dice-and-formulas). |
@@ -1035,7 +1089,7 @@ Sent only for a campaign whose players are asked for their saves; see
 | Type | Payload |
 | --- | --- |
 | `roll.prompt.opened` | `{ prompt }`: the game asks one of the campaign's characters for a saving throw. |
-| `roll.prompt.closed` | `{ id, reason }`: a prompt no longer waits on its player. `reason` is `"answered"` (rolled from the app), `"rolled"` (rolled from its card in Foundry), `"gone"` (its card was deleted) or `"expired"` (left ten minutes). For a [Midi prompt](#midi-qols-own-saves) (module 0.27.0), exactly one of: `"answered"` (an answer from the app was made), `"rolled"` (answered in Foundry first, where Midi asks there too), `"expired"` (the wait ended, or the character is no longer open in the app, so Midi's own way is taken) or `"gone"` (Midi's workflow was aborted). |
+| `roll.prompt.closed` | `{ id, reason }`: a prompt no longer waits on its player. `reason` is `"answered"` (rolled from the app), `"rolled"` (rolled from its card in Foundry), `"gone"` (its card was deleted, or since module 0.29.0 its character no longer concentrates on what a concentration card asked about) or `"expired"` (left ten minutes). For a [Midi prompt](#midi-qols-own-saves) (module 0.27.0), exactly one of: `"answered"` (an answer from the app was made), `"rolled"` (answered in Foundry first, where Midi asks there too), `"expired"` (the wait ended, or the character is no longer open in the app, so Midi's own way is taken) or `"gone"` (Midi's workflow was aborted). |
 
 A prompt:
 
@@ -1299,8 +1353,8 @@ A prompt:
   where the hello's new `gmRolls` says so (`true` wherever `enabled`). Such a roll says `by: "gm"`
   and is made as any other, as the same user; every message it makes (dnd5e 5.3's death outcome
   too, as `outcome`) is flagged `flags["sending-stone"].by` `"gm"`, marked "GM" on its card, and
-  sent with `gmRoll`, the roll's id. Another `by`, or `"gm"` on `endEnchantment`, is `"invalid"`
-  (`error` `"by"`). A module before 0.23.0 ignores `by`, so a listener sends it only to the session
+  sent with `gmRoll`, the roll's id. Another `by`, or `"gm"` on `endEnchantment` (and since 0.29.0
+  `endConcentration`), is `"invalid"` (`error` `"by"`). A module before 0.23.0 ignores `by`, so a listener sends it only to the session
   whose hello said `gmRolls`; one that sends none needs no change.
 
   Module 0.23.0 reads a refusal's JSON [`reason`](#transport), or its status and text from an older
@@ -1354,6 +1408,24 @@ A prompt:
 - Module 0.28.0 adds `damage`, `damageLabel`, `section`, `flavor` and `attack` to every
   [roll summary](#chat-message), in chat messages' `rolls` and `command.result`'s `rolls`, each
   left out where it doesn't apply. A listener that doesn't read them needs no change.
+- Module 0.29.0 lets a player end a concentration, spend charges directly and use or gain Heroic
+  Inspiration from the app, as three new `kinds`, [`endConcentration`, `spend` and
+  `inspiration`](#concentration-charges-and-heroic-inspiration): the first wherever players' rolls
+  are made, the others wherever the Gamemaster lets them attack and cast, whether or not attacks can
+  be made now; no other hello field changes. `spend` and `inspiration` post a line in chat, marked
+  the Gamemaster's for theirs; `endConcentration` posts nothing and refuses theirs (`"by"`). Their
+  results have no new fields: the character's sheet goes first. The sheet adds
+  [`concentration`](#character-sheet), and its `uses` say which [`counter`](#counters) they are and
+  whether they're `spendable`, and an `activity` what it `spends`. A dnd5e concentration card's
+  prompt closes as `"gone"` once its character no longer concentrates on what it asked about. A
+  [combatant](#combatant) says its token's `disposition`, never Secret. A chat message's
+  [`dnd5e`](#chat-message) says whether an attack hit each target, `targets[].outcome`, who saved
+  against Midi-QOL's card, `targets[].save`, and on a save from dnd5e's card whose save it is and
+  whether it succeeded, `save`, each only where Foundry shows players it unless Gamemaster-only
+  information is on; and unless it's on, `content` goes without DCs on buttons, without labels with
+  DCs players don't see, and with Midi's sections of hits and saves emptied, and `text` with it. Each
+  is an addition a listener before 0.29.0 ignores, or drops, as an unknown kind; a listener that
+  offers the new kinds only where the hello lists them needs nothing more for an older module.
 
 ## Changes from protocol 1
 
@@ -1385,6 +1457,9 @@ campaign, with **Players roll in the app** on its Player actions tab. It is made
 | `textRoll` | A [roll in a description](#descriptions-that-roll), such as `[[/r 1d4]]`. Module 0.17.0. | `text`, `link`: the description and the link in it. |
 | `ask` | Not a roll: the table [asked](#descriptions-that-roll) for a description's saving throw, or since module 0.18.0 its check. Module 0.17.0. | `text`, `link` |
 | `endEnchantment` | Not a roll: an [enchantment](#enchantments) on one of the character's items ended, among the `kinds` wherever `"use"` is. Module 0.21.0. | `enchantment`: `{ item, effect }`. |
+| `endConcentration` | Not a roll: a [concentration](#concentration-charges-and-heroic-inspiration) of the character's ended. Module 0.29.0. | `concentration`: `{ effect }`. |
+| `spend` | Not a roll: so many of the character's [charges](#concentration-charges-and-heroic-inspiration) spent directly. Module 0.29.0. | `counter`, `count`. |
+| `inspiration` | Not a roll: the character's [Heroic Inspiration](#concentration-charges-and-heroic-inspiration) used or gained. Module 0.29.0. | `inspiration`: `"use"` or `"gain"`. |
 
 ### Fetching rolls
 
@@ -1439,7 +1514,7 @@ the order they came; but for an answer to a [Midi prompt](#midi-qols-own-saves),
 | `explicit` | Did the player choose how, as in dnd5e's roll dialog? Then the game rolls it that way. Otherwise it rolls as the character's sheet has it, which is where the app's `mode` came from. |
 | `extras` | What the player added, each `{ sign, count, sides }` or `{ sign, flat }`: such as `+1d4` for Bless. At most 10. Made as the roll's situational bonus. |
 | `dice` | Every die thrown, in order: the d20s, one or two (`mode` not `0`), then each added term's dice; for a hit die, its one die; for hit dice, one entry per `hitDice` entry, in the same order, with `count` results; for a formula or a description's roll, each of its dice terms'. Each `{ faces, results }`, every result one of the die's faces. |
-| `by` | `"gm"` for a roll the campaign's Gamemaster made in the app as the character (module 0.23.0), where the hello says `gmRolls`; absent for its player's, as is `null`. Anything else, or `"gm"` on an `endEnchantment`, is refused (`"invalid"`, `error` `"by"`) with nothing posted. Any kind may have it: an attack, a use, their damage, an ask and a prompt's answer too. |
+| `by` | `"gm"` for a roll the campaign's Gamemaster made in the app as the character (module 0.23.0), where the hello says `gmRolls`; absent for its player's, as is `null`. Anything else, or `"gm"` on an `endEnchantment` or since module 0.29.0 an `endConcentration`, neither of which posts anything to mark as theirs, is refused (`"invalid"`, `error` `"by"`) with nothing posted. A `spend` and an `inspiration` may have it: their line is marked as the Gamemaster's. Any kind may have it: an attack, a use, their damage, an ask and a prompt's answer too. |
 
 ### Making a roll
 
@@ -1623,7 +1698,7 @@ the Gamemaster, as it would in Foundry, such as a target's reaction; an attack m
 
 | Field | Meaning |
 | --- | --- |
-| `attack` | `{ critical, fumble, outcome }`, when `visible`. `outcome` is `"hit"` or `"miss"` at its target, given only where the game shows players whether an attack hit: dnd5e's *Attack Roll Visibility* not *None*; Midi's *Auto Check Hits* showing hits to all, and not whispered as the Gamemaster's own rolls are when private. Otherwise `null`. A target under total cover is missed. The target's armor class is never sent. An area attack also has `targets` (module 0.16.0): each `{ combatId, combatantId, outcome }`, in the order picked, its `outcome` given as above, and `null` for a target Midi didn't check, not being on the Gamemaster's canvas; `outcome` is then the one target's, or `null` for several or none. Its targets' names and armor classes are never sent. |
+| `attack` | `{ critical, fumble, outcome }`, when `visible`. `outcome` is `"hit"` or `"miss"` at its target, given only where the game shows players whether an attack hit: dnd5e's *Attack Result Visibility* not *Hide all*; Midi's *Auto Check Hits* showing hits to all, and not whispered as the Gamemaster's own rolls are when private. Otherwise `null`. A target under total cover is missed. The target's armor class is never sent. An area attack also has `targets` (module 0.16.0): each `{ combatId, combatantId, outcome }`, in the order picked, its `outcome` given as above, and `null` for a target Midi didn't check, not being on the Gamemaster's canvas; `outcome` is then the one target's, or `null` for several or none. Its targets' names and armor classes are never sent. |
 | `damage` | The dice the attack's damage will throw, for its player to roll: `{ critical, plannable, healing, rolls: [{ formula, type, types, dice: [{ faces, number, added?, subtracted? }], perDie }] }`, as dnd5e will make up its rolls, with a critical hit's dice, its extra dice and its critical damage's among them; the dice a critical hit adds as terms of their own have `added: true` (module 0.20.0): its critical damage's, which dnd5e adds after the roll's own, and the copies Midi-QOL's rules that throw a critical hit's dice apart place beside each die; its extra dice, such as Savage Attacks', are counted in its first die's `number`, and the roll's own dice never have `added`. Since module 0.21.0 the dice the damage takes away, as Reduce's or Ray of Enfeeblement's −1d4, are marked `subtracted: true`, as dnd5e reads a roll's signs when it adds damage up: `+` and `-` part its terms, each `-` turns the sign over, and `*`, `/` and `%` keep terms together; a die may be both `added` and `subtracted`, as Midi's copies placed after a `-` are, in the order `faces`, `number`, `added`, `subtracted`; left out otherwise. A roll's `perDie` is how many dice it throws for each die of its own: `1`, or on a critical hit as many as this world's rules make of each, such as `2`; module 0.13.0. `plannable` is `false` when a die can't be known beforehand, such as a d3, or a die inside parentheses, as Foundry's parser may put a leading `-1d4`: the game then rolls all of them, and since module 0.21.0 not at their highest where the roll's `formula` takes a die away (see [changed damage](#attacks)). `healing` is `true` for healing. A roll's `types`, `[{ key, label }]`, are the kinds of damage its roller chooses among, as Chromatic Orb's, or `null` for none. `null` when no damage follows, as when Midi's workflow ends at a miss. |
 
 **The damage** is rolled on the attack's use: on dnd5e's cards, a damage roll linked to the use's
@@ -1888,6 +1963,65 @@ with its concentration, is ended all the same. It has no card: `messageId` is `n
 A use of an enchant activity has `use` `{ type: "enchant" }`, `damage` `null` and no `rolls`; one
 that failed once used, `"enchant"` or `"midi"`, has `enchantment` `null`.
 
+### Concentration, charges and Heroic Inspiration
+
+Since module 0.29.0 a player can end a concentration of their character's, spend their charges
+directly, and use or gain Heroic Inspiration, from the app, as they would on dnd5e's sheet. None of
+them is a roll: each is sent with `mode` `0`, `explicit` `false` and no `extras` or `dice`, names
+exactly its own field below, and none of `item`, `activity`, `target`, `targets`, `self`, `slot`,
+`enchant`, `prompt`, `text`, `link` or `key`; otherwise it's `"invalid"`, with `error` its own
+field's name, or `"dice"` for one that throws dice. Each goes in the character's turn, as their
+rolls do, and the character's sheet as it then stands is sent ahead of the
+[`command.result`](#commandresult), in [`character.updated`](#characterupdated): the result says
+nothing new of what changed, the sheet does.
+
+| Roll field | Meaning |
+| --- | --- |
+| `kind` | `"endConcentration"`, `"spend"` or `"inspiration"`. |
+| `concentration` | For `endConcentration`: `{ effect }`, a concentration's `id` as the sheet's [`concentration`](#character-sheet) lists it. |
+| `counter` | For `spend`: the counter, as a `uses`' [`counter`](#counters) names it, `{ item }`, `{ item, activity }` or `{ resource }`, and nothing else. |
+| `count` | For `spend`: how many, a whole number from 1 to 999. |
+| `inspiration` | For `inspiration`: `"use"` or `"gain"`. |
+
+**Ending a concentration**, among the `kinds` wherever players' rolls are made, whether or not they
+may attack. It's ended through dnd5e's own `endConcentration`, so a module's
+`dnd5e.preEndConcentration` hook may keep it, and what depends on it, such as Bless on the
+character's allies or an enchantment tied to it, goes with it, as the active Gamemaster's client
+deletes it, the bridge; perhaps after the sheet is sent, which is sent again then. Nothing is
+posted, as dnd5e posts nothing, so the Gamemaster can't end one as the character (`by` `"gm"` is
+`"invalid"`, `error` `"by"`). Refused, in this order: `"off"` where the campaign's players' rolls
+aren't made here or the self-test hasn't passed; `"invalid"`; `"unknown"` for a character not in the
+campaign; `"concentration"` where the character doesn't concentrate on it now, as one ended since
+it was sent; and `"cancelled"` where a module's hook kept it. Its result has `messageId` `null` and
+`visible` `true`. A concentration check a [card asks](#saves-the-game-asks-for) of a character who
+no longer concentrates on what it asked about closes as `"gone"`.
+
+**Spending charges**, among the `kinds` wherever the Gamemaster lets the campaign's players attack
+and cast from the app, whether or not attacks can be made here now: it throws no dice and goes
+through no Midi-QOL. The counter's uses are read as they now are: an item's are left as so many
+spent of its maximum (`system.uses.spent`), an activity's likewise through dnd5e's `updateActivity`
+(`uses.spent`), as dnd5e's sheet writes them, and a resource's value (`system.resources.<key>.value`)
+lowered; never given back. Refused, in this order: `"off"`; `"attacks-off"` where the Gamemaster
+doesn't let the campaign's players attack; `"invalid"`; `"unknown"`; `"item"` where the item, or the
+activity, isn't the character's, or one its player can't see; `"uses"` where it may not be spent so,
+as the counter's `spendable` would say, or has no limited uses, or a resource that's unnamed or has
+no maximum; and `"short"` where fewer are left than `count`. It posts a line in chat, below.
+
+**Heroic Inspiration**, among the `kinds` where `"spend"` is: `"use"` while the character has it,
+`"gain"` while they haven't, as dnd5e's sheet header toggles it. Refused, in this order: `"off"`,
+`"attacks-off"`, `"invalid"`, `"unknown"`, then `"not-inspired"` for a use without it and
+`"inspired"` for a gain with it. It posts a line in chat, below.
+
+**The line.** Charges spent and Heroic Inspiration each post one public chat message as the
+character, by their player, as a roll from the app is, with `flags["sending-stone"].request` the
+command's `id`, marked on its card, and for the Gamemaster's, `by` `"gm"`, marked "GM", sent with
+[`gmRoll`](#chat-message) and listed in their result's `messages`. Its `content` is one paragraph in
+the game's language: `Spends {count} · {name}`, `name` the item's, for an activity's own uses
+`<item>: <activity>`, or the resource's label, escaped, never how many are left, which other players
+don't see in Foundry; `Uses Heroic Inspiration`; or `Gains Heroic Inspiration`. The result has its
+`messageId` and whether its player may see it, `visible`; where it can't be posted, what it tells of
+is made all the same, `"done"`, with `messageId` `null` and `visible` `true`.
+
 ### Saves the game asks for
 
 With **Save and concentration prompts** also ticked for the campaign, its players are
@@ -1914,7 +2048,14 @@ asking a character to use their action to save (`actionSave`) asks no one: an an
 couldn't count for it.
 
 Each is sent as [`roll.prompt.opened`](#prompts). It stays open for up to ten minutes: until its
-character rolls the save from its card, or the card is deleted. [`roll.prompt.closed`](#prompts)
+character rolls the save from its card, or the card is deleted. Since module 0.29.0 dnd5e's
+concentration card asks its character only while they concentrate on something they began
+concentrating on no later than the card was posted, as both documents' server times
+(`_stats.createdTime`) have it: once the last of those ends, from the app or in Foundry by anyone,
+its prompt closes as `"gone"`, a later hello leaves it out and an answer is refused (`"gone"`), and
+concentrating on something new after doesn't bring it back. A request in chat for a concentration
+check is asked as before, whatever the character concentrates on, and Midi-QOL's own concentration
+cards are left to [Midi's prompts](#midi-qols-own-saves), untouched. [`roll.prompt.closed`](#prompts)
 says when it closes. The player answers it with a `save` naming it:
 
 | Roll field | Meaning |
@@ -1926,8 +2067,9 @@ says when it closes. The player answers it with a `save` naming it:
 Its other fields are a save's. The module makes it as dnd5e does from the card's button: a saving
 throw, or a concentration check, against the card's DC, as the character's player, linked to the
 card (`flags.dnd5e.originatingMessage`), so the card shows whether they saved. A failed
-concentration check ends the character's concentration, which the player can't from the app; with
-Midi-QOL, Midi ends it, where its Gamemaster has it remove concentration. Refused as `"prompt"`,
+concentration check ends the character's concentration, all of it, as dnd5e's card does; with
+Midi-QOL, Midi ends it, where its Gamemaster has it remove concentration. Since module 0.29.0 the
+player may also [end one](#concentration-charges-and-heroic-inspiration) from the app themselves. Refused as `"prompt"`,
 with why in `error`: `"off"` (the campaign doesn't ask its players now), `"character"` (another
 character's), `"gone"` (its card is gone, or asks no save of the character), `"expired"`,
 `"answered"` (the character has rolled it), or `"ability"` (one the prompt doesn't offer, or since

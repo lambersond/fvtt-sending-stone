@@ -72,6 +72,46 @@ export function limitedUses(uses, labels) {
 }
 
 /**
+ * The old-style resources a sheet's counter may name.
+ * @type {string[]}
+ */
+export const RESOURCES = ["primary", "secondary", "tertiary"];
+
+/**
+ * Limited uses as the sheet sends them, since module 0.29.0 saying which counter they are,
+ * `counter`: an item's own uses, `{item}`, one of its activities', `{item, activity}`, or an
+ * old-style resource, `{resource}`; and whether a player may spend them directly from the app,
+ * `spendable`, as `spendsDirectly` has it for an item's or an activity's, and always for a
+ * resource's. Given no counter, as for what a Cast or forward spends of another, they're sent as
+ * they are. Built here alone, so that an action and its row say the same.
+ * @param {{value: number, max: number, recovery: string|null}|null} uses   As `limitedUses` has them.
+ * @param {object} [of]
+ * @param {Item} [of.item]           Whose uses they are, or whose activity's.
+ * @param {Activity} [of.activity]   Whose they are, of the item's.
+ * @param {string} [of.resource]     Which resource's they are.
+ * @returns {object|null}
+ */
+export function countedUses(uses, { item, activity, resource }={}) {
+  if ( !uses ) return null;
+  if ( RESOURCES.includes(resource) ) return { ...uses, counter: { resource }, spendable: true };
+  if ( !item?.id ) return uses;
+  const counter = activity?.id ? { item: item.id, activity: activity.id } : { item: item.id };
+  return { ...uses, counter, ...(spendsDirectly(item) && { spendable: true }) };
+}
+
+/**
+ * May a player spend an item's uses, or one of its activities', directly from the app, as dnd5e's
+ * sheet lets them be changed? Not one not identified yet, which keeps them to itself; nor a spell's,
+ * which casting it spends; nor those of an item used up as they run out, such as a potion or a
+ * scroll, which only using it should spend, so that dnd5e takes it away.
+ * @param {Item} item
+ * @returns {boolean}
+ */
+export function spendsDirectly(item) {
+  return (item?.system?.identified !== false) && (item?.type !== "spell") && (item?.system?.uses?.autoDestroy !== true);
+}
+
+/**
  * Join words as a list in the game's language, such as "Short Rest, Long Rest".
  * @param {string[]} words
  * @returns {string}

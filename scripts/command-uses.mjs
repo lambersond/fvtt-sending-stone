@@ -735,12 +735,12 @@ function hits(use, outcome) {
 /**
  * Whether an attack hit its target, as dnd5e's card shows it: a critical hit always does; a
  * fumble, or a total under the target's armor class, misses. A target under total cover can't be
- * hit, as Midi-QOL has it.
+ * hit, as Midi-QOL has it. Since 0.29.0 so it's read for each target of dnd5e's attack in chat.
  * @param {Roll} roll
  * @param {{ac: number|null}} target
  * @returns {"hit"|"miss"}
  */
-function outcomeOf(roll, { ac }) {
+export function outcomeOf(roll, { ac }) {
   if ( ac === null ) return "miss";
   const miss = !roll.isCritical && ((roll.total < ac) || roll.isFumble);
   return miss ? "miss" : "hit";

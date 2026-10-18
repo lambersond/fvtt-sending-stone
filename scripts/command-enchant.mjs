@@ -298,11 +298,13 @@ function enchantResult(command, card, actor, campaign, enchantment) {
  * Send a character's sheet as it stands, with an enchantment applied or ended, ahead of the result
  * that says so, rather than once its changes settle: the app checks what its player asks next
  * against the sheet it was sent, so a switch turned straight back is checked against the
- * enchantment as it now is, not as it was.
+ * enchantment as it now is, not as it was. Since 0.29.0 so it goes ahead of the result of a
+ * concentration ended, charges spent and Heroic Inspiration used or gained, which say nothing of
+ * the counts they changed: the sheet does.
  * @param {Actor} actor
  * @returns {void}
  */
-function sheetFirst(actor) {
+export function sheetFirst(actor) {
   try {
     sendCharacter(actor.id);
   } catch (err) {

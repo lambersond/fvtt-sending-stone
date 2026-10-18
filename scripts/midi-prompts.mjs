@@ -78,10 +78,11 @@ const ID = /^[A-Za-z0-9]{1,64}$/;
 const KEY = /^[A-Za-z][\w-]{0,31}$/;
 
 /**
- * The ways Midi shows saves for which it shows players whether they saved.
+ * The ways Midi shows saves for which it shows players whether they saved: on a save asked in the
+ * app, and since 0.29.0 on the targets of its card in chat.
  * @type {Set<string>}
  */
-const OUTCOME_SHOWN = new Set(["all", "allNoRoll", "allShow"]);
+export const OUTCOME_SHOWN = new Set(["all", "allNoRoll", "allShow"]);
 
 /**
  * The roll mode of a player's save in Midi's standard roll, by its *Player Roll Saves*.
@@ -421,7 +422,7 @@ function describeAsk(workflow, options) {
   // The DC, and whether the player saved, only where Midi shows players them.
   const shown = workflow.activity?.saveDisplay;
   const saveDisplay = ((shown ?? "default") === "default") ? settings.autoCheckSaves : shown;
-  const dcShown = !["whisper", "gmOnly"].includes(saveDisplay) && challengeShown(workflow.actor);
+  const dcShown = !["whisper", "gmOnly"].includes(saveDisplay) && midiChallengeShown(workflow.actor);
   const rollDC = saveDetails.rollDC;
   const effect = workflow.workflowOptions?.overTimeEffectUuid ?? saveDetails.workflowOptions?.overTimeEffectUuid;
   const overtime = typeof effect === "string";
@@ -553,12 +554,13 @@ function midiFlag(actor, name, data) {
 }
 
 /**
- * May players see a workflow's DC, as Midi has dnd5e's *Challenge Visibility*: everyone's, or only
- * where its user is a player's character?
- * @param {Actor|undefined} actor   The workflow's.
+ * May players see a workflow's DC, and whether its targets saved, as Midi has dnd5e's *Challenge
+ * Visibility*: everyone's, or only where its user is a player's character? Since 0.29.0 so it's
+ * read for Midi's card in chat, of its speaker.
+ * @param {Actor|null|undefined} actor   The workflow's.
  * @returns {boolean}
  */
-function challengeShown(actor) {
+export function midiChallengeShown(actor) {
   let visibility;
   try {
     visibility = game.settings.get("dnd5e", "challengeVisibility");
