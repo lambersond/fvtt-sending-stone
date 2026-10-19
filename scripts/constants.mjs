@@ -75,8 +75,8 @@ export const SETTINGS = Object.freeze({
    *  it held the campaigns alone. */
   CAMPAIGNS_MENU: "campaignsMenu",
 
-  /** World-scope list of campaigns: {id, title, characters, rolls, attacks, prompts}, characters
-   *  being actor ids. */
+  /** World-scope list of campaigns: {id, title, characters, groups, rolls, attacks, prompts,
+   *  manualDice}, characters and groups being actor ids. */
   CAMPAIGNS: "campaigns",
 
   /** World-scope set of the actor ids of connected characters, from before campaigns. Read once,
@@ -117,6 +117,17 @@ export const EVENTS = Object.freeze({
   /** Descriptions that characters' sheets refer to by hash. Sent before the sheets that refer to
    *  them, and only those the campaign has not been sent since its last hello. */
   CHARACTER_TEXTS: "character.texts",
+
+  /** One of a campaign's Group actors, its party, changed, as its sheet or who may see it: sent
+   *  only to an app that says it reads them, `features.groups`. */
+  GROUP_UPDATED: "group.updated",
+
+  /** One of a campaign's Group actors was deleted. */
+  GROUP_REMOVED: "group.removed",
+
+  /** What the world's settings that decide what players see now are, for the campaign's
+   *  Gamemaster: sent only to an app that says it reads them, `features.settings`. */
+  BRIDGE_SETTINGS: "bridge.settings",
 
   CHAT_CREATED: "chat.message.created",
   CHAT_UPDATED: "chat.message.updated",
@@ -244,14 +255,15 @@ export const HELLO_WANTED_HOOK = "sendingStone.helloWanted";
 /**
  * The name of the hook called with what the listener does beyond taking events, as it answers a
  * campaign's hello or heartbeat: such as `{commands: true}`, or null when it says nothing. Called
- * with the campaign's id and that.
+ * with the campaign's id and that, and since 0.30.0 the type of the event answered.
  * @type {string}
  */
 export const LISTENER_FEATURES_HOOK = "sendingStone.listenerFeatures";
 
 /**
  * The name of the hook called when a campaign's bridge.hello is answered with a 2xx, for its
- * characters' sheets to follow it, each in a post of its own. Called with the campaign's id.
+ * characters' sheets to follow it, each in a post of its own. Called with the campaign's id, and
+ * since 0.30.0 the hello's envelope.
  * @type {string}
  */
 export const HELLO_DELIVERED_HOOK = "sendingStone.helloDelivered";

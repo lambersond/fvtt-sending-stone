@@ -8,11 +8,19 @@
         </span>
         <span class="sending-stone-subtitle">{{campaign.summary}}</span>
     </div>
+    {{!-- What players see in chat, by the saved settings: kept current as they change. --}}
+    <p class="hint sending-stone-results" data-results>{{campaign.results}}</p>
     <nav class="sending-stone-tabs" aria-label="{{localize "SENDINGSTONE.Config.Tabs.Label"}}">
         <button type="button" data-action="view" data-section="campaign" data-campaign-id="{{campaign.id}}"
                 data-tab="players" {{#if campaign.tabs.players}}aria-current="page"{{/if}}>
             {{localize "SENDINGSTONE.Config.Tabs.Players"}}
         </button>
+        {{#if campaign.partyTab}}
+        <button type="button" data-action="view" data-section="campaign" data-campaign-id="{{campaign.id}}"
+                data-tab="party" {{#if campaign.tabs.party}}aria-current="page"{{/if}}>
+            {{localize "SENDINGSTONE.Config.Tabs.Party"}}
+        </button>
+        {{/if}}
         <button type="button" data-action="view" data-section="campaign" data-campaign-id="{{campaign.id}}"
                 data-tab="actions" {{#if campaign.tabs.actions}}aria-current="page"{{/if}}>
             {{localize "SENDINGSTONE.Config.Tabs.Actions"}}
@@ -152,6 +160,94 @@
     {{/each}}
     <p class="sending-stone-empty" data-filter-empty hidden>{{localize "SENDINGSTONE.Config.NoMatch"}}</p>
 </div>
+
+{{else if campaign.tabs.party}}
+{{#if campaign.party.picker}}
+{{!-- The groups that can be added, in place of the campaign's parties. --}}
+<div class="sending-stone-picker" data-party-picker role="group" aria-labelledby="sending-stone-party-picker-title">
+    <div class="sending-stone-toolbar sending-stone-picker-head">
+        <h3 id="sending-stone-party-picker-title">{{campaign.party.picker.title}}</h3>
+        <button type="button" class="icon fa-solid fa-xmark" data-action="closePartyPicker"
+                data-tooltip="SENDINGSTONE.Config.Picker.Cancel"
+                aria-label="{{localize "SENDINGSTONE.Config.Picker.Cancel"}}"></button>
+    </div>
+    <div class="sending-stone-scroll">
+        <section class="sending-stone-group">
+            {{#each campaign.party.picker.entries as |group|}}
+            <label class="sending-stone-row sending-stone-pick">
+                <input type="checkbox" data-pick-party="{{group.id}}" {{#if group.inCampaign}}checked disabled{{/if}}>
+                <img src="{{group.img}}" alt="">
+                <span class="sending-stone-row-name">
+                    <span>{{group.name}}</span>
+                    <span class="hint">{{group.where}}</span>
+                </span>
+                {{#if group.primary}}<span class="sending-stone-chip">{{localize "SENDINGSTONE.Config.Party.Primary"}}</span>{{/if}}
+            </label>
+            {{/each}}
+        </section>
+        {{#if campaign.party.picker.empty}}
+        <p class="sending-stone-empty" data-party-picker-empty>{{campaign.party.picker.empty}}</p>
+        {{/if}}
+    </div>
+    <div class="sending-stone-picker-footer">
+        <span data-pick-party-count role="status" aria-live="polite"></span>
+        <button type="button" data-action="closePartyPicker">{{localize "SENDINGSTONE.Config.Picker.Cancel"}}</button>
+        <button type="button" data-action="addPickedParties" disabled>
+            <i class="fa-solid fa-people-group" inert></i>
+            {{localize "SENDINGSTONE.Config.Picker.Add"}}
+        </button>
+    </div>
+</div>
+
+{{else}}
+{{#if campaign.party.groups.length}}
+<div class="sending-stone-toolbar">
+    <button type="button" data-action="openPartyPicker">
+        <i class="fa-solid fa-people-group" inert></i>
+        {{localize "SENDINGSTONE.Config.Party.Add"}}
+    </button>
+</div>
+{{/if}}
+<div class="sending-stone-scroll">
+    {{#if campaign.party.groups.length}}
+    <ul class="sending-stone-list" data-party-list>
+        {{#each campaign.party.groups as |group|}}
+        <li class="sending-stone-row sending-stone-party" data-group-id="{{group.id}}">
+            <img src="{{group.img}}" alt="">
+            <span class="sending-stone-row-name">
+                <span>{{group.name}}</span>
+                <span class="hint">{{group.members}}</span>
+                {{#if group.seenBy}}
+                <span class="hint" data-party-seen>{{group.seenBy}}</span>
+                {{else}}
+                <span class="hint sending-stone-warning" data-party-warning>
+                    <i class="fa-solid fa-triangle-exclamation" inert></i>
+                    {{localize "SENDINGSTONE.Config.Party.NoOne"}}
+                </span>
+                {{/if}}
+            </span>
+            {{#if group.primary}}<span class="sending-stone-chip">{{localize "SENDINGSTONE.Config.Party.Primary"}}</span>{{/if}}
+            <button type="button" class="icon fa-solid fa-xmark" data-action="removeParty"
+                    data-group-id="{{group.id}}" data-tooltip="{{group.removeLabel}}"
+                    aria-label="{{group.removeLabel}}"></button>
+        </li>
+        {{/each}}
+    </ul>
+    {{else}}
+    <div class="sending-stone-empty-state">
+        <i class="fa-solid fa-people-group" inert></i>
+        <p class="sending-stone-empty-title">{{localize "SENDINGSTONE.Config.Party.Empty"}}</p>
+        <p class="hint">{{localize "SENDINGSTONE.Config.Party.EmptyHint"}}</p>
+        <div class="sending-stone-empty-actions">
+            <button type="button" data-action="openPartyPicker">
+                <i class="fa-solid fa-people-group" inert></i>
+                {{localize "SENDINGSTONE.Config.Party.Add"}}
+            </button>
+        </div>
+    </div>
+    {{/if}}
+</div>
+{{/if}}
 
 {{else if campaign.tabs.actions}}
 <div class="sending-stone-scroll">

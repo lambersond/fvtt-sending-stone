@@ -860,3 +860,15 @@
   opacity: 1;
   font-weight: bold;
 }
+
+/* What players see in chat, under a campaign's title (module 0.30.0): read-only, and long. */
+#sending-stone-settings .sending-stone-results {
+  margin: 0;
+  font-size: var(--font-size-12, 0.75rem);
+  opacity: 0.85;
+}
+
+/* A party whose sheet no player may see in Foundry says so in its row, wrapping as it needs. */
+#sending-stone-settings .sending-stone-party .sending-stone-warning {
+  white-space: normal;
+}

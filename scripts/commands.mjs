@@ -13,6 +13,8 @@ import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mj
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
 import { gmRollOf } from "./chat-data.mjs";
 import { diceStatus } from "./dice-plan.mjs";
+import { noteSettingsReader } from "./foundry-settings.mjs";
+import { noteGroupReader } from "./groups.mjs";
 import { answersMidiPrompt, midiPromptsOffered, noteMidiReader, noteOpen } from "./midi-prompts.mjs";
 import { prompting } from "./prompts.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
@@ -197,15 +199,20 @@ export function registerCommandHooks() {
 
 /**
  * Note what the app said it does beyond taking events, answering a campaign's hello or heartbeat:
- * since 0.27.0, whether it reads Midi-QOL's prompts too.
+ * since 0.27.0, whether it reads Midi-QOL's prompts too; and since 0.30.0, whether it reads groups
+ * and what the world's settings are, each of which is sent at once where it starts to in a
+ * heartbeat's answer.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
+ * @param {string} [type]          The event answered, a hello or a heartbeat.
  * @returns {void}
  */
-export function noteListenerFeatures(campaignId, features) {
+export function noteListenerFeatures(campaignId, features, type) {
   if ( features?.commands === true ) offered.add(campaignId);
   else offered.delete(campaignId);
   noteMidiReader(campaignId, features);
+  noteGroupReader(campaignId, features, type);
+  noteSettingsReader(campaignId, features, type);
   syncPollers();
 }
 

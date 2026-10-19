@@ -6,7 +6,10 @@ import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
 import { getDestination, getSecret, isMixedContent, parseDestination } from "../config.mjs";
 import { campaignStatus, describeProblem } from "../delivery-status.mjs";
 import { diceStatus } from "../dice-plan.mjs";
+import { WATCHED_SETTINGS } from "../foundry-settings.mjs";
+import { candidateGroups, groupEntry, groupsAvailable, memberCount, primaryPartyId } from "../groups.mjs";
 import { midiPromptStatus } from "../midi-prompts.mjs";
+import { resultsVerdict } from "../results.mjs";
 import { buildEnvelope, deliver, DeliveryError } from "../transport.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -56,9 +59,9 @@ const MODULE_TONES = Object.freeze({ active: "ok", off: "warning", inactive: "id
 /**
  * The Gamemaster's window for every Sending Stone setting, in sections down its side: General,
  * for the app's address and what's sent; Modules, for the modules that change what Sending Stone
- * can do, the author's own among them; each campaign, one at a time, with its players, what they
- * may do from the app, and its connection; and the Roster, every character against every
- * campaign.
+ * can do, the author's own among them; each campaign, one at a time, with its players, since 0.30.0
+ * its parties, what they may do from the app, and its connection, under a line saying what its
+ * players see in chat; and the Roster, every character against every campaign.
  *
  * Only the open section is drawn, so a world with many players and campaigns never lists every
  * character once per campaign. What's typed and ticked is kept as it changes, whichever section
@@ -97,7 +100,11 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       closePicker: SettingsWindow.#onClosePicker,
       pickGroup: SettingsWindow.#onPickGroup,
       addPicked: SettingsWindow.#onAddPicked,
-      filterScope: SettingsWindow.#onFilterScope
+      filterScope: SettingsWindow.#onFilterScope,
+      openPartyPicker: SettingsWindow.#onOpenPartyPicker,
+      closePartyPicker: SettingsWindow.#onClosePartyPicker,
+      addPickedParties: SettingsWindow.#onAddPickedParties,
+      removeParty: SettingsWindow.#onRemoveParty
     }
   };
 
@@ -125,8 +132,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
 
   /**
    * The campaigns as being edited, each with the secret this browser holds for it.
-   * @type {{id: string, title: string, secret: string, characters: Set<string>, rolls: boolean,
-   *   attacks: boolean, prompts: boolean, manualDice: boolean}[]}
+   * @type {{id: string, title: string, secret: string, characters: Set<string>, groups: Set<string>,
+   *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({ ...campaign, secret: getSecret(campaign.id) }));
 
@@ -139,7 +146,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   /**
    * The section open: General, Modules, the Roster, or a campaign at one of its tabs.
    * @type {{section: "general"|"modules"|"roster"|"campaign", campaignId: string|null,
-   *   tab: "players"|"actions"|"connection"}}
+   *   tab: "players"|"actions"|"party"|"connection"}}
    */
   #view = this.#firstView();
 
@@ -148,6 +155,12 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * @type {boolean}
    */
   #picker = false;
+
+  /**
+   * Is the open campaign's list of groups to add in place of its parties?
+   * @type {boolean}
+   */
+  #partyPicker = false;
 
   /**
    * What each list is filtered by, typed or chosen, kept for re-rendering.
@@ -179,6 +192,13 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * @type {number|null}
    */
   #statusHook = null;
+
+  /**
+   * The listeners rewriting what players see in chat while the window is open, as the settings that
+   * decide it are stored or changed, by their hook.
+   * @type {[string, number][]}
+   */
+  #resultsHooks = [];
 
   /* -------------------------------------------- */
   /*  State                                       */
@@ -218,6 +238,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         title: campaign.title.trim(),
         secret: campaign.secret.trim(),
         characters: Array.from(campaign.characters).filter(id => game.actors.has(id)).sort(),
+        groups: Array.from(campaign.groups).filter(isGroup),
         rolls: campaign.rolls,
         attacks: campaign.attacks,
         prompts: campaign.prompts,
@@ -278,6 +299,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     const saved = new Map(getCampaigns().map(campaign => [campaign.id, campaign]));
     const actors = this.#actors();
     if ( (this.#view.section === "campaign") && !this.#current() ) this.#view = { section: "general", campaignId: null, tab: "players" };
+    // A world without Group actors has no Party tab.
+    if ( (this.#view.tab === "party") && !groupsAvailable() ) this.#view.tab = "players";
     const { section } = this.#view;
     const context = {
       nav: this.#navContext(saved, actors),
@@ -521,6 +544,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       untitled: !campaign.title.trim(),
       summary: `${count(members.length, "Character")} · ${count(new Set(members.flatMap(m => m.owners)).size, "Player")}`,
       tabs: { [tab]: true },
+      partyTab: groupsAvailable(),
+      results: verdictLine(),
       ...this.#stateOf(campaign, saved)
     };
 
@@ -567,6 +592,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       });
     }
     else if ( tab === "actions" ) Object.assign(context, this.#actionsContext(campaign));
+    else if ( tab === "party" ) context.party = this.#partyContext(campaign, others);
     else if ( tab === "connection" ) {
       Object.assign(context, {
         title: campaign.title,
@@ -578,6 +604,60 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
           ?? game.i18n.localize("SENDINGSTONE.Config.Connection.NoAddress")
       });
     }
+    return context;
+  }
+
+  /**
+   * A campaign's Party tab: its groups, each with how many members it has and which of the
+   * campaign's characters' players may see it in Foundry, or a warning that none may; or in their
+   * place, the groups that can be added. The context is `party`, as `groups` is the players tab's.
+   * @param {SettingsWindow["#campaigns"][number]} campaign
+   * @param {SettingsWindow["#campaigns"]} others   The other campaigns.
+   * @returns {object}
+   */
+  #partyContext(campaign, others) {
+    const names = new Map(Array.from(campaign.characters, id => [id, game.actors.get(id)?.name]));
+    const listed = Array.from(campaign.groups, id => game.actors.get(id)).filter(isGroup);
+    const context = {
+      groups: listed.map(group => {
+        const { access, primary } = groupEntry(group, campaign);
+        const seen = Object.keys(access).map(id => names.get(id)).filter(Boolean);
+        const members = memberCount(group);
+        return {
+          id: group.id,
+          name: group.name,
+          img: group.img,
+          primary,
+          members: (members === 1) ? game.i18n.localize("SENDINGSTONE.Config.Party.Member")
+            : game.i18n.format("SENDINGSTONE.Config.Party.Members", { count: members }),
+          seenBy: seen.length ? game.i18n.format("SENDINGSTONE.Config.Party.SeenBy", { characters: seen.join(", ") }) : null,
+          removeLabel: game.i18n.format("SENDINGSTONE.Config.Party.Remove", { name: group.name })
+        };
+      })
+    };
+    if ( !this.#partyPicker ) return context;
+    const titles = list => list.map(other => this.#titleOf(other)).join(", ");
+    const primary = primaryPartyId();
+    const entries = candidateGroups().map(group => {
+      const inCampaign = campaign.groups.has(group.id);
+      const where = others.filter(other => other.groups.has(group.id));
+      return {
+        id: group.id,
+        name: group.name,
+        img: group.img,
+        primary: group.id === primary,
+        inCampaign,
+        where: inCampaign ? game.i18n.localize("SENDINGSTONE.Config.Picker.Already")
+          : where.length ? game.i18n.format("SENDINGSTONE.Config.Picker.In", { campaigns: titles(where) })
+            : game.i18n.localize("SENDINGSTONE.Config.Picker.Nowhere")
+      };
+    });
+    context.picker = {
+      title: game.i18n.format("SENDINGSTONE.Config.Party.PickerTitle", { campaign: this.#titleOf(campaign) }),
+      entries,
+      empty: !entries.length ? game.i18n.localize("SENDINGSTONE.Config.Party.NoGroups")
+        : entries.every(entry => entry.inCampaign) ? game.i18n.localize("SENDINGSTONE.Config.Party.PickerEmpty") : null
+    };
     return context;
   }
 
@@ -619,6 +699,10 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   async _onFirstRender(context, options) {
     await super._onFirstRender?.(context, options);
     this.#statusHook = Hooks.on(STATUS_HOOK, () => this.#showStatus());
+    // What players see in chat follows dnd5e's and Midi-QOL's settings, which change elsewhere.
+    this.#resultsHooks = ["createSetting", "updateSetting"].map(hook => [hook, Hooks.on(hook, setting => {
+      if ( WATCHED_SETTINGS.has(setting?.key) ) this.#showResults();
+    })]);
     this.element.addEventListener("change", event => this.#onEdit(event));
     this.element.addEventListener("input", event => this.#onEdit(event));
     this.element.addEventListener("keydown", event => this.#onKeyDown(event));
@@ -629,6 +713,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     await super._onRender?.(context, options);
     this.#applyFilters();
     this.#countPicks();
+    this.#countPartyPicks();
     const { focus, top } = this.#after;
     this.#after = { focus: null, top: false };
     if ( top ) this.element.querySelector(".sending-stone-scroll")?.scrollTo(0, 0);
@@ -640,6 +725,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     super._onClose?.(options);
     if ( this.#statusHook !== null ) Hooks.off(STATUS_HOOK, this.#statusHook);
     this.#statusHook = null;
+    for ( const [hook, id] of this.#resultsHooks ) Hooks.off(hook, id);
+    this.#resultsHooks = [];
   }
 
   /**
@@ -652,6 +739,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     const moved = (view.section !== this.#view.section) || ((view.campaignId ?? null) !== this.#view.campaignId);
     this.#view = { section: view.section, campaignId: view.campaignId ?? null, tab: view.tab ?? "players" };
     this.#picker = false;
+    this.#partyPicker = false;
     if ( moved ) {
       this.#revealed = false;
       this.#filters.players = "";
@@ -679,6 +767,10 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     }
     if ( target.dataset?.pick ) {
       this.#countPicks();
+      return;
+    }
+    if ( target.dataset?.pickParty ) {
+      this.#countPartyPicks();
       return;
     }
     if ( !target.name ) return;
@@ -709,6 +801,11 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       event.preventDefault();
       event.stopPropagation();
       SettingsWindow.#onClosePicker.call(this);
+    }
+    else if ( (event.key === "Escape") && this.#partyPicker ) {
+      event.preventDefault();
+      event.stopPropagation();
+      SettingsWindow.#onClosePartyPicker.call(this);
     }
   }
 
@@ -755,6 +852,20 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       button.hidden = !boxes.length;
       button.textContent = game.i18n.localize(`SENDINGSTONE.Config.Picker.${(boxes.length && boxes.every(box => box.checked)) ? "Clear" : "SelectAll"}`);
     }
+  }
+
+  /**
+   * Say how many groups are picked to add.
+   * @returns {void}
+   */
+  #countPartyPicks() {
+    const picker = this.element.querySelector("[data-party-picker]");
+    if ( !picker ) return;
+    const picked = picker.querySelectorAll("[data-pick-party]:checked:not(:disabled)").length;
+    picker.querySelector("[data-pick-party-count]").textContent = picked
+      ? game.i18n.format("SENDINGSTONE.Config.Picker.Selected", { count: picked })
+      : game.i18n.localize("SENDINGSTONE.Config.Picker.NoneSelected");
+    picker.querySelector("[data-action='addPickedParties']").disabled = !picked;
   }
 
   /**
@@ -811,6 +922,17 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     if ( output.dataset.dirty === String(dirty) ) return;
     output.dataset.dirty = String(dirty);
     output.textContent = game.i18n.localize(`SENDINGSTONE.Config.${dirty ? "Unsaved" : "NoChanges"}`);
+  }
+
+  /**
+   * Rewrite what players see in chat as the saved settings now say, leaving the rest of the window,
+   * and what has been typed in it, as it is.
+   * @returns {void}
+   */
+  #showResults() {
+    if ( !this.element ) return;
+    const line = verdictLine();
+    for ( const element of this.element.querySelectorAll("[data-results]") ) element.textContent = line;
   }
 
   /**
@@ -871,8 +993,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    */
   static async #onAddCampaign() {
     const campaign = {
-      id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), rolls: false, attacks: false,
-      prompts: false, manualDice: false
+      id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
+      attacks: false, prompts: false, manualDice: false
     };
     this.#campaigns.push(campaign);
     await this.#show({ section: "campaign", campaignId: campaign.id, tab: "connection" }, "[name='campaign.title']");
@@ -1058,6 +1180,53 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   }
 
   /**
+   * Show the groups that can be added to the open campaign in place of its parties.
+   * @this {SettingsWindow}
+   * @returns {Promise<void>}
+   */
+  static async #onOpenPartyPicker() {
+    this.#partyPicker = true;
+    this.#after = { focus: "[data-pick-party]:not(:disabled), [data-action='closePartyPicker']", top: true };
+    await this.render();
+  }
+
+  /**
+   * @this {SettingsWindow}
+   * @returns {Promise<void>}
+   */
+  static async #onClosePartyPicker() {
+    this.#partyPicker = false;
+    this.#after = { focus: "[data-action='openPartyPicker']", top: true };
+    await this.render();
+  }
+
+  /**
+   * Add the groups picked to the open campaign, after those it has, and show its parties again.
+   * @this {SettingsWindow}
+   * @returns {Promise<void>}
+   */
+  static async #onAddPickedParties() {
+    const campaign = this.#current();
+    if ( !campaign ) return;
+    for ( const box of this.element.querySelectorAll("[data-pick-party]:checked:not(:disabled)") ) {
+      campaign.groups.add(box.dataset.pickParty);
+    }
+    await SettingsWindow.#onClosePartyPicker.call(this);
+  }
+
+  /**
+   * @this {SettingsWindow}
+   * @param {PointerEvent} _event
+   * @param {HTMLButtonElement} target   The remove button, carrying the group's id.
+   * @returns {Promise<void>}
+   */
+  static async #onRemoveParty(_event, target) {
+    this.#current()?.groups.delete(target.dataset.groupId);
+    this.#after.focus = "[data-action='openPartyPicker']";
+    await this.render();
+  }
+
+  /**
    * Show a list's characters in one scope or another: the picker's, those not in the campaign or
    * everyone; the Roster's, everyone or those in no campaign.
    * @this {SettingsWindow}
@@ -1090,7 +1259,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       ...campaign,
       title: campaign.title.trim(),
       secret: campaign.secret.trim(),
-      characters: Array.from(campaign.characters).filter(id => game.actors.has(id))
+      characters: Array.from(campaign.characters).filter(id => game.actors.has(id)),
+      groups: Array.from(campaign.groups).filter(isGroup)
     }));
 
     // Thrown rather than notified, so that the window stays open with what was entered. Each
@@ -1119,6 +1289,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       id: campaign.id,
       title: campaign.title,
       characters: campaign.characters,
+      groups: campaign.groups,
       rolls: campaign.rolls,
       attacks: campaign.attacks,
       prompts: campaign.prompts,
@@ -1133,6 +1304,25 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       ui.notifications.warn("SENDINGSTONE.Test.HintMixedContent", { localize: true });
     }
   }
+}
+
+/**
+ * Is an id, or an actor, one of the world's Group actors?
+ * @param {string|Actor|null|undefined} idOrActor
+ * @returns {boolean}
+ */
+function isGroup(idOrActor) {
+  const actor = (typeof idOrActor === "string") ? game.actors.get(idOrActor) : idOrActor;
+  return actor?.type === "group";
+}
+
+/**
+ * What players see in chat, as the saved settings have it, in one line: for the campaign's header.
+ * @returns {string}
+ */
+function verdictLine() {
+  const lines = resultsVerdict().map(line => line.text);
+  return `${game.i18n.localize("SENDINGSTONE.Results.Lead")} ${lines.join(" · ")}`;
 }
 
 /**
