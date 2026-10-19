@@ -9,6 +9,7 @@ import { migrateConnectedCharacters } from "./campaigns.mjs";
 import { registerChatHooks } from "./chat.mjs";
 import { registerCombatHooks } from "./combat.mjs";
 import { installDicePlans, selfTest } from "./dice-plan.mjs";
+import { registerSettingsWatch } from "./foundry-settings.mjs";
 import { startHeartbeat } from "./heartbeat.mjs";
 import { installMidiPrompts, registerMidiPromptHooks } from "./midi-prompts.mjs";
 import { registerPromptHooks } from "./prompts.mjs";
@@ -22,6 +23,7 @@ Hooks.once("init", () => {
   registerPromptHooks();
   registerMidiPromptHooks();
   registerCommandHooks();
+  registerSettingsWatch();
 });
 
 // Every client registers the hooks, but only the active Gamemaster's posts anything. That role can

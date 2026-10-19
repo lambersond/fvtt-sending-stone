@@ -76,10 +76,17 @@ const sent = new Map();
  * @property {string} [html]            The description's HTML, as stored.
  * @property {Document} [relativeTo]    The document it belongs to, for its links and roll data.
  * @property {string} [reference]       The UUID of a journal page whose text it is, instead.
+ * @property {boolean} [secrets]        Is it enriched with its secrets, as for its owner? Since
+ *                                      0.30.0 a Group's are not: see SheetTexts.
+ * @property {boolean} [actionable]     May its links be acted on from the app? A Group's may not.
  */
 
 /**
  * The descriptions a set of sheets refers to, collected as they are described.
+ *
+ * A character's are enriched as its player sees them, secrets and all, with links to act on. Since
+ * 0.30.0 a Group's go without either: dnd5e shows a group's secrets only to its owners, and one
+ * party sheet goes to its observers and owners alike; and nothing is rolled from it.
  */
 export class SheetTexts {
   /**
@@ -95,11 +102,36 @@ export class SheetTexts {
   #format = null;
 
   /**
+   * Are these descriptions enriched with their secrets?
+   * @type {boolean}
+   */
+  #secrets;
+
+  /**
+   * May the links in these descriptions be acted on?
+   * @type {boolean}
+   */
+  #actionable;
+
+  /**
+   * @param {object} [options]
+   * @param {boolean} [options.secrets]      Enrich them with their secrets, as for their owner.
+   * @param {boolean} [options.actionable]   Make their links ones the app can act on.
+   */
+  constructor({ secrets=true, actionable=true }={}) {
+    this.#secrets = secrets !== false;
+    this.#actionable = actionable !== false;
+  }
+
+  /**
    * Refer to a description, noting where it comes from.
    *
    * Its hash is of everything what is sent depends on: the format it's sent in, the rules and
-   * language, where it comes from and its HTML, and what it shows of the character's numbers. A
-   * change to any of them is a new description, sent anew.
+   * language, where it comes from and its HTML, and what it shows of the character's numbers; and
+   * since 0.30.0 whether it goes without its secrets or links to act on. A change to any of them is
+   * a new description, sent anew. Those two are hashed only where they differ from a character's,
+   * so that no character's description has a new hash for them, and the same HTML enriched both
+   * ways never shares one.
    * @param {TextSource} source
    * @returns {string|null}   Its hash, or null if there is nothing to describe.
    */
@@ -109,8 +141,11 @@ export class SheetTexts {
     this.#format ??= textFormat();
     const from = reference ? `ref:${reference}`
       : `${relativeTo?.uuid ?? ""}\n${shownSafely(html, relativeTo)}\n${html}`;
-    const hash = textHash(`${this.#format}\n${from}`);
-    if ( !this.sources.has(hash) ) this.sources.set(hash, source);
+    const options = `${this.#secrets ? "" : "\nsecrets:false"}${this.#actionable ? "" : "\nactionable:false"}`;
+    const hash = textHash(`${this.#format}\n${from}${options}`);
+    if ( !this.sources.has(hash) ) {
+      this.sources.set(hash, { ...source, secrets: this.#secrets, actionable: this.#actionable });
+    }
     return hash;
   }
 }
@@ -231,6 +266,7 @@ async function render(sources) {
  * A description as the character's player sees it in Foundry: secrets included, since they own
  * the character, and links and rolls enriched, with the roll data of the document it's on, or of
  * the actor an effect is on. Then its links are made the app's, and it is cut to the longest sent.
+ * Since 0.30.0 a source may say it goes without its secrets, or links to act on, as a Group's does.
  *
  * It never fails, so it can't cost a hello its descriptions: a description that can't be enriched
  * is read as it's stored, one whose links can't be read has them cleaned up by string alone, and
@@ -240,7 +276,7 @@ async function render(sources) {
  *   The HTML sent, the DCs its authors hid, and the activities its damage is rolled by, by link
  *   number.
  */
-async function enrich({ html, relativeTo, reference }) {
+async function enrich({ html, relativeTo, reference, secrets, actionable }) {
   let text = html ?? "";
   let rollData;
   let result = null;
@@ -252,7 +288,7 @@ async function enrich({ html, relativeTo, reference }) {
     }
     rollData = rollDataOf(relativeTo);
     const TextEditor = foundry.applications.ux.TextEditor.implementation;
-    result = await TextEditor.enrichHTML(text, { secrets: true, relativeTo, rollData });
+    result = await TextEditor.enrichHTML(text, { secrets: secrets !== false, relativeTo, rollData });
   } catch (err) {
     console.warn(`${MODULE_ID} | Could not enrich a description of ${relativeTo?.uuid ?? reference}`, err);
   }
@@ -260,7 +296,9 @@ async function enrich({ html, relativeTo, reference }) {
   try {
     const hiddenDCs = new Map();
     const activities = new Map();
-    const normalised = normaliseLinks(enrichedText, { relativeTo, rollData, actionable: !reference, hiddenDCs, activities });
+    const normalised = normaliseLinks(enrichedText, {
+      relativeTo, rollData, actionable: (actionable !== false) && !reference, hiddenDCs, activities
+    });
     return { html: cutShort(normalised), hiddenDCs, activities };
   } catch (err) {
     console.warn(`${MODULE_ID} | Could not read the links of a description of ${relativeTo?.uuid ?? reference}`, err);

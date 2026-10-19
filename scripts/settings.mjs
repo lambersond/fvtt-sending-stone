@@ -61,6 +61,8 @@ export function registerSettings() {
       id: new StringField({ blank: false }),
       title: new StringField({ blank: false }),
       characters: new ArrayField(new StringField({ blank: false })),
+      // Its Group actors, its parties, whose sheets its players may see as Foundry lets them.
+      groups: new ArrayField(new StringField({ blank: false })),
       rolls: new BooleanField({ initial: false }),
       attacks: new BooleanField({ initial: false }),
       prompts: new BooleanField({ initial: false }),

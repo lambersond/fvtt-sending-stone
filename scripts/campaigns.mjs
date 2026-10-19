@@ -17,6 +17,8 @@ import { diceStatus } from "./dice-plan.mjs";
  * @property {string} id              Generated when the campaign is created; never changes.
  * @property {string} title           Set by the Gamemaster, and how players find the campaign.
  * @property {Set<string>} characters The actor ids of its characters.
+ * @property {Set<string>} groups     The actor ids of its Group actors, its parties, in the order
+ *                                    the Gamemaster added them: see groups.mjs.
  * @property {boolean} rolls          Do its players' rolls in the app get made here, with their
  *                                    dice? Off until the Gamemaster turns it on.
  * @property {boolean} attacks        Do its players' attacks, spells and features in the app get
@@ -37,10 +39,11 @@ import { diceStatus } from "./dice-plan.mjs";
  */
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
-  return stored.map(({ id, title, characters, rolls, attacks, prompts, manualDice }) => ({
+  return stored.map(({ id, title, characters, groups, rolls, attacks, prompts, manualDice }) => ({
     id,
     title,
     characters: new Set(characters),
+    groups: new Set(groups ?? []),
     rolls: rolls === true,
     attacks: attacks === true,
     prompts: prompts === true,

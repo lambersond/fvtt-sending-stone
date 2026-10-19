@@ -6,6 +6,8 @@ import { getCampaigns } from "./campaigns.mjs";
 import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { roster } from "./characters.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
+import { foundrySettings, noteSettingsSent } from "./foundry-settings.mjs";
+import { campaignGroups, groupEntry } from "./groups.mjs";
 import { releaseHeldCards } from "./midi-prompts.mjs";
 import { openPrompts } from "./prompts.mjs";
 import { forgetSent } from "./sheet-texts.mjs";
@@ -66,7 +68,9 @@ const resent = new Map();
  * made one post larger than an app takes: once it's answered, each follows in a post of its own,
  * after its descriptions (see character-sync.mjs), and it says so with `sheetsApart`. Each says
  * whether its players' rolls in the app are made here; and fetching them starts afresh, so a
- * campaign whose fetch was refused is tried again.
+ * campaign whose fetch was refused is tried again. Since 0.30.0 it lists the campaign's groups,
+ * each without its sheet, which follows it as its characters' do to an app that reads groups; and
+ * says what the world's settings that decide what players see are, `settings`, for its Gamemaster.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -95,11 +99,15 @@ export function announce({ campaignId }={}) {
     // The listener starts afresh, so every sheet and description goes again after it.
     forgetTold(campaign.id);
     forgetSent(campaign.id);
+    const settings = foundrySettings(campaign);
+    noteSettingsSent(campaign.id, settings);
     send(EVENTS.HELLO, {
       ...shared,
       features: { rolls: rollFeatures(campaign) },
       sheetsApart: true,
       characters: roster(campaign),
+      groups: campaignGroups(campaign).map(group => groupEntry(group, campaign)),
+      settings,
       combats: combats.map(combat => snapshotCombat(combat, campaign)),
       prompts: openPrompts(campaign)
     }, campaign);

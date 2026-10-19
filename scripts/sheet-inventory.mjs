@@ -34,12 +34,16 @@ const DEEPEST = 5;
 /* -------------------------------------------- */
 
 /**
- * The character's inventory.
+ * The character's inventory; since 0.30.0 a Group's too, whose items are only looked at.
  * @param {Actor} actor
  * @param {SheetTexts} texts    Collects the items' descriptions.
+ * @param {object} [options]
+ * @param {boolean} [options.usable]   Does each item say what it rolls, how it's used and its
+ *                                     enchantments, for its owner to use it from the app? A
+ *                                     Group's don't: nothing is used from a party sheet.
  * @returns {object}
  */
-export function inventoryOf(actor, texts) {
+export function inventoryOf(actor, texts, { usable=true }={}) {
   const items = Array.from(actor.items ?? []);
   const topLevel = items.filter(item => !containerOf(actor, item));
   const sort = list => list.sort((a, b) => ((a.sort ?? 0) - (b.sort ?? 0)) || a.name.localeCompare(b.name, game.i18n.lang));
@@ -47,11 +51,11 @@ export function inventoryOf(actor, texts) {
   const sections = inventorySections()
     .map(({ type, id, label }) => ({
       id, label,
-      items: sort(topLevel.filter(item => item.type === type)).map(item => describeItem(item, texts))
+      items: sort(topLevel.filter(item => item.type === type)).map(item => describeItem(item, texts, usable))
     }))
     .filter(section => section.items.length);
   const containers = sort(topLevel.filter(item => item.type === "container"))
-    .map(container => describeContainer(actor, container, texts, 1));
+    .map(container => describeContainer(actor, container, texts, 1, usable));
 
   const attributes = actor.system?.attributes ?? {};
   return {
@@ -99,9 +103,10 @@ function inventorySections() {
  * secrets.
  * @param {Item} item
  * @param {SheetTexts} texts
+ * @param {boolean} [usable]   With what it rolls, how it's used and its enchantments.
  * @returns {object}
  */
-function describeItem(item, texts) {
+function describeItem(item, texts, usable=true) {
   const system = item.system ?? {};
   const identified = system.identified !== false;
   return {
@@ -120,8 +125,8 @@ function describeItem(item, texts) {
     properties: identified ? Array.from(item.labels?.properties ?? [], property => property.label).filter(Boolean) : [],
     identified,
     // What it rolls, and how it's used, so it's used or rolled from Inventory as from Actions.
-    ...usableFields(item, texts),
-    ...enchantmentsOf(item),
+    ...(usable && usableFields(item, texts)),
+    ...(usable && enchantmentsOf(item)),
     text: texts.add({
       html: identified ? system.description?.value : system.unidentified?.description,
       relativeTo: item
@@ -149,18 +154,19 @@ function usableFields(item, texts) {
  * @param {Item} container
  * @param {SheetTexts} texts
  * @param {number} depth        How deep in other containers it is.
+ * @param {boolean} [usable]    As `describeItem`'s.
  * @returns {object}
  */
-function describeContainer(actor, container, texts, depth) {
+function describeContainer(actor, container, texts, depth, usable=true) {
   const system = container.system ?? {};
   const hidden = (system.identified === false) && (system.properties?.has?.("unidentifiedContents") ?? false);
   const contents = (hidden || (depth > DEEPEST)) ? null : Array.from(actor.items ?? [])
     .filter(item => containerOf(actor, item) === container)
     .sort((a, b) => ((a.sort ?? 0) - (b.sort ?? 0)) || a.name.localeCompare(b.name, game.i18n.lang))
     .map(item => (item.type === "container")
-      ? describeContainer(actor, item, texts, depth + 1)
-      : describeItem(item, texts));
-  return { ...describeItem(container, texts), capacity: hidden ? null : capacityOf(system), contents };
+      ? describeContainer(actor, item, texts, depth + 1, usable)
+      : describeItem(item, texts, usable));
+  return { ...describeItem(container, texts, usable), capacity: hidden ? null : capacityOf(system), contents };
 }
 
 /**

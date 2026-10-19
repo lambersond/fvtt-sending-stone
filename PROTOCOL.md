@@ -21,7 +21,7 @@ Authorization: Bearer <the campaign's secret>     (only when one is configured)
 
 | Your answer | What the module does |
 | --- | --- |
-| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). In answer to a `bridge.hello` or `bridge.heartbeat`, `{"features": {"commands": true}}` says the listener has players' rolls for the module to fetch; see [Rolls from the app](#rolls-from-the-app). Since module 0.22.0, in answer to those and to a `character.updated`, `features`' `slimSheets` and `maxBytes` say what the listener takes of sheets and posts; see [below](#post-size-and-slim-sheets). Since module 0.27.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `midiPrompts` says the listener reads [Midi-QOL's prompts](#midi-qols-own-saves). All may be in one body. Anything else is ignored. |
+| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). In answer to a `bridge.hello` or `bridge.heartbeat`, `{"features": {"commands": true}}` says the listener has players' rolls for the module to fetch; see [Rolls from the app](#rolls-from-the-app). Since module 0.22.0, in answer to those and to a `character.updated`, `features`' `slimSheets` and `maxBytes` say what the listener takes of sheets and posts; see [below](#post-size-and-slim-sheets). Since module 0.27.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `midiPrompts` says the listener reads [Midi-QOL's prompts](#midi-qols-own-saves). Since module 0.30.0, in answer to those, `features`' `groups` says it reads [groups](#group), and `settings` that it reads [`bridge.settings`](#bridgesettings); and a `group.updated`'s answer says what it takes of sheets, as a `character.updated`'s does. All may be in one body. Anything else is ignored. |
 | `408`, `425`, `429`, any `5xx`, no answer, or no answer within 10 s | Retried after 1 s, then again after 3 s, with the same envelope. Dropped after the third failure. |
 | Any other status, such as `400` or `401` | Dropped immediately. |
 
@@ -144,8 +144,18 @@ to 1,000,000 bytes, as it may go elsewhere than the campaign's events. Before 0.
 - **Lost posts are sent again.** Since module 0.22.0, a `bridge.hello`, `character.updated` or
   `character.texts` dropped after failures that might not last (no answer, or `408`, `425`, `429`
   or a `5xx`, three times) is sent again some 30 seconds later: a hello with every sheet after it, a
-  character as it then stands, and descriptions with the next sheet that refers to them. One
-  refused with any other status isn't.
+  character as it then stands, and descriptions with the next sheet that refers to them. Since
+  module 0.30.0, a `group.updated` too, as the group then stands; and a `group.removed` or
+  `bridge.settings` lost sends the campaign's hello again, which says both. One refused with any
+  other status isn't.
+- **Say what you read, in your answers to a hello and a heartbeat.** Since module 0.30.0 the
+  module sends a campaign's [groups](#group) (`group.updated`, `group.removed`) only to a listener
+  whose latest answer to the campaign's `bridge.hello` or `bridge.heartbeat` said
+  `"features": {"groups": 1}`, and [`bridge.settings`](#bridgesettings) only to one that said
+  `"settings": 1`, each a whole number of 1 or more, the format it reads. Say it in every such
+  answer: one that doesn't is sent neither from then on. A listener that starts to say it in a
+  heartbeat's answer, as one deployed mid-session, is sent every group, and the settings, at once;
+  after a hello's answer, the groups follow its characters, and the hello said the settings.
 
 ## Campaigns
 
@@ -735,6 +745,42 @@ app](#descriptions-that-roll):
 - **Older listeners** see the classes `roll` and `ref` that Foundry's and dnd5e's links had, and can
   show them as before. A listener that doesn't know `ss-check` can show it as text.
 
+### Group
+
+Since module 0.30.0, under D&D Fifth Edition, a campaign's Gamemaster adds Group actors, its parties,
+to it in Manage Campaigns, and its players see each group's sheet as Foundry lets them. A campaign
+may have several, and a group may be in several campaigns. dnd5e's encounters, an Actor type of
+their own, are never one.
+
+```json
+{
+  "id": "party",
+  "uuid": "Actor.party",
+  "name": "The Company",
+  "img": "party.webp",
+  "type": "group",
+  "primary": true,
+  "access": { "thorin": "observer", "vex": "owner" },
+  "sheet": { "…": "see below" }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `uuid`, `name`, `img`, `type` | The group's actor: `uuid` `"Actor.<id>"`, `img` as stored or `null`, `type` always `"group"`. |
+| `primary` | Is it the world's primary party, as dnd5e's actors directory sets it (`game.actors.party`)? |
+| `access` | Which of the campaign's characters may see it, as Foundry lets their players: by each character's player owners' highest ownership of the group, or for a character no player owns, the group's default; `"owner"` for Owner, `"observer"` for Observer. A character whose players have Limited or less on it, or none, has no key. Gamemasters count for none: they see every group. `{}` means no player may see it. |
+| `sheet` | In `group.updated`, the group's sheet, as below; `null` where it's private, `access` being `{}`, or withheld as too large, with `sheetWithheld` saying so: `{ reason: "private" }` or `{ reason: "tooLarge", bytes, limit }`, as a character's (see [Character](#character)). A private group goes with no descriptions at all. Absent in a hello. |
+
+Its sheet: what any of its players may see of it, and nothing more, observers and owners alike.
+
+| Field | Meaning |
+| --- | --- |
+| `members` | Its members, as dnd5e's group sheet lists them: characters, then NPCs, then vehicles, each by name in the game's language. Each is exactly `{ id, name, img, type, character }`, and nothing else of any member is ever sent, not their level, classes or hit points: `img` their token's image where the group shows token portraits (`flags.dnd5e.showTokenPortrait`), never one of its random images, else their own, or `null`; `type` `"character"`, `"npc"` or `"vehicle"`; `character` `true` for one of the campaign's characters. A member no longer in the world, and any other kind of actor, is left out. |
+| `description` | `{ full, summary }`, each the hash of a [description](#descriptions) sent in `character.texts`, or `null`. dnd5e shows a group's secrets to its owners alone, so they're enriched without secrets, and with no link to act on: the hash never names the same text as a character's would. |
+| `inventory` | The group's own items, never its primary vehicle's, exactly as a [character sheet](#character-sheet)'s `inventory`, with nothing to roll, use or enchant: no roll, use or enchantment fields on any item; `uses` read-only; `encumbrance` and `attunement` `null`. Item and container ids are Foundry's; currency ids are dnd5e's, and a value may be fractional under dnd5e 6. |
+| `slim` | `1` where the listener expands [slim sheets](#slim-sheets), which a group's are made as a character's are. |
+
 ### Chat message
 
 | Field | Meaning |
@@ -747,14 +793,14 @@ app](#descriptions-that-roll):
 | `speaker` | `{ alias, actorId, tokenId, sceneId }`. The ids are `null` when not spoken by an actor. |
 | `character` | The campaign character's actor id if one spoke it, else `null`. |
 | `title` | The pop-out title, or `null`. |
-| `flavor`, `content` | As stored, in HTML. Content links are not yet rendered: they appear as `@UUID[…]{Label}`. Since module 0.29.0, unless Gamemaster-only information is on, `content` is cleaned of what cards keep from players there, parsed into an inert document and written back: every element's `data-dc` is removed; dnd5e's labels with DCs (`.visible-dc`) are removed where its *Challenge Visibility* doesn't show players the card's DC, as `ask`'s `dc` below; and Midi-QOL's sections of hits and saves (`.midi-qol-hits-display`, `.midi-qol-saves-display`), which the client that ran its workflow, often the Gamemaster's, draws with armor classes and DCs, are emptied. With it on, `content` is as stored. Read results from `dnd5e` below, never from `content`. |
+| `flavor`, `content` | As stored, in HTML. Content links are not yet rendered: they appear as `@UUID[…]{Label}`. Since module 0.29.0, unless Gamemaster-only information is on, `content` is cleaned of what cards keep from players there, parsed into an inert document and written back: every element's `data-dc` is removed; dnd5e's labels with DCs (`.visible-dc`) are removed where its *Challenge Visibility* doesn't show players the card's DC, as `ask`'s `dc` below; and Midi-QOL's sections of hits and saves (`.midi-qol-hits-display`, `.midi-qol-saves-display`), which the client that ran its workflow, often the Gamemaster's, draws with armor classes and DCs, are emptied. Since module 0.30.0, on a Gamemaster's card of Midi-QOL's, what Midi's *GM Attack Roll Display* and *GM Damage Roll Display* keep from players goes too, with its attack and damage buttons: see [A Gamemaster's rolls on Midi-QOL's cards](#a-gamemasters-rolls-on-midi-qols-cards). With it on, `content` is as stored. Read results from `dnd5e` below, never from `content`. |
 | `text` | `content` as plain text, with content links reduced to their labels. dnd5e's cards, such as a roll request or a spell's saving throw, give each button two labels, with its DC and without, and show one; since module 0.17.0, only the one players see is kept, as `ask`'s `dc` below. Before, both were. Since module 0.29.0 it's made from `content` as sent, so without Midi's sections' words either, unless Gamemaster-only information is on. |
 | `ask` | The save, or since module 0.18.0 the check, a roll request card asks the table for, or `null` for any other message: the Gamemaster's, posted from a `/save`, `/concentration`, `/check`, `/skill` or `/tool` enricher's request link, or a player's [asked from the app](#descriptions-that-roll). For a save, `{ type, abilities, dc, label }`: `type` is `"save"`, or `"concentration"` for a concentration check; `abilities` the abilities its buttons offer, as dnd5e's keys, or for a concentration check the one it names, if any. For a check, `{ type: "check", checks, dc, label }`: `checks` the checks its buttons offer, from 1 to 10, each `{ type, ability }` with `type` `"check"` for an ability check, `{ type: "skill", ability, skill }`, or `{ type: "tool", ability, tool, name }`, with the tool's `name` as dnd5e names it, never as the card labels it; each check once, each ability one of the six, its button's or else the skill's or tool's own, and each skill and tool one dnd5e has, a tool or a kind of vehicle; a card that offers none of them, or more than 10, has `null`. For either, `dc` its DC, only where dnd5e's *Challenge Visibility* shows players the card's DC: *Show all*, or *Show only from other players* for a card a player posted; and never for a card that shows it no one, as dnd5e's request for a link whose author hid its DC, or any card that labels its buttons alike with the DC and without; otherwise left out; `label`, for a player's, where the save or check comes from, such as their item, and otherwise left out. dnd5e 6's requests, which are messages of their own kind, have `null`. Module 0.17.0; checks, 0.18.0, before which a check's request card has `null`. |
 | `blind` | Was it a blind roll? |
 | `audience` | Who can read it. See [Visibility](#visibility). |
-| `rolls` | Every roll in the message, as below. |
-| `system` | The subtype's data for any `type` other than `"base"`, else `null`. |
-| `dnd5e` | Under dnd5e, what the system recorded about the message, as below. Otherwise `null`. |
+| `rolls` | Every roll in the message, as below. Since module 0.30.0, on a Gamemaster's card of Midi-QOL's with Gamemaster-only information off, as Midi shows them to players: see [A Gamemaster's rolls on Midi-QOL's cards](#a-gamemasters-rolls-on-midi-qols-cards). |
+| `system` | The subtype's data for any `type` other than `"base"`, else `null`. Since module 0.30.0, unless Gamemaster-only information is on, without what dnd5e keeps from players there, under every dnd5e version: every target's armor class (`targets[].ac`), every button's DC (`buttons[].dataset.dc` on a usage card, and `buttons[].dc` on dnd5e 6's `prompt` messages, its posted roll requests and concentration checks, whose labels each client draws for itself), a button's label with its DC (`buttons[].label.value`, replaced by its `label.hidden` unless that's blank, as dnd5e draws it) where *Challenge Visibility* doesn't show players the card's DC, as `ask`'s `dc` above, and a request's DC and target (`data.dc`, `data.target`). |
+| `dnd5e` | Under dnd5e, what the system recorded about the message, as below: from dnd5e 5's flags, and since module 0.30.0 from dnd5e 6's typed messages (`type` and `system`), which before had `null`. Otherwise `null`. |
 | `gmRoll` | Since module 0.23.0, on a message flagged as made for a roll the campaign's Gamemaster made in the app as a character (`flags["sending-stone"].by` `"gm"`, see [Making a roll](#making-a-roll)), that roll's `id`: the roll it was made for, the use whose card it is, or the death save whose outcome it tells. Left out on any other. The message's author, a player, may change its flags, so it's a claim, which a listener checks against the rolls it handed over as the Gamemaster's. A player can copy a real one onto a message of their own too, so the app takes it only on a message spoken by the character the roll was made as, and only while the roll is being made: the module sends the messages a roll makes before the [`command.result`](#commandresult) that says it was made. Since module 0.25.0 that result lists the messages the roll made, [`messages`](#commandresult), where the hello says `gmRollMessages`, so a listener can take `gmRoll` on those alone, whichever arrives first, and never on a copy a player's browser made. A module that creates chat messages on the Gamemaster's browser for players, as Midi-QOL's `createChatMessage` socket does, could still have a copy listed while the roll is being made. |
 
 A roll:
@@ -839,27 +885,79 @@ The `dnd5e` object:
 
 | Field | Meaning |
 | --- | --- |
-| `messageType` | dnd5e's own classification, such as `"roll"` or `"usage"`. |
-| `roll` | What was rolled, exactly as dnd5e records it. `type` is one of `"skill"` (with `skillId`), `"tool"` (with `toolId`), `"ability"` or `"save"` (with `ability`), `"attack"`, `"damage"`, `"death"`, `"hitDie"`, `"concentration"` or `"generic"`. `null` if not a roll. |
+| `messageType` | dnd5e's own classification, such as `"roll"` or `"usage"`; under dnd5e 6, the message's `type`, such as `"attack"` or `"save"`. |
+| `roll` | What was rolled, exactly as dnd5e records it. `type` is one of `"skill"` (with `skillId`), `"tool"` (with `toolId`), `"ability"` or `"save"` (with `ability`), `"attack"`, `"damage"`, `"death"`, `"hitDie"`, `"concentration"` or `"generic"`. `null` if not a roll. Under dnd5e 6, since module 0.30.0, made from the message's `type` and `system` as dnd5e 5 names it: `"attack"`, `"damage"`, `"healing"` and `"hitDie"` as they are; a save `"save"`, a concentration save's among them, and a death save `"death"`; a check `"skill"`, `"tool"` or `"ability"`, by its `system.skill` and `system.tool`, never initiative; each with `ability`, `skillId` and `toolId` where `system` has them; `null` for any other. |
 | `item`, `activity` | The item and activity used, or `null`. |
-| `targets` | What was targeted when the item was used, each `{ name, uuid }`, `uuid` the target's actor's. `ac` is added only when Gamemaster-only information is on. Since module 0.29.0 each may have `outcome` and `save`, as below. |
-| `originatingMessage` | For a roll made from an item's chat card, the id of that card's message. |
-| `save` | Since module 0.29.0, on a saving throw rolled from a save activity's card of dnd5e's: `{ target, outcome, readers }`, as below. Left out on any other message. |
+| `targets` | What was targeted when the item was used, each `{ name, uuid }`, `uuid` the target's actor's; under dnd5e 6 from `system.targets`, `uuid` their `actor`. `ac` is added only when Gamemaster-only information is on. Since module 0.29.0 each may have `outcome` and `save`, as below. |
+| `originatingMessage` | For a roll made from an item's chat card, the id of that card's message; under dnd5e 6, `system.origin`'s, else dnd5e's flag. |
+| `save` | Since module 0.29.0, on a saving throw rolled from a save activity's card of dnd5e's, and since 0.30.0 on any saving throw but a death save, from any origin (`roll.type` `"save"` or `"concentration"`): `{ target, outcome, readers }`, as below. Left out on any other message. |
+| `check` | Since module 0.30.0, on an ability, skill or tool check, from any origin (`roll.type` `"ability"`, `"skill"` or `"tool"`): `{ target, outcome, readers }`, as `save`. Left out on any other message. |
 
-**Hits, misses and saves** (module 0.29.0). What Foundry decided of a message's targets is told
-only once it's decided, and only where Foundry shows players it: unless Gamemaster-only information
-is on, when everything decided is told, as `ac` is, and `readers` never is. The settings are read as
-the message is sent, each that can't be read counting as hiding it; one changed later sends no
-message again. A message Midi-QOL shows players as "??" (`flags["midi-qol"].obscureRoll`) tells
-none, unless Gamemaster-only information is on. Each field is left out where it isn't told.
+**Hits, misses, saves and checks** (module 0.29.0; checks, and every rule as Foundry draws it for a
+player, from dnd5e 5.3.3's, dnd5e 6.0.5's and Midi-QOL v14's own code, since 0.30.0). What Foundry
+decided of a message's targets is told only once it's decided, and only where Foundry shows players
+it: unless Gamemaster-only information is on, when everything decided is told, as `ac` is, and
+`readers` never is. The settings are read as the message is sent, each that can't be read counting
+as hiding it; one changed later sends no message again. A message Midi-QOL shows players as "??"
+(`flags["midi-qol"].obscureRoll`) tells none, unless Gamemaster-only information is on. Each field
+is left out where it isn't told. Midi-QOL's settings are named by their own labels.
 
 | Field | Meaning |
 | --- | --- |
-| `targets[].outcome` | `"hit"` or `"miss"`. On dnd5e's attack (`roll.type` `"attack"`, its first roll a `D20Roll`), judged for each target as the app's own attacks are (`attack.outcome` in a command's result): a critical hit hits, a fumble or a total under the target's `ac` misses, and one under total cover (`ac` `null`) misses. dnd5e's card differs there alone: it draws a target under total cover as hit, of armor class ∞, unless the attack is a fumble, as it compares the total with `null`. Told while dnd5e's *Attack Result Visibility* is "Show only results" or "Show results & target ACs" (its `attackRollVisibility` setting, `hideAC` or `all`), never under "Hide all" (`none`); nothing for a target with no `ac` at all. On Midi-QOL's card (one whose `flags["midi-qol"].messageType` is a string), from the tokens Midi records as hit (`hitTargetUuids`, `hitECTargetUuids`) and as aimed at (its `targets`), each taken for its actor, as `uuid` names targets: only once Midi has checked hits, its *Auto Check Hits* not "none" and the card marked so (`GMOnlyAttackRoll` `false`, which Midi writes `true` before it checks), on a card with an attack roll (so not a use whose every target Midi lists as hit); told where *Auto Check Hits* is "all" and the card is whispered to no one and not blind. Nothing for a target whose token can't be found, as one deleted since, nor for an actor two of whose tokens came out differently. |
-| `targets[].save` | `"success"` or `"failure"`, on Midi-QOL's card only, from the tokens Midi records as saved (`saveUuids`) and as failed (`failedSaveUuids`), each taken for its actor, never from `saved`: only once Midi has checked saves, its *Auto Check Saves* not "none", and shown them, some target marked `saved` `true` or `false` (Midi lists every target as failed before anyone rolls); told where Midi shows players whether they saved, the card's activity's *Save Display* where it isn't "default", else *Auto Check Saves*, being "all", "allNoRoll" or "allShow", where dnd5e's *Challenge Visibility* is "Show all", or "Show only from other players" for a card whose speaker a player owns, on a card whispered to no one and not blind; and for a target no player owns, only under "Show all", as Midi keeps an NPC's save from players otherwise. Nothing for a target Midi decided nothing of. |
-| `save.target` | The `uuid` of the actor who saved, as the card's `targets` name it: the message's speaker's. Sent whenever that resolves, on a save whose `originatingMessage` is a save activity's card still in the chat log, never Midi-QOL's card, which tells its own in `targets`, nor dnd5e's concentration card or a request in chat. |
-| `save.outcome` | `"success"` or `"failure"`, as dnd5e highlights it: its first roll a `D20Roll` against a DC (`options.target`), whose first die is one d20 dnd5e counts no otherwise (no success counting or margins); a legendary resistance's forced success (`roll.forceSuccess`) a success. Told as the card's *Challenge Visibility* shows it: under "Show all", or "Show only from other players" for a card a player posted, to everyone; otherwise, for a card a player posted, to its author's characters alone, with `readers`, and not at all where they have none; otherwise not at all. |
+| `targets[].outcome` | `"hit"` or `"miss"`. On dnd5e's attack (`roll.type` `"attack"`, its first roll a `D20Roll`), as its card judges each target: a critical hit hits, a fumble or a total under the target's `ac` misses, and since module 0.30.0 a target under total cover (`ac` `null`) is drawn as dnd5e's version draws it: a hit under dnd5e 5 unless the attack is a fumble, a miss under dnd5e 6. Before, it was a miss under both, as the app's own attacks are still judged (`attack.outcome` in a command's result). Told while dnd5e's *Attack Result Visibility* is "Show only results" or "Show results & target ACs" (its `attackRollVisibility` setting, `hideAC` or `all`), never under "Hide all" (`none`); nothing for a target with no `ac` at all. **With Midi-QOL active**, which draws no tray of targets on any message, since module 0.30.0 only for an attack at one target, by dnd5e's own highlight of the total: where the d20 has the target's armor class (its `options.target`, which dnd5e gives an attack at a single target) and is one d20 dnd5e judges, unmodified, and while Midi's *Color code Hit/Miss/Save Display* is on and *Only highlight critical/fumble hits* off; never under total cover, which gives the d20 no target. **On Midi-QOL's card** (one whose `flags["midi-qol"].messageType` is a string), only once Midi has checked (`GMOnlyAttackRoll` `false`, which Midi writes `true` before it checks), on a card with an attack roll (so not a use whose every target Midi lists as hit), by the three ways Midi shows players hits, in this order. Its hits section: under *Auto check if attack hits target* "Check - all see result" (`all`) with *Attack Result Visibility* showing results (since 0.30.0: before, whatever it was), from the tokens Midi records as hit (`hitTargetUuids`, `hitECTargetUuids`) and as aimed at (its `targets`), each taken for its actor; nothing for a target that would be a miss on a critical card (`isCritical`), as Midi draws every row of a critical hit. Since 0.30.0, the Gamemaster's words in place of the total: on a Gamemaster's card at one target, under *GM Attack Roll Display* "Hit/Miss Only" or "Hit/Miss/Critical/Fumble" (`hitMiss`, `hitMissCrit`) and *Auto check if attack hits target* "None" or "all", the word Midi writes, from `isHit`, under the second `isCritical`, then `isFumble`, first; under "None" only where the d20 has a target. And since 0.30.0 the success or failure Midi marks on the total of a card at one target whose d20 has a target, as its icons read it: under *Auto check if attack hits target* "None" or "all", *Attack Result Visibility* showing results, *Color code Hit/Miss/Save Display* on and *Only highlight critical/fumble hits* off, of one d20 Midi judges, never on a Gamemaster's card under *GM Attack Roll Display* "Hidden". Told to every reader of the card, whatever its whispers, as Midi draws it (before 0.30.0, only on a card whispered to no one). Nothing for a target whose token can't be found, as one deleted since, nor for an actor two of whose tokens came out differently. With Gamemaster-only information on, everything Midi checked; where it checked nothing ("None"), the total's outcome for a card at one target whose d20 has one. |
+| `targets[].save` | `"success"` or `"failure"`, on Midi-QOL's card only, from the tokens Midi records as saved (`saveUuids`) and as failed (`failedSaveUuids`), each taken for its actor, never from `saved`: only once Midi has checked saves, its *Auto check Saves* not "Off" (`none`), and shown them, some target marked `saved` `true` or `false` (Midi lists every target as failed before anyone rolls). Since module 0.30.0, told for each target as Midi draws it, by the target alone: under *Auto check Saves* "Save - All see result only", "Save - All see result + save total" or "Save - All see Result + Rolls" (`allNoRoll`, `all`, `allShow`), for a target a player owns where dnd5e's *Challenge Visibility* is "Show all" or "Show only from other players", and for any other only under "Show all". The card's speaker, its DC, its whispers and its activity's own *Save Display* play no part, as they did before 0.30.0. Nothing for a target Midi decided nothing of. |
+| `save.target` | The `uuid` of the actor who saved, as cards' `targets` name it: the message's speaker's. Sent whenever that resolves, on a save of any origin since module 0.30.0: a save activity's card, Midi-QOL's card, a request in chat, dnd5e's concentration card, a link in a description, or none. Before, on a save activity's card still in the chat log alone. |
+| `save.outcome` | `"success"` or `"failure"`, as dnd5e highlights it: its first roll a `D20Roll` against a DC (`options.target`), whose first die is one d20 dnd5e counts no otherwise (no success counting or margins); a legendary resistance's forced success (dnd5e 5's `roll.forceSuccess`, dnd5e 6's `resisted`) a success. A link whose author hid its DC is rolled against it anyway, so its roller sees it, but the DC itself is never sent. With Midi-QOL active, since module 0.30.0 only while its *Color code Hit/Miss/Save Display* is on and *Only highlight critical/fumble hits* off, as Midi strips dnd5e's highlight from every roll otherwise. Told as dnd5e's *Challenge Visibility* shows it for the card it was rolled from, its `originatingMessage` still in the chat log, Midi-QOL's among them, or else for the roll itself, whose author is its roller: under "Show all", or "Show only from other players" for a card a player posted, to everyone; otherwise, for a card a player posted, to its author's characters alone, with `readers`, and not at all where they have none; otherwise not at all. |
 | `save.readers` | The ids of the campaign's characters whose players alone may see `outcome`: those the card's author owns. Absent where everyone who can read the message may. |
+| `check.target`, `check.outcome`, `check.readers` | Since module 0.30.0, as `save`'s, for an ability, skill or tool check: from a check activity's card, a request in chat, a link in a description, or none. |
+
+#### A Gamemaster's rolls on Midi-QOL's cards
+
+Since module 0.30.0, with Gamemaster-only information off, a Gamemaster's card of Midi-QOL's (its
+author a Gamemaster, `flags["midi-qol"].messageType` a string) has its `rolls` and `content` trimmed
+as Midi's *GM Attack Roll Display* and *GM Damage Roll Display* show it to players, and never more
+than those settings' own words say they show. Nothing changes where both are "Full Roll", on a
+player's card, on any other message, or with Gamemaster-only information on. Where Midi's settings
+can't be read, both count as "Hidden". A roll keeps every key and its type: what's gone is an empty
+`formula` (`""`), no `dice` (`[]`), or no `total` (`null`), which a listener shows as "–".
+
+The attack roll (`attack` `true`), by *GM Attack Roll Display*. "If marked" means the roll's own
+`critical` and `fumble` are kept only where Midi marks the total for players, under *Auto check if
+attack hits target* "None" or "all", *Attack Result Visibility* showing results and *Color code
+Hit/Miss/Save Display* on; otherwise they're `false`. Outside "Hit/Miss Only" and "Hidden",
+`critical` is also `true` where Midi's hits section is shown (as under `targets[].outcome`) and the
+card, which lists a target, is a critical (`isCritical`), as its rows' ✓✓ show it. `advantage` and
+`disadvantage` are kept, as Midi's label says them, except under Midi's fake dice (`addFakeDice`),
+whose label always reads "Attack": then both are `false` under every value but "Full Roll".
+
+| *GM Attack Roll Display* | `formula` | `dice` | `total` | `critical`, `fumble` |
+| --- | --- | --- | --- | --- |
+| "Full Roll" (`full`) | as rolled | as rolled | as rolled | as rolled |
+| "Hide Formula" (`hideFormula`) | `""` | `[]` | as rolled | if marked |
+| "D20 Only" (`d20Only`) | `""` | exactly `[{ "expression": "d20", "faces": 20, "number": 1, "results": [{ "result": N, "active": true }] }]`, `N` the one number Midi shows, the first term's total: never the die's own expression, how many were rolled, or any other result | `null` | if marked |
+| "Attack Total Only" (`attackTotal`) | `""` | `[]` | as rolled | if marked |
+| "Hit/Miss Only" (`hitMiss`) | `""` | `[]` | `null` | both `false` |
+| "Hit/Miss/Critical/Fumble" (`hitMissCrit`) | `""` | `[]` | `null` | `critical` where the card's `isCritical` is `true`, or marked and rolled; `fumble` otherwise where its `isFumble` is, or marked and rolled |
+| "Hidden" (`hidden`) | `""` | `[]` | `null` | both `false` |
+
+Damage rolls (`damage` `true`), by *GM Damage Roll Display*: under "Full Roll" as rolled; under
+"Damage Total Only" (`totalOnly`) with `formula` `""` and `dice` `[]`; under "Hidden" with `total`
+`null` too. Unless Midi shows each roll apart (*mergeCardMultiDamage*), under those two each
+`section`'s damage rolls arrive folded into one, as Midi draws one total per section, in its first
+roll's place: of its `class`, `damage` and `section`; its `total` the section's, each part by
+damage type counted as at least 0 as Midi adds them (`null` under "Hidden"); `damageType` and
+`damageLabel` only where every roll of the section has the one type; and `flavor` the rolls'
+bonus names joined with ", ", to 100 characters. Where Midi does show each apart, each roll's total
+is as Midi draws it alone, a part below zero counted as 0. On every trimmed card, a damage roll's
+`critical` is `true` only where the trimmed attack roll's is, as Midi marks no critical on damage.
+
+In `content`, unless *GM Attack Roll Display* is "Full Roll", every `.dice-roll` in
+`.midi-qol-attack-roll` and every `.midi-attribution-info` is removed; unless *GM Damage Roll
+Display* is, every `.dice-roll` in `.midi-qol-damage-roll`, `.midi-qol-other-damage-roll` and
+`.midi-qol-bonus-damage-roll`; and always the attack and damage buttons (`.midi-qol-attack-buttons`,
+`.midi-qol-damage-buttons`, `.midi-qol-otherDamage-button`), which Midi hides from players who
+didn't write the card, and whose damage button reads "Critical" on a critical. `text` is made from
+it. What players see of the rolls is in `rolls`, never in `content`.
 
 ### Combat
 
@@ -941,6 +1039,8 @@ Dice is switched on or off while a campaign allows its players to enter their di
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
 | `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls, gmRollMessages, manualDice, midiPrompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; since module 0.29.0 `"endConcentration"` wherever players' rolls are made, and `"spend"` and `"inspiration"` wherever the Gamemaster lets them attack and cast, whether or not the game can make their attacks now, as while the attack self-test fails or **Run players' attacks through Midi** is off; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). And since module 0.25.0 `gmRollMessages`, `true` wherever `gmRolls` is: such a roll's [`command.result`](#commandresult) lists the chat messages it made, `messages`. And since module 0.26.0 `manualDice`, whether the campaign's players may enter what their own dice show in the app: `true` only while players' rolls are made (`enabled`), the Gamemaster allows it and [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) is on, else `false`. Nothing is entered yet: a listener may show that it's coming. And since module 0.27.0 `midiPrompts`: `true` where `prompts` is and this Midi-QOL has what [asking its own saves](#midi-qols-own-saves) needs, else `false`; a listener needs nothing from it, as Midi prompts are sent only to one that says it reads them. See [Rolls from the app](#rolls-from-the-app). |
 | `characters` | Every [character](#character) in the campaign: since module 0.22.0 without its `sheet`, which follows in `character.updated`; since module 0.26.0 each with `manualDice`, whether its player enters its dice results in the app, always `false` for now. |
+| `groups` | Since module 0.30.0, the campaign's [groups](#group), its parties, in the order the Gamemaster listed them, each without its sheet: `[]` where it has none, and under any system but D&D Fifth Edition. Actors that no longer exist, or aren't of dnd5e's Group type, are left out. Each group's sheet follows in [`group.updated`](#groupupdated) to a listener that reads groups. |
+| `settings` | Since module 0.30.0, [what Foundry says of itself](#bridgesettings) for the campaign's Gamemaster: the modules Sending Stone works with and their versions, the campaign's switches and every campaign's, the dnd5e and Midi-QOL settings that decide what players see in chat, and what players see. |
 | `sheetsApart` | `true` since module 0.22.0: the characters carry no sheets, and each follows once the hello is answered. Absent before, when each carried its sheet. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 | `prompts` | Every [prompt](#prompts) open for the campaign's players, read afresh from the chat log, and since module 0.27.0 every [Midi prompt](#midi-qols-own-saves) waiting on them: any the campaign was told of that isn't among them has closed. Empty while its players aren't asked for their saves. |
@@ -948,9 +1048,11 @@ Dice is switched on or off while a campaign allows its players to enter their di
 Since module 0.22.0 nothing comes before it, and once it's answered `2xx`, each character follows
 in the order listed, each in a [`character.updated`](#characterupdated) of its own after the
 [`character.texts`](#charactertexts) with the descriptions its sheet refers to that haven't gone
-since the hello. A hello refused is followed by nothing: ask for another, as ever. Before 0.22.0 a
-hello came after the `character.texts` with every description its characters' sheets refer to,
-and carried their sheets itself.
+since the hello. Since module 0.30.0, to a listener that reads groups, each of the campaign's groups
+follows its characters in a [`group.updated`](#groupupdated) of its own, in the order listed. A
+hello refused is followed by nothing: ask for another, as ever. Before 0.22.0 a hello came after the
+`character.texts` with every description its characters' sheets refer to, and carried their sheets
+itself.
 
 ### `character.updated`
 
@@ -992,6 +1094,72 @@ dropped on its next hello: since 0.22.0, those none of the sheets you keep refer
 `character.texts` is not part of the event stream, so its `sequence` is `null`. Since module
 0.22.0 it comes after its session's `bridge.hello`; from a module before, it may arrive before it:
 store it, and don't ask for a resend.
+
+### `group.updated`
+
+Since module 0.30.0, `{ group }`: one of the campaign's [groups](#group), sheet included, as it now
+stands, to a listener whose latest answer to the campaign's hello or heartbeat said `"groups": 1`.
+Part of the event stream. Sent after every answered hello, after its characters; to every group when
+the listener starts to read groups in a heartbeat's answer, and when what it takes of sheets
+changes; and when a group may have changed: the group itself or its items, as an item made, changed,
+deleted or moved into a container; a member renamed or given a new portrait, or deleted; a campaign
+character's ownership, or its deletion, which changes who may see every group of its campaign; and
+the world's primary party. Nothing is sent where the group is as the campaign was last told, so a
+member's hit points changing sends nothing. A burst of changes is sent once it settles, and a change
+while a hello is on its way goes after it. Any description its sheet refers to that the campaign
+hasn't had since its hello comes first, in `character.texts`. Answer it with your `features`, as you
+answer a `character.updated`.
+
+### `group.removed`
+
+Since module 0.30.0, `{ id }`: one of the campaign's groups was deleted. Part of the event stream,
+and sent only to a listener that reads groups. One deleted while the campaign's hello is on its way,
+which was built as it was queued and so lists it, is removed once that hello is answered, after it,
+where the answer says the listener reads groups. A group the Gamemaster takes out of the campaign
+sends a fresh `bridge.hello` instead, which no longer lists it: drop any group a hello doesn't list.
+You may be told of the removal of one you don't have: ignore it.
+
+### `bridge.settings`
+
+Since module 0.30.0, `{ settings }`: what Foundry says of itself for the campaign, for its
+Gamemaster, as in the hello's `settings`. Part of the event stream, sent only to a listener whose
+latest answer to the campaign's hello or heartbeat said `"settings": 1`: once when it starts to say
+so in a heartbeat's answer, and after a change to one of the settings it says that tells nothing
+else afresh, dnd5e's *Attack Result Visibility* and *Challenge Visibility*, Midi-QOL's settings,
+its *GM Sees all whispered messages* and *Replace dnd5e activities with midi-qol equivalents*, and
+**Allow targets off your screen**, or to the name of a group the campaign lists, or its deletion,
+since its groups are among what it says, once a burst of changes settles, and only where what it
+says differs from what the campaign was last told. A change while the campaign's hello is on its
+way, which says them as they were when it was queued, follows that hello once it's answered. Every
+other setting it says sends a hello. A listener need not count it as a change players see.
+
+`settings` is format 1, an allowlist, never a whole settings object: it never holds a secret, the
+app's address or any token, nor the Gamemaster's user, nor a free-text error.
+
+```json
+{
+  "format": 1,
+  "modules": [{ "id": "midi-qol", "title": "Midi QOL", "version": "14.1.2", "active": true }],
+  "sections": [
+    { "id": "campaign", "title": "This campaign", "rows": [
+      { "id": "rolls", "label": "Players roll in the app", "value": true, "text": "On", "note": "Foundry, or a module, rolls dice differently than expected. The browser console says why." }
+    ] },
+    { "id": "dnd5e", "title": "D&D Fifth Edition", "rows": [
+      { "id": "challengeVisibility", "label": "Challenge Visibility", "value": "player", "text": "Show only from other players" }
+    ] }
+  ],
+  "results": [
+    { "id": "saves", "state": "partial", "text": "Saves: shown on players' cards and rolls, hidden otherwise (Challenge Visibility: Show only from other players)" }
+  ]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `format` | `1`. |
+| `modules` | The modules Sending Stone works with that are installed, in this order: `midi-qol`, `lib-wrapper`, `manual-dice`, `combat-focus`; each `{ id, title, version, active }`, `version` `null` where it has none. Sending Stone's own is the hello's `module`. |
+| `sections` | In this order: `campaign`, "This campaign", always, with `rolls`, `attacks`, `prompts`, `manualDice` and `groups`; `sending-stone`, "Sending Stone, for every campaign", always, with `chatEvents`, `chatScope`, `combatEvents`, `gmContent`, and while Midi-QOL is active `midiIntegration` and `offCanvasTargets`; `dnd5e`, titled as the system is, under D&D Fifth Edition, with `attackRollVisibility` and `challengeVisibility`, and under dnd5e 6 `chatCardSummary`, as the Gamemaster's browser has it; and `midi-qol`, "Midi-QOL", while it's active, with `autoCheckHit`, `autoCheckSaves`, `gmAttackDisplay`, `gmDamageDisplay`, `highlightSuccess`, `highLightCriticalAttackOnly`, `playerRollSaves`, `rollNPCSaves`, `rollNPCLinkedSaves`, `rollSavesBlind`, `rollChecksBlind`, `rollSkillsBlind`, `blindRollDisplay`, `showGM`, `ReplaceDefaultActivities`, and as the Gamemaster's browser has them `ForceHideRoll` and `EnableWorkflow`. Each row is `{ id, label, value, text, note? }`: `label` in the Gamemaster's Foundry language, dnd5e's and Midi-QOL's in their own words; `value` as stored, a boolean, a string up to 100 characters, a number (a list of ids is how many it names, `"all"` as it is) or `null`; `text` the value in words, "—" where there's none; and `note`, where a switch that's on can't do what it says in this game, why. |
+| `results` | What players see in chat, by the same rules as each message is told by: up to six lines, `{ id, state, text }`, `state` `"shown"`, `"partial"` or `"hidden"`. `id` is one of `hits` (dnd5e's own attacks), `midiHits`, `saves`, `checks`, `midiSaves` and `gmRolls` (a Gamemaster's rolls on Midi-QOL's cards), the Midi ones while it's active; or alone, `chat`, with chat messages off, or `system`, under another system. Read `id` as any string. |
 
 ### `bridge.heartbeat`
 
@@ -1426,6 +1594,45 @@ A prompt:
   DCs players don't see, and with Midi's sections of hits and saves emptied, and `text` with it. Each
   is an addition a listener before 0.29.0 ignores, or drops, as an unknown kind; a listener that
   offers the new kinds only where the hello lists them needs nothing more for an older module.
+- Module 0.30.0 adds a campaign's [party sheets](#group) and its [Foundry settings](#bridgesettings),
+  and tells chat results only as Foundry shows them to players. A listener may say, in the
+  `features` of its answers to a hello or heartbeat, `"groups": 1`, that it reads the hello's
+  `groups`, [`group.updated`](#groupupdated) and [`group.removed`](#groupremoved), and
+  `"settings": 1`, that it reads [`bridge.settings`](#bridgesettings); each is read as an integer of
+  1 or more, and without it neither event is sent. `group.updated` is among the answers whose terms
+  the module follows, and the `sendingStone.listenerFeatures` hook is called with the envelope's
+  type as its third argument, and `sendingStone.helloDelivered` with the hello's envelope as its
+  second. Every hello has `groups`, the campaign's groups the Gamemaster listed on its new Party
+  tab, each with its `access` for the campaign's characters, `[]` for none or outside dnd5e, and
+  `settings`, the campaign's Foundry settings in format 1 with `results`, what players see of chat
+  results. A `group.updated` follows every answered hello after its
+  `character.updated`s, and any change to a group, its members' names and portraits, its items, its
+  primary party or its characters' ownership; it carries the group's sheet (`members`,
+  `description`, `inventory`), or `sheet` `null` with `sheetWithheld` `{ reason: "private" }` or
+  `"tooLarge"`. A listed group deleted is `group.removed`, after the hello if one is on its way;
+  one unlisted sends the hello again. A `bridge.settings` follows a change to a watched setting or
+  to a listed group's name, and an answered hello whose settings changed while it was on its way,
+  only when what the campaign was last told differs. A chat message's [`dnd5e`](#chat-message) has
+  `save` on a saving throw from any origin, and a new `check`, of the same shape, on an ability,
+  skill or tool check; `targets[].outcome` is drawn as dnd5e's version draws a target under total
+  cover, under Midi-QOL is told on dnd5e's attacks only for one target, by its total's highlight,
+  and on Midi-QOL's cards also needs
+  **Attack Result Visibility** to show results, may be told for one target by Midi-QOL's highlight
+  or its Gamemaster's hit or miss words, and is told to every reader of the card whatever its
+  whispers; `targets[].save` is told per target, by its player owner, whoever spoke the card; and
+  with Midi-QOL active, `save` and `check` keep their `outcome` only while Midi keeps dnd5e's
+  highlight. Under dnd5e 6, `dnd5e` is built from the message's type and `system`, rather than
+  `null`. With Gamemaster-only information off, `system` goes without targets' `ac`, buttons' DCs,
+  in their `dataset` or on dnd5e 6's prompt buttons themselves, labels with DCs players don't see
+  and a request's `dc` and `target`, under every version; and the
+  [Gamemaster's rolls on Midi-QOL's cards](#a-gamemasters-rolls-on-midi-qols-cards) are trimmed in
+  `rolls` as Midi-QOL's **GM Attack Roll Display** and **GM Damage Roll Display** show them, a
+  section's damage folded into one under `totalOnly` and `hidden` without `mergeCardMultiDamage`,
+  and their `content` and `text` without those sections' dice rolls, its attribution icon and its
+  attack and damage buttons. A trimmed roll keeps every key, with `formula` `""`, `dice` `[]` or one
+  d20, or `total` `null`. A listener before 0.30.0 ignores all of them: it never says `groups` or
+  `settings`, so is sent neither event, ignores the hello's new fields and `check`, and reads a
+  trimmed roll as one with nothing shown.
 
 ## Changes from protocol 1
 

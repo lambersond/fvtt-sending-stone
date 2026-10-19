@@ -5,6 +5,34 @@
         "Name": "Sending Stone",
         "Label": "Open Settings",
         "Hint": "The app's address, what's sent, and each campaign's players and options."
+      },
+      "Campaign": "This campaign",
+      "World": "Sending Stone, for every campaign",
+      "MidiTitle": "Midi-QOL",
+      "On": "On",
+      "Off": "Off",
+      "None": "None",
+      "All": "All",
+      "Groups": "Party sheets",
+      "ThisBrowser": "{label} (this browser)",
+      "Midi": {
+        "autoCheckHit": "Auto check if attack hits target",
+        "autoCheckSaves": "Auto check Saves",
+        "gmAttackDisplay": "GM Attack Roll Display",
+        "gmDamageDisplay": "GM Damage Roll Display",
+        "highlightSuccess": "Color code Hit/Miss/Save Display",
+        "highLightCriticalAttackOnly": "Only highlight critical/fumble hits",
+        "playerRollSaves": "Prompt Players to Roll Saves",
+        "rollNPCSaves": "Prompt GM to Roll Saves (Unlinked)",
+        "rollNPCLinkedSaves": "Prompt GM to Roll Saves (Linked)",
+        "rollSavesBlind": "Which ability saves are rolled blind",
+        "rollChecksBlind": "Which ability checks are rolled blind",
+        "rollSkillsBlind": "Which skill checks are rolled blind",
+        "blindRollDisplay": "Blind roll display",
+        "showGM": "GM Sees all whispered messages",
+        "ForceHideRoll": "Really Hide private/blind/self-rolls",
+        "EnableWorkflow": "Enable roll automation support",
+        "ReplaceDefaultActivities": "Replace dnd5e activities with midi-qol equivalents"
       }
     },
     "Config": {
@@ -68,6 +96,7 @@
       "Tabs": {
         "Label": "Campaign sections",
         "Players": "Players",
+        "Party": "Party",
         "Actions": "Player actions",
         "Connection": "Connection"
       },
@@ -83,6 +112,20 @@
         "Copy": "Copy",
         "ManualDice": "Enter {name}'s dice results manually",
         "Soon": "Coming soon"
+      },
+      "Party": {
+        "Add": "Add groups",
+        "Empty": "No groups yet",
+        "EmptyHint": "Add the party's Group actor so its players can see its sheet in the app.",
+        "Primary": "Primary party",
+        "Member": "1 member",
+        "Members": "{count} members",
+        "SeenBy": "Seen by {characters}",
+        "NoOne": "No player in this campaign can see this group in Foundry. Give them Observer or Owner on it.",
+        "Remove": "Remove {name}",
+        "PickerTitle": "Add a group to {campaign}",
+        "PickerEmpty": "Every group is already in this campaign.",
+        "NoGroups": "This world has no Group actors yet. Create one in the Actors directory."
       },
       "Picker": {
         "Title": "Add to {campaign}",
@@ -278,6 +321,31 @@
       "Spends": "Spends {count} · {name}",
       "InspirationUsed": "Uses Heroic Inspiration",
       "InspirationGained": "Gains Heroic Inspiration"
+    },
+    "Results": {
+      "Lead": "What players see in chat:",
+      "Hits": "Hit and miss",
+      "HitsDnd5e": "Hit and miss on dnd5e's cards",
+      "HitsMidi": "Hit and miss on Midi-QOL's cards",
+      "Saves": "Saves",
+      "SavesMidi": "Saves on Midi-QOL's cards",
+      "Checks": "Checks",
+      "GmRolls": "The Gamemaster's rolls on Midi-QOL's cards",
+      "Shown": "{what}: shown ({why})",
+      "Hidden": "{what}: hidden ({why})",
+      "Partial": "{what}: shown {where}, hidden otherwise ({why})",
+      "Where": {
+        "PlayersOnly": "on players' cards and rolls",
+        "OwnOnly": "only to the player whose card or roll it is",
+        "PlayerTargets": "for players' characters",
+        "OneTarget": "for an attack at one target",
+        "GmOneTarget": "on the Gamemaster's attacks at one target",
+        "GmTrimmed": "as GM Attack Roll Display and GM Damage Roll Display allow"
+      },
+      "Why": "{setting}: {value}",
+      "GmContent": "GM-only details: On",
+      "ChatOff": "Chat: not sent (Chat messages: Off)",
+      "System": "Hit and miss, saves and checks: not sent (they need D&D Fifth Edition)"
     }
   }
 }

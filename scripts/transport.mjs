@@ -73,10 +73,10 @@ const ANNOUNCING = new Set([EVENTS.HELLO, EVENTS.HEARTBEAT]);
 /**
  * The events whose answers say what the listener takes of sheets: since 0.22.0, a character's
  * update's too, so that an app rolled back to one that doesn't expand slim sheets is noticed at
- * the next sheet it's sent.
+ * the next sheet it's sent; and since 0.30.0 a group's.
  * @type {Set<string>}
  */
-const TERMS_FROM = new Set([EVENTS.HELLO, EVENTS.HEARTBEAT, EVENTS.CHARACTER_UPDATED]);
+const TERMS_FROM = new Set([EVENTS.HELLO, EVENTS.HEARTBEAT, EVENTS.CHARACTER_UPDATED, EVENTS.GROUP_UPDATED]);
 
 /**
  * What the listener takes of each campaign's sheets, from its latest answer that says, by
@@ -560,11 +560,15 @@ function answered(envelope, answer) {
   }
   if ( answer.resend === "hello" ) Hooks.callAll(HELLO_WANTED_HOOK, campaignId);
   // A listener that says nothing of what more it does, as one before Sending Stone's commands,
-  // does nothing more.
-  if ( ANNOUNCING.has(envelope.type) ) Hooks.callAll(LISTENER_FEATURES_HOOK, campaignId, answer.features);
+  // does nothing more. Since 0.30.0 it's told which event was answered, as what's sent when a
+  // feature turns on differs after a hello and a heartbeat.
+  if ( ANNOUNCING.has(envelope.type) ) {
+    Hooks.callAll(LISTENER_FEATURES_HOOK, campaignId, answer.features, envelope.type);
+  }
   // The sheets follow the hello they belong to, sent as the listener now takes them; a hello's
-  // sheets are sent as it takes them anyway.
-  if ( envelope.type === EVENTS.HELLO ) Hooks.callAll(HELLO_DELIVERED_HOOK, campaignId);
+  // sheets are sent as it takes them anyway. Since 0.30.0 it's told the hello, which says what the
+  // campaign was as it was queued.
+  if ( envelope.type === EVENTS.HELLO ) Hooks.callAll(HELLO_DELIVERED_HOOK, campaignId, envelope);
   else if ( termsChanged ) Hooks.callAll(SHEET_TERMS_HOOK, campaignId);
 }
 

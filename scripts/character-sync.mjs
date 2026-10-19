@@ -3,9 +3,11 @@ import { canSend, resendHello } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, rosterEntry, summarizeCharacter } from "./characters.mjs";
 import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
+import { campaignGroups, groupEntry, groupReader, groupsListing } from "./groups.mjs";
+import { groupSheet } from "./sheet-group.mjs";
 import { slimSheet } from "./sheet-slim.mjs";
 import { forgetSent, sendTexts, SheetTexts, takeUnsent } from "./sheet-texts.mjs";
-import { buildEnvelope, helloPending, inMegabytes, post, termsOf } from "./transport.mjs";
+import { buildEnvelope, helloPending, inMegabytes, post, send, termsOf } from "./transport.mjs";
 
 /**
  * Keeping each campaign's copy of its characters current. Since 0.22.0 a bridge.hello lists a
@@ -26,6 +28,11 @@ import { buildEnvelope, helloPending, inMegabytes, post, termsOf } from "./trans
  * makes it, where it expands them, and never in a post larger than it takes. A sheet too large is
  * withheld, the listener and the Gamemaster told so, rather than cut short. And a sheet, or the
  * hello it follows, lost to failures that might not last is sent again a while later.
+ *
+ * Since 0.30.0 a campaign's groups, its parties, are kept current the same way, in `group.updated`,
+ * to an app that says it reads them (groups.mjs): when the group or its items change, when one of
+ * its members is renamed or given a new portrait, and when who may see it does, as when a campaign
+ * character's ownership changes; and `group.removed` when one is deleted.
  */
 
 /**
@@ -64,6 +71,13 @@ const built = new Map();
 const settling = new Map();
 
 /**
+ * The actors settling whose ownership changed, which changes who may see every group of their
+ * campaigns.
+ * @type {Set<string>}
+ */
+const ownershipChanged = new Set();
+
+/**
  * The hellos and characters lost to failures that might not last, to be sent again, by
  * `hello:${campaignId}` or `${campaignId}.${actorId}`, with when they were lost.
  * @type {Map<string, {campaignId: string, actorId: string|null, at: number}>}
@@ -93,7 +107,8 @@ const CRITICAL_SETTINGS = new Set([
  * @returns {void}
  */
 export function registerCharacterHooks() {
-  Hooks.on("updateActor", actor => characterChanged(actor));
+  Hooks.on("updateActor", (actor, changes) => characterChanged(actor, changes));
+  Hooks.on("deleteActor", actor => actorDeleted(actor));
   for ( const hook of [
     "createItem", "updateItem", "deleteItem",
     "createActiveEffect", "updateActiveEffect", "deleteActiveEffect"
@@ -107,6 +122,7 @@ export function registerCharacterHooks() {
   // A world setting is stored the first time it's changed from its default, and updated after.
   for ( const hook of ["createSetting", "updateSetting"] ) {
     Hooks.on(hook, setting => criticalRulesChanged(setting));
+    Hooks.on(hook, setting => primaryPartyChanged(setting));
   }
 }
 
@@ -127,33 +143,116 @@ export function forgetTold(campaignId) {
  * Send each campaign a character is in the character as it now stands, unless that is what the
  * campaign was last told. A campaign whose hello is on its way is left be: every character follows
  * the hello once it's answered, sent as its answer says the listener takes them.
+ *
+ * Since 0.30.0, then every group the change may show in, to each campaign whose app reads groups:
+ * the actor itself as a group; each group it's a member of, for its name and portrait; and where
+ * its ownership changed and it's a campaign character, every group of its campaigns, for who may
+ * see them. Each goes only where it isn't what the campaign was last told, so a member's hit points
+ * changing sends no group. The character goes first, as a command's result follows its sheet.
  * @param {string} actorId
+ * @param {object} [options]
+ * @param {boolean} [options.ownership]   Did its ownership change?
  * @returns {void}
  */
-export function sendCharacter(actorId) {
+export function sendCharacter(actorId, { ownership=false }={}) {
   if ( !canSend() ) return;
   const actor = game.actors.get(actorId);
-  if ( !actor ) return;
-  for ( const campaign of getCampaigns() ) {
-    if ( !campaign.characters.has(actorId) || helloPending(campaign.id) ) continue;
-    sendSheet(campaign, actor);
+  if ( actor ) {
+    for ( const campaign of getCampaigns() ) {
+      if ( !campaign.characters.has(actorId) || helloPending(campaign.id) ) continue;
+      sendSheet(campaign, actor);
+    }
   }
+  const groups = new Map();
+  const add = (campaign, group) => groups.set(`${campaign.id}.${group.id}`, { campaign, group });
+  for ( const campaign of getCampaigns() ) {
+    if ( !groupsTaken(campaign) ) continue;
+    const listed = campaignGroups(campaign);
+    const own = listed.find(group => group.id === actorId);
+    if ( own ) add(campaign, own);
+    if ( ownership && campaign.characters.has(actorId) ) listed.forEach(group => add(campaign, group));
+  }
+  for ( const { campaign, group } of groupsListing(actorId) ) {
+    if ( groupsTaken(campaign) ) add(campaign, group);
+  }
+  for ( const { campaign, group } of groups.values() ) sendGroup(campaign, group);
+}
+
+/**
+ * Does a campaign's app read groups, with no hello on its way, which its groups follow anyway?
+ * @param {Campaign} campaign
+ * @returns {boolean}
+ */
+function groupsTaken(campaign) {
+  return groupReader(campaign.id) && !helloPending(campaign.id);
+}
+
+/**
+ * Send a campaign whose app has just said it reads groups, in answer to a heartbeat, as an app
+ * deployed mid-session does, every group afresh. After a hello's answer, they follow its
+ * characters instead.
+ * @param {string} campaignId
+ * @returns {void}
+ */
+export function groupsWanted(campaignId) {
+  const campaign = getCampaigns().find(c => c.id === campaignId);
+  if ( !campaign || !canSend() || helloPending(campaign.id) ) return;
+  for ( const group of campaignGroups(campaign) ) {
+    const key = `${campaign.id}.${group.id}`;
+    told.delete(key);
+    built.delete(key);
+  }
+  sendGroups(campaign);
+}
+
+/**
+ * Send a campaign whose app reads groups each of its groups as it now stands, in the order the
+ * Gamemaster listed them.
+ * @param {Campaign} campaign
+ * @returns {void}
+ */
+function sendGroups(campaign) {
+  if ( !groupReader(campaign.id) ) return;
+  for ( const group of campaignGroups(campaign) ) sendGroup(campaign, group);
 }
 
 /**
  * Send a campaign whose hello was answered every character, in the order the hello listed them,
  * each in a post of its own after the descriptions its sheet refers to. Every description goes
  * again, as every sheet does: the listener started afresh, and another hello may have followed the
- * one that was answered.
+ * one that was answered. Then its groups, and since the hello was built when it was queued, the
+ * removal of any group it listed that has been deleted since.
  * @param {string} campaignId
+ * @param {object} [hello]    The hello answered.
  * @returns {void}
  */
-export function helloDelivered(campaignId) {
+export function helloDelivered(campaignId, hello) {
   const campaign = getCampaigns().find(c => c.id === campaignId);
   if ( !campaign || !canSend() ) return;
   forgetTold(campaign.id);
   forgetSent(campaign.id);
   for ( const actor of campaignActors(campaign) ) sendSheet(campaign, actor);
+  sendGroups(campaign);
+  removedSince(campaign, hello);
+}
+
+/**
+ * Tell a campaign whose app reads groups, in `group.removed`, of each group its hello listed that
+ * no longer exists: one deleted while the hello was on its way, which `actorDeleted` leaves to it.
+ * The app keeps each group the hello lists, and nothing after it would say this one is gone. One
+ * that exists but isn't listed any more was taken out in Manage Campaigns, which says so in a
+ * hello of its own.
+ * @param {Campaign} campaign
+ * @param {object} [hello]
+ * @returns {void}
+ */
+function removedSince(campaign, hello) {
+  const listed = hello?.data?.groups;
+  if ( !groupReader(campaign.id) || !Array.isArray(listed) ) return;
+  for ( const id of listed.map(entry => entry?.id) ) {
+    if ( (typeof id !== "string") || (game.actors.get(id)?.type === "group") ) continue;
+    send(EVENTS.GROUP_REMOVED, { id }, campaign);
+  }
 }
 
 /**
@@ -168,45 +267,91 @@ export function sheetTermsChanged(campaignId) {
   if ( !campaign || !canSend() || helloPending(campaign.id) ) return;
   forgetTold(campaign.id);
   for ( const actor of campaignActors(campaign) ) sendSheet(campaign, actor);
+  sendGroups(campaign);
 }
 
 /**
  * Send a campaign a character as it now stands, unless that is what the campaign was last told:
- * in `character.updated`, after any description its sheet refers to that the campaign hasn't been
- * sent, in the slim format the listener expands, if it does. A sheet that can't be described goes
- * as null, so that one character can't cost the others theirs; one that makes a post larger than
- * the listener takes is withheld, the post saying so, and its descriptions wait for a sheet that
- * fits.
+ * in `character.updated`, as `sendActor` sends it.
  * @param {Campaign} campaign
  * @param {Actor} actor
  * @returns {void}
  */
 function sendSheet(campaign, actor) {
+  sendActor(campaign, actor, {
+    event: EVENTS.CHARACTER_UPDATED,
+    build: ({ sheet=true }={}) => {
+      const texts = new SheetTexts();
+      return { texts, data: { character: sheet ? summarizeCharacter(actor, texts) : { ...rosterEntry(actor), sheet: null } } };
+    }
+  });
+}
+
+/**
+ * Send a campaign one of its groups as it now stands, unless that is what the campaign was last
+ * told: in `group.updated`, as `sendActor` sends it, its descriptions enriched without secrets or
+ * links to act on. One no campaign character may see in Foundry goes without its sheet or any
+ * description, saying it's private.
+ * @param {Campaign} campaign
+ * @param {Actor} group
+ * @returns {void}
+ */
+function sendGroup(campaign, group) {
+  sendActor(campaign, group, {
+    event: EVENTS.GROUP_UPDATED,
+    build: ({ sheet=true }={}) => {
+      const entry = groupEntry(group, campaign);
+      if ( !Object.keys(entry.access).length ) {
+        return { texts: new SheetTexts(), data: { group: { ...entry, sheet: null, sheetWithheld: { reason: "private" } } } };
+      }
+      const texts = new SheetTexts({ secrets: false, actionable: false });
+      return { texts, data: { group: { ...entry, sheet: sheet ? groupSheet(group, texts, campaign) : null } } };
+    }
+  });
+}
+
+/**
+ * Send a campaign an actor as it now stands, a character or since 0.30.0 a group, unless that is
+ * what the campaign was last told: after any description its sheet refers to that the campaign
+ * hasn't been sent, in the slim format the listener expands, if it does. A sheet that can't be
+ * described goes as null, so that one actor can't cost the others theirs; one that makes a post
+ * larger than the listener takes is withheld, the post saying so, and its descriptions wait for a
+ * sheet that fits.
+ * @param {Campaign} campaign
+ * @param {Actor} actor
+ * @param {object} kind
+ * @param {string} kind.event   The event it goes in.
+ * @param {(options?: {sheet?: boolean}) => {texts: SheetTexts, data: object}} kind.build
+ *   Builds the event's data, its one key the actor with its sheet, and the descriptions the sheet
+ *   refers to; with `sheet: false`, the actor with a null sheet, and none.
+ * @returns {void}
+ */
+function sendActor(campaign, actor, { event, build }) {
   try {
-    let texts = new SheetTexts();
-    let character;
+    let made;
     try {
-      character = summarizeCharacter(actor, texts);
+      made = build();
     } catch (err) {
       console.error(`${MODULE_ID} | Could not describe the sheet of ${actor.name}`, err);
-      texts = new SheetTexts();
-      character = { ...rosterEntry(actor), sheet: null };
+      made = build({ sheet: false });
     }
+    const { texts, data } = made;
+    const [[field, entry]] = Object.entries(data);
     const { slimSheets, maxBytes } = termsOf(campaign.id);
-    if ( slimSheets && character.sheet ) {
+    if ( slimSheets && entry.sheet ) {
       try {
-        character.sheet = slimSheet(character.sheet);
+        entry.sheet = slimSheet(entry.sheet);
       } catch (err) {
         console.warn(`${MODULE_ID} | Could not make the sheet of ${actor.name} smaller; sending it in full`, err);
       }
     }
-    const json = JSON.stringify(character);
+    const json = JSON.stringify(entry);
     const key = `${campaign.id}.${actor.id}`;
     // Nothing new if built as it was when the campaign was last told of it, sheet withheld or not.
     if ( told.has(key) && (built.get(key) === json) ) return;
 
     // Measured as it will be posted.
-    const envelope = buildEnvelope(EVENTS.CHARACTER_UPDATED, { character }, { campaign });
+    const envelope = buildEnvelope(event, data, { campaign });
     const bytes = new TextEncoder().encode(JSON.stringify(envelope)).length;
     if ( bytes <= maxBytes ) {
       told.set(key, json);
@@ -216,9 +361,9 @@ function sendSheet(campaign, actor) {
       noteSheetSent(campaign.id, actor.id);
       return;
     }
-    const { sheet, ...entry } = character;
-    const withheld = { ...entry, sheet: null, sheetWithheld: { reason: "tooLarge", bytes, limit: maxBytes } };
-    envelope.data = { character: withheld };
+    const { sheet, ...rest } = entry;
+    const withheld = { ...rest, sheet: null, sheetWithheld: { reason: "tooLarge", bytes, limit: maxBytes } };
+    envelope.data = { [field]: withheld };
     told.set(key, JSON.stringify(withheld));
     built.set(key, json);
     post(envelope);
@@ -257,8 +402,9 @@ function warnTooLarge(campaign, actor, bytes, limit) {
  * Note a post that was dropped, to send it again later if it was lost to failures that might not
  * last, such as the app restarting: a hello, which the app may have taken with its answer lost, and
  * no sheet followed; a character, which the campaign is no longer taken to have been told; or
- * descriptions, which go again with the next sheet that refers to them. What the app refused would
- * be refused again, and isn't.
+ * descriptions, which go again with the next sheet that refers to them. Since 0.30.0 a group as a
+ * character; and a group's removal, or what the world's settings are, as the hello, which says both
+ * again. What the app refused would be refused again, and isn't.
  * @param {object} envelope
  * @param {{temporary: boolean}} options
  * @returns {void}
@@ -270,14 +416,19 @@ export function eventDropped(envelope, { temporary }={}) {
     case EVENTS.HELLO:
       lost.set(`hello:${campaignId}`, { campaignId, actorId: null, at: Date.now() });
       break;
-    case EVENTS.CHARACTER_UPDATED: {
-      const character = envelope.data?.character;
-      if ( !character?.id ) return;
-      const key = `${campaignId}.${character.id}`;
-      if ( told.get(key) === JSON.stringify(character) ) told.delete(key);
-      lost.set(key, { campaignId, actorId: character.id, at: Date.now() });
+    case EVENTS.CHARACTER_UPDATED:
+    case EVENTS.GROUP_UPDATED: {
+      const entry = (envelope.type === EVENTS.GROUP_UPDATED) ? envelope.data?.group : envelope.data?.character;
+      if ( !entry?.id ) return;
+      const key = `${campaignId}.${entry.id}`;
+      if ( told.get(key) === JSON.stringify(entry) ) told.delete(key);
+      lost.set(key, { campaignId, actorId: entry.id, at: Date.now() });
       break;
     }
+    case EVENTS.GROUP_REMOVED:
+    case EVENTS.BRIDGE_SETTINGS:
+      lost.set(`hello:${campaignId}`, { campaignId, actorId: null, at: Date.now() });
+      break;
     case EVENTS.CHARACTER_TEXTS:
       forgetSent(campaignId, Object.keys(envelope.data?.texts ?? {}));
       break;
@@ -285,7 +436,8 @@ export function eventDropped(envelope, { temporary }={}) {
 }
 
 /**
- * Send again what was lost long enough ago: a hello, with every character after it, or a character.
+ * Send again what was lost long enough ago: a hello, with every character after it, or a character
+ * or group, which `sendCharacter` sends where it now belongs.
  * @returns {void}
  */
 export function resendLost() {
@@ -302,18 +454,66 @@ export function resendLost() {
 
 /**
  * Note that a character may have changed, and send it once its changes settle. Only the bridge
- * sends; every other client ignores the change.
+ * sends; every other client ignores the change. Since 0.30.0 it's noted whether any of the changes
+ * settling was to its ownership, which changes who may see its campaigns' groups.
  * @param {Actor|null} actor
+ * @param {object} [changes]   What an update of the actor changed.
  * @returns {void}
  */
-function characterChanged(actor) {
+function characterChanged(actor, changes) {
   if ( !actor?.id || !canSend() ) return;
   const id = actor.id;
+  if ( changes && (typeof changes === "object") && ("ownership" in changes) ) ownershipChanged.add(id);
   clearTimeout(settling.get(id));
   settling.set(id, setTimeout(() => {
     settling.delete(id);
-    sendCharacter(id);
+    const ownership = ownershipChanged.delete(id);
+    sendCharacter(id, { ownership });
   }, SETTLE_AFTER));
+}
+
+/**
+ * Tell each campaign whose app reads groups of an actor deleted: a group of its own is removed, in
+ * `group.removed`, and forgotten; and every group the actor was in is sent again without it, as is
+ * every group of a campaign it was a character of, whose players may see them no longer through
+ * it. A group isn't prepared again for a member deleted, so it's still found as one. A campaign
+ * whose hello is on its way is told once it's answered: of the group by `helloDelivered`, as the
+ * hello lists it, and of the rest as they then are.
+ * @param {Actor} actor
+ * @returns {void}
+ */
+function actorDeleted(actor) {
+  if ( !actor?.id || !canSend() ) return;
+  const id = actor.id;
+  for ( const campaign of getCampaigns() ) {
+    if ( !campaign.groups.has(id) || !groupsTaken(campaign) ) continue;
+    const key = `${campaign.id}.${id}`;
+    told.delete(key);
+    built.delete(key);
+    send(EVENTS.GROUP_REMOVED, { id }, campaign);
+  }
+  const groups = new Map();
+  for ( const { campaign, group } of groupsListing(id) ) groups.set(`${campaign.id}.${group.id}`, { campaign, group });
+  for ( const campaign of getCampaigns() ) {
+    if ( !campaign.characters.has(id) ) continue;
+    for ( const group of campaignGroups(campaign) ) groups.set(`${campaign.id}.${group.id}`, { campaign, group });
+  }
+  for ( const { campaign, group } of groups.values() ) {
+    if ( groupsTaken(campaign) ) sendGroup(campaign, group);
+  }
+}
+
+/**
+ * Send every campaign's groups again when the world's primary party changes, which each says it is
+ * or isn't. Nothing of the party's experience or level is read.
+ * @param {Setting} setting   The setting stored or changed.
+ * @returns {void}
+ */
+function primaryPartyChanged(setting) {
+  if ( (setting?.key !== "dnd5e.primaryParty") || !canSend() ) return;
+  for ( const campaign of getCampaigns() ) {
+    if ( groupsTaken(campaign) ) sendGroups(campaign);
+  }
 }
 
 /**
