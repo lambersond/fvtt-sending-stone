@@ -83,8 +83,8 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Run players' attacks through Midi | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; and whether the game system is D&D Fifth Edition. |
-| A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character has a switch for it, coming soon. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; the app says it's coming soon. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. |
+| A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -155,11 +155,21 @@ while the roll is being made.
   and no other. If it fails, as it might with a module that rolls dice its own way, players' rolls
   stay in the app, and each campaign's Player actions tab says why.
 - **libWrapper** is recommended: with it, the dice are wrapped alongside other modules' wrappers.
-- **Players' own dice.** Players who roll physical dice will be able to type what they show in the
-  app instead, with [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) on. With it on,
-  **Allow Players to enter dice results manually** on a campaign's Player actions tab tells the app,
-  which shows the setting as coming soon, and its Players tab shows each character's switch for it,
-  coming soon too. Nothing is entered in the app yet.
+- **Players' own dice.** Players who roll physical dice can type what they show in the app instead,
+  with [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) on. Tick **Allow Players to
+  enter dice results manually** on a campaign's Player actions tab, and each of its characters'
+  players whose Foundry user has core's **Make Manual Rolls** permission, which Manual Dice's roles
+  set, is offered a switch in the app's settings; once they turn it on, the app asks them for what
+  their dice show for every roll, attack and damage. A character's player is the user whose
+  assigned Character it is, or else its owners; the campaign's Players tab shows, for each
+  character, who may (a keyboard), that they need Make Manual Rolls (a lock), or that it has no
+  player (a crossed-out player), saying which on hover or focus. A change of role, permission,
+  assigned Character or ownership reaches the app at once. The game makes the roll with those
+  values as with dice rolled in the app, and its card is marked with a keyboard, "Entered by hand on
+  Sending Stone", in place of the phone; the Gamemaster's own rolls in the app stay marked GM. A
+  character with Elven Accuracy enters a third d20 for an attack with advantage made with an
+  ability it's for. A player's own Manual Dice toggle in Foundry lives in their browser alone, and
+  plays no part in the app.
 
 The app's address must be able to answer the module's fetches of players' rolls, which only the
 Sending Stone app, or a listener that says it can, is asked for; see
@@ -175,8 +185,10 @@ the spell slot, ammunition or attack mode, and tap it; then the app rolls its da
 with their dice, once the game has made the use, asking first for the kind of damage where it
 offers a choice, as Chromatic Orb does. The item is used as in Foundry, spending its ammunition,
 uses or spell slot; an attack is made with the d20s they rolled, at their target; and the damage
-or healing is rolled on the same use, critical hit's dice included. The app shows whether an
-attack hit only where the game shows players.
+or healing is rolled on the same use, critical hit's dice included. A critical hit's damage from
+the app follows dnd5e's settings, Critical Damage Modifiers and Powerful Critical, under Midi-QOL
+too: Midi-QOL's "Choose critical damage" options apply to your own rolls in Foundry only. The app
+shows whether an attack hit only where the game shows players.
 
 - **Without Midi-QOL**, dnd5e's own cards are posted, as the character's player: the use's card,
   naming the targets, the attack and the damage, linked to it. You roll the targets' saving throws
@@ -322,8 +334,15 @@ either is missing.
   see the party's sheet but move nothing.
 - **Sending to another character.** A player gives from their own character to any other of the
   campaign's characters, which needs nothing of its owner, as a trade at the table needs none.
+- **Sending from a party.** Since 0.32.0, a player whose Foundry user is Owner of a party can send
+  its items and coins to any of the campaign's characters, or to another of its parties they own;
+  "Sends 20 gp from The Iron Company to Vex".
+- **Distributing a party's coin.** Since 0.32.0, a party's Owner can share one kind of its coin
+  among its members that are the campaign's characters, each the same whole share; what can't be
+  shared evenly stays with the party: "Distributes 100 gp among Bram, Lia, Thorin, and Vex (25 gp
+  each); 3 gp stays with The Iron Company". Its members changing in the meantime stops it.
 - **You** can move anything between the campaign's characters and parties from the app's Gamemaster
-  pages. The switch counts for your moves too.
+  pages, party to party too, and distribute any party's coin. The switch counts for your moves too.
 - **What moves.** Part of a stack, or all of it; a container whole, with everything in it, as dnd5e's
   drop moves it. Each item arrives unequipped and unattuned, what a container held too, with its
   uses, effects and identification. A potion joins a stack of the same potion, but never an
@@ -487,18 +506,18 @@ description's damage or roll aren't offered yet.
   would an attack's damage: at its highest, with more of its first die, or that die another size,
   the die added to never one it takes away, as the −1d4 of `3 - 1d4 + 2d6`, and damage that takes a
   die away never at its highest. Healing can be changed, but is never a critical hit's. The game
-  rolls a critical hit's as your world rolls one: dnd5e's Critical Damage Modifiers and Powerful
-  Critical, or Midi-QOL's critical damage rules for the Gamemaster. Damage dnd5e's own link rolls
-  through one of the item's activities, as a `[[/damage]]` naming no formula, is a critical hit's
-  only as that activity allows: never for a saving throw's damage, as dnd5e's damage dialog offers
-  none, and with what it adds, such as a weapon's critical damage. One whose critical hit throws
-  extra dice, as a melee weapon does for a character with Savage Attacks or Brutal Critical, or
-  whose critical damage has dice of its own, is offered with those dice, as your world rolls them:
-  thrown with the weapon's first die, at their most as Midi's "Max Critical Dice (flat number)" adds
-  them, or left out where Midi's rules leave them out. Where Midi rolls a critical hit's dice apart,
-  as its "Max Critical Dice (roll dice)" and exploding rules do, the app can't plan a description's
-  critical hit, and doesn't offer one. Changes aren't offered where the self-test found damage isn't
-  changed as expected.
+  rolls a critical hit's as dnd5e's settings make one, its Critical Damage Modifiers and Powerful
+  Critical: since 0.32.0, a critical hit's damage from the app is always dnd5e's, and Midi-QOL's
+  "Choose critical damage" options apply to your own rolls in Foundry only. Damage dnd5e's own link
+  rolls through one of the item's activities, as a `[[/damage]]` naming no formula, is a critical
+  hit's only as that activity allows: never for a saving throw's damage, as dnd5e's damage dialog
+  offers none, and with what it adds, such as a weapon's critical damage. One whose critical hit
+  throws extra dice, as a melee weapon does for a character with Savage Attacks or Brutal Critical,
+  or whose critical damage has dice of its own, is offered with those dice, thrown with the weapon's
+  first die, as dnd5e throws them. Before 0.32.0 a critical hit's followed Midi's rules for your
+  rolls too, which might add those dice at their most, leave them out, or roll them apart, when the
+  app offered no critical hit for a description. Changes aren't offered where the self-test found
+  damage isn't changed as expected.
 - **Rolls**, such as `[[/r 1d4]]`, are rolled with their dice on a card naming where they're from.
   One with a die the app doesn't roll, such as a d3, is refused.
 - **Dice Foundry rolls again, keeps or counts**, such as `[[/damage 2d6r<=2 + 7]]` or
@@ -650,6 +669,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/delivery-status.mjs` | What the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
 | `scripts/characters.mjs` | A campaign's characters and who owns them |
+| `scripts/typed-dice.mjs` | Whether a character's player may type in what their own dice show in the app: its primary players, and core's Make Manual Rolls permission |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
 | `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player, and what it concentrates on |
@@ -683,8 +703,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
 | `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat |
-| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat |
-| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, planning damage's dice as the world rolls them, critical hits too, and the self-test that it works |
+| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters |
+| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster |
 | `templates/settings/` | The settings window's templates, one for each kind of section |
 | `tools/echo-listener.mjs` | Stand-in listener for development |

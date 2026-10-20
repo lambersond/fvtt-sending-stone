@@ -120,14 +120,17 @@ export function failedResult(command, reason, error=null) {
  * The flags this module puts on a message a command makes: the command's id, under the key that
  * says what the message is, and from 0.23.0, where the campaign's Gamemaster made the roll in the
  * app as the character, `by: "gm"`. The message's author is the player's all the same, as the
- * modules that read it expect: only this mark says who rolled.
+ * modules that read it expect: only this mark says who rolled. From 0.32.0, where the player typed
+ * the dice in from their own physical dice, `typed: true`; never with the Gamemaster's mark, whose
+ * page never types. The dice are used the same either way.
  * @param {object} command
  * @param {"request"|"use"|"outcome"} [key]   "request" for a roll, "use" for a use's card, and
  *                                            "outcome" for dnd5e 5.3's message of a death save's.
  * @returns {object}
  */
 export function appFlags(command, key="request") {
-  return { [key]: command.id, ...((command.by === "gm") && { by: "gm" }) };
+  return { [key]: command.id, ...((command.by === "gm") && { by: "gm" }),
+    ...((command.typed === true) && (command.by !== "gm") && { typed: true }) };
 }
 
 /* -------------------------------------------- */
@@ -879,7 +882,8 @@ async function makeRoll(command, actor) {
  * 5.3, a save that revives, steadies or kills the character posts what came of it as a message of
  * its own, without the roll's flags: one the Gamemaster made in the app has that message marked as
  * theirs too, before the app is told, under `outcome` rather than `request`, so that the roll is
- * still the message the command made. dnd5e 6 writes what came of it on the roll's own card.
+ * still the message the command made; and since 0.32.0 so has one whose die the player typed in,
+ * marked `typed`. dnd5e 6 writes what came of it on the roll's own card.
  * @param {object} command
  * @param {Actor} actor
  * @param {object} config    The roll's configuration, as for any roll.
@@ -888,7 +892,7 @@ async function makeRoll(command, actor) {
  */
 async function rollDeathSave(command, actor, config, message) {
   const dialog = { configure: false };
-  if ( command.by !== "gm" ) return messageOf(await actor.rollDeathSave(config, dialog, message));
+  if ( (command.by !== "gm") && (command.typed !== true) ) return messageOf(await actor.rollDeathSave(config, dialog, message));
   let marking = null;
   const mark = (rolls, { message: outcome, subject }={}) => {
     if ( (subject?.id !== actor.id) || (rolls?.[0]?.options?.[ROLL_TAG] !== command.id) ) return;
@@ -1345,22 +1349,24 @@ export function describeResult(command, message, actor, campaign, { rolls=messag
 
 /**
  * Mark a roll made from the app on its chat card, for everyone to see; one the Gamemaster made
- * there as the character, "GM".
+ * there as the character, "GM"; and since 0.32.0 one whose dice the player typed in from their own,
+ * with a keyboard, "Entered by hand".
  * @param {ChatMessage} message
  * @param {HTMLElement} html
  */
 export function markAppRoll(message, html) {
   const flags = message.flags?.[MODULE_ID];
   const gm = flags?.by === "gm";
+  const typed = !gm && (flags?.typed === true);
   if ( !(flags?.request || flags?.use || gm) || !(html instanceof HTMLElement) ) return;
   const header = html.querySelector(".message-header .message-metadata") ?? html.querySelector(".message-header");
   if ( !header || header.querySelector(".sending-stone-badge") ) return;
   const badge = document.createElement("span");
-  badge.className = gm ? "sending-stone-badge sending-stone-gm" : "sending-stone-badge";
-  const label = game.i18n.localize(gm ? "SENDINGSTONE.Roll.BadgeGM" : "SENDINGSTONE.Roll.Badge");
+  badge.className = gm ? "sending-stone-badge sending-stone-gm" : (typed ? "sending-stone-badge sending-stone-typed" : "sending-stone-badge");
+  const label = game.i18n.localize(gm ? "SENDINGSTONE.Roll.BadgeGM" : (typed ? "SENDINGSTONE.Roll.BadgeTyped" : "SENDINGSTONE.Roll.Badge"));
   badge.dataset.tooltip = label;
   badge.setAttribute("aria-label", label);
-  badge.innerHTML = '<i class="fa-solid fa-mobile-screen-button" inert></i>';
+  badge.innerHTML = typed ? '<i class="fa-solid fa-keyboard" inert></i>' : '<i class="fa-solid fa-mobile-screen-button" inert></i>';
   // The author is the player's, so the badge is what says the Gamemaster rolled it.
   if ( gm ) {
     const who = document.createElement("span");

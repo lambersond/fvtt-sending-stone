@@ -258,11 +258,25 @@ export const MOST_MOVED = 10_000_000;
 export const MOST_MOVED_ITEMS = 10;
 
 /**
+ * The most characters one distribution shares a coin among.
+ * @type {number}
+ */
+export const MOST_AMONG = 20;
+
+/**
  * The roll option naming the player's roll a roll is made for, so that its dice can be the ones
  * the player rolled.
  * @type {string}
  */
 export const ROLL_TAG = "sendingStone";
+
+/**
+ * The roll option marking a damage roll this module builds to plan or preview a player's damage
+ * from the app, never posted, whose critical hit is made as dnd5e makes one, as the player's own
+ * roll is, since 0.32.0.
+ * @type {string}
+ */
+export const CRITICAL_AS_DND5E = "sendingStoneCritical";
 
 /**
  * The dice a player can roll in the app.

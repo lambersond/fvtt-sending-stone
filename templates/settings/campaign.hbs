@@ -118,11 +118,10 @@
                 <img src="{{character.img}}" alt="">
                 <span class="sending-stone-row-name">{{character.name}}</span>
                 {{#if character.also}}<span class="sending-stone-chip" data-tooltip="{{character.also}}">{{character.also}}</span>{{/if}}
-                {{#if character.manualDice}}
-                <span class="sending-stone-manual-dice" data-tooltip="{{character.manualDice}}">
-                    <i class="fa-solid fa-keyboard" inert></i>
-                    <input type="checkbox" data-manual-dice="{{character.id}}" aria-label="{{character.manualDice}}" disabled>
-                    <span class="sending-stone-pill">{{localize "SENDINGSTONE.Config.Players.Soon"}}</span>
+                {{#if character.typedDice}}
+                <span class="sending-stone-manual-dice" data-manual-dice="{{character.id}}" data-state="{{character.typedDice.state}}"
+                      role="img" tabindex="0" aria-label="{{character.typedDice.label}}" data-tooltip="{{character.typedDice.label}}">
+                    <i class="fa-solid {{character.typedDice.icon}}" inert></i>
                 </span>
                 {{/if}}
                 <button type="button" class="icon fa-solid fa-xmark" data-action="removeCharacter"

@@ -235,7 +235,8 @@ export function usageOf(item) {
  * activity itself, such as a save or healing; the saving throw it calls for; its damage or
  * healing; a utility's own roll, such as a d4 of luck; and the checks a check activity calls for.
  * A spell's activity that spends no spell slot, as one used after the spell is cast does, such as
- * Hex's Bonus Hex Damage, says so. A forward rolls as the activity it's used through.
+ * Hex's Bonus Hex Damage, says so. A forward rolls as the activity it's used through. Since 0.32.0
+ * an attack dnd5e would give Elven Accuracy says so, for its player to type in a third d20.
  * @param {Item} item
  * @param {Activity} [activity]
  * @param {SheetTexts} [texts]    Collects the description of a spell it casts.
@@ -253,6 +254,8 @@ function activityRolls(item, activity, texts) {
     toHit: attack ? toHitOf(activity) : null,
     // The attack the bonus is for, so the app can have it made here.
     attackId: attack ? activity.id : null,
+    // A third d20 with advantage, which the player types in where they type their dice.
+    ...(attack && elvenAccuracyOf(item, activity) && { elvenAccuracy: true }),
     // What else it's used through, such as a save or healing, so the app can have it used here.
     activity: usedHere(item, activity) ? describeUse(item, activity) : null,
     attackModes: attack ? attackModesOf(item) : null,
@@ -266,6 +269,19 @@ function activityRolls(item, activity, texts) {
     ...(check && { check }),
     ...(spendsNoSlot(item, activity) && { consumesSlot: false })
   };
+}
+
+/**
+ * Would dnd5e give this attack Elven Accuracy with advantage: its actor has the flag, and it's
+ * made with an ability the flag is for, as dnd5e's attack activity decides it.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+function elvenAccuracyOf(item, activity) {
+  const actor = activity.actor ?? item.actor;
+  const abilities = CONFIG.DND5E.characterFlags?.elvenAccuracy?.abilities ?? [];
+  return Boolean(actor?.getFlag?.("dnd5e", "elvenAccuracy")) && abilities.includes(activity.ability);
 }
 
 /**

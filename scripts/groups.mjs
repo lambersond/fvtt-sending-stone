@@ -136,6 +136,18 @@ export function memberCount(group) {
 }
 
 /**
+ * A group's members that are the campaign's characters, as dnd5e last prepared it, in its order:
+ * those a party's coin is distributed among, since 0.32.0.
+ * @param {Actor} group
+ * @param {Campaign} campaign
+ * @returns {Actor[]}
+ */
+export function campaignMembers(group, campaign) {
+  return Array.from(memberIds(group), id => game.actors.get(id))
+    .filter(actor => actor && campaign.characters.has(actor.id));
+}
+
+/**
  * The ids of a group's members, as dnd5e prepares them (data/actor/group.mjs).
  * @param {Actor} group
  * @returns {Set<string>}

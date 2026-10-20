@@ -1,13 +1,15 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend, resendHello } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { campaignActors, rosterEntry, summarizeCharacter } from "./characters.mjs";
+import { campaignActors, rosterEntry } from "./characters.mjs";
 import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
 import { campaignGroups, groupEntry, groupReader, groupsListing } from "./groups.mjs";
 import { groupSheet } from "./sheet-group.mjs";
+import { characterSheet } from "./sheet.mjs";
 import { slimSheet } from "./sheet-slim.mjs";
 import { forgetSent, sendTexts, SheetTexts, takeUnsent } from "./sheet-texts.mjs";
 import { buildEnvelope, helloPending, inMegabytes, post, send, termsOf } from "./transport.mjs";
+import { typesDice } from "./typed-dice.mjs";
 
 /**
  * Keeping each campaign's copy of its characters current. Since 0.22.0 a bridge.hello lists a
@@ -33,6 +35,11 @@ import { buildEnvelope, helloPending, inMegabytes, post, send, termsOf } from ".
  * to an app that says it reads them (groups.mjs): when the group or its items change, when one of
  * its members is renamed or given a new portrait, and when who may see it does, as when a campaign
  * character's ownership changes; and `group.removed` when one is deleted.
+ *
+ * Since 0.32.0 each character says whether its player may enter its dice results in the app,
+ * `manualDice` (typed-dice.mjs), so it's sent again when who may could have changed: the world's
+ * roles' permissions, or a user's role, assigned Character or own permissions, or a user added or
+ * removed. Only those whose answer changed are posted.
  */
 
 /**
@@ -93,7 +100,9 @@ const warned = new Set();
 
 /**
  * The world's settings that change how a critical hit's damage is rolled: dnd5e's, and Midi-QOL's,
- * which keeps its rules for critical hits among its own.
+ * which keeps its rules for critical hits among its own. Since 0.32.0 the app's rolls follow
+ * dnd5e's rules whatever Midi's say, so a change to Midi's leaves every sheet as it was, and none is
+ * posted.
  * @type {Set<string>}
  */
 const CRITICAL_SETTINGS = new Set([
@@ -103,7 +112,17 @@ const CRITICAL_SETTINGS = new Set([
 /* -------------------------------------------- */
 
 /**
- * Listen for changes to actors, and to the items and effects they hold.
+ * What changing on a user may change who may type a character's dice: their role, their assigned
+ * Character, or a permission of their own.
+ * @type {string[]}
+ */
+const USER_KEYS = ["role", "character", "permissions"];
+
+/* -------------------------------------------- */
+
+/**
+ * Listen for changes to actors, and to the items and effects they hold; and since 0.32.0, to the
+ * world's roles' permissions and to its users, which decide who may type a character's dice.
  * @returns {void}
  */
 export function registerCharacterHooks() {
@@ -123,7 +142,11 @@ export function registerCharacterHooks() {
   for ( const hook of ["createSetting", "updateSetting"] ) {
     Hooks.on(hook, setting => criticalRulesChanged(setting));
     Hooks.on(hook, setting => primaryPartyChanged(setting));
+    Hooks.on(hook, setting => permissionsChanged(setting));
   }
+  Hooks.on("updateUser", (user, changes) => usersChanged(changes));
+  Hooks.on("createUser", () => usersChanged());
+  Hooks.on("deleteUser", () => usersChanged());
 }
 
 /**
@@ -272,7 +295,8 @@ export function sheetTermsChanged(campaignId) {
 
 /**
  * Send a campaign a character as it now stands, unless that is what the campaign was last told:
- * in `character.updated`, as `sendActor` sends it.
+ * in `character.updated`, as `sendActor` sends it. Since 0.32.0 with whether its player may enter
+ * its dice results in the app, `manualDice`, as the hello's roster says it, read as it's built.
  * @param {Campaign} campaign
  * @param {Actor} actor
  * @returns {void}
@@ -282,7 +306,10 @@ function sendSheet(campaign, actor) {
     event: EVENTS.CHARACTER_UPDATED,
     build: ({ sheet=true }={}) => {
       const texts = new SheetTexts();
-      return { texts, data: { character: sheet ? summarizeCharacter(actor, texts) : { ...rosterEntry(actor), sheet: null } } };
+      const manualDice = typesDice(actor, campaign);
+      return { texts, data: { character: sheet
+        ? { ...rosterEntry(actor), manualDice, sheet: characterSheet(actor, texts) }
+        : { ...rosterEntry(actor), manualDice, sheet: null } } };
     }
   });
 }
@@ -539,6 +566,31 @@ function effectsRunningDown() {
  */
 function criticalRulesChanged(setting) {
   if ( !CRITICAL_SETTINGS.has(setting?.key) || !canSend() ) return;
+  for ( const actor of campaignCharacters() ) characterChanged(actor);
+}
+
+/**
+ * Note that every campaign character may have changed when the world's roles' permissions do,
+ * since its player's Make Manual Rolls decides whether they may type its dice. Core refreshes the
+ * permissions after this hook, in the same update; each character is built once its changes
+ * settle, by when it has.
+ * @param {Setting} setting   The setting stored or changed.
+ * @returns {void}
+ */
+function permissionsChanged(setting) {
+  if ( (setting?.key !== "core.permissions") || !canSend() ) return;
+  for ( const actor of campaignCharacters() ) characterChanged(actor);
+}
+
+/**
+ * Note that every campaign character may have changed when a user is added, removed, or changed
+ * in a way that changes who may type its dice.
+ * @param {object} [changes]   What an update of the user changed; none for one added or removed.
+ * @returns {void}
+ */
+function usersChanged(changes) {
+  if ( !canSend() ) return;
+  if ( changes && !USER_KEYS.some(key => Object.hasOwn(changes, key)) ) return;
   for ( const actor of campaignCharacters() ) characterChanged(actor);
 }
 
