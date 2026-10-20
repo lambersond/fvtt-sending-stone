@@ -1697,11 +1697,13 @@ A prompt:
   damage made for the app, and every damage roll built to plan or preview one, is made as dnd5e's
   own rules make it, never Midi-QOL's "Choose critical damage" options, which keep to the
   Gamemaster's own rolls; the sheet's [`critical`](#character-sheet) says dnd5e's rule under Midi
-  too, so `1d6 + 4` is `2d6 + 4`. A party's Owner may send its items and coins to any of the
-  campaign's characters or to another party they own, and the Gamemaster anything, party to party
-  too, `features.transfers.partySends`; and a party's coin of one kind may be shared among its
-  characters, a `transfer` with [`among`](#moving-items-and-coins) in place of `to`,
-  `features.transfers.distribute`; both `true` wherever `transfers.enabled` is. A move from a party,
+  too, so `1d6 + 4` is `2d6 + 4`; its critical damage's dice are `added` in a preview under dnd5e 6
+  too, so damage may be changed in the app there (`modifiers`), with or without Midi. A party's
+  Owner may send its items and coins to any of the campaign's characters or to another party they
+  own, and the Gamemaster anything, party to party too, `features.transfers.partySends`; and a
+  party's coin of one kind may be shared among its characters, a `transfer` with
+  [`among`](#moving-items-and-coins) in place of `to`, `features.transfers.distribute`; both `true`
+  wherever `transfers.enabled` is. A move from a party,
   or a distribution, may be made as any of the campaign's characters, an end or not. They post
   "Sends … from … to …" and "Distributes … among … (… each); … stays with …" (or "none stays"),
   spoken by the character the move is made as; a distribution is refused `"members"` where `among`
@@ -1842,16 +1844,17 @@ description's roll and damage, an answer to a [Midi prompt](#midi-qols-own-saves
 Sending Stone", in place of the phone; the Gamemaster's mark wins. A use's card never has it, as a
 use has no dice of its own.
 
-Since module 0.32.0, a critical hit's damage made for the app, the player's and the Gamemaster's
-as the character, an attack's, a use's and a description's, and every damage roll the module builds
-to plan or preview one, is made as dnd5e's own rules make a critical hit's, whatever Midi-QOL's
-"Choose critical damage" options say: each rolled die term's dice twice over, the item's critical
-extra dice on the first; its numbers doubled only under dnd5e's *Critical Damage Modifiers*; under
-*Powerful Critical*, its dice once, with the most they could roll added as a number; critical
-damage added after, as it is; and never `mx`, `min`, `kh` or `x` added for it. Midi-QOL's other
-changes to damage still apply, and its critical rules to the Gamemaster's own rolls in Foundry,
-which the app makes none of. So `1d6 + 4` is thrown as `2d6 + 4`, under Midi as without it, and the
-sheet's [`critical`](#character-sheet) says so.
+Since module 0.32.0, a critical hit's damage made for the app, the player's and the Gamemaster's as
+the character, an attack's, a use's and a description's, and every damage roll the module builds to
+plan or preview one, is made as dnd5e's own rules make a critical hit's, whatever Midi-QOL's "Choose
+critical damage" options say: each rolled die term's dice twice over, the item's critical extra dice
+on the first; its numbers doubled only under dnd5e's *Critical Damage Modifiers*; under *Powerful
+Critical*, its dice once, with the most they could roll added as a number; critical damage added
+after, as it is, and marked as dnd5e 5.3 marks it under dnd5e 6 too, which doesn't, so that its dice
+are `added` in a [preview](#attacks) and a die more never changes them; and never `mx`, `min`, `kh`
+or `x` added for it. Midi-QOL's other changes to damage still apply, and its critical rules to the
+Gamemaster's own rolls in Foundry, which the app makes none of. So `1d6 + 4` is thrown as `2d6 + 4`,
+under Midi as without it, and the sheet's [`critical`](#character-sheet) says so.
 
 It then sends [`command.result`](#commandresult). A roll made blind, as Midi-QOL can make a
 player's check, is reported as made, with `visible: false` and no rolls, so that the app tells

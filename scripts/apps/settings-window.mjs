@@ -61,6 +61,19 @@ const STATES = Object.freeze(["error", "warning", "ok", "idle"]);
 const MODULE_TONES = Object.freeze({ active: "ok", off: "warning", inactive: "idle", missing: "idle" });
 
 /**
+ * The Players tab's mark of whether a character's player may enter its dice results in the app:
+ * an icon of its own for each state, so that the states differ by more than how faint the mark is.
+ * @type {Readonly<Record<string, string>>}
+ */
+const TYPED_DICE_ICONS = Object.freeze({ allowed: "fa-keyboard", permission: "fa-lock", none: "fa-user-slash" });
+
+/**
+ * The marks whose tooltips open on focus too, for keyboards, as Foundry opens tooltips on hover alone.
+ * @type {string}
+ */
+const FOCUS_TOOLTIPS = ".sending-stone-manual-dice[data-tooltip]";
+
+/**
  * The Gamemaster's window for every Sending Stone setting, in sections down its side: General,
  * for the app's address and what's sent; Modules, for the modules that change what Sending Stone
  * can do, the author's own among them; each campaign, one at a time, with its players, since 0.30.0
@@ -596,7 +609,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         if ( !actor ) return null;
         const { state, player } = typedDiceState(actor);
         const label = game.i18n.format(`SENDINGSTONE.Config.Players.TypedDice.${state}`, { player: player?.name ?? "", name: entry.name });
-        return { state, label };
+        return { state, label, icon: TYPED_DICE_ICONS[state] };
       };
       Object.assign(context, {
         groups: this.#groups(members.map(entry => {
@@ -737,6 +750,13 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     this.element.addEventListener("change", event => this.#onEdit(event));
     this.element.addEventListener("input", event => this.#onEdit(event));
     this.element.addEventListener("keydown", event => this.#onKeyDown(event));
+    this.element.addEventListener("focusin", event => {
+      const mark = event.target.closest?.(FOCUS_TOOLTIPS);
+      if ( mark ) game.tooltip?.activate(mark, { text: mark.dataset.tooltip });
+    });
+    this.element.addEventListener("focusout", event => {
+      if ( event.target.closest?.(FOCUS_TOOLTIPS) ) game.tooltip?.deactivate();
+    });
   }
 
   /** @inheritDoc */

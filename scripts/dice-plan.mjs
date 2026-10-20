@@ -701,7 +701,8 @@ function rerollsOn(modifier, face) {
 /**
  * Is a term one dnd5e added to a critical hit's damage as its critical damage, as an attack's
  * critical damage or a damage activity's: marked so, for it to be taken off when the roll is made
- * again? Midi-QOL marks the dice its rules add beside each die so too.
+ * again? Midi-QOL marks the dice its rules add beside each die so too, and since 0.32.0 the module
+ * marks an app roll's under dnd5e 6, which adds it unmarked (`criticalAsDnd5e`).
  * @param {RollTerm} term
  * @returns {boolean}
  */
@@ -1048,7 +1049,17 @@ function criticalAsDnd5e(wrapped, ...args) {
   if ( !uncritical.has(this) ) uncritical.set(this, this.terms.map(copyTerm));
   this.terms = uncritical.get(this).map(copyTerm);
   this.options.configured = false;
-  return DND5E_CONFIGURE.call(this, { critical: args[0]?.critical ?? {} });
+  const critical = args[0]?.critical ?? {};
+  DND5E_CONFIGURE.call(this, { critical });
+  // dnd5e 6 adds a critical hit's critical damage unmarked, where dnd5e 5.3 and Midi-QOL mark it:
+  // marked here as they mark it, its operator too, so that it's planned as added, never as one of
+  // the damage's own dice that a player may change. dnd5e 6 never reads the mark.
+  const { bonusDamage } = foundry.utils.mergeObject(critical, this.options.critical ?? {}, { inplace: false });
+  if ( bonusDamage ) {
+    const extra = new Roll(bonusDamage, this.data).terms;
+    const count = extra.length + ((extra[0] instanceof foundry.dice.terms.OperatorTerm) ? 0 : 1);
+    for ( const term of this.terms.slice(-count) ) term.options.criticalBonusDamage = true;
+  }
 }
 
 /**

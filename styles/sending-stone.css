@@ -484,7 +484,7 @@
 }
 
 /* Whether a character's player may enter its dice results in the app (module 0.32.0): read-only,
-   faded where they may not. */
+   an icon for each state, and faded where they may not. It takes focus, for its tooltip. */
 #sending-stone-settings .sending-stone-manual-dice {
   display: inline-flex;
   flex: none;
@@ -495,6 +495,13 @@
 
 #sending-stone-settings .sending-stone-manual-dice:not([data-state="allowed"]) {
   opacity: 0.45;
+}
+
+#sending-stone-settings .sending-stone-manual-dice:focus-visible {
+  border-radius: 2px;
+  opacity: 1;
+  outline: 2px solid var(--ss-accent);
+  outline-offset: 2px;
 }
 
 #sending-stone-settings .sending-stone-row > button.icon {

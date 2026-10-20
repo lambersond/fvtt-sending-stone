@@ -120,8 +120,8 @@
                 {{#if character.also}}<span class="sending-stone-chip" data-tooltip="{{character.also}}">{{character.also}}</span>{{/if}}
                 {{#if character.typedDice}}
                 <span class="sending-stone-manual-dice" data-manual-dice="{{character.id}}" data-state="{{character.typedDice.state}}"
-                      role="img" aria-label="{{character.typedDice.label}}" data-tooltip="{{character.typedDice.label}}">
-                    <i class="fa-solid fa-keyboard" inert></i>
+                      role="img" tabindex="0" aria-label="{{character.typedDice.label}}" data-tooltip="{{character.typedDice.label}}">
+                    <i class="fa-solid {{character.typedDice.icon}}" inert></i>
                 </span>
                 {{/if}}
                 <button type="button" class="icon fa-solid fa-xmark" data-action="removeCharacter"

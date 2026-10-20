@@ -162,10 +162,11 @@ while the roll is being made.
   set, is offered a switch in the app's settings; once they turn it on, the app asks them for what
   their dice show for every roll, attack and damage. A character's player is the user whose
   assigned Character it is, or else its owners; the campaign's Players tab shows, for each
-  character, who may, or that they need Make Manual Rolls. A change of role, permission, assigned
-  Character or ownership reaches the app at once. The game makes the roll with those values as with
-  dice rolled in the app, and its card is marked with a keyboard, "Entered by hand on Sending
-  Stone", in place of the phone; the Gamemaster's own rolls in the app stay marked GM. A
+  character, who may (a keyboard), that they need Make Manual Rolls (a lock), or that it has no
+  player (a crossed-out player), saying which on hover or focus. A change of role, permission,
+  assigned Character or ownership reaches the app at once. The game makes the roll with those
+  values as with dice rolled in the app, and its card is marked with a keyboard, "Entered by hand on
+  Sending Stone", in place of the phone; the Gamemaster's own rolls in the app stay marked GM. A
   character with Elven Accuracy enters a third d20 for an attack with advantage made with an
   ability it's for. A player's own Manual Dice toggle in Foundry lives in their browser alone, and
   plays no part in the app.
