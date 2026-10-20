@@ -13,6 +13,7 @@ import { candidateGroups, groupEntry, groupsAvailable, memberCount, primaryParty
 import { midiPromptStatus } from "../midi-prompts.mjs";
 import { resultsVerdict } from "../results.mjs";
 import { buildEnvelope, deliver, DeliveryError } from "../transport.mjs";
+import { typedDiceState } from "../typed-dice.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const { FormDataExtended } = foundry.applications.ux;
@@ -586,8 +587,17 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       };
     }
     else if ( tab === "players" ) {
-      // Each character's own switch for entering its dice results, while its players may: coming soon.
+      // Whether each character's player may enter its dice results in the app, while the campaign's
+      // players may: its primary player has Make Manual Rolls, needs it, or there's none. The switch
+      // itself is each player's, in the app.
       const manualDice = manualDiceOn(campaign);
+      const typedDice = entry => {
+        const actor = manualDice ? game.actors.get(entry.id) : null;
+        if ( !actor ) return null;
+        const { state, player } = typedDiceState(actor);
+        const label = game.i18n.format(`SENDINGSTONE.Config.Players.TypedDice.${state}`, { player: player?.name ?? "", name: entry.name });
+        return { state, label };
+      };
       Object.assign(context, {
         groups: this.#groups(members.map(entry => {
           const also = others.filter(other => other.characters.has(entry.id));
@@ -595,7 +605,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
             ...entry,
             also: also.length ? game.i18n.format("SENDINGSTONE.Config.Players.AlsoIn", { campaigns: titles(also) }) : null,
             removeLabel: game.i18n.format("SENDINGSTONE.Config.Players.Remove", { name: entry.name }),
-            manualDice: manualDice ? game.i18n.format("SENDINGSTONE.Config.Players.ManualDice", { name: entry.name }) : null
+            typedDice: typedDice(entry)
           };
         })),
         filter: this.#filters.players,

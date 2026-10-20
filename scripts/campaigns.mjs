@@ -60,8 +60,8 @@ export function getCampaigns() {
  * May a campaign's players enter their own dice results in the app? Only while its players' rolls
  * in the app are made here, so not under another system or after a failed self-test, and Manual
  * Dice is on. A choice saved while Manual Dice was on is kept once it isn't, but counts for nothing
- * until it is again. Nothing is entered in the app yet: this only tells the app, and shows each
- * character's switch, coming soon.
+ * until it is again. Since 0.32.0 a character's player may then enter its dice results in the app
+ * where they have Make Manual Rolls (typed-dice.mjs), as each character's `manualDice` says.
  * @param {{rolls: boolean, manualDice: boolean}} campaign
  * @returns {boolean}
  */

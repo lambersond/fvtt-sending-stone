@@ -142,7 +142,8 @@ const made = new Map();
  * the character's and marked as theirs, wherever rolls are made (`gmRolls`); from 0.25.0, that
  * the result of such a command lists the chat messages it made (`gmRollMessages`), so that only
  * those are taken as the Gamemaster's; from 0.26.0, whether its players may enter their own dice
- * results in the app, with Manual Dice (`manualDice`), which the app doesn't offer yet; from
+ * results in the app, with Manual Dice (`manualDice`), as from 0.32.0 each character's player
+ * may where its own `manualDice` says so too; from
  * 0.27.0, whether the saves Midi-QOL asks of them are asked in the app too (`midiPrompts`); and
  * from 0.29.0, among the kinds, ending a concentration of theirs, wherever their rolls are made,
  * and spending their charges directly and using or gaining Heroic Inspiration, wherever the
@@ -453,7 +454,8 @@ class Poller {
  * earlier rolls, in the order they were made. An answer to a save Midi-QOL asked is made at once:
  * Midi waits on it, perhaps inside one of those earlier rolls, as a player's spell from the app
  * that asks them for a save. Since 0.31.0 a move of items and coins waits for the rolls of both its
- * ends too, as a potion drunk at the moment it's given, and their next rolls wait for it.
+ * ends too, as a potion drunk at the moment it's given, and their next rolls wait for it; since
+ * 0.32.0 a distribution for every character it shares among, and theirs for it.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -471,7 +473,8 @@ function take(command, campaign) {
 
   const keyOf = value => ((typeof value === "string") && value) ? value : null;
   const keys = (command.kind === "transfer")
-    ? [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to)].filter(Boolean))]
+    ? [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to),
+      ...(Array.isArray(command.transfer?.among) ? command.transfer.among.map(keyOf) : [])].filter(Boolean))]
     : [String(command.actorId)];
   const made = Promise.all(keys.map(key => queues.get(key) ?? Promise.resolve()))
     .then(() => make(command, campaign))

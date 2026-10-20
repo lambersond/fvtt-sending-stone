@@ -483,7 +483,8 @@
   white-space: nowrap;
 }
 
-/* A character's own switch for entering its dice results, coming soon. */
+/* Whether a character's player may enter its dice results in the app (module 0.32.0): read-only,
+   faded where they may not. */
 #sending-stone-settings .sending-stone-manual-dice {
   display: inline-flex;
   flex: none;
@@ -492,8 +493,8 @@
   opacity: 0.75;
 }
 
-#sending-stone-settings .sending-stone-manual-dice input {
-  margin: 0;
+#sending-stone-settings .sending-stone-manual-dice:not([data-state="allowed"]) {
+  opacity: 0.45;
 }
 
 #sending-stone-settings .sending-stone-row > button.icon {

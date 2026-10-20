@@ -1,11 +1,11 @@
-import { MOST_MOVED, MOST_MOVED_ITEMS, TRANSFER_KINDS } from "./constants.mjs";
+import { MOST_AMONG, MOST_MOVED, MOST_MOVED_ITEMS, TRANSFER_KINDS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { postLine } from "./command-charges.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import {
   checkCommand, failedResult, isId, isObject, namesRollFields, throwsNoDice, visibleTo
 } from "./command-rolls.mjs";
-import { accessFor, campaignGroups } from "./groups.mjs";
+import { accessFor, campaignGroups, campaignMembers } from "./groups.mjs";
 import { hidesContents, inventoryTypes, listedInSheet } from "./sheet-inventory.mjs";
 import { localize } from "./sheet-values.mjs";
 
@@ -47,6 +47,15 @@ import { localize } from "./sheet-values.mjs";
  *
  * The app is told what moved and its new ids, never a name, nor what a container held; the sheets go
  * ahead of it.
+ *
+ * Since 0.32.0 a party's things may be sent elsewhere by a player whose character's users own it: to
+ * any of the campaign's characters, or to another of its parties they own too, made as their
+ * character, whether or not it's one of the ends, with the line "Sends 2 gp from The Iron Company
+ * to Vex"; and the Gamemaster may send anything anywhere, party to party too. A character's things
+ * are still moved only as that character or the one they go to. And a party's coin of one kind may
+ * be distributed among its members that are the campaign's characters, a whole share each, what's
+ * left staying with the party, which the line says: "Distributes 100 gp among Bram, Lia, Thorin,
+ * and Vex (25 gp each); 3 gp stays with The Iron Company".
  */
 
 /**
@@ -57,10 +66,11 @@ import { localize } from "./sheet-values.mjs";
 const RESET = Object.freeze(["attuned", "equipped", "prepared", "crew.value"]);
 
 /**
- * The fields a move names what it moves by.
+ * The fields a move names what it moves by; since 0.32.0, `among` for a distribution, in place of
+ * `to`.
  * @type {ReadonlySet<string>}
  */
-const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency"]));
+const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among"]));
 
 /**
  * The campaigns whose app takes moves, by id, as their latest answer to a hello or heartbeat said.
@@ -91,14 +101,21 @@ export function transfersOn(campaign) {
 /**
  * What a campaign tells the app of moving items and coins in its hello, beside its rolls: whether
  * moves are made here, and if not, why not, the Gamemaster not letting its players, or another
- * system.
+ * system. Since 0.32.0, wherever they're made, that a party's things may be sent elsewhere by its
+ * Owner, party to party too (`partySends`), and a party's coin distributed among its characters
+ * (`distribute`).
  * @param {Campaign} campaign
- * @returns {{enabled: boolean, kinds: string[], reason: "off"|"system"|null}}
+ * @returns {{enabled: boolean, kinds: string[], reason: "off"|"system"|null, partySends: boolean,
+ *   distribute: boolean}}
  */
 export function transferFeatures(campaign) {
-  if ( campaign.transfers !== true ) return { enabled: false, kinds: [], reason: "off" };
-  if ( game.system?.id !== "dnd5e" ) return { enabled: false, kinds: [], reason: "system" };
-  return { enabled: true, kinds: [...TRANSFER_KINDS], reason: null };
+  if ( campaign.transfers !== true ) {
+    return { enabled: false, kinds: [], reason: "off", partySends: false, distribute: false };
+  }
+  if ( game.system?.id !== "dnd5e" ) {
+    return { enabled: false, kinds: [], reason: "system", partySends: false, distribute: false };
+  }
+  return { enabled: true, kinds: [...TRANSFER_KINDS], reason: null, partySends: true, distribute: true };
 }
 
 /**
@@ -131,7 +148,9 @@ export function transferReader(campaignId) {
 /**
  * Why a fetched move isn't one to make, if it isn't: it names its two ends, which differ, and what
  * moves, items by id with how many of each, each once, and coins by their keys with how many; at
- * least one of them, and nothing a roll names, and throws no dice.
+ * least one of them, and nothing a roll names, and throws no dice. Since 0.32.0 a distribution names
+ * the characters it shares among in place of the end it goes to: from one to MOST_AMONG of them,
+ * each once, never the party itself, and coins of one kind alone, no items.
  * @param {object} command
  * @returns {string|null}
  */
@@ -140,11 +159,31 @@ export function checkTransferCommand(command) {
   const given = value => (value !== undefined) && (value !== null);
   if ( namesRollFields(command) || !isObject(transfer) ) return "transfer";
   if ( Object.keys(transfer).some(key => !FIELDS.has(key)) ) return "transfer";
-  if ( !isId(transfer.from) || !isId(transfer.to) || (transfer.from === transfer.to) ) return "transfer";
-  if ( !given(transfer.items) && !given(transfer.currency) ) return "transfer";
+  if ( !isId(transfer.from) ) return "transfer";
+  if ( given(transfer.to) === given(transfer.among) ) return "transfer";
+  if ( given(transfer.to) ) {
+    if ( !isId(transfer.to) || (transfer.from === transfer.to) ) return "transfer";
+    if ( !given(transfer.items) && !given(transfer.currency) ) return "transfer";
+  } else {
+    if ( !isAmong(transfer.among, transfer.from) ) return "among";
+    if ( given(transfer.items) ) return "items";
+    if ( !isCoins(transfer.currency) || (Object.keys(transfer.currency).length !== 1) ) return "currency";
+  }
   if ( given(transfer.items) && !isItemList(transfer.items) ) return "items";
   if ( given(transfer.currency) && !isCoins(transfer.currency) ) return "currency";
   return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Are these the characters a distribution shares among: from one to MOST_AMONG ids, each once, none
+ * the party it's from?
+ * @param {unknown} among
+ * @param {string} from
+ * @returns {boolean}
+ */
+function isAmong(among, from) {
+  if ( !Array.isArray(among) || !among.length || (among.length > MOST_AMONG) ) return false;
+  return among.every(id => isId(id) && (id !== from)) && (new Set(among).size === among.length);
 }
 
 /**
@@ -189,7 +228,8 @@ function isMoved(value) {
 
 /**
  * Make a move fetched from the app, once every move before it has been made, whoever made it.
- * @param {object} command      `{transfer: {from, to, items?, currency?}}`, as fetched from the app.
+ * @param {object} command      `{transfer: {from, to, items?, currency?}}`, or since 0.32.0 a
+ *                              distribution's `{transfer: {from, among, currency}}`, as fetched.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @returns {Promise<CommandResult>}
  */
@@ -202,7 +242,8 @@ export function runTransferCommand(command, campaign) {
 /**
  * Make a move now, if it may be made: who may move what (`whoMoves`), then what there is to move,
  * as both ends now are (`plansOf`), before anything is written; then the coins, then each item; the
- * line that says what moved; and both sheets as they then stand, ahead of the result.
+ * line that says what moved; and both sheets as they then stand, ahead of the result. A
+ * distribution is made by `distributeNow`.
  * @param {object} command
  * @param {Campaign} passed     The campaign as it was when fetched, which may be a queue's wait old.
  * @returns {Promise<CommandResult>}
@@ -216,7 +257,8 @@ async function transferNow(command, passed) {
   if ( invalid ) return failed("invalid", invalid);
   const ends = whoMoves(command, campaign);
   if ( ends.refusal ) return failed(ends.refusal);
-  const { from, to } = ends;
+  if ( !ends.to ) return distributeNow(command, campaign, ends);
+  const { from, to, mover } = ends;
   const plans = await plansOf(command.transfer, from, to);
   if ( plans.refusal ) return failed(plans.refusal);
 
@@ -234,10 +276,12 @@ async function transferNow(command, passed) {
     error = messageOf(err);
   }
 
-  // The line says what moved, if anything did, as the character who moved it.
-  const speaker = from.group ? to.actor : from.actor;
+  // The line says what moved, if anything did, as the character who moved it: the giver; the taker,
+  // from a party into the move's own character; or the one it's made as, from a party elsewhere.
+  const verb = !from.group ? "Gives" : ((to.actor.id === mover.id) ? "Takes" : "Sends");
+  const speaker = { Gives: from.actor, Takes: to.actor, Sends: mover }[verb];
   const line = (moved.coins.length || moved.items.length)
-    ? await postLine(command, speaker, lineText(from, to, moved)) : null;
+    ? await postLine(command, speaker, lineText(verb, from, to, moved)) : null;
   if ( wrote ) {
     sheetFirst(from.actor);
     sheetFirst(to.actor);
@@ -266,17 +310,21 @@ async function transferNow(command, passed) {
 /* -------------------------------------------- */
 
 /**
- * The two ends of a move, as they now are, if its maker may move between them; or why not. Each is
- * an actor that's one of the campaign's characters or one of its parties (`unknown`); never two
- * parties, and the character it was made as is one of them (`not-yours`). A player moves only from
- * their own character, or into it from a party (`not-yours`), and with a party only one they own in
- * Foundry: one they only observe is `not-owner`, and one they can't see `unknown`, as one not there.
- * The Gamemaster moves anything between them.
+ * The ends of a move, as they now are, and the character it's made as, if its maker may move
+ * between them; or why not. Each end is one of the campaign's characters or parties, and a
+ * distribution's are its characters (`unknown`). The character it's made as is one of the
+ * campaign's, and one of the ends where a character's things move; a party's things may be moved
+ * as any of them, and a distribution is a party's (`not-yours`). A player moves only
+ * from their own character, and with a party only one their character's users own in Foundry: one
+ * they only observe is `not-owner`, and one they can't see `unknown`, as one not there. The
+ * Gamemaster moves anything between them, party to party too. A distribution is shared among
+ * exactly the party's characters, as Foundry now has them (`members`).
  * @param {object} command
  * @param {Campaign} campaign
- * @returns {{refusal: string}|{from: MoveEnd, to: MoveEnd}}
+ * @returns {{refusal: string}|{from: MoveEnd, to: MoveEnd|null, among: Actor[], mover: Actor}}
  */
 function whoMoves(command, campaign) {
+  const { transfer } = command;
   const groups = new Set(campaignGroups(campaign).map(group => group.id));
   const endOf = id => {
     const actor = game.actors.get(id);
@@ -284,23 +332,42 @@ function whoMoves(command, campaign) {
     if ( groups.has(id) ) return { actor, group: true };
     return campaign.characters.has(id) ? { actor, group: false } : null;
   };
-  const from = endOf(command.transfer.from);
-  const to = endOf(command.transfer.to);
-  if ( !from || !to ) return { refusal: "unknown" };
-  if ( from.group && to.group ) return { refusal: "not-yours" };
-  const mover = [from, to].find(end => !end.group && (end.actor.id === command.actorId));
+  // A distribution's characters are characters alone: a party named among them is as unknown as an
+  // id that's nothing, so that it says nothing of a party the player can't see.
+  const characterOf = id => {
+    const actor = game.actors.get(id);
+    return (actor && !groups.has(id) && campaign.characters.has(id)) ? actor : null;
+  };
+  const sharing = Array.isArray(transfer.among);
+  const from = endOf(transfer.from);
+  const to = sharing ? null : endOf(transfer.to);
+  const among = sharing ? transfer.among.map(characterOf) : [];
+  if ( !from || (!sharing && !to) || among.includes(null) ) return { refusal: "unknown" };
+
+  // A character's things are moved only as one of the move's ends, the Gamemaster's too.
+  const mover = campaign.characters.has(command.actorId) && !groups.has(command.actorId)
+    ? (game.actors.get(command.actorId) ?? null) : null;
   if ( !mover ) return { refusal: "not-yours" };
+  if ( !from.group && ![from, to].some(end => end?.actor.id === mover.id) ) return { refusal: "not-yours" };
+  if ( sharing && !from.group ) return { refusal: "not-yours" };
+
   if ( command.by !== "gm" ) {
-    // A player gives from their own character, or takes into it.
-    if ( mover !== (from.group ? to : from) ) return { refusal: "not-yours" };
-    const party = [from, to].find(end => end.group);
-    if ( party ) {
-      const access = accessFor(party.actor, mover.actor);
+    // A player moves a character's things only from their own; and with a party, only one they own.
+    if ( !from.group && (from.actor.id !== mover.id) ) return { refusal: "not-yours" };
+    for ( const end of [from, to] ) {
+      if ( !end?.group ) continue;
+      const access = accessFor(end.actor, mover);
       if ( !access ) return { refusal: "unknown" };
       if ( access !== "owner" ) return { refusal: "not-owner" };
     }
   }
-  return { from, to };
+
+  if ( sharing ) {
+    const members = new Set(campaignMembers(from.actor, campaign).map(actor => actor.id));
+    const named = new Set(among.map(actor => actor.id));
+    if ( (members.size !== named.size) || [...named].some(id => !members.has(id)) ) return { refusal: "members" };
+  }
+  return { from, to, among, mover };
 }
 
 /**
@@ -309,6 +376,88 @@ function whoMoves(command, campaign) {
  * @property {Actor} actor
  * @property {boolean} group   Is it a party, a Group actor?
  */
+
+/* -------------------------------------------- */
+/*  A distribution                              */
+/* -------------------------------------------- */
+
+/**
+ * Distribute a party's coin of one kind among its characters, since 0.32.0, as its sheet in the app
+ * showed it: refused where the party holds fewer than that now (`short`), or there's not a whole
+ * coin for each of them (`split`). Each is given a whole share, in the order named, after the
+ * party's are taken; what's left over stays with the party, and the line says how much. Where a
+ * share can't be given, the party is given back the shares not given, and the line says what was;
+ * where that fails too, those coins are lost, never made twice, and the line says only what the
+ * party still has. The party's sheet and each one's given a share go ahead of the result.
+ * @param {object} command
+ * @param {Campaign} campaign
+ * @param {{from: MoveEnd, among: Actor[], mover: Actor}} ends
+ * @returns {Promise<CommandResult>}
+ */
+async function distributeNow(command, campaign, { from, among, mover }) {
+  const failed = (reason, error=null) => failedResult(command, reason, error);
+  const party = from.actor;
+  const [[key, n]] = Object.entries(command.transfer.currency);
+  const k = among.length;
+  const stored = actor => actor._source?.system?.currency?.[key] ?? 0;
+  const held = Math.min(Math.floor(party.system?.currency?.[key] ?? 0), stored(party));
+  if ( n > held ) return failed("short");
+  if ( n < k ) return failed("split");
+  const share = Math.floor(n / k);
+  const total = share * k;
+
+  // The party's own write first: refused, nothing is written, said or sent.
+  try {
+    await updated(party, { [`system.currency.${key}`]: stored(party) - total });
+  } catch (err) {
+    return failed("error", messageOf(err));
+  }
+  const credited = [];
+  let error = null;
+  let lost = false;
+  for ( const actor of among ) {
+    try {
+      await updated(actor, { [`system.currency.${key}`]: stored(actor) + share });
+      credited.push(actor);
+    } catch (err) {
+      // The shares not given go back to the party, in one write.
+      const back = share * (k - credited.length);
+      try {
+        await putBack(err, () => updated(party, { [`system.currency.${key}`]: stored(party) + back }));
+      } catch (thrown) {
+        error = messageOf(thrown);
+        lost = thrown !== err;
+      }
+      break;
+    }
+  }
+
+  // What stays with the party of what it held: all but the shares given, unless the shares not
+  // given were lost putting them back.
+  const left = lost ? (held - total) : (held - (share * credited.length));
+  const line = credited.length
+    ? await postLine(command, mover, distributionText(from, credited, key, share, left)) : null;
+  sheetFirst(party);
+  for ( const actor of credited ) sheetFirst(actor);
+  const transfer = {
+    from: party.id,
+    to: null,
+    items: [],
+    currency: credited.length ? { [key]: share * credited.length } : null,
+    among: credited.map(actor => actor.id)
+  };
+  if ( error !== null ) {
+    const result = failed("error", error);
+    return credited.length ? { ...result, transfer } : result;
+  }
+  return {
+    id: command.id, status: "done", reason: null, error: null,
+    messageId: line?.id ?? null,
+    visible: line ? visibleTo(line, mover, campaign) : true,
+    rolls: [],
+    transfer
+  };
+}
 
 /* -------------------------------------------- */
 /*  What there is to move                       */
@@ -622,33 +771,87 @@ function messageOf(err) {
 
 /**
  * The line that says what moved, as the character who moved it: "Gives 2 Potion of Healing to The
- * Iron Company" from a character, "Takes 50 gp from The Iron Company" from a party. Each item by the
- * name the app's sheet shows, an unidentified one's, in the order moved; then the coins, in dnd5e's
- * order, by its abbreviations; never what a container held. Every name is escaped, as players name
- * their characters and items.
+ * Iron Company" from a character, "Takes 50 gp from The Iron Company" from a party into the move's
+ * own character, and since 0.32.0 "Sends 20 gp from The Iron Company to Vex" from a party anywhere
+ * else. Each item by the name the app's sheet shows, an unidentified one's, in the order moved; then
+ * the coins, in dnd5e's order, by its abbreviations; never what a container held. Every name is
+ * escaped, as players name their characters and items.
+ * @param {"Gives"|"Takes"|"Sends"} verb
  * @param {MoveEnd} from
  * @param {MoveEnd} to
  * @param {{coins: [string, number][], items: {quantity: number, name: string}[]}} moved
  * @returns {string}
  */
-function lineText(from, to, moved) {
+function lineText(verb, from, to, moved) {
   const lang = game.i18n.lang;
-  const escape = text => foundry.utils.escapeHTML(String(text ?? ""));
-  const currencies = CONFIG.DND5E?.currencies ?? {};
   const parts = [
     ...moved.items.map(({ quantity, name }) => game.i18n.format("SENDINGSTONE.Chat.Things", {
       count: quantity.toLocaleString(lang), name: escape(name)
     })),
-    ...moved.coins.map(([key, n]) => game.i18n.format("SENDINGSTONE.Chat.Coins", {
-      count: n.toLocaleString(lang), abbreviation: escape(localize(currencies[key]?.abbreviation) || key.toUpperCase())
-    }))
+    ...moved.coins.map(([key, n]) => coinsText(key, n))
   ];
-  let things;
-  try {
-    things = new Intl.ListFormat(lang, { type: "conjunction" }).format(parts);
-  } catch {
-    things = parts.join(", ");
+  const things = listOf(parts);
+  if ( verb === "Takes" ) return game.i18n.format("SENDINGSTONE.Chat.Takes", { things, source: escape(from.actor.name) });
+  if ( verb === "Sends" ) {
+    return game.i18n.format("SENDINGSTONE.Chat.Sends", { things, source: escape(from.actor.name), target: escape(to.actor.name) });
   }
-  if ( from.group ) return game.i18n.format("SENDINGSTONE.Chat.Takes", { things, source: escape(from.actor.name) });
   return game.i18n.format("SENDINGSTONE.Chat.Gives", { things, target: escape(to.actor.name) });
+}
+
+/**
+ * The line that says what a distribution shared, among whom, how much each was given, and what of
+ * the coin stays with the party: "Distributes 100 gp among Bram, Lia, Thorin, and Vex (25 gp
+ * each); 3 gp stays with The Iron Company", or "none stays" where nothing does. Only those given
+ * their share are named, in the order they were named.
+ * @param {MoveEnd} from
+ * @param {Actor[]} credited
+ * @param {string} key      The coin's key.
+ * @param {number} share    Each one's.
+ * @param {number} left     What stays with the party, in whole coins.
+ * @returns {string}
+ */
+function distributionText(from, credited, key, share, left) {
+  const data = {
+    things: coinsText(key, share * credited.length),
+    names: listOf(credited.map(actor => escape(actor.name))),
+    each: coinsText(key, share),
+    source: escape(from.actor.name)
+  };
+  if ( left > 0 ) return game.i18n.format("SENDINGSTONE.Chat.Distributes", { ...data, left: coinsText(key, left) });
+  return game.i18n.format("SENDINGSTONE.Chat.DistributesAll", data);
+}
+
+/**
+ * So many of a coin, as a line says them: "25 gp", by dnd5e's abbreviation.
+ * @param {string} key
+ * @param {number} n
+ * @returns {string}
+ */
+function coinsText(key, n) {
+  const currencies = CONFIG.DND5E?.currencies ?? {};
+  return game.i18n.format("SENDINGSTONE.Chat.Coins", {
+    count: n.toLocaleString(game.i18n.lang), abbreviation: escape(localize(currencies[key]?.abbreviation) || key.toUpperCase())
+  });
+}
+
+/**
+ * Parts listed as the language lists them, "a, b, and c", or with commas where it can't.
+ * @param {string[]} parts
+ * @returns {string}
+ */
+function listOf(parts) {
+  try {
+    return new Intl.ListFormat(game.i18n.lang, { type: "conjunction" }).format(parts);
+  } catch {
+    return parts.join(", ");
+  }
+}
+
+/**
+ * Text made safe to put in a line's HTML.
+ * @param {unknown} text
+ * @returns {string}
+ */
+function escape(text) {
+  return foundry.utils.escapeHTML(String(text ?? ""));
 }

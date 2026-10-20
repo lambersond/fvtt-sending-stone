@@ -114,8 +114,11 @@
         "Or": "or",
         "CopyFrom": "Copy from",
         "Copy": "Copy",
-        "ManualDice": "Enter {name}'s dice results manually",
-        "Soon": "Coming soon"
+        "TypedDice": {
+          "allowed": "{player} may enter {name}'s dice results in the app",
+          "permission": "{player} needs Make Manual Rolls to enter {name}'s dice results in the app",
+          "none": "{name} has no player to enter its dice results in the app"
+        }
       },
       "Party": {
         "Add": "Add groups",
@@ -166,10 +169,10 @@
         },
         "Dice": "Who rolls the dice",
         "DicePlayers": "Allow Players to enter dice results manually",
-        "DicePlayersHint": "They type in what their own dice show.",
+        "DicePlayersHint": "They type in what their own dice show, once each turns it on in the app's settings. A character's player needs Make Manual Rolls, which Manual Dice's roles set.",
         "DiceNeedsRolls": "Needs Players roll in the app.",
         "ManualDice": {
-          "active": "Manual Dice is on. Entering results in the app is coming soon.",
+          "active": "Manual Dice is on. Players with Make Manual Rolls may enter their dice results in the app.",
           "off": "Manual Dice is installed but off: enable it in its settings.",
           "inactive": "Manual Dice is installed but not enabled in this world.",
           "missing": "Needs the Manual Dice module."
@@ -223,7 +226,7 @@
       "ManualDice": {
         "Title": "Manual Dice",
         "Hint": "Players type in what their physical dice show.",
-        "Unlocks": "Players entering their dice results in the app (coming soon)."
+        "Unlocks": "Players entering their dice results in the app."
       },
       "CombatFocus": {
         "Title": "Combat Focus",
@@ -323,6 +326,7 @@
     "Roll": {
       "Badge": "Rolled on Sending Stone",
       "BadgeGM": "Rolled on Sending Stone by the Gamemaster",
+      "BadgeTyped": "Entered by hand on Sending Stone",
       "GM": "GM"
     },
     "Chat": {
@@ -331,6 +335,9 @@
       "InspirationGained": "Gains Heroic Inspiration",
       "Gives": "Gives {things} to {target}",
       "Takes": "Takes {things} from {source}",
+      "Sends": "Sends {things} from {source} to {target}",
+      "Distributes": "Distributes {things} among {names} ({each} each); {left} stays with {source}",
+      "DistributesAll": "Distributes {things} among {names} ({each} each); none stays with {source}",
       "Things": "{count} {name}",
       "Coins": "{count} {abbreviation}"
     },

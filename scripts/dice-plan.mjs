@@ -1,4 +1,4 @@
-import { DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from "./constants.mjs";
+import { CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from "./constants.mjs";
 
 /**
  * Making a player's roll here with the dice they rolled in the Sending Stone app.
@@ -7,11 +7,19 @@ import { DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from "./constants.mjs";
  * critical hits, Dice So Nice and modules such as Midi-QOL all behave as they always do. Only the
  * dice are the player's: each roll made for them is tagged with their roll's id, and while that roll
  * is being made, each die it throws takes the next value the player rolled for that kind of die.
- * A die the player didn't roll, such as a third d20 for Elven Accuracy, a d4 for Bless, or a
- * Halfling's reroll of a 1, is rolled by Foundry as usual, and Foundry's total is the roll's total.
+ * A die the player didn't roll, such as a d4 for Bless, or a Halfling's reroll of a 1, is rolled by
+ * Foundry as usual, and Foundry's total is the roll's total. Elven Accuracy's third d20 is the
+ * player's where they sent three, as one typing in their own dice does since 0.32.0, and Foundry's
+ * otherwise; and a d20 roll that throws fewer first than they sent, as one dnd5e gives no Elven
+ * Accuracy after all, takes only as many, so that a d20 they added keeps its own.
  * So is a die a formula's own modifiers roll again, as `2d6r<=2` rerolls a 1 or a 2 and `1d6x`
  * explodes on a 6: the player's dice are each die's first throw, and what Foundry keeps, drops or
  * counts of them, as `4d6kh3` keeps the highest three, it works out from those.
+ *
+ * Since 0.32.0 a critical hit's damage made for a player from the app, or planned for one, is made
+ * as dnd5e makes it, whatever another module's rules for critical hits say, as Midi-QOL's for the
+ * Gamemaster, whose client this is: each die doubled, never Midi's `mx2` or its maximized dice.
+ * The Gamemaster's own rolls keep those rules.
  */
 
 /**
@@ -53,6 +61,13 @@ class DicePlan {
      * @type {boolean}
      */
     this.configured = false;
+
+    /**
+     * Have the player's d20s been fitted to the d20s its roll throws first, so that a d20 they
+     * added keeps its own? Once, for the roll as first built.
+     * @type {boolean}
+     */
+    this.d20Fitted = false;
   }
 
   /**
@@ -85,6 +100,21 @@ class DicePlan {
  * @type {Map<string, DicePlan>}
  */
 const plans = new Map();
+
+/**
+ * dnd5e's own configuration of a damage roll, as it was before any module wrapped it: Midi-QOL's
+ * critical rules, which never call it for a critical hit, are set aside with it for the app's.
+ * Null where dnd5e's dice aren't there, as under another system; the app's rolls are then left
+ * to whatever configures them.
+ * @type {Function|null}
+ */
+const DND5E_CONFIGURE = globalThis.dnd5e?.dice?.DamageRoll?.prototype?.configureDamage ?? null;
+
+/**
+ * Each app roll's terms as configured without its critical hit, the first time.
+ * @type {WeakMap<Roll, RollTerm[]>}
+ */
+const uncritical = new WeakMap();
 
 /**
  * The kinds of a player's roll that are damage, which they may change in the app: a use's, as an
@@ -286,7 +316,8 @@ function tagOf(process, config, index) {
  * roll another module changed so that the player's dice can't reach it, as inside a function, is
  * called off: nothing is spent or healed, and nothing posted; so is damage that, built and changed,
  * can't take every die the player rolled for it, as where a module added dice to it afterwards
- * otherwise than planned, or a die more was chosen of a part with none of its own.
+ * otherwise than planned, or a die more was chosen of a part with none of its own. Since 0.32.0 a
+ * d20 roll then takes no more of the player's d20s than it throws first (`fitD20s`).
  * @param {Roll[]} rolls
  * @returns {boolean|void}   False to call the roll off.
  */
@@ -311,12 +342,43 @@ function onRollConfiguration(rolls) {
       }
       continue;
     }
-    if ( !plan?.command.explicit ) continue;
-    const { mode } = plan.command;
-    if ( roll.options.advantageMode === mode ) continue;
-    roll.options.advantageMode = mode;
-    roll.configureModifiers?.();
+    if ( !plan ) continue;
+    const { explicit, mode } = plan.command;
+    if ( explicit && (roll.options.advantageMode !== mode) ) {
+      roll.options.advantageMode = mode;
+      roll.configureModifiers?.();
+    }
+    fitD20s(plan, roll);
   }
+}
+
+/**
+ * How many d20s a built d20 roll throws first: its number, times one more than its advantage's
+ * count, as dnd5e expands it (basic-die.mjs's expandAdvantage). Null where it can't be told.
+ * @param {Roll} roll
+ * @returns {number|null}
+ */
+function firstD20s(roll) {
+  const die = roll?.d20;
+  if ( !die || !Number.isInteger(die.number) ) return null;
+  const match = (die.modifiers ?? []).map(modifier => /^(adv|dis)(\d*)/i.exec(modifier)).find(Boolean);
+  return die.number * (match ? 1 + parseInt(match[2] || 1) : 1);
+}
+
+/**
+ * Leave the d20s a built roll throws first only as many of the player's values as it takes, so a
+ * d20 they added keeps its own: as when they sent three for Elven Accuracy and the roll has none.
+ * Never adds any.
+ * @param {DicePlan} plan
+ * @param {Roll} roll
+ */
+function fitD20s(plan, roll) {
+  if ( plan.d20Fitted ) return;
+  plan.d20Fitted = true;
+  const given = plan.command.dice?.[0];
+  const need = firstD20s(roll);
+  if ( (given?.faces !== 20) || (need === null) || (given.results.length <= need) ) return;
+  plan.queues.get(20)?.splice(need, given.results.length - need);
 }
 
 /**
@@ -726,8 +788,10 @@ export function modifiedDice(preview, modifiers) {
 export function reshapeDamage(roll, modifiers) {
   if ( !reshapes(modifiers) ) return;
   const { DiceTerm } = foundry.dice.terms;
-  const taken = subtractedTerms(roll.terms);
-  const term = roll.terms.find(each => (each instanceof DiceTerm) && Number.isInteger(each.number) && (each.number > 0)
+  // An app roll's critical hit is made again from its terms as they were without it.
+  const terms = uncriticalTerms(roll);
+  const taken = subtractedTerms(terms);
+  const term = terms.find(each => (each instanceof DiceTerm) && Number.isInteger(each.number) && (each.number > 0)
     && !criticalDamageTerm(each) && !taken.has(each));
   if ( !term ) return;
   if ( modifiers.faces ) term.faces = modifiers.faces;
@@ -736,7 +800,8 @@ export function reshapeDamage(roll, modifiers) {
     term.number = term.options.baseNumber;
   }
   if ( typeof roll.configureDamage === "function" ) roll.configureDamage();
-  else roll.resetFormula();
+  // dnd5e 6 configures a roll once, so its formula says the change only once written again.
+  roll.resetFormula();
 }
 
 /**
@@ -936,7 +1001,9 @@ function altersDice(roll) {
 /**
  * The rolls dnd5e makes of a damage roll's configuration, as it makes them without its dialog,
  * built but not rolled: with the world's rules for critical hits, which dnd5e's damage rolls
- * apply, and those of modules that change them, such as Midi-QOL's.
+ * apply, and the changes modules make to damage, such as Midi-QOL's. Since 0.32.0 each is marked
+ * as one of the app's, so that its critical hit is made as dnd5e makes it, as the player's roll
+ * will be (`criticalAsDnd5e`).
  * @param {object} process   A damage roll's configuration, as an activity's `getDamageConfig`
  *                           gives it, with whether it's a critical hit's.
  * @returns {Roll[]}
@@ -949,8 +1016,58 @@ export function damageRollsFor(process) {
   return (config.rolls ?? []).map(rollConfig => {
     const options = { ...(rollConfig.options ?? {}) };
     options.isCritical ??= config.isCritical;
+    options[CRITICAL_AS_DND5E] = true;
     return DamageRoll.fromConfig({ ...rollConfig, options }, config);
   });
+}
+
+/**
+ * Configure a critical hit's damage made for a player's roll from the app, or planned for one, as
+ * dnd5e makes it, whatever another module's rules for critical hits say: the roll configured as
+ * if it weren't critical, by every module that configures it, Midi-QOL's other changes to damage
+ * among them; those terms kept the first time; then dnd5e's own critical made of a fresh copy of
+ * them, each time it's configured, so that a die more never doubles what was doubled. Any other
+ * roll is configured as it would be.
+ * @this {DamageRoll}
+ * @param {Function} wrapped
+ * @param {...any} args
+ * @returns {void}
+ */
+function criticalAsDnd5e(wrapped, ...args) {
+  const ours = (this.options?.[CRITICAL_AS_DND5E] === true)
+    || DAMAGE_COMMANDS.has(planFor(this.options?.[ROLL_TAG])?.command.kind);
+  const allowed = (this.options?.critical?.allow !== false) && (args[0]?.critical?.allow !== false);
+  if ( !ours || !DND5E_CONFIGURE || !this.isCritical || !allowed ) return wrapped(...args);
+  // libWrapper drops a WRAPPER that doesn't call what it wraps: the rest always configures it.
+  this.options.isCritical = false;
+  try {
+    wrapped(...args);
+  } finally {
+    this.options.isCritical = true;
+  }
+  if ( !uncritical.has(this) ) uncritical.set(this, this.terms.map(copyTerm));
+  this.terms = uncritical.get(this).map(copyTerm);
+  this.options.configured = false;
+  return DND5E_CONFIGURE.call(this, { critical: args[0]?.critical ?? {} });
+}
+
+/**
+ * A copy of a roll's term, unevaluated, as dnd5e 6 copies one (damage-roll.mjs:217).
+ * @param {RollTerm} term
+ * @returns {RollTerm}
+ */
+function copyTerm(term) {
+  return foundry.dice.terms.RollTerm.fromData(foundry.utils.deepClone(term.toJSON()));
+}
+
+/**
+ * A damage roll's terms as configured without its critical hit, where it's an app roll's: those
+ * a player's changes are made to.
+ * @param {Roll} roll
+ * @returns {RollTerm[]}
+ */
+export function uncriticalTerms(roll) {
+  return uncritical.get(roll) ?? roll.terms;
 }
 
 /* -------------------------------------------- */
@@ -966,6 +1083,9 @@ let installed = false;
 /**
  * Set up rolling with players' dice. Done on the Gamemaster's client, which makes their rolls.
  * Wrapped through libWrapper when it's active, to sit well with other modules that wrap dice.
+ * Since 0.32.0 dnd5e's configuration of damage too, where it has damage rolls, as a WRAPPER, which
+ * libWrapper runs outside every other kind, so outside Midi-QOL's: a critical hit's damage for the
+ * app is then made as dnd5e makes it.
  * @returns {void}
  */
 export function installDicePlans() {
@@ -973,12 +1093,16 @@ export function installDicePlans() {
   installed = true;
   const DiceTerm = "foundry.dice.terms.DiceTerm.prototype._roll";
   const Roll = "foundry.dice.Roll.prototype.evaluate";
+  const Damage = "CONFIG.Dice.DamageRoll.prototype.configureDamage";
+  const damage = typeof CONFIG.Dice?.DamageRoll?.prototype?.configureDamage === "function";
   if ( game.modules.get("lib-wrapper")?.active && globalThis.libWrapper ) {
     globalThis.libWrapper.register(MODULE_ID, DiceTerm, plannedRoll, "MIXED");
     globalThis.libWrapper.register(MODULE_ID, Roll, taggedEvaluate, "WRAPPER");
+    if ( damage ) globalThis.libWrapper.register(MODULE_ID, Damage, criticalAsDnd5e, "WRAPPER");
   } else {
     wrap(foundry.dice.terms.DiceTerm.prototype, "_roll", plannedRoll);
     wrap(foundry.dice.Roll.prototype, "evaluate", taggedEvaluate);
+    if ( damage ) wrap(CONFIG.Dice.DamageRoll.prototype, "configureDamage", criticalAsDnd5e);
   }
   Hooks.on("dnd5e.preRoll", onPreRoll);
   Hooks.on("dnd5e.postBuildRollConfig", onBuildRollConfig);
