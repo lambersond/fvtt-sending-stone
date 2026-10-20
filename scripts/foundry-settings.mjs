@@ -1,9 +1,9 @@
-import { CHAT_SCOPES, EVENTS, HELLO_DELIVERED_HOOK, MODULE_ID, SETTINGS } from "./constants.mjs";
+import { CHAT_SCOPES, EVENTS, HELLO_DELIVERED_HOOK, MODULE_ID, RESULTS_MODES, SETTINGS } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { attacksUnavailable } from "./command-uses.mjs";
 import { MANUAL_DICE, moduleState } from "./companions.mjs";
-import { chatEnabled, chatScope, combatEnabled, includeGmContent } from "./config.mjs";
+import { chatEnabled, chatScope, combatEnabled, includeGmContent, resultsAlways } from "./config.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { campaignGroups } from "./groups.mjs";
 import { dnd5eChoice, midiSettings, midiValueText, MISSING, readSetting, resultsVerdict } from "./results.mjs";
@@ -58,14 +58,15 @@ const MIDI_PLAIN = Object.freeze([
 
 /**
  * The world's settings that change what's said here, and that tell nothing else afresh when they
- * do: dnd5e's visibility, Midi-QOL's, and this module's own for targets off screen. Every other one
- * of this module's sends a hello, which says it.
+ * do: dnd5e's visibility, Midi-QOL's, and this module's own for targets off screen and, since
+ * 0.31.0, for hit/miss and save results in the app. Every other one of this module's sends a hello,
+ * which says it.
  * @type {ReadonlySet<string>}
  */
 export const WATCHED_SETTINGS = Object.freeze(new Set([
   "dnd5e.attackRollVisibility", "dnd5e.challengeVisibility",
   "midi-qol.ConfigSettings", "midi-qol.showGM", "midi-qol.ReplaceDefaultActivities",
-  `${MODULE_ID}.${SETTINGS.OFF_CANVAS_TARGETS}`
+  `${MODULE_ID}.${SETTINGS.OFF_CANVAS_TARGETS}`, `${MODULE_ID}.${SETTINGS.CHAT_RESULTS}`
 ]));
 
 /**
@@ -161,7 +162,8 @@ function toggle(id, label, value, note=null) {
 }
 
 /**
- * The campaign's own switches, and its groups.
+ * The campaign's own switches, since 0.31.0 whether its players move items and coins among them,
+ * and its groups.
  * @param {Campaign} campaign
  * @returns {object[]}
  */
@@ -174,27 +176,34 @@ function campaignRows(campaign) {
   const dice = moduleState(MANUAL_DICE);
   const diceWhy = (campaign.manualDice && (dice !== "active")) ? localize(`SENDINGSTONE.Config.Actions.ManualDice.${dice}`) : null;
   const groups = campaignGroups(campaign);
+  const transfersWhy = (campaign.transfers && (game.system?.id !== "dnd5e"))
+    ? localize("SENDINGSTONE.Config.Actions.RollsReason.system") : null;
   return [
     toggle("rolls", localize("SENDINGSTONE.Config.Actions.Rolls"), campaign.rolls, rollsWhy),
     toggle("attacks", localize("SENDINGSTONE.Config.Actions.Attacks"), campaign.attacks, attacksWhy),
     toggle("prompts", localize("SENDINGSTONE.Config.Actions.Prompts"), campaign.prompts),
     toggle("manualDice", localize("SENDINGSTONE.Config.Actions.DicePlayers"), campaign.manualDice, diceWhy),
+    toggle("transfers", localize("SENDINGSTONE.Config.Actions.TransfersPlayers"), campaign.transfers, transfersWhy),
     row("groups", localize("SENDINGSTONE.Settings.Groups"), groups.length,
       groups.length ? groups.map(group => group.name).join(", ") : localize("SENDINGSTONE.Settings.None"))
   ];
 }
 
 /**
- * What's sent for every campaign, and with Midi-QOL, how players' attacks are made.
+ * What's sent for every campaign, since 0.31.0 whether hit/miss and save results are told as Foundry
+ * shows them or always, and with Midi-QOL, how players' attacks are made.
  * @param {boolean} midi   Is Midi-QOL active?
  * @returns {object[]}
  */
 function worldRows(midi) {
   const scope = chatScope();
+  const mode = resultsAlways() ? RESULTS_MODES.ALWAYS : RESULTS_MODES.FOUNDRY;
   const rows = [
     toggle("chatEvents", localize("SENDINGSTONE.Config.General.Chat"), chatEnabled()),
     row("chatScope", localize("SENDINGSTONE.Config.General.Scope"), scope,
       localize(`SENDINGSTONE.Config.General.${(scope === CHAT_SCOPES.CONNECTED) ? "ScopeConnected" : "ScopeAll"}`)),
+    row("chatResults", localize("SENDINGSTONE.Config.General.Results"), mode,
+      localize(`SENDINGSTONE.Config.General.${(mode === RESULTS_MODES.ALWAYS) ? "ResultsAlways" : "ResultsFoundry"}`)),
     toggle("combatEvents", localize("SENDINGSTONE.Config.General.Combat"), combatEnabled()),
     toggle("gmContent", localize("SENDINGSTONE.Config.General.GmContent"), includeGmContent())
   ];

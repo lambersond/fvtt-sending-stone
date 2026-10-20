@@ -159,7 +159,7 @@ function usableFields(item, texts) {
  */
 function describeContainer(actor, container, texts, depth, usable=true) {
   const system = container.system ?? {};
-  const hidden = (system.identified === false) && (system.properties?.has?.("unidentifiedContents") ?? false);
+  const hidden = hidesContents(container);
   const contents = (hidden || (depth > DEEPEST)) ? null : Array.from(actor.items ?? [])
     .filter(item => containerOf(actor, item) === container)
     .sort((a, b) => ((a.sort ?? 0) - (b.sort ?? 0)) || a.name.localeCompare(b.name, game.i18n.lang))
@@ -167,6 +167,35 @@ function describeContainer(actor, container, texts, depth, usable=true) {
       ? describeContainer(actor, item, texts, depth + 1, usable)
       : describeItem(item, texts, usable));
   return { ...describeItem(container, texts, usable), capacity: hidden ? null : capacityOf(system), contents };
+}
+
+/**
+ * Does a container keep what it holds from players, as one not yet identified that hides its
+ * contents does?
+ * @param {Item} container
+ * @returns {boolean}
+ */
+export function hidesContents(container) {
+  const system = container.system ?? {};
+  return (system.identified === false) && (system.properties?.has?.("unidentifiedContents") ?? false);
+}
+
+/**
+ * Does the inventory the app is sent list an item, since 0.31.0 for what may be moved from the
+ * app: one at the top, or in containers, each listing what it holds, no deeper than they're
+ * followed. Not one in a container that hides its contents, at any depth, nor below the deepest
+ * followed, which the app has no row of, and so can't name.
+ * @param {Actor} actor
+ * @param {Item} item
+ * @returns {boolean}
+ */
+export function listedInSheet(actor, item) {
+  let container = containerOf(actor, item);
+  for ( let above = 1; container; above++ ) {
+    if ( (above > DEEPEST) || (container.type !== "container") || hidesContents(container) ) return false;
+    container = containerOf(actor, container);
+  }
+  return true;
 }
 
 /**

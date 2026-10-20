@@ -3,6 +3,7 @@ import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignCharacterId, playerOwners } from "./characters.mjs";
 import { askedSave, chatAudience } from "./chat-data.mjs";
+import { resultsAlways } from "./config.mjs";
 import { midiActivities } from "./command-uses.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { findMidiPrompt, midiOpenPrompts } from "./midi-prompts.mjs";
@@ -367,14 +368,15 @@ export function findPrompt(id, actor, campaign, command) {
 
 /**
  * Whether a save answering a prompt succeeded, where its player may know: as the card would show
- * them. Null where they may not, or for a save against no DC.
+ * them, or since 0.31.0 always, where the Gamemaster has players told so, the DC itself still kept
+ * from them. Null where they may not, or for a save against no DC.
  * @param {RollPrompt} prompt
  * @param {Roll[]} rolls     The save's rolls, as made.
  * @returns {"success"|"failure"|null}
  */
 export function outcomeOf(prompt, rolls) {
   const [roll] = rolls ?? [];
-  if ( !prompt.showsDc || !roll || !Number.isNumeric(roll.options?.target) ) return null;
+  if ( (!prompt.showsDc && !resultsAlways()) || !roll || !Number.isNumeric(roll.options?.target) ) return null;
   return (roll.isSuccess || (roll.options.success === true)) ? "success" : "failure";
 }
 

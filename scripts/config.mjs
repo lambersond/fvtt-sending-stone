@@ -1,4 +1,4 @@
-import { CHAT_SCOPES, COMMANDS_PATH, EVENTS_PATH, MODULE_ID, SETTINGS } from "./constants.mjs";
+import { CHAT_SCOPES, COMMANDS_PATH, EVENTS_PATH, MODULE_ID, RESULTS_MODES, SETTINGS } from "./constants.mjs";
 
 /**
  * Typed accessors for this module's settings.
@@ -148,4 +148,13 @@ export function combatEnabled() {
  */
 export function includeGmContent() {
   return game.settings.get(MODULE_ID, SETTINGS.GM_CONTENT) === true;
+}
+
+/**
+ * Are players told hit/miss and save results whatever Foundry shows them, since 0.31.0? Any value
+ * but "always" follows Foundry, as 0.30.0 did.
+ * @returns {boolean}
+ */
+export function resultsAlways() {
+  return game.settings.get(MODULE_ID, SETTINGS.CHAT_RESULTS) === RESULTS_MODES.ALWAYS;
 }

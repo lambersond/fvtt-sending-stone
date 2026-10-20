@@ -4,7 +4,7 @@ import { campaignActors, campaignCharacterId, charactersSeenBy } from "./charact
 import { outcomeOf as attackOutcome } from "./command-uses.mjs";
 import {
   attacksShown, challengeAudience, gmRollTrim, midiCard, midiHighlightShown, midiHitsShown, midiSaveSeen,
-  midiTotalShown, readSetting, resultRules
+  midiTotalShown, readSetting, resultRules, resultsTold
 } from "./results.mjs";
 import { traitLabel } from "./sheet-details.mjs";
 import { localize } from "./sheet-values.mjs";
@@ -800,6 +800,21 @@ export function dnd5eSource(message) {
 }
 
 /**
+ * The armor class of each target a dnd5e card names, by its actor's uuid, as dnd5e and Midi-QOL
+ * write it on the card, dnd5e 6's in `system`: null for one under total cover; none for one of no
+ * armor class at all. Since 0.31.0, for judging the app's own attack through Midi-QOL where Midi
+ * checks no hits, with the results told always.
+ * @param {ChatMessage|null|undefined} message
+ * @returns {Map<string, number|null>}
+ */
+export function cardTargetAcs(message) {
+  const targets = (message ? dnd5eSource(message)?.targets : null) ?? [];
+  return new Map(targets
+    .map(({ uuid, ac }) => [uuid, (ac === null) ? null : (Number.isFinite(ac) ? ac : undefined)])
+    .filter(([uuid, ac]) => (typeof uuid === "string") && (ac !== undefined)));
+}
+
+/**
  * Is a message one of dnd5e 6's typed ones, with what it is in `system`?
  * @param {ChatMessage} message
  * @returns {boolean}
@@ -961,7 +976,8 @@ function targetResults(message, src, rules) {
  * data/chat-message/attack-message-data.mjs:95). Seen by players only while dnd5e's Attack Result
  * Visibility shows them, "Show only results" or "Show results & target ACs". While Midi-QOL is
  * active, which draws no tray of targets on any message, only an attack at one target, by dnd5e's
- * own highlight of its total (F7).
+ * own highlight of its total (F7). Since 0.31.0, told always, every target by its armor class, as
+ * with GM-only details.
  * @param {ChatMessage} message
  * @param {Dnd5eSource} src
  * @param {ResultRules} rules
@@ -972,7 +988,7 @@ function attackResults(message, src, rules) {
   const D20Roll = CONFIG.Dice?.D20Roll;
   if ( (src.roll?.type !== "attack") || !D20Roll || !(roll instanceof D20Roll) ) return null;
   if ( !Number.isFinite(roll.total) || !attacksShown(rules) ) return null;
-  if ( (rules.midi !== null) && !rules.gmContent ) return highlightedAttack(roll, src.targets, rules);
+  if ( (rules.midi !== null) && !resultsTold(rules) ) return highlightedAttack(roll, src.targets, rules);
   return src.targets.map(({ ac }) => {
     if ( ac === null ) return { outcome: coveredOutcome(roll, src) };
     return Number.isFinite(ac) ? { outcome: attackOutcome(roll, { ac }) } : {};
@@ -1067,9 +1083,11 @@ function midiJudges(roll) {
  * - H2, the success or failure Midi marks on the total of an attack at one target, against its d20's
  *   target, where shown.
  * Told to every reader of the card, whatever its whispers, as Midi draws it. With Gamemaster-only
- * information on, everything Midi checked; and where it checked nothing, H2's outcome for a card at
- * one target. Nothing for a target that can't be found by its token, as one deleted since, nor
- * where two tokens of one actor came out differently.
+ * information on, or since 0.31.0 the results told always, everything Midi checked; and where it
+ * checked nothing, H2's outcome for a card at one target, and for one at several, each target by the
+ * armor class Midi writes on the card, one under total cover missed. Nothing for a target that can't
+ * be found by its token, as one deleted since, nor where two tokens of one actor came out
+ * differently.
  * @param {ChatMessage} message
  * @param {object[]} targets
  * @param {ResultRules} rules
@@ -1085,9 +1103,12 @@ function midiHits(message, targets, rules) {
   const one = targets.length === 1;
   const byTotal = () => [{ outcome: attackOutcome(attack, { ac: aimed }) }];
 
-  if ( rules.gmContent ) {
+  if ( resultsTold(rules) ) {
     if ( check !== "none" ) return checkedHits(flags, targets);
-    return (one && (aimed !== null) && midiJudges(attack)) ? byTotal() : null;
+    if ( one && (aimed !== null) && midiJudges(attack) ) return byTotal();
+    if ( !attack || !midiJudges(attack) ) return null;
+    return targets.map(({ ac }) => (ac === null) ? { outcome: "miss" }
+      : (Number.isFinite(ac) ? { outcome: attackOutcome(attack, { ac }) } : {}));
   }
   if ( midiHitsShown(rules) ) return checkedHits(flags, targets, { critical: flags.isCritical === true });
 
@@ -1182,7 +1203,7 @@ function rollResult(message, campaign, rules, src) {
   if ( !rules.gmContent && obscured(message) ) return { field, value: { target } };
   const outcome = rollOutcome(message, src);
   if ( !outcome ) return { field, value: { target } };
-  if ( !rules.gmContent && !midiHighlightShown(rules) ) return { field, value: { target } };
+  if ( !resultsTold(rules) && !midiHighlightShown(rules) ) return { field, value: { target } };
   const origin = src.origin ?? message;
   switch ( challengeAudience(rules, origin.author) ) {
     case "everyone": return { field, value: { target, outcome } };

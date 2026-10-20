@@ -1,4 +1,5 @@
 import { MODULE_ID, ROLL_TAG, SETTINGS } from "./constants.mjs";
+import { cardTargetAcs } from "./chat-data.mjs";
 import {
   appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
@@ -7,6 +8,7 @@ import {
   unmaximizable, withPlan
 } from "./dice-plan.mjs";
 import { dnd5eEnchant, enchantChoice, midiEnchantNow } from "./command-enchant.mjs";
+import { resultsAlways } from "./config.mjs";
 import { midiPromptWaits } from "./midi-prompts.mjs";
 import { DND5E_ACTIVITIES, ownDamageConfig } from "./sheet-links.mjs";
 import { enchantInPlay } from "./sheet-enchant.mjs";
@@ -677,8 +679,9 @@ async function dnd5eAttack(command, campaign, actor, use) {
     path: "dnd5e", type: "attack", attackMode: attackMode ?? null, ammunition: ammo?.id ?? null, critical, targets,
     preview
   });
-  // As dnd5e shows players on the card whether an attack hit each target, if the world lets it.
-  const shown = targets.length && (game.settings.get("dnd5e", "attackRollVisibility") !== "none");
+  // As dnd5e shows players on the card whether an attack hit each target, if the world lets it, or
+  // since 0.31.0 the Gamemaster has players told always.
+  const shown = targets.length && ((game.settings.get("dnd5e", "attackRollVisibility") !== "none") || resultsAlways());
   return attackResult(command, message, actor, campaign, rolls, {
     critical,
     fumble: roll.isFumble === true,
@@ -1058,10 +1061,17 @@ async function midiUseNow(command, campaign, actor, use) {
     if ( !attack ) return useResult(command, card, actor, campaign, activity, preview);
 
     // As Midi shows players whether an attack hit each target: only those the Gamemaster's canvas
-    // draws, which Midi checks.
+    // draws, which Midi checks. Since 0.31.0, with players told always, whatever Midi whispers; and
+    // where it checks none, each target by the armor class it writes on its card, as chat has it.
     const settings = globalThis.MidiQOL.configSettings?.() ?? {};
-    const shown = (tokens.length > 0) && (settings.autoCheckHit === "all") && !workflow.whisperAttackCard;
+    const always = resultsAlways();
+    const shown = (tokens.length > 0) && (always || ((settings.autoCheckHit === "all") && !workflow.whisperAttackCard));
+    const acs = (always && (settings.autoCheckHit === "none")) ? cardTargetAcs(card) : null;
     const outcome = target => {
+      if ( acs ) {
+        const uuid = target.token?.actor?.uuid;
+        return acs.has(uuid) ? outcomeOf(workflow.attackRoll, { ac: acs.get(uuid) }) : null;
+      }
       const token = target.token?.object;
       if ( !shown || !token ) return null;
       return (workflow.hitTargets?.has(token) || workflow.hitTargetsEC?.has(token)) ? "hit" : "miss";

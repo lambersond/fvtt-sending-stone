@@ -58,6 +58,10 @@ export const SETTINGS = Object.freeze({
   /** World-scope switch for sending information only a Gamemaster can see. */
   GM_CONTENT: "gmContent",
 
+  /** World-scope choice of whether players are told hit/miss and save results whatever Foundry
+   *  shows them. One of RESULTS_MODES. */
+  CHAT_RESULTS: "chatResults",
+
   /** World-scope switch for making players' attacks from the app through Midi-QOL's workflow.
    *  Shown only while Midi-QOL is active. */
   MIDI_INTEGRATION: "midiIntegration",
@@ -76,7 +80,7 @@ export const SETTINGS = Object.freeze({
   CAMPAIGNS_MENU: "campaignsMenu",
 
   /** World-scope list of campaigns: {id, title, characters, groups, rolls, attacks, prompts,
-   *  manualDice}, characters and groups being actor ids. */
+   *  manualDice, transfers}, characters and groups being actor ids. */
   CAMPAIGNS: "campaigns",
 
   /** World-scope set of the actor ids of connected characters, from before campaigns. Read once,
@@ -94,6 +98,19 @@ export const CHAT_SCOPES = Object.freeze({
 
   /** Only messages spoken by one of a campaign's characters. */
   CONNECTED: "connected"
+});
+
+/**
+ * Whether players are told hit/miss and save results in the app: since 0.31.0, as Foundry shows
+ * them, or always, armor class and DCs aside.
+ * @type {Readonly<Record<string, string>>}
+ */
+export const RESULTS_MODES = Object.freeze({
+  /** Where Foundry shows players them, by dnd5e's and Midi-QOL's settings, as 0.30.0 did. */
+  FOUNDRY: "foundry",
+
+  /** For every target, save and check, whatever those settings show players. */
+  ALWAYS: "always"
 });
 
 /**
@@ -213,10 +230,32 @@ export const CONCENTRATION_KINDS = Object.freeze(["endConcentration"]);
 export const CHARGE_KINDS = Object.freeze(["spend", "inspiration"]);
 
 /**
+ * What a player, or their Gamemaster, can have done here from the app with what their character
+ * carries, since module 0.31.0: move items and coins between the character and a party of the
+ * campaign's, or to another of its characters. Each posts a line in chat saying so. Offered wherever
+ * the Gamemaster lets the campaign's players move items and coins, apart from their rolls: it
+ * throws no dice.
+ * @type {readonly string[]}
+ */
+export const TRANSFER_KINDS = Object.freeze(["transfer"]);
+
+/**
  * The most charges a player can spend at once from the app.
  * @type {number}
  */
 export const MOST_SPENT = 999;
+
+/**
+ * The most of an item, or of a coin, a player can move at once from the app.
+ * @type {number}
+ */
+export const MOST_MOVED = 10_000_000;
+
+/**
+ * The most items, and the most kinds of coin, one move from the app names.
+ * @type {number}
+ */
+export const MOST_MOVED_ITEMS = 10;
 
 /**
  * The roll option naming the player's roll a roll is made for, so that its dice can be the ones

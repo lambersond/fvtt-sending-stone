@@ -77,13 +77,14 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | App address | The Sending Stone app's address. Each event goes to the campaigns it involves. |
 | General | Chat messages | Chat messages created, edited and deleted, and the log being cleared. |
 | General | Which messages | Every message a campaign's players can read, or only those its characters spoke. |
+| General | Hit/miss and save results in the app | "Follow Foundry's visibility settings", the default: hits, misses and saves show in the app where Foundry shows players them. "Always show them to players": every target's hit or miss, and every save and check's success or failure, whatever Foundry shows; armor class and DCs still need GM-only details. See [Hit, miss and save results](#hit-miss-and-save-results). |
 | General | Combat tracker | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
 | General | GM-only details | Also send what only a Gamemaster can see. Off by default. |
 | General | Run players' attacks through Midi | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character has a switch for it, coming soon. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; the app says it's coming soon. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; the app says it's coming soon. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -308,10 +309,40 @@ attack hit only where the game shows players.
   Points" or "Gains Heroic Inspiration", never how many are left. One you make from the app's
   Gamemaster page is marked "GM" on its card, as your rolls there are.
 
+### Moving items and coins
+
+Tick **Players move items and coins** on a campaign's **Player actions** tab, and its players can
+move things from the app as they would by dragging between sheets in Foundry, whether or not their
+rolls are made here. It needs D&D Fifth Edition, and an app that takes moves; the tab says so where
+either is missing.
+
+- **Taking from and giving to a party.** A player takes items and coins from one of the campaign's
+  parties into their own character, or gives from their character to it, where their Foundry user
+  is **Owner** of the Group actor, as Foundry needs to change a group's inventory. With Observer they
+  see the party's sheet but move nothing.
+- **Sending to another character.** A player gives from their own character to any other of the
+  campaign's characters, which needs nothing of its owner, as a trade at the table needs none.
+- **You** can move anything between the campaign's characters and parties from the app's Gamemaster
+  pages. The switch counts for your moves too.
+- **What moves.** Part of a stack, or all of it; a container whole, with everything in it, as dnd5e's
+  drop moves it. Each item arrives unequipped and unattuned, what a container held too, with its
+  uses, effects and identification. A potion joins a stack of the same potion, but never an
+  unidentified one, one with uses spent or one enchanted. Coins are moved exactly: never more than
+  there are, and dnd5e 6's fractions stay. An item in a container that hides what it holds, or
+  deeper than five containers, isn't offered.
+- **A line in chat** for each move, as the character who moved it, for everyone, such as "Takes 50
+  gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM".
+- **One at a time.** Moves are made one after another, so two players taking the last potion at once
+  never both get it. A move is written in steps, the copy before the original is deleted; one that
+  fails, or that another module stops, puts back what it can and moves nothing more. A browser
+  closed between them can leave an item on both sides, or coins on neither, which the sheets show,
+  for you to put right.
+
 ### Hit, miss and save results
 
 The app shows whether an attack hit each target, and whether a creature saved or passed a check,
-only where Foundry shows players, as Midi-QOL changes it. Under each campaign's title, Manage
+only where Foundry shows players, as Midi-QOL changes it; or since 0.31.0 always, with **Hit/miss
+and save results in the app** "Always show them to players" in General. Under each campaign's title, Manage
 Campaigns says what players see in chat now, from the settings below, and the campaign's Gamemaster
 sees the same in the app.
 
@@ -345,11 +376,20 @@ sees the same in the app.
     "Show all", whoever's card it is.
 
 Out of the box, dnd5e's Attack Result Visibility ("Hide all") hides every hit and miss, and Midi's
-Auto check Saves ("Off") every save on its cards, so turn those on to see them in the app. With
+Auto check Saves ("Off") every save on its cards, so turn those on to see them in the app, or set
+**Hit/miss and save results in the app** to "Always show them to players". Then players see every
+target's hit or miss, and every save and check's success or failure, in chat and on their own rolls
+from the app, whatever those settings show them in Foundry; but never a target's armor class or a
+DC, which still need GM-only details, nor a roll Midi shows players as "??". Whispers and blind
+rolls still go only to those who may read them, and the Gamemaster's rolls on Midi-QOL's cards are
+trimmed as Midi has them. Where Midi's Auto check if attack hits target is "None", which checks no
+hits, each target is judged against the armor class Midi writes on its card, so a Shield cast after
+the roll isn't counted; Midi records no saves on its card under Auto check Saves "Off", so those
+show only where they're rolled, as dnd5e's. With
 Gamemaster-only information off, the Gamemaster's attack and damage rolls on Midi-QOL's cards arrive
 trimmed as Midi-QOL's GM Attack Roll Display and GM Damage Roll Display show them to players. With
 **GM-only details** on, every result is sent, whatever Foundry shows players, as armor class is, and
-every roll whole.
+every roll whole; where Midi checks no hits, by each target's armor class too.
 
 ### Saves the game asks for
 
@@ -525,8 +565,8 @@ With **GM-only details** off, the listener receives what players could see:
 | Character sheets | The campaign's own characters only: what their players can already see in Foundry. |
 | Party sheets | Only to characters whose players have Observer or Owner on the group in Foundry: names and portraits of its members, its inventory and its description, without secrets. |
 | Foundry settings | Versions, this campaign's switches, the visibility settings that decide chat results, and what players see, for the campaign's Gamemaster only; never a secret, address or token. |
-| Attack targets | Name only; armor class is withheld. Whether an attack hit each, only where Foundry shows players: dnd5e's *Attack Result Visibility*, and with Midi-QOL its *Auto check if attack hits target*, its highlights and its *GM Attack Roll Display* ([Hit, miss and save results](#hit-miss-and-save-results)). |
-| Success or failure against a DC | Left out of roll summaries, so a hidden DC is not revealed. A save or check says whether it succeeded only as dnd5e's *Challenge Visibility* shows players for its card or roll, to its author's characters alone where it shows only them, and with Midi-QOL only while Midi keeps dnd5e's highlight; Midi-QOL's card says who saved only where Midi shows players it, a player's character's under "Show all" or "Show only from other players", any other only under "Show all". |
+| Attack targets | Name only; armor class is withheld. Whether an attack hit each, only where Foundry shows players: dnd5e's *Attack Result Visibility*, and with Midi-QOL its *Auto check if attack hits target*, its highlights and its *GM Attack Roll Display*; or for every target with *Hit/miss and save results in the app* "Always show them to players" ([Hit, miss and save results](#hit-miss-and-save-results)). |
+| Success or failure against a DC | Left out of roll summaries, so a hidden DC is not revealed. A save or check says whether it succeeded only as dnd5e's *Challenge Visibility* shows players for its card or roll, to its author's characters alone where it shows only them, and with Midi-QOL only while Midi keeps dnd5e's highlight; Midi-QOL's card says who saved only where Midi shows players it, a player's character's under "Show all" or "Show only from other players", any other only under "Show all". With *Hit/miss and save results in the app* "Always show them to players", every save and check's success or failure, to everyone, still without the DC. |
 | The Gamemaster's rolls on Midi-QOL's cards | Trimmed as Midi-QOL's *GM Attack Roll Display* and *GM Damage Roll Display* show them to players: without the formula, dice or total each hides. |
 | DCs on chat cards | A card's text, and a roll request's DC, as dnd5e's *Challenge Visibility* shows players: of the two labels its buttons have, with the DC and without, only the one players see; never a DC the card shows no one, as a request for a link with `hideDC`. A card's content goes with no button's DC, without labels with DCs players don't see, and with Midi-QOL's sections of hits and saves, drawn for you with armor classes and DCs, emptied; and its `system` data, as dnd5e 6 keeps a card's, with no target's armor class, no button's DC, a card's or a roll request's or concentration check's, and no request's DC. |
 | Token dispositions | Friendly, neutral or hostile, as players see a token's border; never Secret, nor a hidden token's. |
@@ -629,12 +669,12 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/character-sync.mjs` | Sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes, then each of the campaign's groups, again when it, its members' names or portraits, or its characters' ownership change, or one of its characters is deleted, and its removal when deleted, after the hello if one was on its way; withholding a sheet too large to post or a group's no player sees; sending again what was lost |
 | `scripts/chat.mjs` | Chat hooks |
 | `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack; whether an attack hit each target, who saved and whether a save or check succeeded, by the rules of `results.mjs`; dnd5e 6's typed messages, and their data without what players don't see; its content without what cards keep from players; the Gamemaster's rolls on Midi-QOL's cards trimmed as Midi shows them to players |
-| `scripts/results.mjs` | The rules of what players see of chat results, as dnd5e and Midi-QOL show them, read once per message, and the verdict on them that Manage Campaigns and the app show |
+| `scripts/results.mjs` | The rules of what players see of chat results, as dnd5e and Midi-QOL show them, or always where the Gamemaster has players told so, read once per message, and the verdict on them that Manage Campaigns and the app show |
 | `scripts/foundry-settings.mjs` | A campaign's Foundry settings for its Gamemaster in the app: versions, its switches, the visibility settings that decide chat results and the verdict; sent again when one changes or a listed group is renamed or deleted, and after a hello if they changed while it was on its way |
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization, each combatant's token's disposition as players see it |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
-| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells and descriptions' links from the app, one campaign at a time, with which characters it has open, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes |
+| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells, descriptions' links and moves of items and coins from the app, one campaign at a time, with which characters it has open, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes |
 | `scripts/prompts.mjs` | The saves the game asks of a campaign's characters on chat cards, told to the app as prompts, and closed as they're answered, or a concentration card's once its character no longer concentrates on what it asked about |
 | `scripts/midi-prompts.mjs` | Midi-QOL's own saves, concentration checks and OverTime turn saves, asked in the app while the character is open there, answered with the player's dice, or left to Midi |
 | `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card, as the Gamemaster's where they made it; a prompt's save on its card, or Midi-QOL's as Midi rolls it; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time |
@@ -643,6 +683,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
 | `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat |
+| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, planning damage's dice as the world rolls them, critical hits too, and the self-test that it works |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster |
 | `templates/settings/` | The settings window's templates, one for each kind of section |

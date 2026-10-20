@@ -149,13 +149,14 @@ function chargeRefusal(command, campaign) {
  * Post the line that says what a character did, as the character, for everyone: the text given,
  * whose names are escaped already, being what players may write. One the Gamemaster made in the
  * app is flagged theirs, and so listed in their result. One that can't be posted is no failure of
- * what it tells of, which is done: it's left unsaid.
+ * what it tells of, which is done: it's left unsaid. Since 0.31.0 a move of items and coins posts
+ * its line so too.
  * @param {object} command
  * @param {Actor} actor
  * @param {string} text
  * @returns {Promise<ChatMessage|null>}
  */
-async function postLine(command, actor, text) {
+export async function postLine(command, actor, text) {
   try {
     return await ChatMessage.implementation.create({
       author: authorFor(actor).id,

@@ -82,17 +82,32 @@ export function groupEntry(group, campaign) {
  * @returns {Record<string, "observer"|"owner">}
  */
 function accessOf(group, campaign) {
-  const { OBSERVER, OWNER } = CONST.DOCUMENT_OWNERSHIP_LEVELS;
   const access = {};
   for ( const actor of campaignActors(campaign) ) {
-    const owners = playerOwners(actor);
-    const level = owners.length
-      ? Math.max(...owners.map(user => Number(group.getUserLevel(user)) || 0))
-      : (Number(group.ownership?.default) || 0);
-    if ( level >= OWNER ) access[actor.id] = "owner";
-    else if ( level >= OBSERVER ) access[actor.id] = "observer";
+    const level = accessFor(group, actor);
+    if ( level ) access[actor.id] = level;
   }
   return access;
+}
+
+/**
+ * What one character may do with a group, as Foundry lets its players: by the highest ownership of
+ * the group among them, or for one no player owns, the group's default. Owner, Observer, or none for
+ * Limited or less. Since 0.31.0 also who may move items and coins with a group from the app, so that
+ * the module and the app, which is told `access`, can't disagree.
+ * @param {Actor} group
+ * @param {Actor} actor
+ * @returns {"owner"|"observer"|null}
+ */
+export function accessFor(group, actor) {
+  const { OBSERVER, OWNER } = CONST.DOCUMENT_OWNERSHIP_LEVELS;
+  const owners = playerOwners(actor);
+  const level = owners.length
+    ? Math.max(...owners.map(user => Number(group.getUserLevel(user)) || 0))
+    : (Number(group.ownership?.default) || 0);
+  if ( level >= OWNER ) return "owner";
+  if ( level >= OBSERVER ) return "observer";
+  return null;
 }
 
 /**

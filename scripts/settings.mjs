@@ -1,4 +1,4 @@
-import { CHAT_SCOPES, MODULE_ID, SETTINGS } from "./constants.mjs";
+import { CHAT_SCOPES, MODULE_ID, RESULTS_MODES, SETTINGS } from "./constants.mjs";
 import { announce } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { MANUAL_DICE } from "./companions.mjs";
@@ -66,7 +66,9 @@ export function registerSettings() {
       rolls: new BooleanField({ initial: false }),
       attacks: new BooleanField({ initial: false }),
       prompts: new BooleanField({ initial: false }),
-      manualDice: new BooleanField({ initial: false })
+      manualDice: new BooleanField({ initial: false }),
+      // May its players move items and coins from the app? Apart from its rolls.
+      transfers: new BooleanField({ initial: false })
     })),
     default: [],
     onChange: () => reannounce()
@@ -126,6 +128,19 @@ export function registerSettings() {
     type: Boolean,
     default: false,
     onChange: () => reannounce()
+  });
+
+  // Whether players are told hits, misses and saves whatever Foundry shows them. It changes only
+  // what each message says from then on, which the settings report follows by itself: no hello.
+  game.settings.register(MODULE_ID, SETTINGS.CHAT_RESULTS, {
+    scope: "world",
+    config: false,
+    type: String,
+    choices: {
+      [RESULTS_MODES.FOUNDRY]: "SENDINGSTONE.Config.General.ResultsFoundry",
+      [RESULTS_MODES.ALWAYS]: "SENDINGSTONE.Config.General.ResultsAlways"
+    },
+    default: RESULTS_MODES.FOUNDRY
   });
 
   // Shown in the settings window only where Midi-QOL is: without it, attacks and spells always take

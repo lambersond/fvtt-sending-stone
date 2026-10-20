@@ -311,6 +311,19 @@
             {{/unless}}
         </p>
     </fieldset>
+
+    <fieldset class="sending-stone-transfers">
+        <legend>{{localize "SENDINGSTONE.Config.Actions.Transfers"}}</legend>
+        <div class="form-group">
+            <label for="sending-stone-transfers">{{localize "SENDINGSTONE.Config.Actions.TransfersPlayers"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-transfers" name="campaign.transfers" {{#if campaign.transfers}}checked{{/if}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.TransfersHint"}}</p>
+            {{#if campaign.transfersUnavailable}}<p class="hint sending-stone-warning">{{campaign.transfersUnavailable}}</p>{{/if}}
+            {{#if campaign.transfersApp}}<p class="hint sending-stone-warning">{{localize "SENDINGSTONE.Config.Actions.TransfersApp"}}</p>{{/if}}
+        </div>
+    </fieldset>
 </div>
 
 {{else if campaign.tabs.connection}}
