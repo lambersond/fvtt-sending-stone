@@ -1,6 +1,7 @@
 import { EVENTS, MODULE_ID, SETTINGS } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { resultsAlways } from "./config.mjs";
 import { wrap } from "./dice-plan.mjs";
 import {
   concentratingOn, ownConcentrationAbility, prompting, PROMPT_LIFETIME, showsChallenge
@@ -1042,8 +1043,9 @@ export function midiPromptAnswered(entry, rolls, chosen) {
 
 /**
  * Whether the answer saved, as Midi decided it, where its player may know: when the DC was sent
- * and Midi shows players whether they saved; for a concentration card, as its roll met the DC.
- * Waited for at most ten seconds.
+ * and Midi shows players whether they saved, or since 0.31.0, with players told always, wherever
+ * Midi checks saves at all; for a concentration card, as its roll met the DC. Waited for at most
+ * ten seconds.
  * @param {MidiPrompt} entry
  * @param {Roll[]} rolls
  * @returns {Promise<"success"|"failure"|null>}
@@ -1060,7 +1062,8 @@ export async function midiOutcome(entry, rolls) {
     new Promise(resolve => { timer = setTimeout(() => resolve(null), VERDICT_WAIT); })
   ]);
   clearTimeout(timer);
-  return ((entry.dc !== null) && OUTCOME_SHOWN.has(entry.saveDisplay)) ? verdict : null;
+  const shown = resultsAlways() ? (entry.saveDisplay !== "none") : ((entry.dc !== null) && OUTCOME_SHOWN.has(entry.saveDisplay));
+  return shown ? verdict : null;
 }
 
 /**

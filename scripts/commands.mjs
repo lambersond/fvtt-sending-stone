@@ -8,6 +8,7 @@ import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
+import { noteTransferReader, runTransferCommand, transferReader, transfersOn } from "./command-transfers.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
@@ -100,7 +101,8 @@ const pollers = new Map();
 const taken = [];
 
 /**
- * The latest roll of each character, which its next roll waits for, by actor id.
+ * The latest roll of each character, which its next roll waits for, by actor id; since 0.31.0 a
+ * move of items and coins too, under each of its ends, a party's among them.
  * @type {Map<string, Promise<void>>}
  */
 const queues = new Map();
@@ -201,7 +203,9 @@ export function registerCommandHooks() {
  * Note what the app said it does beyond taking events, answering a campaign's hello or heartbeat:
  * since 0.27.0, whether it reads Midi-QOL's prompts too; and since 0.30.0, whether it reads groups
  * and what the world's settings are, each of which is sent at once where it starts to in a
- * heartbeat's answer.
+ * heartbeat's answer; and since 0.31.0, whether it takes moves of items and coins, for which it's
+ * fetched from even while its players' rolls aren't made here. A hello's answer wakes the
+ * campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -213,12 +217,15 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteMidiReader(campaignId, features);
   noteGroupReader(campaignId, features, type);
   noteSettingsReader(campaignId, features, type);
+  noteTransferReader(campaignId, features);
   syncPollers();
+  if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.wake?.();
 }
 
 /**
- * Fetch for each campaign that lets its players roll from the app, and that the app has commands
- * for, while this client is the bridge; and for no other.
+ * Fetch for each campaign that lets its players roll from the app, or since 0.31.0 move items and
+ * coins from it, and that the app has commands for, while this client is the bridge; and for no
+ * other.
  * @param {object} [options]
  * @param {boolean} [options.retry]   Try again the campaigns whose fetch the app refused, as after
  *                                    a change to the settings.
@@ -227,9 +234,9 @@ export function noteListenerFeatures(campaignId, features, type) {
 export function syncPollers({ retry=false }={}) {
   if ( retry ) refused.clear();
   const wanted = new Set();
-  if ( canSend() && diceStatus.ready ) {
+  if ( canSend() ) {
     for ( const campaign of getCampaigns() ) {
-      if ( campaign.rolls && offered.has(campaign.id) && !refused.has(campaign.id) ) wanted.add(campaign.id);
+      if ( fetchesFor(campaign) && offered.has(campaign.id) && !refused.has(campaign.id) ) wanted.add(campaign.id);
     }
   }
   for ( const [id, poller] of pollers ) {
@@ -238,6 +245,28 @@ export function syncPollers({ retry=false }={}) {
   for ( const id of wanted ) {
     if ( !pollers.has(id) ) new Poller(id).start();
   }
+}
+
+/**
+ * Is anything fetched for a campaign: its players' rolls, made here once the self-test has passed;
+ * or since 0.31.0, their moves of items and coins, where they may make them and its app takes them,
+ * whether or not their rolls are made here. A roll fetched while only moves are is refused as one
+ * fetched while rolls are off.
+ * @param {Campaign} campaign
+ * @returns {boolean}
+ */
+function fetchesFor(campaign) {
+  return (campaign.rolls && diceStatus.ready) || (transfersOn(campaign) && transferReader(campaign.id));
+}
+
+/**
+ * Did the app say, in its last answer to a campaign's hello or heartbeat, that it has commands for
+ * it? Since 0.31.0, for Manage Campaigns to say so where it has them but takes no moves.
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function commandsOffered(campaignId) {
+  return offered.has(campaignId);
 }
 
 /**
@@ -307,7 +336,7 @@ class Poller {
     let failures = 0;
     while ( !this.stopped ) {
       const campaign = getCampaigns().find(({ id }) => id === this.campaignId);
-      if ( !campaign?.rolls || !canSend() ) break;
+      if ( !campaign || !fetchesFor(campaign) || !canSend() ) break;
       let answer;
       try {
         answer = await this.#fetch(campaign);
@@ -423,7 +452,8 @@ class Poller {
  * Take a command to make: once, however often it's fetched, and after the same character's
  * earlier rolls, in the order they were made. An answer to a save Midi-QOL asked is made at once:
  * Midi waits on it, perhaps inside one of those earlier rolls, as a player's spell from the app
- * that asks them for a save.
+ * that asks them for a save. Since 0.31.0 a move of items and coins waits for the rolls of both its
+ * ends too, as a potion drunk at the moment it's given, and their next rolls wait for it.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -439,13 +469,16 @@ function take(command, campaign) {
     return;
   }
 
-  const actorId = String(command.actorId);
-  const made = (queues.get(actorId) ?? Promise.resolve())
+  const keyOf = value => ((typeof value === "string") && value) ? value : null;
+  const keys = (command.kind === "transfer")
+    ? [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to)].filter(Boolean))]
+    : [String(command.actorId)];
+  const made = Promise.all(keys.map(key => queues.get(key) ?? Promise.resolve()))
     .then(() => make(command, campaign))
     .catch(err => console.error(`${MODULE_ID} | Could not report a roll from Sending Stone`, err));
-  queues.set(actorId, made);
+  for ( const key of keys ) queues.set(key, made);
   void made.finally(() => {
-    if ( queues.get(actorId) === made ) queues.delete(actorId);
+    for ( const key of keys ) if ( queues.get(key) === made ) queues.delete(key);
   });
 }
 
@@ -538,6 +571,7 @@ function runCommand(command, campaign, signal) {
     case "ask": return runAskCommand(command, campaign);
     case "textDamage": return runTextDamageCommand(command, campaign);
     case "textRoll": return runTextRollCommand(command, campaign);
+    case "transfer": return runTransferCommand(command, campaign);
     default: return runRollCommand(command, campaign, { signal });
   }
 }

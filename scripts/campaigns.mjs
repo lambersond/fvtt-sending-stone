@@ -31,6 +31,10 @@ import { diceStatus } from "./dice-plan.mjs";
  * @property {boolean} manualDice     May its players enter what their own dice show in the app?
  *                                    Off until the Gamemaster turns it on, and counted only with
  *                                    `rolls` while Manual Dice is on: see manualDiceOn.
+ * @property {boolean} transfers      May its players move items and coins from the app: take from
+ *                                    and give to its groups they own in Foundry, and give to each
+ *                                    other's characters? Off until the Gamemaster turns it on;
+ *                                    apart from `rolls`.
  */
 
 /**
@@ -39,7 +43,7 @@ import { diceStatus } from "./dice-plan.mjs";
  */
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
-  return stored.map(({ id, title, characters, groups, rolls, attacks, prompts, manualDice }) => ({
+  return stored.map(({ id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers }) => ({
     id,
     title,
     characters: new Set(characters),
@@ -47,7 +51,8 @@ export function getCampaigns() {
     rolls: rolls === true,
     attacks: attacks === true,
     prompts: prompts === true,
-    manualDice: manualDice === true
+    manualDice: manualDice === true,
+    transfers: transfers === true
   }));
 }
 

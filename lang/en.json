@@ -79,10 +79,14 @@
         "AddressHint": "Where every campaign sends its events.",
         "Send": "What to send",
         "Chat": "Chat messages",
-        "ChatHint": "New, edited and deleted messages, and the log being cleared. Hits, misses and saves show where Foundry shows players them: dnd5e's Attack Result Visibility and Challenge Visibility (its Configure Visibility settings), and Midi-QOL's Auto Check Hits and Auto Check Saves.",
+        "ChatHint": "New, edited and deleted messages, and the log being cleared.",
         "Scope": "Which messages",
         "ScopeAll": "All its players can read",
         "ScopeConnected": "Its characters' messages only",
+        "Results": "Hit/miss and save results in the app",
+        "ResultsFoundry": "Follow Foundry's visibility settings",
+        "ResultsAlways": "Always show them to players",
+        "ResultsHint": "Follow: hits, misses and saves show where Foundry shows players them, by dnd5e's Attack Result Visibility and Challenge Visibility and Midi-QOL's Auto Check Hits and Auto Check Saves. Always: players see every target's hit or miss, and every save and check's success or failure. Armor class and DCs still need GM-only details, and whispers and blind rolls still go only to those who may read them.",
         "Combat": "Combat tracker",
         "CombatHint": "Encounters, turns, rounds, initiative and defeats.",
         "GmContent": "GM-only details",
@@ -170,7 +174,11 @@
           "inactive": "Manual Dice is installed but not enabled in this world.",
           "missing": "Needs the Manual Dice module."
         },
-        "ViewModules": "View modules"
+        "ViewModules": "View modules",
+        "Transfers": "Items and coins",
+        "TransfersPlayers": "Players move items and coins",
+        "TransfersHint": "From the app, they take from and give to the campaign's parties they own in Foundry, and give to each other's characters. You can move anything between its characters and parties. Each move posts a line in chat.",
+        "TransfersApp": "The app this campaign sends to doesn't take moves yet."
       },
       "Connection": {
         "Title": "Title",
@@ -320,7 +328,11 @@
     "Chat": {
       "Spends": "Spends {count} · {name}",
       "InspirationUsed": "Uses Heroic Inspiration",
-      "InspirationGained": "Gains Heroic Inspiration"
+      "InspirationGained": "Gains Heroic Inspiration",
+      "Gives": "Gives {things} to {target}",
+      "Takes": "Takes {things} from {source}",
+      "Things": "{count} {name}",
+      "Coins": "{count} {abbreviation}"
     },
     "Results": {
       "Lead": "What players see in chat:",

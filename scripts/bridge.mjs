@@ -3,6 +3,7 @@ import { chatEnabled, chatScope, combatEnabled, getDestination, includeGmContent
 import { forgetCombats, noteCombatSent } from "./campaign-combats.mjs";
 import { forgetTold } from "./character-sync.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { transferFeatures } from "./command-transfers.mjs";
 import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { roster } from "./characters.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
@@ -71,6 +72,8 @@ const resent = new Map();
  * campaign whose fetch was refused is tried again. Since 0.30.0 it lists the campaign's groups,
  * each without its sheet, which follows it as its characters' do to an app that reads groups; and
  * says what the world's settings that decide what players see are, `settings`, for its Gamemaster.
+ * Since 0.31.0 it says whether its players may move items and coins from the app, beside their
+ * rolls, `features.transfers`, whatever the rolls.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -103,7 +106,7 @@ export function announce({ campaignId }={}) {
     noteSettingsSent(campaign.id, settings);
     send(EVENTS.HELLO, {
       ...shared,
-      features: { rolls: rollFeatures(campaign) },
+      features: { rolls: rollFeatures(campaign), transfers: transferFeatures(campaign) },
       sheetsApart: true,
       characters: roster(campaign),
       groups: campaignGroups(campaign).map(group => groupEntry(group, campaign)),

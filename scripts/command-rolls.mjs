@@ -4,6 +4,7 @@ import {
 } from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
+import { checkTransferCommand } from "./command-transfers.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
 import {
   claimMidiPrompt, midiAnswerAuthor, midiAnswerConfig, midiAnswerFailed, midiAnswerFlags, midiOutcome,
@@ -209,7 +210,8 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * check or saving throw may name the link in a description it's rolled for, but not while
  * answering a prompt; and a check may name the item and check activity it's rolled for instead.
  * Only a use names the enchantment it applies. Ending a concentration, spending charges and Heroic
- * Inspiration each name what they end, spend or change, and nothing else.
+ * Inspiration each name what they end, spend or change, and nothing else; and since 0.31.0, a move
+ * of items and coins what it moves, from where to where.
  * @param {object} command
  * @returns {string|null}
  */
@@ -221,6 +223,7 @@ export function checkCommand(command) {
   if ( CONCENTRATION_KINDS.includes(command.kind) ) return checkConcentrationCommand(command);
   if ( command.kind === "spend" ) return checkSpendCommand(command);
   if ( command.kind === "inspiration" ) return checkInspirationCommand(command);
+  if ( command.kind === "transfer" ) return checkTransferCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);
@@ -449,7 +452,7 @@ function checkEnchantCommand(command) {
 
 /**
  * The fields a command names its item, activity, targets, prompt or link by, none of which ending
- * a concentration, spending charges or Heroic Inspiration names.
+ * a concentration, spending charges or Heroic Inspiration names, nor a move of items and coins.
  * @type {string[]}
  */
 const ROLL_FIELDS = [
@@ -461,7 +464,7 @@ const ROLL_FIELDS = [
  * @param {object} command
  * @returns {boolean}
  */
-function namesRollFields(command) {
+export function namesRollFields(command) {
   return ROLL_FIELDS.some(field => (command[field] !== undefined) && (command[field] !== null));
 }
 
@@ -470,7 +473,7 @@ function namesRollFields(command) {
  * @param {object} command
  * @returns {boolean}
  */
-function throwsNoDice(command) {
+export function throwsNoDice(command) {
   if ( (command.mode !== 0) || (command.explicit !== false) ) return false;
   const none = list => (list === undefined) || (list === null) || (Array.isArray(list) && !list.length);
   return none(command.extras) && none(command.dice);
@@ -538,7 +541,7 @@ function isCounter(counter) {
  * @param {unknown} value
  * @returns {boolean}
  */
-function isObject(value) {
+export function isObject(value) {
   return Boolean(value) && (typeof value === "object") && !Array.isArray(value);
 }
 
@@ -558,7 +561,7 @@ function isEnchant(value) {
  * @param {unknown} value
  * @returns {boolean}
  */
-function isId(value) {
+export function isId(value) {
   return (typeof value === "string") && (value.length > 0) && (value.length <= 64);
 }
 

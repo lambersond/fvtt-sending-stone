@@ -1,4 +1,4 @@
-import { chatEnabled, includeGmContent } from "./config.mjs";
+import { chatEnabled, includeGmContent, resultsAlways } from "./config.mjs";
 import { OUTCOME_SHOWN } from "./midi-prompts.mjs";
 
 /**
@@ -9,6 +9,12 @@ import { OUTCOME_SHOWN } from "./midi-prompts.mjs";
  * functions, so that the two can't drift apart.
  *
  * Every setting is read as it's set now, once per message, or once for a verdict.
+ *
+ * Since 0.31.0 the Gamemaster may have players told every hit, miss and save in the app whatever
+ * Foundry shows them, "Hit/miss and save results in the app: Always show them to players", as
+ * GM-only details tells them, but never with a target's armor class or a DC, and never of a roll
+ * Midi-QOL shows players as "??". Who reads a message, and the Gamemaster's rolls Midi trims, stay
+ * as Foundry has them.
  */
 
 /**
@@ -55,6 +61,8 @@ export const MISSING = "—";
  * The rules what players see is told by, as the world has them now.
  * @typedef {object} ResultRules
  * @property {boolean} gmContent                         Is Gamemaster-only information sent?
+ * @property {boolean} always                            Are players told every hit, miss and save,
+ *                                                       whatever Foundry shows them (0.31.0)?
  * @property {string|undefined} attackRollVisibility     dnd5e's.
  * @property {string|undefined} challengeVisibility      dnd5e's.
  * @property {{autoCheckHit: string|undefined, autoCheckSaves: string|undefined, highlightSuccess: unknown,
@@ -71,6 +79,7 @@ export const MISSING = "—";
 export function resultRules() {
   return {
     gmContent: includeGmContent(),
+    always: resultsAlways(),
     attackRollVisibility: asString(readSetting("dnd5e", "attackRollVisibility")),
     challengeVisibility: asString(readSetting("dnd5e", "challengeVisibility")),
     midi: (game.modules.get("midi-qol")?.active === true) ? midiRules() : null
@@ -157,13 +166,24 @@ export function midiCard(message) {
 /* -------------------------------------------- */
 
 /**
+ * Are players told every hit, miss, save and check result, whatever Foundry shows them: with
+ * GM-only details sent, or since 0.31.0 the results always? Neither armor class nor a DC goes with
+ * them by this alone.
+ * @param {ResultRules} rules
+ * @returns {boolean}
+ */
+export function resultsTold(rules) {
+  return rules.gmContent || rules.always;
+}
+
+/**
  * Do players see whether dnd5e's attack hit, as its Attack Result Visibility has it (D5
  * documents/chat-message.mjs:208, 442-444)?
  * @param {ResultRules} rules
  * @returns {boolean}
  */
 export function attacksShown(rules) {
-  return rules.gmContent || ATTACKS_SHOWN.has(rules.attackRollVisibility);
+  return resultsTold(rules) || ATTACKS_SHOWN.has(rules.attackRollVisibility);
 }
 
 /**
@@ -219,7 +239,7 @@ export function midiMarked(rules) {
  * @returns {"everyone"|"author"|"none"}
  */
 export function challengeAudience(rules, author) {
-  if ( rules.gmContent ) return "everyone";
+  if ( resultsTold(rules) ) return "everyone";
   const visibility = rules.challengeVisibility;
   if ( visibility === "all" ) return "everyone";
   const player = Boolean(author) && !author.isGM;
@@ -237,7 +257,7 @@ export function challengeAudience(rules, author) {
  * @returns {boolean}
  */
 export function midiSaveSeen(rules, actor) {
-  if ( rules.gmContent ) return true;
+  if ( resultsTold(rules) ) return true;
   if ( !OUTCOME_SHOWN.has(rules.midi?.autoCheckSaves) ) return false;
   const visibility = rules.challengeVisibility;
   return (actor?.hasPlayerOwner === true) ? ["all", "player"].includes(visibility) : (visibility === "all");
@@ -301,6 +321,23 @@ export function resultsVerdict(rules=resultRules()) {
     return lines;
   }
 
+  // Told always, but for what Midi-QOL decides nothing of, and the rolls it trims, which follow it.
+  if ( rules.always ) {
+    const why = [reason(localize("SENDINGSTONE.Config.General.Results"), localize("SENDINGSTONE.Config.General.ResultsAlways"))];
+    line("hits", midi ? "HitsDnd5e" : "Hits", "shown", why);
+    if ( midi ) line("midiHits", "HitsMidi", "shown", why);
+    line("saves", "Saves", "shown", why);
+    line("checks", "Checks", "shown", why);
+    if ( midi ) {
+      if ( rules.midi.autoCheckSaves === "none" ) {
+        line("midiSaves", "SavesMidi", "hidden", [midiReason("autoCheckSaves", "none")]);
+      }
+      else line("midiSaves", "SavesMidi", "shown", why);
+      gmRollsLine(rules, line);
+    }
+    return lines;
+  }
+
   // dnd5e's own attack cards: with Midi, which never draws their tray, only an attack at one target.
   if ( !midi ) line("hits", "Hits", attacksShown(rules) ? "shown" : "hidden", [arv]);
   else {
@@ -340,14 +377,24 @@ export function resultsVerdict(rules=resultRules()) {
     if ( pc && npc ) line("midiSaves", "SavesMidi", "shown", why);
     else if ( pc ) line("midiSaves", "SavesMidi", "partial", why, "PlayerTargets");
     else line("midiSaves", "SavesMidi", "hidden", why);
-
-    const { gmAttackDisplay: attack, gmDamageDisplay: damage } = rules.midi;
-    const reasons = [midiReason("gmAttackDisplay", attack), midiReason("gmDamageDisplay", damage)];
-    const state = ((attack === "full") && (damage === "full")) ? "shown"
-      : ((attack === "hidden") && (damage === "hidden")) ? "hidden" : "partial";
-    line("gmRolls", "GmRolls", state, reasons, "GmTrimmed");
+    gmRollsLine(rules, line);
   }
   return lines;
+}
+
+/**
+ * The verdict's line of the Gamemaster's rolls on Midi-QOL's cards, as its GM displays trim them,
+ * GM-only details aside.
+ * @param {ResultRules} rules
+ * @param {(id: string, what: string, state: string, why: string[], where?: string) => void} line
+ * @returns {void}
+ */
+function gmRollsLine(rules, line) {
+  const { gmAttackDisplay: attack, gmDamageDisplay: damage } = rules.midi;
+  const reasons = [midiReason("gmAttackDisplay", attack), midiReason("gmDamageDisplay", damage)];
+  const state = ((attack === "full") && (damage === "full")) ? "shown"
+    : ((attack === "hidden") && (damage === "hidden")) ? "hidden" : "partial";
+  line("gmRolls", "GmRolls", state, reasons, "GmTrimmed");
 }
 
 /**

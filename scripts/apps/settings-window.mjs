@@ -1,7 +1,9 @@
-import { CHAT_SCOPES, EVENTS, MODULE_ID, SETTINGS, STATUS_HOOK } from "../constants.mjs";
+import { CHAT_SCOPES, EVENTS, MODULE_ID, RESULTS_MODES, SETTINGS, STATUS_HOOK } from "../constants.mjs";
 import { getCampaigns, manualDiceOn } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
+import { transferReader } from "../command-transfers.mjs";
 import { attacksUnavailable } from "../command-uses.mjs";
+import { commandsOffered } from "../commands.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
 import { getDestination, getSecret, isMixedContent, parseDestination } from "../config.mjs";
 import { campaignStatus, describeProblem } from "../delivery-status.mjs";
@@ -28,6 +30,7 @@ const TEMPLATES = `modules/${MODULE_ID}/templates/settings`;
 const GENERAL = Object.freeze({
   chatEvents: SETTINGS.CHAT_EVENTS,
   chatScope: SETTINGS.CHAT_SCOPE,
+  chatResults: SETTINGS.CHAT_RESULTS,
   combatEvents: SETTINGS.COMBAT_EVENTS,
   gmContent: SETTINGS.GM_CONTENT,
   midiIntegration: SETTINGS.MIDI_INTEGRATION,
@@ -40,7 +43,7 @@ const GENERAL = Object.freeze({
  */
 const DEPENDENTS = Object.freeze({
   "campaign.rolls": ["campaign.attacks", "campaign.prompts", "campaign.manualDice"],
-  chatEvents: ["chatScope"],
+  chatEvents: ["chatScope", "chatResults"],
   midiIntegration: ["offCanvasTargets"]
 });
 
@@ -125,15 +128,15 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
 
   /**
    * The app's address and the General section's settings, as being edited.
-   * @type {{destination: string, chatEvents: boolean, chatScope: string, combatEvents: boolean,
-   *   gmContent: boolean, midiIntegration: boolean, offCanvasTargets: boolean}}
+   * @type {{destination: string, chatEvents: boolean, chatScope: string, chatResults: string,
+   *   combatEvents: boolean, gmContent: boolean, midiIntegration: boolean, offCanvasTargets: boolean}}
    */
   #general = SettingsWindow.#readGeneral();
 
   /**
    * The campaigns as being edited, each with the secret this browser holds for it.
    * @type {{id: string, title: string, secret: string, characters: Set<string>, groups: Set<string>,
-   *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean}[]}
+   *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({ ...campaign, secret: getSecret(campaign.id) }));
 
@@ -242,7 +245,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         rolls: campaign.rolls,
         attacks: campaign.attacks,
         prompts: campaign.prompts,
-        manualDice: campaign.manualDice
+        manualDice: campaign.manualDice,
+        transfers: campaign.transfers
       }))
     });
   }
@@ -267,14 +271,15 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     if ( has("destination") ) this.#general.destination = String(data.destination ?? "");
     for ( const name of Object.keys(GENERAL) ) {
       if ( !has(name) ) continue;
-      this.#general[name] = (name === "chatScope") ? String(data[name]) : (data[name] === true);
+      // The choices are strings; every other General setting is a switch.
+      this.#general[name] = (["chatScope", "chatResults"].includes(name)) ? String(data[name]) : (data[name] === true);
     }
 
     const campaign = this.#current();
     if ( campaign ) {
       if ( has("campaign.title") ) campaign.title = String(data["campaign.title"] ?? "");
       if ( has("campaign.secret") ) campaign.secret = String(data["campaign.secret"] ?? "");
-      for ( const name of ["rolls", "attacks", "prompts", "manualDice"] ) {
+      for ( const name of ["rolls", "attacks", "prompts", "manualDice", "transfers"] ) {
         if ( has(`campaign.${name}`) ) campaign[name] = data[`campaign.${name}`] === true;
       }
     }
@@ -442,6 +447,14 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         value,
         label: game.i18n.localize(`SENDINGSTONE.Config.General.${key}`),
         selected: general.chatScope === value
+      })),
+      results: [
+        { value: RESULTS_MODES.FOUNDRY, key: "ResultsFoundry" },
+        { value: RESULTS_MODES.ALWAYS, key: "ResultsAlways" }
+      ].map(({ value, key }) => ({
+        value,
+        label: game.i18n.localize(`SENDINGSTONE.Config.General.${key}`),
+        selected: general.chatResults === value
       })),
       combatEvents: general.combatEvents === true,
       gmContent: general.gmContent === true,
@@ -663,7 +676,9 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
 
   /**
    * A campaign's Player actions tab: what its players may do from the app, why any of it can't be
-   * done in this game, and whether they may enter their own dice results, which needs Manual Dice.
+   * done in this game, and whether they may enter their own dice results, which needs Manual Dice;
+   * and since 0.31.0, whether they may move items and coins, which needs D&D Fifth Edition and an
+   * app that takes moves, an older one answering with commands but not with `transfers`.
    * @param {SettingsWindow["#campaigns"][number]} campaign
    * @returns {object}
    */
@@ -691,7 +706,13 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         ready: manualDice === "active",
         enabled: campaign.rolls && (manualDice === "active"),
         note: game.i18n.localize(`SENDINGSTONE.Config.Actions.ManualDice.${manualDice}`)
-      }
+      },
+      transfers: campaign.transfers,
+      transfersUnavailable: (game.system?.id !== "dnd5e")
+        ? game.i18n.format("SENDINGSTONE.Config.Actions.Unavailable", {
+          reason: game.i18n.localize("SENDINGSTONE.Config.Actions.RollsReason.system")
+        }) : null,
+      transfersApp: campaign.transfers && commandsOffered(campaign.id) && !transferReader(campaign.id)
     };
   }
 
@@ -994,7 +1015,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   static async #onAddCampaign() {
     const campaign = {
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
-      attacks: false, prompts: false, manualDice: false
+      attacks: false, prompts: false, manualDice: false, transfers: false
     };
     this.#campaigns.push(campaign);
     await this.#show({ section: "campaign", campaignId: campaign.id, tab: "connection" }, "[name='campaign.title']");
@@ -1293,7 +1314,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       rolls: campaign.rolls,
       attacks: campaign.attacks,
       prompts: campaign.prompts,
-      manualDice: campaign.manualDice
+      manualDice: campaign.manualDice,
+      transfers: campaign.transfers
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {
       const value = this.#general[name];

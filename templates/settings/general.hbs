@@ -33,6 +33,17 @@
                 </select>
             </div>
         </div>
+        <div class="form-group sending-stone-nested {{#unless general.chatEvents}}disabled{{/unless}}">
+            <label for="sending-stone-results">{{localize "SENDINGSTONE.Config.General.Results"}}</label>
+            <div class="form-fields">
+                <select id="sending-stone-results" name="chatResults" {{#unless general.chatEvents}}disabled{{/unless}}>
+                    {{#each general.results as |choice|}}
+                    <option value="{{choice.value}}" {{#if choice.selected}}selected{{/if}}>{{choice.label}}</option>
+                    {{/each}}
+                </select>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.General.ResultsHint"}}</p>
+        </div>
         <div class="form-group">
             <label for="sending-stone-combat">{{localize "SENDINGSTONE.Config.General.Combat"}}</label>
             <div class="form-fields">
