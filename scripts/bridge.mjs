@@ -9,6 +9,7 @@ import { roster } from "./characters.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
 import { foundrySettings, noteSettingsSent } from "./foundry-settings.mjs";
 import { campaignGroups, groupEntry } from "./groups.mjs";
+import { noteFeatures } from "./journals.mjs";
 import { releaseHeldCards } from "./midi-prompts.mjs";
 import { openPrompts } from "./prompts.mjs";
 import { forgetSent } from "./sheet-texts.mjs";
@@ -74,7 +75,9 @@ const resent = new Map();
  * says what the world's settings that decide what players see are, `settings`, for its Gamemaster.
  * Since 0.31.0 it says whether its players may move items and coins from the app, beside their
  * rolls, `features.transfers`, whatever the rolls. Since 0.33.0, whether an item may be removed from
- * a character from the app, `features.removals`, under dnd5e, with no switch.
+ * a character from the app, `features.removals`, under dnd5e, with no switch. Since 0.34.0, whether
+ * journal notes are kept here, `features.notes`, and which of the campaign's characters and parties
+ * have a journal of them.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -107,7 +110,10 @@ export function announce({ campaignId }={}) {
     noteSettingsSent(campaign.id, settings);
     send(EVENTS.HELLO, {
       ...shared,
-      features: { rolls: rollFeatures(campaign), transfers: transferFeatures(campaign), removals: removalFeatures() },
+      features: {
+        rolls: rollFeatures(campaign), transfers: transferFeatures(campaign), removals: removalFeatures(),
+        notes: noteFeatures(campaign)
+      },
       sheetsApart: true,
       characters: roster(campaign),
       groups: campaignGroups(campaign).map(group => groupEntry(group, campaign)),

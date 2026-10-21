@@ -11,6 +11,7 @@ import { registerCombatHooks } from "./combat.mjs";
 import { installDicePlans, selfTest } from "./dice-plan.mjs";
 import { registerSettingsWatch } from "./foundry-settings.mjs";
 import { startHeartbeat } from "./heartbeat.mjs";
+import { registerJournalHooks } from "./journals.mjs";
 import { installMidiPrompts, registerMidiPromptHooks } from "./midi-prompts.mjs";
 import { registerPromptHooks } from "./prompts.mjs";
 import { registerSettings } from "./settings.mjs";
@@ -20,6 +21,7 @@ Hooks.once("init", () => {
   registerChatHooks();
   registerCombatHooks();
   registerCharacterHooks();
+  registerJournalHooks();
   registerPromptHooks();
   registerMidiPromptHooks();
   registerCommandHooks();

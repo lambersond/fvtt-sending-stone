@@ -340,6 +340,7 @@ function whatOf(type) {
   if ( kind.startsWith("combat.") ) return "Combat";
   if ( kind.startsWith("roll.prompt.") ) return "Prompt";
   if ( kind === EVENTS.COMMAND_RESULT ) return "Result";
+  if ( kind === EVENTS.JOURNAL_UPDATED ) return "Journal";
   return "Event";
 }
 

@@ -60,4 +60,7 @@ for v in X=1 "X=1 DND5E6=1"; do run sends $v SLIM_CHECK=1; done
 # Module 0.33.0: an item removed from a character (dnd5e 5.3.3 and 6.0.5 stand-ins), fetched with
 # rolls and moves off.
 for v in X=1 "X=1 DND5E6=1"; do run removals $v SLIM_CHECK=1; done
+# Module 0.34.0: journal notes, personal and party, chapters, kept in step with Foundry (dnd5e 5.3.3 and
+# 6.0.5 stand-ins), fetched with rolls, moves and removals off.
+for v in X=1 "X=1 DND5E6=1"; do run notes $v; done
 exit $fail

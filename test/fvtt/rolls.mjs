@@ -250,10 +250,11 @@ assert.equal(diceStatus.ready, true, `self-test: ${diceStatus.error}`)
 assert.equal(diceStatus.hitDice, true, `hit die self-test: ${diceStatus.hitDiceError}`)
 // Under dnd5e 5.x, a check activity's checks may be rolled for it (module 0.21.0); attacks needn't be.
 // Since module 0.32.0 `features.transfers` says whether a party's things may be sent and distributed,
-// and since 0.33.0 `features.removals` that an item may be removed from a character, with no switch.
+// and since 0.33.0 `features.removals` that an item may be removed from a character, with no switch;
+// since 0.34.0 `features.notes` that journal notes are kept, under any system, with none made yet.
 assert.deepEqual(hellos, {
-  Ashlands: { rolls: { enabled: true, kinds: [...checks, ...concentration, ...texts], reason: null, modifiers: false, areaAttacks: false, prompts: false, activityChecks: true, signedDice: true, selfTargets: false, gmRolls: true, gmRollMessages: true, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null } },
-  Mirkwood: { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null } },
+  Ashlands: { rolls: { enabled: true, kinds: [...checks, ...concentration, ...texts], reason: null, modifiers: false, areaAttacks: false, prompts: false, activityChecks: true, signedDice: true, selfTargets: false, gmRolls: true, gmRollMessages: true, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [] } },
+  Mirkwood: { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [] } },
 })
 ok("passes its self-test, hit dice's too, and tells each campaign whether its players' rolls are made here: a utility's formula always, a hit die once its self-test has passed, a check activity's checks under dnd5e 5, and the Gamemaster's as a character wherever rolls are made")
 if (process.env.LIBWRAPPER) {
@@ -1147,7 +1148,7 @@ await game.settings.set('sending-stone', 'campaigns', [
 ])
 await settle(); await settle()
 const off = app.events.filter(e => e.type === 'bridge.hello' && e.campaign.id === 'camp-a').at(-1)
-assert.deepEqual(off.data.features, { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null } })
+assert.deepEqual(off.data.features, { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [] } })
 const offAt = app.polls.length
 await settle(); await settle()
 assert.equal(app.polls.length, offAt)

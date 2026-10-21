@@ -4,6 +4,7 @@ import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, rosterEntry } from "./characters.mjs";
 import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
 import { campaignGroups, groupEntry, groupReader, groupsListing } from "./groups.mjs";
+import { forgetBooks, journalOwnershipChanged, sendBooks } from "./journals.mjs";
 import { groupSheet } from "./sheet-group.mjs";
 import { characterSheet } from "./sheet.mjs";
 import { slimSheet } from "./sheet-slim.mjs";
@@ -171,7 +172,9 @@ export function forgetTold(campaignId) {
  * the actor itself as a group; each group it's a member of, for its name and portrait; and where
  * its ownership changed and it's a campaign character, every group of its campaigns, for who may
  * see them. Each goes only where it isn't what the campaign was last told, so a member's hit points
- * changing sends no group. The character goes first, as a command's result follows its sheet.
+ * changing sends no group. The character goes first, as a command's result follows its sheet. Since
+ * 0.34.0, where its ownership changed, who may see its journals of notes is set again, and they're
+ * sent (journals.mjs).
  * @param {string} actorId
  * @param {object} [options]
  * @param {boolean} [options.ownership]   Did its ownership change?
@@ -199,6 +202,7 @@ export function sendCharacter(actorId, { ownership=false }={}) {
     if ( groupsTaken(campaign) ) add(campaign, group);
   }
   for ( const { campaign, group } of groups.values() ) sendGroup(campaign, group);
+  if ( ownership ) void journalOwnershipChanged(actorId);
 }
 
 /**
@@ -244,7 +248,8 @@ function sendGroups(campaign) {
  * each in a post of its own after the descriptions its sheet refers to. Every description goes
  * again, as every sheet does: the listener started afresh, and another hello may have followed the
  * one that was answered. Then its groups, and since the hello was built when it was queued, the
- * removal of any group it listed that has been deleted since.
+ * removal of any group it listed that has been deleted since; and since 0.34.0, every journal of
+ * notes the campaign has, to an app that reads them.
  * @param {string} campaignId
  * @param {object} [hello]    The hello answered.
  * @returns {void}
@@ -254,9 +259,11 @@ export function helloDelivered(campaignId, hello) {
   if ( !campaign || !canSend() ) return;
   forgetTold(campaign.id);
   forgetSent(campaign.id);
+  forgetBooks(campaign.id);
   for ( const actor of campaignActors(campaign) ) sendSheet(campaign, actor);
   sendGroups(campaign);
   removedSince(campaign, hello);
+  sendBooks(campaign, hello);
 }
 
 /**
@@ -281,7 +288,8 @@ function removedSince(campaign, hello) {
 /**
  * Send a campaign every character again as its listener now takes them, as when it says it expands
  * slim sheets, says so no longer, or takes larger posts than before, which a sheet withheld as too
- * large may now fit in. Not while a hello is on its way, which they follow anyway.
+ * large may now fit in. Not while a hello is on its way, which they follow anyway. Since 0.34.0 its
+ * journals of notes too, which a larger post may now take.
  * @param {string} campaignId
  * @returns {void}
  */
@@ -291,6 +299,8 @@ export function sheetTermsChanged(campaignId) {
   forgetTold(campaign.id);
   for ( const actor of campaignActors(campaign) ) sendSheet(campaign, actor);
   sendGroups(campaign);
+  forgetBooks(campaign.id);
+  sendBooks(campaign);
 }
 
 /**
@@ -431,7 +441,8 @@ function warnTooLarge(campaign, actor, bytes, limit) {
  * no sheet followed; a character, which the campaign is no longer taken to have been told; or
  * descriptions, which go again with the next sheet that refers to them. Since 0.30.0 a group as a
  * character; and a group's removal, or what the world's settings are, as the hello, which says both
- * again. What the app refused would be refused again, and isn't.
+ * again; and since 0.34.0 a journal of notes, as the hello, which every journal follows. What the
+ * app refused would be refused again, and isn't.
  * @param {object} envelope
  * @param {{temporary: boolean}} options
  * @returns {void}
@@ -454,6 +465,7 @@ export function eventDropped(envelope, { temporary }={}) {
     }
     case EVENTS.GROUP_REMOVED:
     case EVENTS.BRIDGE_SETTINGS:
+    case EVENTS.JOURNAL_UPDATED:
       lost.set(`hello:${campaignId}`, { campaignId, actorId: null, at: Date.now() });
       break;
     case EVENTS.CHARACTER_TEXTS:

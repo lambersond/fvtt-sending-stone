@@ -494,7 +494,7 @@ assert.ok(listed.some(item => item.id === 'potion') && listed.some(item => item.
 
 const ON = { enabled: true, kinds: ['remove'], reason: null }
 assert.deepEqual(helloOf().data.features.removals, ON)
-assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals'])
+assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes'])
 assert.deepEqual([helloOf().data.features.rolls.enabled, helloOf().data.features.transfers.enabled], [false, false], "the campaign's rolls and moves off")
 // Apart from the rolls, the moves and the dice: whatever they are.
 diceStatus.ready = false
