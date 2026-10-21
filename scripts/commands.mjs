@@ -8,7 +8,10 @@ import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
-import { noteTransferReader, runTransferCommand, transferReader, transfersOn } from "./command-transfers.mjs";
+import {
+  noteRemovalReader, noteTransferReader, removalReader, removalsOn, runRemoveCommand, runTransferCommand,
+  transferReader, transfersOn
+} from "./command-transfers.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
@@ -205,8 +208,10 @@ export function registerCommandHooks() {
  * since 0.27.0, whether it reads Midi-QOL's prompts too; and since 0.30.0, whether it reads groups
  * and what the world's settings are, each of which is sent at once where it starts to in a
  * heartbeat's answer; and since 0.31.0, whether it takes moves of items and coins, for which it's
- * fetched from even while its players' rolls aren't made here. A hello's answer wakes the
- * campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
+ * fetched from even while its players' rolls aren't made here; and since 0.33.0, whether it takes
+ * removals of characters' items, for which it's fetched from even while its players' rolls and
+ * moves aren't made here. A hello's answer wakes the campaign's fetching, which may be waiting as an
+ * answer given before the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -219,14 +224,15 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteGroupReader(campaignId, features, type);
   noteSettingsReader(campaignId, features, type);
   noteTransferReader(campaignId, features);
+  noteRemovalReader(campaignId, features);
   syncPollers();
   if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.wake?.();
 }
 
 /**
  * Fetch for each campaign that lets its players roll from the app, or since 0.31.0 move items and
- * coins from it, and that the app has commands for, while this client is the bridge; and for no
- * other.
+ * coins from it, or since 0.33.0 remove their characters' items, under dnd5e, wherever its app
+ * takes them, and that the app has commands for, while this client is the bridge; and for no other.
  * @param {object} [options]
  * @param {boolean} [options.retry]   Try again the campaigns whose fetch the app refused, as after
  *                                    a change to the settings.
@@ -251,13 +257,15 @@ export function syncPollers({ retry=false }={}) {
 /**
  * Is anything fetched for a campaign: its players' rolls, made here once the self-test has passed;
  * or since 0.31.0, their moves of items and coins, where they may make them and its app takes them,
- * whether or not their rolls are made here. A roll fetched while only moves are is refused as one
- * fetched while rolls are off.
+ * whether or not their rolls are made here; or since 0.33.0 removals of their items, under dnd5e,
+ * wherever its app takes them, with rolls and moves off too. A roll fetched while only moves or
+ * removals are is refused as one fetched while rolls are off.
  * @param {Campaign} campaign
  * @returns {boolean}
  */
 function fetchesFor(campaign) {
-  return (campaign.rolls && diceStatus.ready) || (transfersOn(campaign) && transferReader(campaign.id));
+  return (campaign.rolls && diceStatus.ready) || (transfersOn(campaign) && transferReader(campaign.id))
+    || (removalsOn() && removalReader(campaign.id));
 }
 
 /**
@@ -455,7 +463,9 @@ class Poller {
  * Midi waits on it, perhaps inside one of those earlier rolls, as a player's spell from the app
  * that asks them for a save. Since 0.31.0 a move of items and coins waits for the rolls of both its
  * ends too, as a potion drunk at the moment it's given, and their next rolls wait for it; since
- * 0.32.0 a distribution for every character it shares among, and theirs for it.
+ * 0.32.0 a distribution for every character it shares among, and theirs for it. Since 0.33.0 a
+ * removal waits for its character's earlier rolls and moves, as a roll does, and their next ones for
+ * it.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -575,6 +585,7 @@ function runCommand(command, campaign, signal) {
     case "textDamage": return runTextDamageCommand(command, campaign);
     case "textRoll": return runTextRollCommand(command, campaign);
     case "transfer": return runTransferCommand(command, campaign);
+    case "remove": return runRemoveCommand(command, campaign);
     default: return runRollCommand(command, campaign, { signal });
   }
 }

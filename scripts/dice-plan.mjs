@@ -19,7 +19,8 @@ import { CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from 
  * Since 0.32.0 a critical hit's damage made for a player from the app, or planned for one, is made
  * as dnd5e makes it, whatever another module's rules for critical hits say, as Midi-QOL's for the
  * Gamemaster, whose client this is: each die doubled, never Midi's `mx2` or its maximized dice.
- * The Gamemaster's own rolls keep those rules.
+ * Since 0.33.0 only its dice are doubled, never a number in it, whatever dnd5e's Critical Damage
+ * Modifiers, Midi-QOL or the roll's own options say. The Gamemaster's own rolls keep those rules.
  */
 
 /**
@@ -861,26 +862,27 @@ export function plannedDamage(process) {
 }
 
 /**
- * The ways numbers may come out of a critical hit's damage, as dnd5e's two settings for it make
- * them: doubled or not (Critical Damage Modifiers), and with the most its dice could roll added or
- * not (Powerful Critical).
+ * The ways numbers may come out of an app roll's critical hit's damage: never doubled, since
+ * 0.33.0, whatever dnd5e's Critical Damage Modifiers says (`criticalAsDnd5e`), and with the most its
+ * dice could roll added or not (Powerful Critical). Numbers that come out doubled can't be read.
  * @type {[boolean, boolean][]}
  */
-const NUMBER_RULES = [[false, false], [true, false], [false, true], [true, true]];
+const NUMBER_RULES = [[false, false], [false, true]];
 
 /**
  * How this world rolls a critical hit's damage, for the app to plan a description's: each die
  * thrown `perDie` times over, such as twice, or once where dnd5e's Powerful Critical adds the most
- * it could roll instead, and no other die; whether its numbers are doubled, and the most its dice
- * could roll added, for the app to work out its total by; and whether its dice are changed beyond
- * that, as at their highest, so that only the game can. Found by building a critical hit's damage
- * as this client builds it, with the rules of modules that change it, such as Midi-QOL's, which
- * keeps its own for the Gamemaster, never from dnd5e's settings alone, which Midi's may set aside:
- * one die and a number first, then dice of two sizes, which must come out the same way. Null where
- * those rules throw dice of their own beside each, as Midi's that roll critical dice apart or
- * explode them do, make dice of one size otherwise than another's, come to numbers dnd5e's settings
- * don't, or can't be read. With it, what the rules do with a critical hit's extra dice, as
- * `extraDiceRule` finds it.
+ * it could roll instead, and no other die; whether its numbers are doubled, which since 0.33.0
+ * they never are, and the most its dice could roll added, for the app to work out its total by; and
+ * whether its dice are changed beyond that, as at their highest, so that only the game can. Found
+ * by building a critical hit's damage as this client builds it, with the rules of modules that
+ * change it, such as Midi-QOL's, which keeps its own for the Gamemaster, never from dnd5e's
+ * settings alone, which Midi's may set aside: one die and a number first, then dice of two sizes,
+ * which must come out the same way. Null where those rules throw dice of their own beside each, as
+ * Midi's that roll critical dice apart or explode them do, make dice of one size otherwise than
+ * another's, come to numbers other than its own or with the most its dice could roll added, or
+ * can't be read. With it, what the rules do with a critical hit's extra dice, as `extraDiceRule`
+ * finds it.
  * @returns {{perDie: number, multiplyNumeric: boolean, powerfulCritical: boolean, altered: boolean,
  *   bonusDice: "rolled"|"maximized"|"ignored"|null}|null}
  */
@@ -894,8 +896,8 @@ export function criticalRule() {
     const perDie = thrown.dice[0]?.number;
     if ( !thrown.plannable || (thrown.dice.length !== 1) || (thrown.dice[0].faces !== 6) ) return null;
     if ( !Number.isInteger(perDie) || (perDie < 1) ) return null;
-    // Its numbers, 3 at first, as each pair of dnd5e's settings would make them, the most a d6 could
-    // roll being 6.
+    // Its numbers, 3 at first and never doubled, with the most a d6 could roll, 6, added or not, as
+    // Powerful Critical says.
     const rule = NUMBER_RULES.find(([doubled, most]) => numbersOf(one) === (doubled ? 6 : 3) + (most ? 6 : 0));
     if ( !rule ) return null;
     const [multiplyNumeric, powerfulCritical] = rule;
@@ -1004,7 +1006,8 @@ function altersDice(roll) {
  * built but not rolled: with the world's rules for critical hits, which dnd5e's damage rolls
  * apply, and the changes modules make to damage, such as Midi-QOL's. Since 0.32.0 each is marked
  * as one of the app's, so that its critical hit is made as dnd5e makes it, as the player's roll
- * will be (`criticalAsDnd5e`).
+ * will be (`criticalAsDnd5e`), and since 0.33.0 with only its dice doubled, whatever Critical
+ * Damage Modifiers says.
  * @param {object} process   A damage roll's configuration, as an activity's `getDamageConfig`
  *                           gives it, with whether it's a critical hit's.
  * @returns {Roll[]}
@@ -1027,8 +1030,10 @@ export function damageRollsFor(process) {
  * dnd5e makes it, whatever another module's rules for critical hits say: the roll configured as
  * if it weren't critical, by every module that configures it, Midi-QOL's other changes to damage
  * among them; those terms kept the first time; then dnd5e's own critical made of a fresh copy of
- * them, each time it's configured, so that a die more never doubles what was doubled. Any other
- * roll is configured as it would be.
+ * them, each time it's configured, so that a die more never doubles what was doubled. Since 0.33.0
+ * only its dice are doubled: never a number, whatever dnd5e's Critical Damage Modifiers, Midi-QOL
+ * or the roll's own options say, nor one in parentheses or a function dnd5e 6 copies
+ * (`numbersOnce`). Any other roll is configured as it would be.
  * @this {DamageRoll}
  * @param {Function} wrapped
  * @param {...any} args
@@ -1049,16 +1054,222 @@ function criticalAsDnd5e(wrapped, ...args) {
   if ( !uncritical.has(this) ) uncritical.set(this, this.terms.map(copyTerm));
   this.terms = uncritical.get(this).map(copyTerm);
   this.options.configured = false;
-  const critical = args[0]?.critical ?? {};
+  // dnd5e takes the roll's own critical options over those it's given, which the world's Critical
+  // Damage Modifiers fills in as it builds the roll, and Midi-QOL as it configures it: both say no
+  // number is doubled, and the roll keeps saying so, should it be configured again.
+  this.options.critical = { ...(this.options.critical ?? {}), multiplyNumeric: false };
+  const critical = { ...(args[0]?.critical ?? {}), multiplyNumeric: false };
+  const own = new Set(this.terms);
   DND5E_CONFIGURE.call(this, { critical });
   // dnd5e 6 adds a critical hit's critical damage unmarked, where dnd5e 5.3 and Midi-QOL mark it:
   // marked here as they mark it, its operator too, so that it's planned as added, never as one of
   // the damage's own dice that a player may change. dnd5e 6 never reads the mark.
-  const { bonusDamage } = foundry.utils.mergeObject(critical, this.options.critical ?? {}, { inplace: false });
+  // The critical options dnd5e read, the roll's own over those given.
+  const rule = foundry.utils.mergeObject(critical, this.options.critical, { inplace: false });
+  const { bonusDamage } = rule;
+  let count = 0;
   if ( bonusDamage ) {
     const extra = new Roll(bonusDamage, this.data).terms;
-    const count = extra.length + ((extra[0] instanceof foundry.dice.terms.OperatorTerm) ? 0 : 1);
+    count = extra.length + ((extra[0] instanceof foundry.dice.terms.OperatorTerm) ? 0 : 1);
     for ( const term of this.terms.slice(-count) ) term.options.criticalBonusDamage = true;
+  }
+  // The critical damage after is added as it is, its numbers too.
+  const added = count ? this.terms.slice(-count) : [];
+  this.terms = [...numbersOnce(this.terms.slice(0, this.terms.length - added.length), own, this.data, rule), ...added];
+  this.resetFormula();
+}
+
+/**
+ * A critical hit's terms as dnd5e 6 makes them, with no number of the roll's own added more than
+ * once. dnd5e 6 copies a term it can't double in place, as a die with modifiers or a group in
+ * parentheses, once for each more time a critical hit throws it, and a group's numbers with it, so
+ * that `(1d6 + 2)` comes out `(1d6 + 2) + (1d6 + 2)`: each copy of a group is made of its dice
+ * alone here, `(1d6 + 2) + (1d6)`. Under its Powerful Critical it adds the most such a term could
+ * roll, worked out of the whole of it, numbers too: worked out here of its dice alone, and none for
+ * a term of no dice, as `(2)`. It copies a function of dice whole too, as `floor((1d6 + 4) / 2)`,
+ * its numbers with it: its copies are left out here, and its own dice thrown as many more times
+ * within it as dnd5e throws a die, its count multiplied and the item's extra dice added on the
+ * first term, `floor((2d6 + 4) / 2)`; and its Powerful Critical's most is of its dice alone too,
+ * `floor((1d6) / 2)`'s. Within a group dnd5e 6 wraps a term and its copies in, where `*`, `/` or `%`
+ * binds it, the same. dnd5e 5.3 copies nothing, and adds Powerful Critical's most for its dice
+ * alone, marked, so its terms come out as they are, as do any but a group's or a function's copies
+ * and most.
+ * @param {RollTerm[]} terms         As dnd5e configured them, without the critical damage added after.
+ * @param {Set<RollTerm>} own        The terms as they were before, each still there, in order.
+ * @param {object} data              The roll's data.
+ * @param {object} [critical]        The critical options dnd5e configured them with.
+ * @returns {RollTerm[]}
+ */
+function numbersOnce(terms, own, data, critical = {}) {
+  const { DiceTerm, FunctionTerm, NumericTerm, OperatorTerm, ParentheticalTerm } = foundry.dice.terms;
+  // The roll's first term, the only one dnd5e gives the item's critical extra dice.
+  const [first] = own;
+  const kept = [];
+  // The last of the roll's own terms dnd5e 6 can't double in place, which what follows may be added for.
+  let source = null;
+  for ( const [index, term] of terms.entries() ) {
+    if ( term instanceof OperatorTerm ) {
+      kept.push(term);
+      continue;
+    }
+    if ( own.has(term) ) {
+      source = ((term instanceof DiceTerm) || (term instanceof NumericTerm)) ? null : term;
+      kept.push(term);
+      continue;
+    }
+    const inner = (term instanceof ParentheticalTerm) ? term.roll?.terms : undefined;
+    if ( Array.isArray(inner) && inner.some(each => own.has(each)) ) {
+      const within = numbersOnce(inner, own, data, critical);
+      const same = (within.length === inner.length) && within.every((each, at) => each === inner[at]);
+      kept.push(same ? term : ParentheticalTerm.fromTerms(within, term.options));
+      source = null;
+      continue;
+    }
+    const follows = source && (terms[index - 1] instanceof OperatorTerm);
+    if ( follows && (term instanceof ParentheticalTerm) && (source instanceof ParentheticalTerm) ) {
+      const dice = diceAlone(term, data);
+      if ( dice ) kept.push(dice);
+      else kept.pop();
+      continue;
+    }
+    // A function's copy, and the operator before it, left out; the function, at its first copy, made
+    // again with its dice thrown as dnd5e throws a die.
+    if ( follows && (term instanceof FunctionTerm) && (source instanceof FunctionTerm) ) {
+      kept.pop();
+      if ( kept.at(-1) === source ) {
+        const extra = (critical.bonusDice && (source === first)) ? critical.bonusDice : 0;
+        kept[kept.length - 1] = functionTimes(source, data, critical.multiplier ?? 2, extra);
+      }
+      continue;
+    }
+    // Powerful Critical's most for it, as dnd5e 6 adds it; dnd5e 5.3 adds its own, a die's alone, at
+    // the end, marked.
+    if ( follows && (term instanceof NumericTerm) && !term.options?.criticalFlatBonus ) {
+      if ( source.isDeterministic ) kept.pop();
+      else {
+        const alone = (source instanceof ParentheticalTerm) ? (diceAlone(source, data) ?? source)
+          : (source instanceof FunctionTerm) ? functionAlone(source, data) : null;
+        if ( alone ) {
+          const whole = mostOf(source);
+          const most = mostOf(alone);
+          if ( (whole > 0) && (most !== null) ) term.number = Math.round(term.number / whole) * most;
+        }
+        kept.push(term);
+      }
+      source = null;
+      continue;
+    }
+    source = null;
+    kept.push(term);
+  }
+  return kept;
+}
+
+/**
+ * A group in parentheses with only the terms in it that throw dice, as `(1d6)` of `(1d6 + 2)`: each
+ * sum it adds or takes away that's a number, such as `+ 2` or `- 2 * 3`, left out, and a group or a
+ * function of dice within it made so too (`functionAlone`); a sum with a die in it, such as
+ * `2 * 1d6`, and Foundry's `(1d4 * -1)` for a leading `-1d4`, kept as it is. The group itself where
+ * there's nothing to leave out; null for one of no dice at all.
+ * @param {ParentheticalTerm} group
+ * @param {object} data   The roll's data.
+ * @returns {ParentheticalTerm|null}
+ */
+function diceAlone(group, data) {
+  const { FunctionTerm, OperatorTerm, ParentheticalTerm } = foundry.dice.terms;
+  const terms = new Roll(group.term, data).terms;
+  // Its sums: a + or a - after a term ends one, and its sign begins the next.
+  const sums = [{ sign: null, terms: [] }];
+  for ( const [index, term] of terms.entries() ) {
+    const ends = (term instanceof OperatorTerm) && ["+", "-"].includes(term.operator)
+      && (index > 0) && !(terms[index - 1] instanceof OperatorTerm);
+    if ( ends ) sums.push({ sign: term, terms: [] });
+    else sums.at(-1).terms.push(term);
+  }
+  const dice = sums.filter(sum => !sum.terms.every(term => term.isDeterministic));
+  if ( !dice.length ) return null;
+  let changed = dice.length !== sums.length;
+  const kept = dice.flatMap(({ sign, terms: each }, index) => {
+    const within = each.map(term => {
+      if ( term.isDeterministic ) return term;
+      const alone = (term instanceof ParentheticalTerm) ? (diceAlone(term, data) ?? term)
+        : (term instanceof FunctionTerm) ? functionAlone(term, data) : term;
+      if ( alone !== term ) changed = true;
+      return alone;
+    });
+    // The first sum kept takes no + before it, but keeps a -.
+    const before = (sign && ((index > 0) || (sign.operator === "-"))) ? [sign] : [];
+    return [...before, ...within];
+  });
+  if ( !changed ) return group;
+  return ParentheticalTerm.fromTerms(kept, foundry.utils.deepClone(group.options));
+}
+
+/**
+ * A function of dice with only the terms in each argument that throw dice, as `floor((1d6) / 2)` of
+ * `floor((1d6 + 4) / 2)`, each argument made as a group's dice alone are (`diceAlone`); an argument
+ * of no dice, as the 2 of `max(1d6, 2)`, which says what the function does rather than adding to
+ * it, kept as it is. The function itself where there's nothing to leave out.
+ * @param {FunctionTerm} fn
+ * @param {object} data   The roll's data.
+ * @returns {FunctionTerm}
+ */
+function functionAlone(fn, data) {
+  let changed = false;
+  const args = fn.terms.map(arg => {
+    const alone = diceAlone({ term: arg, options: {} }, data)?.term ?? arg;
+    if ( alone !== arg ) changed = true;
+    return alone;
+  });
+  return changed ? functionOf(fn, args, data) : fn;
+}
+
+/**
+ * A function of dice with each die term in it thrown as a critical hit throws a die, in a group or a
+ * function within it too: its count multiplied and some added, as dnd5e alters a die, so that
+ * `floor((1d6 + 4) / 2)` doubled is `floor((2d6 + 4) / 2)`, its numbers as they are.
+ * @param {FunctionTerm} fn
+ * @param {object} data       The roll's data.
+ * @param {number} multiply   How many times over each die is thrown.
+ * @param {number} add        How many more of each are thrown after.
+ * @returns {FunctionTerm}
+ */
+function functionTimes(fn, data, multiply, add) {
+  const { DiceTerm, FunctionTerm, ParentheticalTerm } = foundry.dice.terms;
+  const times = formula => Roll.getFormula(new Roll(formula, data).terms.map(term => {
+    if ( term instanceof DiceTerm ) return term.alter(multiply, add);
+    if ( term.isDeterministic ) return term;
+    if ( term instanceof ParentheticalTerm ) return new ParentheticalTerm({ term: times(term.term), options: term.options });
+    if ( term instanceof FunctionTerm ) return functionTimes(term, data, multiply, add);
+    return term;
+  }));
+  return functionOf(fn, fn.terms.map(times), data);
+}
+
+/**
+ * A copy of a function of terms, unevaluated, as dnd5e 6 copies one, with other arguments.
+ * @param {FunctionTerm} fn
+ * @param {string[]} args   Its arguments' formulas.
+ * @param {object} data     The roll's data.
+ * @returns {FunctionTerm}
+ */
+function functionOf(fn, args, data) {
+  return foundry.dice.terms.RollTerm.fromData({
+    ...foundry.utils.deepClone(fn.toJSON()), terms: args, rolls: args.map(arg => Roll.create(arg, data).toJSON())
+  });
+}
+
+/**
+ * The most a term could roll, as dnd5e 6's Powerful Critical works it out: null where it can't be.
+ * @param {RollTerm} term
+ * @returns {number|null}
+ */
+function mostOf(term) {
+  try {
+    const total = Roll.create(term.formula).evaluateSync({ maximize: true }).total;
+    return Number.isFinite(total) ? total : null;
+  } catch {
+    return null;
   }
 }
 

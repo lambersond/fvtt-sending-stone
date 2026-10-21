@@ -4,7 +4,7 @@ import {
 } from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
-import { checkTransferCommand } from "./command-transfers.mjs";
+import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
 import {
   claimMidiPrompt, midiAnswerAuthor, midiAnswerConfig, midiAnswerFailed, midiAnswerFlags, midiOutcome,
@@ -227,6 +227,7 @@ export function checkCommand(command) {
   if ( command.kind === "spend" ) return checkSpendCommand(command);
   if ( command.kind === "inspiration" ) return checkInspirationCommand(command);
   if ( command.kind === "transfer" ) return checkTransferCommand(command);
+  if ( command.kind === "remove" ) return checkRemoveCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);

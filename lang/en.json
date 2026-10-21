@@ -338,6 +338,7 @@
       "Sends": "Sends {things} from {source} to {target}",
       "Distributes": "Distributes {things} among {names} ({each} each); {left} stays with {source}",
       "DistributesAll": "Distributes {things} among {names} ({each} each); none stays with {source}",
+      "Removes": "Removes {things}",
       "Things": "{count} {name}",
       "Coins": "{count} {abbreviation}"
     },

@@ -1,4 +1,4 @@
-import { MOST_AMONG, MOST_MOVED, MOST_MOVED_ITEMS, TRANSFER_KINDS } from "./constants.mjs";
+import { MOST_AMONG, MOST_MOVED, MOST_MOVED_ITEMS, REMOVE_KINDS, TRANSFER_KINDS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { postLine } from "./command-charges.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
@@ -56,6 +56,13 @@ import { localize } from "./sheet-values.mjs";
  * be distributed among its members that are the campaign's characters, a whole share each, what's
  * left staying with the party, which the line says: "Distributes 100 gp among Bram, Lia, Thorin,
  * and Vex (25 gp each); 3 gp stays with The Iron Company".
+ *
+ * Since 0.33.0 an item may be removed from a character: part of a stack lowered, or all of it
+ * deleted, a container with everything in it, as Foundry's own delete does, with the line "Removes 2
+ * Potion of Healing". It has no switch: it's offered wherever the system is D&D Fifth Edition, and
+ * it's made one at a time with the moves, so an item on its way is never also removed. Part of a
+ * stack is never taken for all of it: a removal names how many the app's sheet showed, and is
+ * refused where the stack holds any other number now.
  */
 
 /**
@@ -73,13 +80,26 @@ const RESET = Object.freeze(["attuned", "equipped", "prepared", "crew.value"]);
 const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among"]));
 
 /**
+ * The fields a removal names what it removes by, since 0.33.0, every one of them: the item, how
+ * many, and how many the app's sheet showed.
+ * @type {readonly string[]}
+ */
+const REMOVE_FIELDS = Object.freeze(["held", "item", "quantity"]);
+
+/**
  * The campaigns whose app takes moves, by id, as their latest answer to a hello or heartbeat said.
  * @type {Set<string>}
  */
 const readers = new Set();
 
 /**
- * The latest move, which the next waits for.
+ * The campaigns whose app takes removals, by id, as their latest answer to a hello or heartbeat said.
+ * @type {Set<string>}
+ */
+const removers = new Set();
+
+/**
+ * The latest move, which the next waits for; since 0.33.0 a removal too, in the same line.
  * @type {Promise<void>}
  */
 let chain = Promise.resolve();
@@ -457,6 +477,161 @@ async function distributeNow(command, campaign, { from, among, mover }) {
     rolls: [],
     transfer
   };
+}
+
+/* -------------------------------------------- */
+/*  A removal                                   */
+/* -------------------------------------------- */
+
+/**
+ * May an item be removed from a character from the app here: under D&D Fifth Edition, with no
+ * switch. Since 0.33.0, apart from the campaign's rolls and moves, and from the dice self-test: a
+ * removal throws no dice.
+ * @returns {boolean}
+ */
+export function removalsOn() {
+  return game.system?.id === "dnd5e";
+}
+
+/**
+ * What a campaign tells the app of removing its characters' items in its hello, beside its rolls and
+ * moves, since 0.33.0: whether they're made here, and if not, why not, another system.
+ * @returns {{enabled: boolean, kinds: string[], reason: "system"|null}}
+ */
+export function removalFeatures() {
+  if ( game.system?.id !== "dnd5e" ) return { enabled: false, kinds: [], reason: "system" };
+  return { enabled: true, kinds: [...REMOVE_KINDS], reason: null };
+}
+
+/**
+ * Note whether a campaign's app takes removals: `features.removals`, 1 or later. One that says
+ * nothing of them, as an older or rolled back app, is fetched from for them no longer.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @returns {void}
+ */
+export function noteRemovalReader(campaignId, features) {
+  const format = features?.removals;
+  if ( Number.isInteger(format) && (format >= 1) ) removers.add(campaignId);
+  else removers.delete(campaignId);
+}
+
+/**
+ * Does a campaign's app take removals?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function removalReader(campaignId) {
+  return removers.has(campaignId);
+}
+
+/**
+ * Why a fetched removal isn't one to make, if it isn't: it names one item by id, how many of it to
+ * remove, and how many the app's sheet showed, from 1 to that many, or none of a stack of none;
+ * and nothing else, nothing a roll names, no move, nothing typed in, and throws no dice.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkRemoveCommand(command) {
+  const remove = command.remove;
+  const given = value => (value !== undefined) && (value !== null);
+  if ( namesRollFields(command) || given(command.transfer) || given(command.typed) || !isObject(remove) ) return "remove";
+  if ( (Object.keys(remove).sort().join() !== REMOVE_FIELDS.join()) || !isId(remove.item) ) return "remove";
+  const { quantity: n, held } = remove;
+  const count = value => Number.isInteger(value) && (value >= 0) && (value <= MOST_MOVED);
+  if ( !count(n) || !count(held) || (n > held) || ((n === 0) && (held !== 0)) ) return "quantity";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Remove an item fetched from the app, once every move and removal before it has been made.
+ * @param {object} command      `{remove: {item, quantity, held}}`, as fetched.
+ * @param {Campaign} campaign   The campaign it was fetched for.
+ * @returns {Promise<CommandResult>}
+ */
+export function runRemoveCommand(command, campaign) {
+  const run = chain.then(() => removeNow(command, campaign));
+  chain = run.then(() => {}, () => {});
+  return run;
+}
+
+/**
+ * Remove an item now, if it may be: every check before any write, the item as the character now
+ * holds it. Part of a stack is lowered; all of it is deleted, a container with everything in it, in
+ * one call, as a whole move deletes it, never with dnd5e's `deleteContents`, so that the sheet sent
+ * next lists none of it. A stack that isn't as many as the app's sheet showed (`held`) is refused,
+ * so a part is never taken for all of it. Then the line, where the item itself changed, and the
+ * sheet as it then stands, where anything was written, ahead of the result.
+ * @param {object} command
+ * @param {Campaign} passed     The campaign as it was when fetched, which may be a queue's wait old.
+ * @returns {Promise<CommandResult>}
+ */
+async function removeNow(command, passed) {
+  const failed = (reason, error=null) => failedResult(command, reason, error);
+  const campaign = getCampaigns().find(({ id }) => id === passed?.id);
+  if ( !campaign || !removalsOn() ) return failed("off");
+  const invalid = checkCommand(command);
+  if ( invalid ) return failed("invalid", invalid);
+  const groups = new Set(campaignGroups(campaign).map(group => group.id));
+  const actor = (campaign.characters.has(command.actorId) && !groups.has(command.actorId))
+    ? (game.actors.get(command.actorId) ?? null) : null;
+  if ( !actor ) return failed("unknown");
+  const { item: id, quantity: n, held } = command.remove;
+  const item = actor.items?.get(id) ?? null;
+  if ( !item || !inventoryTypes().has(item.type) || !listedInSheet(actor, item) ) return failed("gone");
+  const q = quantityOf(item);
+  if ( n > q ) return failed("short");
+  if ( q !== held ) return failed("changed");
+
+  // Its name before it's written, as the sheet has it: an unidentified one's.
+  const name = String(item.name ?? "");
+  let lowered = false;
+  let wrote = false;
+  let error = null;
+  try {
+    if ( n < q ) {
+      wrote = true;
+      await updated(item, { "system.quantity": q - n });
+      lowered = true;
+    } else {
+      const ids = [item.id, ...Array.from(item.system?.allContainedItems ?? [], inner => inner.id)];
+      wrote = true;
+      // What a module's hook keeps from being deleted stays, shown at the top of the inventory once
+      // its container has gone; nothing deleted can be put back.
+      const gone = new Set(Array.from(await actor.deleteEmbeddedDocuments("Item", ids) ?? [], doc => doc?.id));
+      lowered = gone.has(item.id);
+      if ( ids.some(inner => !gone.has(inner)) ) throw new Error("Not every item was deleted");
+    }
+  } catch (err) {
+    error = messageOf(err);
+  }
+
+  const line = lowered ? await postLine(command, actor, removalText(n, name)) : null;
+  if ( wrote ) sheetFirst(actor);
+  const removed = { item: id, quantity: n };
+  if ( error !== null ) {
+    const result = failed("error", error);
+    return lowered ? { ...result, removed } : result;
+  }
+  return {
+    id: command.id, status: "done", reason: null, error: null,
+    messageId: line?.id ?? null,
+    visible: line ? visibleTo(line, actor, campaign) : true,
+    rolls: [],
+    removed
+  };
+}
+
+/**
+ * The line that says what was removed, as the character: "Removes 2 Potion of Healing", by the name
+ * the app's sheet shows, an unidentified one's; never what a container held. The name is escaped.
+ * @param {number} n
+ * @param {string} name
+ * @returns {string}
+ */
+function removalText(n, name) {
+  const things = game.i18n.format("SENDINGSTONE.Chat.Things", { count: n.toLocaleString(game.i18n.lang), name: escape(name) });
+  return game.i18n.format("SENDINGSTONE.Chat.Removes", { things });
 }
 
 /* -------------------------------------------- */
