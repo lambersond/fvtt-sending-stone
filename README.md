@@ -186,9 +186,11 @@ with their dice, once the game has made the use, asking first for the kind of da
 offers a choice, as Chromatic Orb does. The item is used as in Foundry, spending its ammunition,
 uses or spell slot; an attack is made with the d20s they rolled, at their target; and the damage
 or healing is rolled on the same use, critical hit's dice included. A critical hit's damage from
-the app follows dnd5e's settings, Critical Damage Modifiers and Powerful Critical, under Midi-QOL
-too: Midi-QOL's "Choose critical damage" options apply to your own rolls in Foundry only. The app
-shows whether an attack hit only where the game shows players.
+the app follows dnd5e's Powerful Critical, under Midi-QOL too: Midi-QOL's "Choose critical damage"
+options apply to your own rolls in Foundry only. Since module 0.33.0 only its dice are doubled,
+never a number, so a shortsword's `1d6 + 4` is `2d6 + 4`, whatever dnd5e's Critical Damage
+Modifiers says: 0.32.0 doubled its numbers too under that setting, `2d6 + 8`. The app shows whether
+an attack hit only where the game shows players.
 
 - **Without Midi-QOL**, dnd5e's own cards are posted, as the character's player: the use's card,
   naming the targets, the attack and the damage, linked to it. You roll the targets' saving throws
@@ -357,6 +359,18 @@ either is missing.
   closed between them can leave an item on both sides, or coins on neither, which the sheets show,
   for you to put right.
 
+### Removing an item
+
+A player can remove an item from their own character in the app: right-click it, long-press it, or
+press the context-menu key on it, then **Remove…**, and confirm. Part of a stack lowers how many
+there are; all of it deletes the item, and a container with everything in it. Should how many there
+are change before it's made, as when a potion is drunk meanwhile, it isn't removed, and the app says
+so. There's no switch: it works under D&D Fifth Edition wherever the app takes it, whether or not
+players' rolls and moves are made here. Each removal posts a line in chat as the character, such as
+"Removes 2 Potion of Healing"; yours, from a character's page in the app's Gamemaster view, is
+marked "GM". Removals are made one at a time with moves, so an item on its way is never also
+removed. An item in a container that hides what it holds isn't offered.
+
 ### Hit, miss and save results
 
 The app shows whether an attack hit each target, and whether a creature saved or passed a check,
@@ -506,18 +520,19 @@ description's damage or roll aren't offered yet.
   would an attack's damage: at its highest, with more of its first die, or that die another size,
   the die added to never one it takes away, as the −1d4 of `3 - 1d4 + 2d6`, and damage that takes a
   die away never at its highest. Healing can be changed, but is never a critical hit's. The game
-  rolls a critical hit's as dnd5e's settings make one, its Critical Damage Modifiers and Powerful
-  Critical: since 0.32.0, a critical hit's damage from the app is always dnd5e's, and Midi-QOL's
-  "Choose critical damage" options apply to your own rolls in Foundry only. Damage dnd5e's own link
-  rolls through one of the item's activities, as a `[[/damage]]` naming no formula, is a critical
-  hit's only as that activity allows: never for a saving throw's damage, as dnd5e's damage dialog
-  offers none, and with what it adds, such as a weapon's critical damage. One whose critical hit
-  throws extra dice, as a melee weapon does for a character with Savage Attacks or Brutal Critical,
-  or whose critical damage has dice of its own, is offered with those dice, thrown with the weapon's
-  first die, as dnd5e throws them. Before 0.32.0 a critical hit's followed Midi's rules for your
-  rolls too, which might add those dice at their most, leave them out, or roll them apart, when the
-  app offered no critical hit for a description. Changes aren't offered where the self-test found
-  damage isn't changed as expected.
+  rolls a critical hit's as dnd5e's settings make one, its Powerful Critical, and before 0.33.0 its
+  Critical Damage Modifiers: since 0.32.0, a critical hit's damage from the app is always dnd5e's,
+  and Midi-QOL's "Choose critical damage" options apply to your own rolls in Foundry only; since
+  0.33.0 only its dice are doubled, never a number, whatever Critical Damage Modifiers says. Damage
+  dnd5e's own link rolls through one of the item's activities, as a `[[/damage]]` naming no formula,
+  is a critical hit's only as that activity allows: never for a saving throw's damage, as dnd5e's
+  damage dialog offers none, and with what it adds, such as a weapon's critical damage. One whose
+  critical hit throws extra dice, as a melee weapon does for a character with Savage Attacks or
+  Brutal Critical, or whose critical damage has dice of its own, is offered with those dice, thrown
+  with the weapon's first die, as dnd5e throws them. Before 0.32.0 a critical hit's followed Midi's
+  rules for your rolls too, which might add those dice at their most, leave them out, or roll them
+  apart, when the app offered no critical hit for a description. Changes aren't offered where the
+  self-test found damage isn't changed as expected.
 - **Rolls**, such as `[[/r 1d4]]`, are rolled with their dice on a card naming where they're from.
   One with a die the app doesn't roll, such as a d3, is refused.
 - **Dice Foundry rolls again, keeps or counts**, such as `[[/damage 2d6r<=2 + 7]]` or
@@ -703,7 +718,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
 | `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat |
-| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters |
+| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster |
 | `templates/settings/` | The settings window's templates, one for each kind of section |

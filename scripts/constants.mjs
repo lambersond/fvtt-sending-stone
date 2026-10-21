@@ -240,6 +240,15 @@ export const CHARGE_KINDS = Object.freeze(["spend", "inspiration"]);
 export const TRANSFER_KINDS = Object.freeze(["transfer"]);
 
 /**
+ * What a player, or their Gamemaster, can have done here from the app with what their character
+ * carries, since module 0.33.0: remove one of its items, or part of a stack. It posts a line in chat
+ * saying so. Offered wherever the system is D&D Fifth Edition, with no switch of its own, apart from
+ * the rolls and the moves: it throws no dice.
+ * @type {readonly string[]}
+ */
+export const REMOVE_KINDS = Object.freeze(["remove"]);
+
+/**
  * The most charges a player can spend at once from the app.
  * @type {number}
  */
