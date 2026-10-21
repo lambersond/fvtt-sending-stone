@@ -36,9 +36,10 @@ jobs:
           # The whole tree minus VCS, CI and development tools, rather than a hand-maintained
           # list: a package that gains or loses a directory needs no edit here, and zip cannot
           # fail with "nothing to do" over a path that does not exist. module.json must land at
-          # the archive root.
+          # the archive root. The harness (test/) and its package files are development tools too.
           zip -r module.zip . \
-            -x '.git/*' '.github/*' '.gitignore' 'tools/*' 'module.zip' '*.DS_Store'
+            -x '.git/*' '.github/*' '.gitignore' 'tools/*' 'module.zip' '*.DS_Store' \
+               'test/*' 'package.json' 'package-lock.json' '.nvmrc' 'node_modules/*' '.cache/*'
           unzip -l module.zip
 
       # module.json is published as a loose asset so that the manifest URL above resolves.

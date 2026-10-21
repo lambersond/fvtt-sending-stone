@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "sh test/harness-all.sh",
+    "harness:one": "sh test/run.sh",
+    "test:setup": "sh test/dnd5e.sh && sh test/old-module.sh",
+    "fixture:slim": "sh test/slim-fixture.sh"
+  },
+  "devDependencies": {
+    "handlebars": "4.7.9",
+    "jsdom": "26.1.0"
+  }
+}

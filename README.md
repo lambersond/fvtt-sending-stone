@@ -655,6 +655,8 @@ name must match the manifest `id`:
 ln -s "$PWD" "$HOME/Library/Application Support/FoundryVTT/Data/modules/sending-stone"
 ```
 
+The module's harness, and how to run it (`npm ci`, `npm run test:setup`, `npm test`), is in [test/README.md](test/README.md).
+
 ### Cutting a release
 
 Pushing a `v*` tag builds the archive and publishes the release via
@@ -667,7 +669,7 @@ git tag v0.1.0 && git push origin v0.1.0
 The tag is the source of truth for the version: the workflow stamps `version`, `manifest` and
 `download` into the released `module.json`. They are therefore stale in the committed copy
 between releases; check the published manifest, not this file, to see what actually shipped.
-`tools/` is left out of the release archive.
+`tools/`, `test/` and the harness's package files are left out of the release archive.
 
 ## Layout
 
@@ -723,4 +725,5 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster |
 | `templates/settings/` | The settings window's templates, one for each kind of section |
 | `tools/echo-listener.mjs` | Stand-in listener for development |
+| `test/` | The harness: the module's scripts run in Node against stand-ins for Foundry and Midi-QOL and dnd5e's real dice ([test/README.md](test/README.md)); the app's e2e uses its stand-ins too |
 | `PROTOCOL.md` | Event envelope and payload reference |
