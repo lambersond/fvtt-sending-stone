@@ -12,6 +12,7 @@ import {
   noteRemovalReader, noteTransferReader, removalReader, removalsOn, runRemoveCommand, runTransferCommand,
   transferReader, transfersOn
 } from "./command-transfers.mjs";
+import { noteInFlight, runNoteCommand } from "./command-notes.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
@@ -19,6 +20,7 @@ import { gmRollOf } from "./chat-data.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { noteSettingsReader } from "./foundry-settings.mjs";
 import { noteGroupReader } from "./groups.mjs";
+import { noteNotesReader, notesOn, notesReader } from "./journals.mjs";
 import { answersMidiPrompt, midiPromptsOffered, noteMidiReader, noteOpen } from "./midi-prompts.mjs";
 import { prompting } from "./prompts.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
@@ -210,8 +212,10 @@ export function registerCommandHooks() {
  * heartbeat's answer; and since 0.31.0, whether it takes moves of items and coins, for which it's
  * fetched from even while its players' rolls aren't made here; and since 0.33.0, whether it takes
  * removals of characters' items, for which it's fetched from even while its players' rolls and
- * moves aren't made here. A hello's answer wakes the campaign's fetching, which may be waiting as an
- * answer given before the hello was taken asked.
+ * moves aren't made here; and since 0.34.0, whether it takes journal notes, for which it's fetched
+ * from under any system, and which are sent at once where it starts to in a heartbeat's answer. A
+ * hello's answer wakes the campaign's fetching, which may be waiting as an answer given before the
+ * hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -225,6 +229,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteSettingsReader(campaignId, features, type);
   noteTransferReader(campaignId, features);
   noteRemovalReader(campaignId, features);
+  noteNotesReader(campaignId, features, type);
   syncPollers();
   if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.wake?.();
 }
@@ -232,7 +237,8 @@ export function noteListenerFeatures(campaignId, features, type) {
 /**
  * Fetch for each campaign that lets its players roll from the app, or since 0.31.0 move items and
  * coins from it, or since 0.33.0 remove their characters' items, under dnd5e, wherever its app
- * takes them, and that the app has commands for, while this client is the bridge; and for no other.
+ * takes them, or since 0.34.0 keep journal notes, under any system, wherever its app takes them, and
+ * that the app has commands for, while this client is the bridge; and for no other.
  * @param {object} [options]
  * @param {boolean} [options.retry]   Try again the campaigns whose fetch the app refused, as after
  *                                    a change to the settings.
@@ -258,14 +264,15 @@ export function syncPollers({ retry=false }={}) {
  * Is anything fetched for a campaign: its players' rolls, made here once the self-test has passed;
  * or since 0.31.0, their moves of items and coins, where they may make them and its app takes them,
  * whether or not their rolls are made here; or since 0.33.0 removals of their items, under dnd5e,
- * wherever its app takes them, with rolls and moves off too. A roll fetched while only moves or
- * removals are is refused as one fetched while rolls are off.
+ * wherever its app takes them, with rolls and moves off too; or since 0.34.0 journal notes, under
+ * any system, wherever its app takes them. A roll fetched while only moves, removals or notes are is
+ * refused as one fetched while rolls are off.
  * @param {Campaign} campaign
  * @returns {boolean}
  */
 function fetchesFor(campaign) {
   return (campaign.rolls && diceStatus.ready) || (transfersOn(campaign) && transferReader(campaign.id))
-    || (removalsOn() && removalReader(campaign.id));
+    || (removalsOn() && removalReader(campaign.id)) || (notesOn() && notesReader(campaign.id));
 }
 
 /**
@@ -465,16 +472,24 @@ class Poller {
  * ends too, as a potion drunk at the moment it's given, and their next rolls wait for it; since
  * 0.32.0 a distribution for every character it shares among, and theirs for it. Since 0.33.0 a
  * removal waits for its character's earlier rolls and moves, as a roll does, and their next ones for
- * it.
+ * it. Since 0.34.0 a note command waits only for earlier ones of its journal, and is made again when
+ * handed over again after it's been answered, as each is made once in effect: one is skipped only
+ * while the same command is being made, until its run settles, however long after its answer.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
  */
 function take(command, campaign) {
-  if ( (typeof command.id !== "string") || taken.includes(command.id) ) return;
-  taken.push(command.id);
-  if ( taken.length > REMEMBERED ) taken.shift();
-  if ( answersMidiPrompt(command) ) {
+  if ( typeof command.id !== "string" ) return;
+  const note = command.kind === "note";
+  if ( note ) {
+    if ( noteInFlight(command.id) ) return;
+  } else {
+    if ( taken.includes(command.id) ) return;
+    taken.push(command.id);
+    if ( taken.length > REMEMBERED ) taken.shift();
+  }
+  if ( !note && answersMidiPrompt(command) ) {
     void make(command, campaign).catch(err => {
       console.error(`${MODULE_ID} | Could not report a roll from Sending Stone`, err);
     });
@@ -482,10 +497,12 @@ function take(command, campaign) {
   }
 
   const keyOf = value => ((typeof value === "string") && value) ? value : null;
-  const keys = (command.kind === "transfer")
-    ? [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to),
-      ...(Array.isArray(command.transfer?.among) ? command.transfer.among.map(keyOf) : [])].filter(Boolean))]
-    : [String(command.actorId)];
+  let keys = [String(command.actorId)];
+  if ( note ) keys = [`note:${command.actorId}`];
+  else if ( command.kind === "transfer" ) {
+    keys = [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to),
+      ...(Array.isArray(command.transfer?.among) ? command.transfer.among.map(keyOf) : [])].filter(Boolean))];
+  }
   const made = Promise.all(keys.map(key => queues.get(key) ?? Promise.resolve()))
     .then(() => make(command, campaign))
     .catch(err => console.error(`${MODULE_ID} | Could not report a roll from Sending Stone`, err));
@@ -586,6 +603,7 @@ function runCommand(command, campaign, signal) {
     case "textRoll": return runTextRollCommand(command, campaign);
     case "transfer": return runTransferCommand(command, campaign);
     case "remove": return runRemoveCommand(command, campaign);
+    case "note": return runNoteCommand(command, campaign);
     default: return runRollCommand(command, campaign, { signal });
   }
 }

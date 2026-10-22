@@ -142,6 +142,10 @@ export const EVENTS = Object.freeze({
   /** One of a campaign's Group actors was deleted. */
   GROUP_REMOVED: "group.removed",
 
+  /** A character's or a party's journal of notes as Foundry holds it, whole, since 0.34.0: sent
+   *  only to an app that says it reads them, `features.notes`. */
+  JOURNAL_UPDATED: "journal.updated",
+
   /** What the world's settings that decide what players see now are, for the campaign's
    *  Gamemaster: sent only to an app that says it reads them, `features.settings`. */
   BRIDGE_SETTINGS: "bridge.settings",
@@ -247,6 +251,29 @@ export const TRANSFER_KINDS = Object.freeze(["transfer"]);
  * @type {readonly string[]}
  */
 export const REMOVE_KINDS = Object.freeze(["remove"]);
+
+/**
+ * What a player, or their Gamemaster, can have done here from the app with journal notes, since
+ * module 0.34.0: a note or chapter added to a journal, changed, or a note deleted. Offered under any
+ * system, with no switch of its own: it throws no dice.
+ * @type {readonly string[]}
+ */
+export const NOTE_KINDS = Object.freeze(["note"]);
+
+/** The journals notes are kept in, since 0.34.0: a character's own, and a party's. */
+export const NOTE_BOOKS = Object.freeze(["personal", "party"]);
+
+/** The most a note's title, body and a journal may hold, since 0.34.0 (round 0.34.0 §5.4). */
+export const MOST_NOTE_TITLE = 200;
+export const MOST_NOTE_BODY = 20_000;
+export const MOST_NOTE_TEXT = 100_000;
+export const MOST_ENTRIES = 300;
+export const MOST_CHAPTERS = 50;
+export const MOST_BOOK_TEXT = 1_000_000;
+export const MOST_NOTES = 400;
+
+/** A note's id, as the app makes it and Foundry makes a page's: 16 letters and digits. */
+export const NOTE_ID = /^[A-Za-z0-9]{16}$/;
 
 /**
  * The most charges a player can spend at once from the app.

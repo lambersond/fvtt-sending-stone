@@ -261,7 +261,8 @@
       "RollsFailing": "{campaign}'s players' rolls aren't reaching the game: {problem} Still trying.",
       "RollsRecovered": "{campaign}'s players' rolls reach the game again.",
       "SheetTooLarge": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes. Its player is told.",
-      "SheetTooLargeUntold": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes."
+      "SheetTooLargeUntold": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes.",
+      "JournalTooLarge": "{name} came to {size}, more than {campaign} takes, so its notes aren’t sent. Players see them as they were."
     },
     "Problem": {
       "unreachable": "Sending Stone can't reach the app at {address}.",
@@ -302,6 +303,7 @@
       "Combat": "A combat update",
       "Prompt": "A save request",
       "Result": "A player's roll result",
+      "Journal": "A journal of notes",
       "Event": "An event"
     },
     "Status": {
@@ -366,6 +368,14 @@
       "GmContent": "GM-only details: On",
       "ChatOff": "Chat: not sent (Chat messages: Off)",
       "System": "Hit and miss, saves and checks: not sent (they need D&D Fifth Edition)"
+    },
+    "Journal": {
+      "Folder": "Sending Stone notes",
+      "Personal": "{name}'s notes",
+      "Party": "{name}: party notes",
+      "InCampaign": "{journal} ({campaign})",
+      "Gamemaster": "Gamemaster",
+      "Someone": "Someone in Foundry"
     }
   }
 }
