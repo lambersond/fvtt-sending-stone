@@ -22,8 +22,9 @@ import { buildEnvelope, helloPending, inMegabytes, post, termsOf } from "./trans
  * each journal is read back for the app whole, in `journal.updated`, as Foundry holds it: after each
  * hello, after every change heard of in Foundry, and before the result of every change from the app.
  * A page's flags say what the module last wrote, and a hash of its text whether it has been changed
- * in Foundry since. Only a page shown to everyone its journal shows is sent, and a party's secrets
- * never are. Names are read as each journal is, never stored.
+ * in Foundry since. Only a page shown to everyone its journal shows is sent, and a secret written in
+ * Foundry only where every one of the character's players may read it there, never a party's. Names
+ * are read as each journal is, never stored.
  *
  * Only the bridge sends, and the hooks are heard only there: what's changed in Foundry while no
  * Gamemaster is connected is read at the next hello.
@@ -399,9 +400,12 @@ export async function journalOwnershipChanged(actorId) {
         if ( flags.author?.actor !== actorId ) continue;
         const next = rederived(page.ownership ?? {}, idList(flags.granted), null, { users: pageOwners(actor) }, INHERIT);
         if ( next.changed ) {
+          // A note changed in Foundry keeps who changed it there, which this write would make the
+          // Gamemaster's, now.
+          const edit = lastFoundryEdit(page);
           await quietly(() => page.update({
             ownership: next.ownership,
-            [`flags.${MODULE_ID}`]: { ...flags, granted: next.granted }
+            [`flags.${MODULE_ID}`]: { ...flags, granted: next.granted, ...(edit && { foundry: edit }) }
           }));
         }
         touch("party", flag.actor, flag.campaign);
@@ -596,26 +600,45 @@ export function pageCreatedAt(page) {
 }
 
 /**
- * How a page would be sent to the app as a note: as format 1 where it's HTML, or a party page whose
- * text, changed in Foundry, holds a secret; and whether its title or text is cut short. What's sent
- * so the app can't change it, as `checkNoteCommand`'s refusal `foundry-only` does.
+ * How a page would be sent to the app as a note: as format 1 where it's HTML, or where its text,
+ * written in Foundry, holds a secret its readers in the app couldn't see there; and whether its
+ * title or text is cut short. What's sent so the app can't change it, as `checkNoteCommand`'s
+ * refusal `foundry-only` does.
  * @param {JournalEntryPage} page
  * @returns {{format: 1|2, secret: boolean, body: string, cut: boolean}}
  */
 export function pageSentAs(page) {
-  const party = journalFlag(page?.parent)?.kind === "party";
+  const hidden = secretsHidden(page);
   const format = pageFormat(page);
   const content = String(page?.text?.content ?? "");
   let sent = { format, secret: false, body: pageBody(page) };
-  if ( party && (format === 1) ) sent.body = withoutSecrets(content);
-  // A party page changed in Foundry whose HTML holds a secret goes as that HTML without it, never as
-  // its Markdown, which holds the secret too.
-  else if ( party && changedInFoundry(page) && holdsSecret(content) ) {
+  if ( hidden && (format === 1) ) sent.body = withoutSecrets(content);
+  // A page changed in Foundry whose HTML holds a secret goes as that HTML without it, never as its
+  // Markdown, which holds the secret too. A chapter's text is always Foundry's, as the app never
+  // writes it, so its title alone, which its revision is of, can't say it's unchanged.
+  else if ( hidden && ((pageRole(page) === "chapter") || changedInFoundry(page)) && holdsSecret(content) ) {
     sent = { format: 1, secret: true, body: withoutSecrets(content) };
   }
   const name = String(page?.name ?? "");
   const cut = (name.length > MOST_NOTE_TITLE) || (sent.body.length > MOST_NOTE_TEXT);
   return { ...sent, cut };
+}
+
+/**
+ * Are a page's secrets kept from the app? Always in a party's journal, as a party sheet's texts are
+ * sent without them; and in a character's where not every one of its player owners is an Owner of
+ * the page, as when the Gamemaster made one of them an Observer of it or of the journal: Foundry
+ * shows a page's secrets to its Owners alone, and the character's seat in the app is any of them.
+ * A character no player owns has no one to show them to.
+ * @param {JournalEntryPage} page
+ * @returns {boolean}
+ */
+function secretsHidden(page) {
+  const flag = journalFlag(page?.parent);
+  if ( flag?.kind !== "personal" ) return true;
+  const actor = game.actors.get(flag.actor);
+  const owners = actor ? playerOwners(actor) : [];
+  return !owners.length || !owners.every(user => page.testUserPermission(user, "OWNER"));
 }
 
 /**
@@ -625,6 +648,38 @@ export function pageSentAs(page) {
  */
 function changedInFoundry(page) {
   return !flagsCount(page) || (pageRev(page) !== page.flags[MODULE_ID].hash);
+}
+
+/**
+ * Who last changed a note in Foundry, and when, as the module kept it before a write of its own
+ * that Foundry counts as the Gamemaster's change, now: one of the note's place or who owns it
+ * (`lastFoundryEdit`). Only while the page still holds what it held then, and only on the page it
+ * was kept on, never a copy of it.
+ * @param {JournalEntryPage} page
+ * @param {string} rev   The page's revision now.
+ * @returns {{at: number, by: string|null}|null}
+ */
+function keptFoundryEdit(page, rev) {
+  const kept = page?.flags?.[MODULE_ID]?.foundry;
+  if ( !isObject(kept) || (kept.page !== page.id) || (kept.rev !== rev) || !isTime(kept.at) ) return null;
+  return ((kept.by === null) || (typeof kept.by === "string")) ? { at: kept.at, by: kept.by } : null;
+}
+
+/**
+ * What to keep in a note's flags, `foundry`, of who last changed it in Foundry and when, in a write
+ * the module makes of its place or who owns it, which Foundry's `_stats` would count as the
+ * Gamemaster's change, now: for a text page changed in Foundry, where what's kept isn't of what it
+ * holds now already; null for any other. A page with no flags of the module's may hold this alone:
+ * its flags still don't count, as `page` isn't among them.
+ * @param {JournalEntryPage|undefined} page
+ * @returns {{page: string, rev: string, at: number, by: string|null}|null}
+ */
+export function lastFoundryEdit(page) {
+  if ( (page?.type !== "text") || !changedInFoundry(page) ) return null;
+  const rev = pageRev(page);
+  if ( keptFoundryEdit(page, rev) ) return null;
+  const by = page._stats?.lastModifiedBy;
+  return { page: page.id, rev, at: timeOf(page._stats?.modifiedTime) ?? pageCreatedAt(page), by: (typeof by === "string") ? by : null };
 }
 
 /**
@@ -661,17 +716,57 @@ function withoutSecrets(html) {
 export function readJournal(entry, campaign) {
   const flag = journalFlag(entry);
   if ( (flag?.kind === "party") && partyPrivate(flag.actor, campaign) ) return { withheld: { reason: "private" } };
-  const pages = textPages(entry).filter(page => NOTE_ID.test(String(page.id)) && sharedLikeJournal(page));
-  const chapters = new Set(pages.filter(page => pageRole(page) === "chapter").map(page => page.id));
+  const chapters = chaptersAsSent(entry);
   const notes = [];
-  let lastChapter = null;
-  for ( const page of pages ) {
+  for ( const page of textPages(entry) ) {
+    if ( !sentToApp(page) ) continue;
     const role = pageRole(page);
-    if ( role === "chapter" ) lastChapter = page.id;
-    const note = describePage(page, campaign, { role, chapters, lastChapter });
+    const note = describePage(page, campaign, { role, chapter: (role === "entry") ? (chapters.get(page.id) ?? null) : null });
     if ( note ) notes.push(note);
   }
   return { notes };
+}
+
+/**
+ * Is a text page one of its journal's notes the app is sent: one with an id the app takes, shared
+ * as its journal is?
+ * @param {JournalEntryPage} page
+ * @returns {boolean}
+ */
+function sentToApp(page) {
+  return NOTE_ID.test(String(page.id)) && sharedLikeJournal(page);
+}
+
+/**
+ * The chapter each of a journal's entries is in as the app is told it (§2.8 step 5), by the entry's
+ * id: its flag's where its flags count, else the nearest chapter before it, whoever may see it; where
+ * that's a chapter the app isn't sent, as one only the Gamemaster sees, the nearest before the entry
+ * that it is, as players read the journal in Foundry; and none where it names no chapter here, as
+ * one not made yet. The note command reads an entry's chapter by this rule too, so a change from the
+ * app that leaves its chapter as the app was shown it never takes it out of one the app isn't shown.
+ * @param {JournalEntry} entry
+ * @returns {Map<string, string|null>}
+ */
+export function chaptersAsSent(entry) {
+  const pages = textPages(entry);
+  const roles = new Map(pages.map(page => [page.id, pageRole(page)]));
+  const shown = new Set(pages.filter(page => (roles.get(page.id) === "chapter") && sentToApp(page)).map(page => page.id));
+  const chapters = new Map();
+  let nearest = null;
+  let nearestShown = null;
+  for ( const page of pages ) {
+    if ( roles.get(page.id) === "chapter" ) {
+      nearest = page.id;
+      if ( shown.has(page.id) ) nearestShown = page.id;
+      continue;
+    }
+    const placed = flagsCount(page) ? page.flags[MODULE_ID].chapter : nearest;
+    let chapter = null;
+    if ( shown.has(placed) ) chapter = placed;
+    else if ( roles.get(placed) === "chapter" ) chapter = nearestShown;
+    chapters.set(page.id, chapter);
+  }
+  return chapters;
 }
 
 /**
@@ -681,11 +776,10 @@ export function readJournal(entry, campaign) {
  * @param {Campaign} campaign
  * @param {object} read
  * @param {"chapter"|"entry"} read.role
- * @param {Set<string>} read.chapters        The journal's chapters sent.
- * @param {string|null} read.lastChapter     The nearest of them before the page.
+ * @param {string|null} read.chapter   An entry's chapter as the app is told it (`chaptersAsSent`).
  * @returns {object|null}
  */
-function describePage(page, campaign, { role, chapters, lastChapter }) {
+function describePage(page, campaign, { role, chapter }) {
   const name = (typeof page.name === "string") ? page.name : "";
   if ( !name ) return null;
   const counts = flagsCount(page);
@@ -693,11 +787,12 @@ function describePage(page, campaign, { role, chapters, lastChapter }) {
   const sent = pageSentAs(page);
   const [title, titleCut] = cutText(name, MOST_NOTE_TITLE);
   const [body, bodyCut] = cutText(sent.body, MOST_NOTE_TEXT);
-  let chapter = null;
-  if ( role === "entry" ) chapter = counts ? (chapters.has(flags.chapter) ? flags.chapter : null) : lastChapter;
   const createdAt = pageCreatedAt(page);
   const rev = pageRev(page);
   const foundry = !counts || (rev !== flags.hash);
+  // Who changed it in Foundry, as kept before the module's own writes of its place or owners, which
+  // Foundry would otherwise count as the Gamemaster's change.
+  const kept = foundry ? keptFoundryEdit(page, rev) : null;
   return {
     id: page.id,
     role,
@@ -708,8 +803,8 @@ function describePage(page, campaign, { role, chapters, lastChapter }) {
     ...((titleCut || bodyCut) && { cut: true }),
     ...(sent.secret && { secret: true }),
     createdAt,
-    modifiedAt: foundry ? (timeOf(page._stats?.modifiedTime) ?? createdAt) : flags.modified.at,
-    modifiedBy: cutText(foundry ? userName(page._stats?.lastModifiedBy, campaign) : writerName(flags.modified), MOST_NAME)[0],
+    modifiedAt: foundry ? (kept?.at ?? timeOf(page._stats?.modifiedTime) ?? createdAt) : flags.modified.at,
+    modifiedBy: cutText(foundry ? userName(kept ? kept.by : page._stats?.lastModifiedBy, campaign) : writerName(flags.modified), MOST_NAME)[0],
     modifiedIn: foundry ? "foundry" : "app",
     author: flags?.author
       ? { actorId: flags.author.actor, gm: flags.author.gm, name: cutText(writerName(flags.author), MOST_NAME)[0] }

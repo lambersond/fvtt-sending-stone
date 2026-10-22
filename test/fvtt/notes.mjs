@@ -4,9 +4,11 @@
 // their ownership and flags; a page per chapter and per note, made with the app's id in a call of
 // its own; who may change what, in the app's command and in Foundry; made at most once in effect,
 // one at a time past the watchdog; Foundry's order; `journal.updated` before every result, and after
-// every change heard of in Foundry, with only what's shared as the journal is, never a party's
-// secret, and nothing the app's schema wouldn't take; ownership kept in step with the actors'; and
-// the safeguards against Foundry's own edits. On journal-core.mjs's stand-in for Foundry's journals,
+// every change heard of in Foundry, with only what's shared as the journal is, never a secret its
+// readers couldn't read in Foundry, and nothing the app's schema wouldn't take, nor to an app that
+// doesn't read it; ownership kept in step with the actors'; who changed a note in Foundry, through
+// the module's own writes; what a journal holds, and who may write; and the safeguards against
+// Foundry's own edits. On journal-core.mjs's stand-in for Foundry's journals,
 // stub.mjs's core and a stand-in app; the real module and its language file. Timers of a second or
 // more run a hundred times faster, so the 60 s watchdog fires in 600 ms. Under DND5E6=1 the system
 // says dnd5e 6.0.5: notes touch nothing of dnd5e, so the same cases pass. Run with --import
@@ -101,8 +103,12 @@ globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body)
   if (String(url).endsWith('/api/events')) {
     if (app.fail?.(body)) return { ok: false, status: 503, statusText: 'Unavailable', headers: new Headers() }
+    // A hello the app is slow to answer, as when the Gamemaster comes back.
+    if (app.holdHello && (body.type === 'bridge.hello')) await wait(app.holdHello)
     app.events.push(body)
-    const announcing = ['bridge.hello', 'bridge.heartbeat'].includes(body.type)
+    // As the app answers them (its src/app/api/events/route.ts, ANSWERED_WITH_FEATURES): a sheet's
+    // post too, so that what it takes of posts holds after the sheets a change of it sends.
+    const announcing = ['bridge.hello', 'bridge.heartbeat', 'character.updated', 'group.updated'].includes(body.type)
     return announcing ? json({ features: app.features[body.campaign.id] ?? {} }) : { ok: true, status: 204, statusText: 'No Content', headers: new Headers() }
   }
   if (String(url).endsWith('/api/bridge/commands')) {
@@ -229,8 +235,8 @@ await Hooks.callAll('ready')
 const { announce } = await import(`${MODULE}/scripts/bridge.mjs`)
 const { heartbeat } = await import(`${MODULE}/scripts/heartbeat.mjs`)
 const { checkCommand } = await import(`${MODULE}/scripts/command-rolls.mjs`)
-const { checkNoteCommand } = await import(`${MODULE}/scripts/command-notes.mjs`)
-const { flagsCount, noteFeatures, pageRev, sharedLikeJournal } = await import(`${MODULE}/scripts/journals.mjs`)
+const { checkNoteCommand, runNoteCommand } = await import(`${MODULE}/scripts/command-notes.mjs`)
+const { flagsCount, noteFeatures, pageRev, pageRole, sharedLikeJournal } = await import(`${MODULE}/scripts/journals.mjs`)
 const { getCampaigns } = await import(`${MODULE}/scripts/campaigns.mjs`)
 const erebor = () => getCampaigns().find(c => c.id === 'erebor')
 await until(() => helloOf('erebor') && helloOf('mirkwood'), 'the hellos')
@@ -660,6 +666,17 @@ await wait(600)
 assert.ok(noteIn(lastBook('erebor', 'personal', 'thorin'), personalAlice.id))
 ok('only pages shared as their journal is are sent: (1) a module page where no player sees the journal; never (2) a GM-only page, (3) nor one in a journal no player sees, (4) nor a party page shown to some of its members; (5) a personal page shown to its owner; a change of a hidden page `gone`; the journal\'s ownership changed in Foundry sends the book again')
 
+// "Add it again" after that `gone`: the app makes the same note again, over the page the Gamemaster
+// hid rather than deleted. It's gone to Bob, so it's never taken as made already, which would lose
+// what he wrote.
+mark = writes.length
+const readd = await made('erebor', P({ id: hiddenPage.id, title: 'Soon hidden', markdown: 'Mine, again.' }))
+assert.deepEqual([...refusal(readd), readd.result.note], ['failed', 'gone', null, { id: hiddenPage.id, rev: null }], 'a create over a hidden page: `gone`, not done')
+assert.equal(writes.filter((w, n) => (n >= mark) && ['create', 'update', 'updateMany', 'journal'].includes(w[0])).length, 0, 'nothing written')
+assert.equal(hiddenPage.text.markdown, 'Some text.', 'the hidden page as it was')
+assert.equal(noteIn(lastBook('erebor', 'party', 'company'), hiddenPage.id), null)
+ok("a note made again from the app over a page the Gamemaster has hidden, not deleted, is `gone`, never done with nothing written")
+
 /* -------------------------------------------- */
 /*  Ownership kept in step                      */
 /* -------------------------------------------- */
@@ -682,6 +699,20 @@ assert.ok(noteIn(lastBook('erebor', 'party', 'company'), wolvesPage.id))
 await own(vex, { dave: 0, bob: 3 })
 assert.deepEqual(wolvesPage.ownership, { default: -1, dave: -1, bob: 3 })
 ok("ownership kept in step: Bob made Thorin's owner is Owner of both his journals, and None once taken off; Vex given to Dave makes Dave Owner of Vex's party notes and Bob inherit; a user the Gamemaster added by hand, and a default they changed, kept")
+
+// Bob changes his note in Foundry, and then who owns it is set again: Foundry counts the module's
+// write as the Gamemaster's change, now, but the note was last changed by Vex's player, then.
+await editPage('bob', wolvesPage, { markdown: 'Grey, and Bob counted nine.' })
+await wait(600)
+const wolvesNow = () => { const note = noteIn(lastBook('erebor', 'party', 'company'), wolvesPage.id); return [note.modifiedIn, note.modifiedBy, note.modifiedAt] }
+const bobsEdit = wolvesNow()
+assert.deepEqual(bobsEdit, ['foundry', 'Vex', wolvesPage._stats.modifiedTime])
+await own(vex, { dave: 3 })
+assert.deepEqual([wolvesPage.ownership.dave, wolvesPage._stats.lastModifiedBy], [3, 'gm'], "set again, which Foundry counts as the Gamemaster's change")
+assert.deepEqual(wolvesNow(), bobsEdit, 'still changed in Foundry by Vex, when Bob changed it')
+await own(vex, { dave: 0 })
+assert.deepEqual([wolvesPage.ownership.dave, ...wolvesNow()], [-1, ...bobsEdit])
+ok("a note changed in Foundry keeps who changed it there, and when, through the module's writes of who owns it")
 
 /* -------------------------------------------- */
 /*  Reading pages written in Foundry            */
@@ -708,6 +739,7 @@ book = lastBook('erebor', 'party', 'company')
 assert.deepEqual([noteIn(book, rich.id).format, noteIn(book, rich.id).html, 'markdown' in noteIn(book, rich.id), noteIn(book, rich.id).secret], [1, '<p>rich</p>', false, undefined], "an HTML page as HTML, a party's secret taken out")
 assert.equal(book.journal.notes.some(n => n.title === 'Picture'), false, 'an image page skipped')
 assert.deepEqual([noteIn(book, copy.id).author, noteIn(book, copy.id).modifiedIn, flagsCount(copy)], [null, 'foundry', false], "a duplicated page is a Foundry note of its own, its copied flags counting for nothing")
+assert.equal(noteIn(book, copy.id).modifiedBy, 'Gamemaster', "made by the Gamemaster's Duplicate: never who changed the original in Foundry, though its flags keep that")
 assert.equal(noteIn(book, wolvesPage.id).author.name, 'Vex', 'the original keeps its author')
 const longNote = noteIn(lastBook('erebor', 'personal', 'thorin'), long.id)
 assert.deepEqual([longNote.title.length, longNote.markdown.length, longNote.cut], [200, 100_000, true])
@@ -757,6 +789,51 @@ assert.deepEqual(refusal(await made('erebor', update(rich, { book: 'party', acto
 assert.deepEqual(refusal(await made('erebor', update(long, { title: 'Short', markdown: 'Short.' }))), ['failed', 'foundry-only', null])
 ok("a party page with a secret, changed in Foundry, goes as its HTML without the secret, never its Markdown, and nothing posted holds it; a member's own raw secret, unchanged in Foundry, as written; an HTML page, one sent for its secret, or one too long changes only in Foundry")
 
+// A secret the Gamemaster writes under a party chapter in Foundry's Markdown editor. A chapter's
+// revision is its title alone, so its text never reads as changed: under the module's own chapter,
+// and under one written in Foundry once a member renames it from the app, which gives it flags.
+await editPage('gm', roadPage, { markdown: 'Chapter intro.\n\n<section class="secret"><p>the betrayer</p></section>' })
+await editPage('gm', s2, { markdown: 'Session notes.\n\n<section class="secret"><p>the turncoat</p></section>' })
+await wait(600)
+const s2Renamed = await made('erebor', update(s2, { book: 'party', actorId: 'company', writer: 'thorin', title: 'Session two' }))
+assert.equal(s2Renamed.result.status, 'done', 'a member renames a chapter written in Foundry')
+assert.ok(flagsCount(s2) && flagsCount(roadPage) && (pageRev(s2) === s2.flags['sending-stone'].hash), 'both chapters with flags that count, unchanged by their revision')
+book = lastBook('erebor', 'party', 'company')
+for (const [page, intro] of [[roadPage, 'Chapter intro.'], [s2, 'Session notes.']]) {
+  const note = noteIn(book, page.id)
+  assert.deepEqual([note.role, note.title, note.format, note.secret, 'markdown' in note, note.html.includes(intro)], ['chapter', page.name, 1, true, false, true], page.name)
+}
+const chapterSecrets = () => ['betrayer', 'turncoat'].filter(word => JSON.stringify(app.events).includes(word))
+assert.deepEqual(chapterSecrets(), [], 'neither secret in anything posted')
+assert.equal((await made('erebor', update(roadPage, { book: 'party', actorId: 'company', writer: 'vex', title: 'The road east, again' }))).result.status, 'done', 'still renamed from the app')
+assert.deepEqual(chapterSecrets(), [])
+ok("a party chapter's text holding a secret goes as its HTML without the secret, never its Markdown: the module's chapter, and one written in Foundry after a member renames it; still renamed from the app")
+
+// A character's page whose secrets its player can't read in Foundry, where a page's secrets show to
+// its Owners alone: one the Gamemaster made Alice an Observer of, and then the journal itself.
+const observed = await addPage('gm', journal, { name: 'Handout', title: { level: 2 }, text: md('For Thorin.\n\n<section class="secret"><p>the sealed vault</p></section>'), ownership: { default: 0, alice: 2 } })
+const observedHtml = await addPage('gm', journal, { name: 'Handout in HTML', title: { level: 2 }, text: { format: 1, content: '<p>Also for Thorin.</p><section class="secret"><p>the hidden stair</p></section>' }, ownership: { default: 0, alice: 2 } })
+const owned = await addPage('gm', journal, { name: 'Owned handout', title: { level: 2 }, text: md('Hers to read.\n\n<section class="secret"><p>the owner reads this</p></section>') })
+await wait(600)
+assert.deepEqual([observed, observedHtml, owned].map(page => page.testUserPermission(users.get('alice'), 'OWNER')), [false, false, true])
+book = lastBook('erebor', 'personal', 'thorin')
+const observedNote = noteIn(book, observed.id)
+assert.deepEqual([observedNote.format, observedNote.secret, 'markdown' in observedNote, observedNote.html.includes('For Thorin.')], [1, true, false, true], "an Observer's Markdown page: its HTML without the secret")
+assert.deepEqual([noteIn(book, observedHtml.id).format, noteIn(book, observedHtml.id).html], [1, '<p>Also for Thorin.</p>'], "an Observer's HTML page without its secret")
+assert.ok(noteIn(book, owned.id).markdown.includes('the owner reads this'), 'a page Alice owns keeps its secret, which Foundry shows her')
+const observerSecrets = () => ['the sealed vault', 'the hidden stair'].filter(words => JSON.stringify(app.events).includes(words))
+assert.deepEqual(observerSecrets(), [], 'neither secret in anything posted')
+assert.deepEqual(refusal(await made('erebor', update(observed, { by: 'gm', markdown: 'Plain.' }))), ['failed', 'foundry-only', null], 'sent for its secret, it changes only in Foundry')
+await journal.update({ ownership: { alice: 2 } })
+await wait(600)
+const ownedNow = () => noteIn(lastBook('erebor', 'personal', 'thorin'), owned.id)
+assert.deepEqual([ownedNow().format, ownedNow().secret, ownedNow().html?.includes('Hers to read.'), ownedNow().html?.includes('the owner reads this')], [1, true, true, false], 'Alice an Observer of the journal: its pages go without their secrets')
+await journal.update({ ownership: { alice: 3 } })
+await wait(600)
+assert.ok(ownedNow().markdown.includes('the owner reads this'), 'an Owner again')
+assert.deepEqual(observerSecrets(), [])
+ok("a character's page whose player is only an Observer of it, or of the journal, goes without its secrets: as HTML, never its Markdown, read only; one they own keeps them")
+
 // Alice edits her own note in Foundry.
 const herNote = await made('erebor', create({ title: 'Hers', markdown: 'As written.' }))
 const herPage = journal.pages.get(herNote.command.note.id)
@@ -765,6 +842,54 @@ await wait(600)
 assert.deepEqual([noteIn(lastBook('erebor', 'personal', 'thorin'), herPage.id).modifiedIn, noteIn(lastBook('erebor', 'personal', 'thorin'), herPage.id).modifiedBy, noteIn(lastBook('erebor', 'personal', 'thorin'), herPage.id).modifiedAt], ['foundry', 'Thorin', herPage._stats.modifiedTime])
 assert.equal(noteIn(lastBook('erebor', 'personal', 'thorin'), chapterOne.note.id).modifiedIn, 'app', 'the module\'s own sorts and flags are no edit')
 ok('an edit in Foundry by Alice reads as changed in Foundry by Thorin, at her write\'s time; the module\'s own writes never do')
+
+// The module's own sorts keep who changed a note in Foundry, and when, though Foundry counts them as
+// the Gamemaster's change, now: Alice's own page, put at the top, and her edit of her note, both
+// moved when the journal is renumbered.
+const hersToo = await addPage('alice', journal, { name: 'Her own page', title: { level: 2 }, text: md('Written by Alice.'), sort: 1 })
+await wait(600)
+const seen = () => [herPage, hersToo].map(page => {
+  const note = noteIn(lastBook('erebor', 'personal', 'thorin'), page.id)
+  return [note.modifiedIn, note.modifiedBy, note.modifiedAt]
+})
+const seenBefore = seen()
+assert.deepEqual(seenBefore, [['foundry', 'Thorin', herPage._stats.modifiedTime], ['foundry', 'Thorin', hersToo._stats.modifiedTime]])
+mark = writes.length
+await made('erebor', create({ title: 'Renumbered' }))
+const moves = writes.slice(mark).filter(w => w[0] === 'updateMany').flatMap(w => w[2].map(u => u._id))
+assert.ok(moves.includes(herPage.id) && moves.includes(hersToo.id), 'a renumber that moves both')
+assert.deepEqual([herPage._stats.lastModifiedBy, hersToo._stats.lastModifiedBy], ['gm', 'gm'], "which Foundry counts as the Gamemaster's change")
+assert.deepEqual(seen(), seenBefore, 'still changed in Foundry by Thorin, when Alice changed them')
+assert.deepEqual([flagsCount(hersToo), noteIn(lastBook('erebor', 'personal', 'thorin'), hersToo.id).author], [false, null], 'a page written in Foundry is still one')
+// Changed from the app, and then in Foundry by the Gamemaster back to what Alice had: theirs, now.
+const herText = herPage.text.markdown
+assert.equal((await made('erebor', update(herPage, { markdown: 'From the app.' }))).result.status, 'done')
+await editPage('gm', herPage, { markdown: herText })
+await wait(600)
+assert.deepEqual(seen()[0], ['foundry', 'Gamemaster', herPage._stats.modifiedTime], 'what was kept of her change goes with the next from the app')
+ok("the module's sorts keep who changed a note in Foundry, and when, of a page written there and a note changed there; a change from the app ends it")
+
+// A note under a chapter only the Gamemaster sees, changed from the app: the app was told it's in
+// the chapter before, as players see it in Foundry, and names that again. It isn't moved, by the
+// change or by a later sort.
+const visible = await made('erebor', create({ actorId: 'ghost', by: 'gm', role: 'chapter', title: 'Visible', markdown: undefined }))
+const visibleId = visible.command.note.id
+const gmPlot = await addPage('gm', ghostJournal, { name: 'GM plot', title: { level: 1 }, text: md(''), ownership: { default: 0 } })
+const clue = await addPage('gm', ghostJournal, { name: 'Clue', title: { level: 2 }, text: md('The kye is under the mat.') })
+await wait(600)
+const ghostOrder = () => pagesOf(ghostJournal).filter(p => p.type === 'text').map(p => p.name)
+const ghostBefore = ghostOrder()
+assert.deepEqual(ghostBefore.slice(-3), ['Visible', 'GM plot', 'Clue'])
+const shownClue = noteIn(lastBook('erebor', 'personal', 'ghost'), clue.id)
+assert.deepEqual([shownClue.chapter, noteIn(lastBook('erebor', 'personal', 'ghost'), gmPlot.id)], [visibleId, null], 'told it is in the chapter before; the hidden one not sent')
+const typo = await made('erebor', update(clue, { actorId: 'ghost', by: 'gm', markdown: 'The key is under the mat.', chapter: shownClue.chapter }))
+assert.equal(typo.result.status, 'done')
+assert.deepEqual(ghostOrder(), ghostBefore, 'not moved out of the hidden chapter')
+assert.deepEqual([clue.text.markdown, clue.flags['sending-stone'].chapter], ['The key is under the mat.', gmPlot.id], 'its flag the chapter it is in')
+assert.equal(noteIn(lastBook('erebor', 'personal', 'ghost'), clue.id).chapter, visibleId, 'still told it is in the one before')
+await made('erebor', create({ actorId: 'ghost', by: 'gm', title: 'Later', chapter: visibleId }))
+assert.deepEqual(ghostOrder().slice(-4), ['Visible', 'Later', 'GM plot', 'Clue'], 'a later sort keeps it there')
+ok("a note under a chapter only the Gamemaster sees is told as in the chapter before it; a change from the app naming that keeps it in its own, in Foundry and through later sorts")
 
 mark = writes.length
 for (const markdown of ['#loot', 'Title\n-', '> ## x', '##', 'Fine\n\nTitle\n===']) {
@@ -842,6 +967,22 @@ await until(() => app.events.slice(hbAt).filter(e => isBook(e, 'erebor')).length
 assert.deepEqual(app.events.slice(hbAt).filter(e => isBook(e, 'erebor')).map(e => `${e.data.kind}:${e.data.actorId}`).sort(), ['party:company', 'personal:ghost', 'personal:thorin', 'personal:vex'])
 ok('Foundry heard: three quick edits send the book once, 500 ms after the last; the module\'s own write once; with no Gamemaster nothing, and once one is back, the hello listing every journal then each book as it now is; a deleted journal `journal: null`; a first `notes: 1` in a heartbeat\'s answer sends every book')
 
+// A change that waited while no Gamemaster was here, fetched as one comes back and made before the
+// hello is answered: the book still goes ahead of its result, after the hello.
+await J.bridgeOff()
+const waited = update(herPage, { markdown: 'Mine, from the app.', base: '0'.repeat(14) })
+handOver('erebor', waited)
+const backAt = app.events.length
+app.holdHello = 300
+await J.bridgeOn()
+await until(() => resultsOf(waited.id).length, 'the waiting change answered', 3000)
+app.holdHello = 0
+const backOrder = app.events.slice(backAt).map(e => ((e.type === 'bridge.hello') && (e.campaign.id === 'erebor')) ? 'hello'
+  : isBook(e, 'erebor', 'personal', 'thorin') ? 'book' : ((e.type === 'command.result') && (e.data.id === waited.id)) ? 'result' : null).filter(Boolean)
+assert.deepEqual(backOrder, ['hello', 'book', 'result'], JSON.stringify(backOrder))
+assert.deepEqual(refusal({ result: resultsOf(waited.id)[0] }), ['failed', 'changed', null])
+ok('a change fetched as the Gamemaster comes back, before the hello is answered: the hello, then the book, then its result')
+
 /* -------------------------------------------- */
 /*  Too large, and failures                     */
 /* -------------------------------------------- */
@@ -890,6 +1031,142 @@ faults.ignoreKeepId = false
 assert.deepEqual(refusal(stray), ['failed', 'error', 'Foundry didn’t keep the note’s id'])
 assert.equal(journal.pages.size, sizeBefore, 'no stray page left')
 ok("a create a module's hook refuses fails, no page; a sort refused after the page is made fails, the note there and the book first; a page made with another id is deleted again and fails")
+
+/* -------------------------------------------- */
+/*  What a journal holds, and who writes        */
+/* -------------------------------------------- */
+
+// Bram's journal holds more than 1,000,000 characters (above): a note more is refused, and so is a
+// longer change of one in it.
+const bramPage = bramJournal.pages.get(bramFirst.command.note.id)
+mark = writes.length
+assert.deepEqual(refusal(await made('erebor', create({ actorId: 'bram', writer: 'bram', title: 'One more', markdown: 'x' }))), ['failed', 'full', null], 'past the most text')
+assert.deepEqual(refusal(await made('erebor', update(bramPage, { actorId: 'bram', writer: 'bram', markdown: 'A little longer now.' }))), ['failed', 'full', null], 'a change past it')
+assert.equal(writes.filter((w, n) => (n >= mark) && ['create', 'update', 'journal'].includes(w[0])).length, 0, 'nothing written')
+// 50 chapters and 300 notes: the 50th and the 300th made, the next of each refused.
+const ofRole = role => ghostJournal.pages.filter(page => (page.type === 'text') && (pageRole(page) === role)).length
+const fill = (role, count) => ghostJournal.createEmbeddedDocuments('JournalEntryPage', Array.from({ length: count }, (_, n) => ({
+  name: `${role} ${n}`, type: 'text', sort: (Math.max(...ghostJournal.pages.map(p => p.sort)) + ((n + 1) * 100000)), title: { level: (role === 'chapter') ? 1 : 2 }, text: md(''),
+})))
+const ghostCreate = (role, title) => made('erebor', create({ actorId: 'ghost', by: 'gm', role, title, ...((role === 'chapter') && { markdown: undefined }) }))
+await fill('chapter', 49 - ofRole('chapter'))
+assert.equal((await ghostCreate('chapter', 'The fiftieth')).result.status, 'done', 'the 50th chapter')
+assert.deepEqual(refusal(await ghostCreate('chapter', 'The fifty-first')), ['failed', 'full', null], 'the 51st')
+await fill('entry', 299 - ofRole('entry'))
+assert.equal((await ghostCreate('entry', 'The three hundredth')).result.status, 'done', 'the 300th note')
+assert.deepEqual(refusal(await ghostCreate('entry', 'One too many')), ['failed', 'full', null], 'the 301st')
+assert.deepEqual([ofRole('chapter'), ofRole('entry')], [50, 300])
+await wait(600)
+ok('a journal holding 50 chapters, 300 notes, or 1,000,000 characters is full: the 50th and 300th made, the next refused `full`, and a change past the text too, nothing written')
+
+// The app taking larger posts, as a heartbeat's answer says: a book held back as too large goes.
+let ahead = 120_000
+const heartbeatNow = () => {
+  const realNow = Date.now
+  ahead += 60_000
+  Date.now = () => realNow() + ahead
+  try { heartbeat() } finally { Date.now = realNow }
+}
+assert.equal(lastBook('erebor', 'personal', 'bram').withheld?.reason, 'tooLarge')
+app.features.erebor = { ...NOTES, maxBytes: 4_000_000 }
+let at = app.events.length
+heartbeatNow()
+await until(() => app.events.slice(at).some(e => isBook(e, 'erebor', 'personal', 'bram') && e.data.journal), "Bram's book", 2000)
+assert.equal(lastBook('erebor', 'personal', 'bram').journal.notes.length, 12)
+app.features.erebor = NOTES
+at = app.events.length
+heartbeatNow()
+await until(() => app.events.slice(at).some(e => isBook(e, 'erebor', 'personal', 'bram')), "Bram's book again", 2000)
+assert.equal(lastBook('erebor', 'personal', 'bram').withheld?.reason, 'tooLarge', 'held back again once it takes less')
+ok('a book held back as too large goes once the app says it takes larger posts, and is held back again once it takes less')
+
+// Who may write: a writer outside the campaign, and a book of a character or party outside it.
+const byMara = await made('erebor', P({ writer: 'mara', title: 'By Mara' }))
+assert.deepEqual(refusal(byMara), ['failed', 'unknown', null], "a party note by a character who isn't the campaign's")
+for (const cmd of [create({ actorId: 'mara', writer: 'mara', title: 'Her own' }), create({ book: 'party', actorId: 'thorin', writer: 'thorin', title: 'Not a party' })]) {
+  const outside = await made('erebor', cmd)
+  assert.deepEqual(refusal(outside), ['failed', 'unknown', null], `${cmd.note.book} ${cmd.actorId}`)
+  assert.equal(outside.before.filter(e => e.type === 'journal.updated').length, 0, 'no book before the journal is looked for')
+}
+assert.deepEqual([journalOf('personal', 'mara', 'erebor'), party.pages.some(p => p.name === 'By Mara')], [null, false])
+// The campaign gone between the fetch and the run, or no JournalEntry here: `off`.
+const offGone = await runNoteCommand(create({ title: 'Nowhere' }), { ...erebor(), id: 'gondor', title: 'Gondor' })
+assert.deepEqual([offGone.status, offGone.reason], ['failed', 'off'], 'a campaign gone')
+await wait(50)
+const journalsHere = game.journal
+let offNoJournals
+game.journal = null
+try {
+  offNoJournals = await runNoteCommand(create({ title: 'No journals' }), erebor())
+} finally {
+  game.journal = journalsHere
+}
+assert.deepEqual([offNoJournals.status, offNoJournals.reason], ['failed', 'off'], 'no journals')
+ok("a note by a writer outside the campaign, or for a book whose character or party isn't in it, is `unknown`, with no book first; one whose campaign has gone, or with no journals here, `off`")
+
+// A book lost to failures that might not last: the hello again, a while later, and every book after it.
+app.fail = e => (e.type === 'journal.updated') && (e.campaign.id === 'erebor') && (e.data.actorId === 'thorin')
+at = app.events.length
+await editPage('alice', herPage, { markdown: 'Lost on its way.' })
+await until(() => logged.some(line => line.includes('Could not deliver journal.updated')), 'the book dropped', 3000)
+app.fail = null
+assert.equal(app.events.slice(at).some(e => isBook(e, 'erebor', 'personal', 'thorin')), false, 'not taken')
+at = app.events.length
+heartbeatNow()
+const lostBook = e => isBook(e, 'erebor', 'personal', 'thorin') && (noteIn(e.data, herPage.id)?.markdown === 'Lost on its way.')
+await until(() => app.events.slice(at).some(lostBook), 'the book again', 3000)
+const resent = app.events.slice(at).filter(e => e.campaign.id === 'erebor')
+assert.ok(resent.findIndex(e => e.type === 'bridge.hello') >= 0, 'the hello again')
+assert.ok(resent.findIndex(e => e.type === 'bridge.hello') < resent.findIndex(lostBook), 'and the book after it')
+// Its failure said in the console, as any post's is, with nothing of the note in it.
+const dropped = logged.filter(line => line.includes('Could not deliver journal.updated'))
+assert.equal(dropped.some(line => line.includes('Lost on its way')), false)
+logged.splice(0, logged.length, ...logged.filter(line => !dropped.includes(line)))
+ok('a book lost to failures that might not last sends the hello again a while later, and the book after it')
+
+// A hello that listed a journal deleted before the hello was answered: `journal: null` after it.
+await made('mirkwood', create({ title: 'Mirk again', markdown: 'Trees.' }))
+const mirkAgain = journalOf('personal', 'thorin', 'mirkwood')
+assert.ok(mirkAgain)
+await wait(600)
+let letGo
+const gate = new Promise(resolve => { letGo = resolve })
+let heldHello = null
+const standIn = globalThis.fetch
+globalThis.fetch = async (url, init) => {
+  const body = JSON.parse(init.body)
+  if (!heldHello && String(url).endsWith('/api/events') && (body.type === 'bridge.hello') && (body.campaign.id === 'mirkwood')) {
+    heldHello = body
+    await gate
+  }
+  return standIn(url, init)
+}
+at = app.events.length
+announce({ campaignId: 'mirkwood' })
+await until(() => heldHello, 'the held hello')
+assert.deepEqual(heldHello.data.features.notes.journals, [{ kind: 'personal', actorId: 'thorin' }])
+await deleteJournal('gm', mirkAgain)
+await wait(700)
+letGo()
+await until(() => app.events.slice(at).some(e => isBook(e, 'mirkwood', 'personal', 'thorin')), "Mirkwood's book", 2000)
+globalThis.fetch = standIn
+assert.deepEqual(lastBook('mirkwood', 'personal', 'thorin'), { kind: 'personal', actorId: 'thorin', journal: null })
+ok('a journal a hello listed, deleted before the hello was answered, is sent `journal: null` after it')
+
+// An app that doesn't say it reads notes, as one rolled back: no book after its hello, nor after a
+// change in Foundry; once it says so again, the books.
+app.features.erebor = { commands: true, groups: 1 }
+at = app.events.length
+announce({ campaignId: 'erebor' })
+await until(() => app.events.slice(at).some(e => (e.type === 'bridge.hello') && (e.campaign.id === 'erebor')), 'the hello')
+await wait(300)
+await editPage('alice', herPage, { markdown: 'To an older app.' })
+await wait(700)
+assert.equal(app.events.slice(at).filter(e => isBook(e, 'erebor')).length, 0, 'no journal.updated to an app that reads none')
+app.features.erebor = NOTES
+announce({ campaignId: 'erebor' })
+await until(() => noteIn(lastBook('erebor', 'personal', 'thorin'), herPage.id)?.markdown === 'To an older app.', 'the book once it reads them', 2000)
+ok("an app whose answer doesn't say `notes: 1` is sent no journal.updated, after its hello or a change in Foundry; once it says so, the books")
 
 /* -------------------------------------------- */
 /*  Nothing but what the app takes              */

@@ -1,7 +1,7 @@
 # The harness
 
 The module's own scripts, run in Node against stand-ins for Foundry VTT 14 and Midi-QOL and against
-dnd5e's real dice classes: 34 harnesses, 73 runs of them in `harness-all.sh`. No Foundry, no browser
+dnd5e's real dice classes: 35 harnesses, 75 runs of them in `harness-all.sh`. No Foundry, no browser
 and no network: `fvtt/stub.mjs` stands in for Foundry's core and replaces `fetch`, so every post the
 module makes lands in the harness, and the stand-in app answers it. None of this is part of the
 module: Foundry reads `module.json` only, and the release workflow leaves `test/`, the package files,
@@ -14,7 +14,7 @@ Node 22 (`.nvmrc`), POSIX `sh`, coreutils' `timeout` and git. From the module's 
     npm ci
     npm run test:setup
 
-`npm ci` installs jsdom and handlebars, pinned exactly. `npm run test:setup` fetches what the harness
+`npm ci` installs jsdom, handlebars and showdown, pinned exactly. `npm run test:setup` fetches what the harness
 loads but this repository doesn't hold (`pins.env`):
 
 - **dnd5e 5.3.3 and 6.0.5** (`dnd5e.sh`): a shallow, sparse clone of
@@ -36,7 +36,7 @@ loads but this repository doesn't hold (`pins.env`):
 
 Each run prints one line, `name variables oks=N exit=C`: how many `ok` lines it printed, and its exit
 code. A failed run also prints up to 15 of its lines that aren't `ok`, and `npm test` exits 1 when any
-run failed. A full pass takes about six minutes.
+run failed. A full pass takes about seven minutes.
 
 `MODULE_DIR` is the module under test: this checkout unless set. The variables the harnesses read:
 
@@ -62,6 +62,7 @@ run failed. A full pass takes about six minutes.
 |---|---|
 | `stub.mjs` | Foundry core: users, actors, combats, settings, hooks, chat messages; replaces `fetch` |
 | `dice-core.mjs` | Foundry v14's core dice |
+| `journal-core.mjs` | Foundry v14's journals, folders and pages, with their ownership, `_stats` and hooks, its showdown and `cleanHTML`: what `notes.mjs` and the app's e2e (through `e2e/fvtt`) keep journal notes in |
 | `actor5e.mjs`, `activity5e.mjs`, `enchant5e.mjs` | dnd5e 5.3.3's actor rolls, items and activities, and enchantments, ported as far as the module uses them |
 | `dnd5e-cards.mjs` | dnd5e's concentration and chat cards, and Midi-QOL's concentration card |
 | `midi-fake.mjs`, `midi-saves.mjs`, `midi-critical.mjs` | Midi-QOL 14's workflow, 13's saving throws, and its rules for critical hits |

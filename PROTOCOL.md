@@ -1172,11 +1172,11 @@ Note = {
 | `journal` | `null` with no `withheld`: the book has no journal in Foundry, never made or deleted there; drop the notes you hold of it. Otherwise its `id`, its `name` as it's called in Foundry now, cut to 200 characters, and its `notes` in Foundry's page order, at most 400: sort them yourself. |
 | `withheld` | The book isn't told now, and `journal` is `null`: keep what you hold. `"private"`: a party none of the campaign's characters may see in Foundry, as its [`group.updated`](#groupupdated) withholds its sheet. `"tooLarge"`: more than 400 notes, or a post larger than the listener takes, `bytes` the post's size and `limit` the most it takes; the Gamemaster is warned once a page load. |
 | `id` | The page's id. For a note made from the app it's the id the app chose (`keepId`); a page added in Foundry has Foundry's. A duplicated page has a new one: it's a note of its own. |
-| `role`, `chapter` | A chapter, or an entry under one: by the module's flag where the page's flags count, otherwise a page whose title is a level 1 heading is a chapter and any other an entry, in the nearest chapter sent before it. `chapter` is `null` for a chapter, for an entry in none, and for one whose chapter isn't among those sent, as one made before its chapter reached Foundry. |
+| `role`, `chapter` | A chapter, or an entry under one: by the module's flag where the page's flags count, otherwise a page whose title is a level 1 heading is a chapter and any other an entry, in the nearest chapter before it. An entry in a chapter that isn't sent, as one only the Gamemaster sees, is in the nearest chapter before it that is, as players see it in Foundry. `chapter` is `null` for a chapter, for an entry in none, and for one whose chapter isn't in the journal, as one made before its chapter reached Foundry. |
 | `title` | The page's name, cut to 200 characters (`cut`). |
-| `format`, `markdown`, `html` | `2` with its `markdown` for a page kept in Markdown; `1` with its `html` for one edited in Foundry's rich-text editor, or a party's page changed in Foundry whose HTML holds a secret, `secret: true`, sent as that HTML without the secret and never as its Markdown. A party page's `html` never holds a `section.secret`. Over 100,000 characters, cut there (`cut`). |
+| `format`, `markdown`, `html` | `2` with its `markdown` for a page kept in Markdown; `1` with its `html` for one edited in Foundry's rich-text editor. A secret goes only where its readers could read it in Foundry, which shows a page's secrets to its Owners alone: never in a party's journal, and in a character's only where every one of the character's player owners is an Owner of the page. Where it doesn't go, an HTML page's `section.secret` is removed; and a page changed in Foundry whose HTML holds one, or a chapter whose text does (the app never writes a chapter's text), goes as `1`, `secret: true`, with that HTML without the secret, never as its Markdown. Over 100,000 characters, cut there (`cut`). |
 | `createdAt` | When it was first written: in the app, where it was written there, even if it reached Foundry later; else Foundry's `_stats.createdTime`, else its `modifiedTime`, else `0`. Whole milliseconds. |
-| `modifiedAt`, `modifiedBy`, `modifiedIn` | Who changed it last and when: `"app"` where Foundry holds what the module last wrote, with the app's time and its writer's name; `"foundry"` where it was changed in Foundry since, or written there, with `_stats.modifiedTime` and its last user: `"Gamemaster"` for a Gamemaster, a player by the one character of the campaign's they own, where they own just one, else by their own name, and `"Someone in Foundry"` for a user that's gone. The module's own sorts, flags and ownership never count as a change. |
+| `modifiedAt`, `modifiedBy`, `modifiedIn` | Who changed it last and when: `"app"` where Foundry holds what the module last wrote, with the app's time and its writer's name; `"foundry"` where it was changed in Foundry since, or written there, with `_stats.modifiedTime` and its last user, or, where the module has since written only its place or who owns it, which Foundry counts as the Gamemaster's change, the change made in Foundry before that, as the module kept it: `"Gamemaster"` for a Gamemaster, a player by the one character of the campaign's they own, where they own just one, else by their own name, and `"Someone in Foundry"` for a user that's gone. The module's own sorts, flags and ownership never count as a change. |
 | `author` | Who wrote it from the app, `{ actorId, gm, name }`, the Gamemaster's `actorId` `null` and `gm` `true`; `null` for one written in Foundry. Names are read as each book is, so a character renamed shows its new name. |
 | `rev` | The page's revision: a hash of its title and, for an entry, its format and text, which changes with every change made in Foundry and never with the module's own sorts, flags or ownership. Send it back as a change's `base`. |
 
@@ -1193,8 +1193,9 @@ groups; and never twice the same, until the campaign's next hello. One lost to f
 not last sends the hello again 30 seconds later, which every book follows.
 
 **What's never sent.** A page that isn't text, as an image; a page shown to fewer of the journal's
-players than the journal is, or to the Gamemaster alone; a party page's secret; a page with no
-title. Every note is as the app's schema takes it, so one odd page, as a hand-edited flag or a null
+players than the journal is, or to the Gamemaster alone; a secret its readers couldn't read in
+Foundry, a party page's or chapter's, or one on a character's page its player owners don't all own;
+a page with no title. Every note is as the app's schema takes it, so one odd page, as a hand-edited flag or a null
 `createdTime`, reads as written in Foundry rather than failing the event.
 
 ### `bridge.settings`
@@ -1283,7 +1284,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | `messages` | For a roll the campaign's Gamemaster made in the app, `by` `"gm"` (module 0.25.0): the `id`s of the chat messages it made, in the order made, at most 20. They're the messages it flagged `by` `"gm"` and sent with [`gmRoll`](#chat-message), dnd5e 5.3's message of a death save's outcome among them, and only those the Gamemaster's client made or marked for it while it was made, never one a player's browser made or marked with its flags copied. A module that creates chat messages on the Gamemaster's browser for players, as Midi-QOL's `createChatMessage` socket does, could still have a copy listed while the roll is being made. Empty when it made none, as when it failed first; on a result after a `"timeout"`, every one made by then. Left out for a player's roll, and by modules before 0.25.0. |
 | `transfer` | For a move of items and coins (module 0.31.0) that moved anything: `{ from, to, items, currency }`, its ends' actor ids, each item moved `{ id, quantity, created, stacked }`, in the command's order, and the coins moved, `{ <key>: <count> }`, or `null` for none; on `"done"`, and on `"error"` after some moved, listing only those. Never a name, nor what a container held. Since module 0.32.0, for a party's coin shared among its characters, `{ from, to: null, items: [], currency, among }`: `currency` the coins given out, `{ <key>: <share × those given one> }`, and `among` the characters given their share, in order, every one of them when done; on `"error"` only where any was given one. Left out on any other failure. See [Moving items and coins](#moving-items-and-coins). |
 | `removed` | For an item removed (module 0.33.0): `{ item, quantity }`, the item's id and how many of it were removed; on `"done"`, and on `"error"` where the item itself was lowered or deleted. Never a name, nor what a container held. See [Removing an item](#removing-an-item). |
-| `note` | For a note command (module 0.34.0): `{ id, rev, deleted? }`, the note's id, its page's revision now, and `deleted: true` for a delete. `rev` is `null` for a delete, and where the page isn't sent, as one only the Gamemaster sees. On a refusal, `{ id, rev }`, the page's revision as Foundry holds it, or `null`. Never its text. See [Journal notes](#journal-notes). |
+| `note` | For a note command (module 0.34.0): `{ id, rev, deleted? }`, the note's id, its page's revision now, and `deleted: true` for a delete. `rev` is `null` for a delete. On a refusal, `{ id, rev }`, the page's revision as Foundry holds it, or `null` where there's none, or it isn't sent, as one only the Gamemaster sees. Never its text. See [Journal notes](#journal-notes). |
 | `outcome` | For a save answering a prompt: `"success"` or `"failure"`, where its player may see whether they saved, as the card would show them, or since module 0.31.0 always, with **Hit/miss and save results in the app** Always, the DC still never sent; since module 0.27.0, for an answer to a [Midi prompt](#midi-qols-own-saves), Midi's own verdict, where its DC was sent and Midi shows players whether they saved, or since module 0.31.0, with that setting Always, wherever Midi checks saves at all, its *Auto check Saves* not "Off"; since module 0.17.0, for a save rolled for a [description's link](#descriptions-that-roll), and since 0.18.0 a check, whether it met the DC it was rolled against, as its card shows the player, when `visible`; otherwise `null`. |
 
 A roll made after the module reported its `"timeout"`, as once the Gamemaster has answered what a
@@ -2727,7 +2728,12 @@ Gamemaster, or `null` itself for a page first written in Foundry; `createdAt` th
 `modified` `{ actor, gm, at }`, who changed it last from the app and when; `hash` its revision as
 the module last wrote it; and `granted`, who the module made its Owner. A page's flags count only
 where `page` is its own id and every field has its shape: a duplicated page's copied flags, or a
-hand-edited one, never do, and it reads as a page written in Foundry, claiming no author.
+hand-edited one, never do, and it reads as a page written in Foundry, claiming no author. Where the
+module writes only a note's place or who owns it, which Foundry counts as the Gamemaster's change,
+now, a note changed in Foundry also keeps `foundry`, `{ page, rev, at, by }`: who last changed it
+there (`by`, a user's id, or `null`) and when, while it holds revision `rev`, on the page whose id
+is `page` alone. It's `null` once the app changes the note again. A page with no other flags of the
+module's may hold it, and its flags still don't count.
 
 **Ownership.** A personal journal is Owner to the character's player owners (non-Gamemaster users
 with Owner of the actor) and None by default; its pages inherit. A party journal is Observer to each
@@ -2749,17 +2755,23 @@ ownership hides it from no player the journal shows it to, up to Observer, and f
 default, and that isn't the Gamemaster's alone (a default of None or Limited of its own with no
 player given Observer or more on it). The module's own pages always are, even in a journal no
 player can see yet. A page the Gamemaster hides from some of the journal's players, or all, isn't
-sent at all: it leaves the app's books as if deleted there. A party page's secret sections are
-removed from its HTML, and a party page changed in Foundry whose HTML holds one goes as that HTML,
-`format` `1` and `secret: true`, never as its Markdown. A page or title too long is cut and marked
-`cut`. Each note is as the app's schema takes it.
+sent at all: it leaves the app's books as if deleted there. A secret goes only where its readers
+in the app could read it in Foundry, which shows a page's secrets to its Owners alone: never in a
+party's journal, and in a character's only where every one of the character's player owners is an
+Owner of the page, so not where the Gamemaster made one of them an Observer of it, or of the
+journal, nor for a character no player owns. Where it doesn't go, an HTML page's secret sections
+are removed from its HTML, and a page changed in Foundry whose HTML holds one goes as that HTML
+without them, `format` `1` and `secret: true`, never as its Markdown; so does a chapter whose text
+holds one, as the app never writes a chapter's text, though a chapter's revision is its title
+alone. A page or title too long is cut and marked `cut`. Each note is as the app's schema takes it.
 
 **Revisions and "changed in Foundry".** A page's revision, `rev`, is a hash of a chapter's title, or
 of an entry's title, format and text (its Markdown, or its HTML where it's read as HTML). Its format
 is Markdown where `text.format` is Markdown and `text.markdown` a string, unless that's empty while
 its HTML isn't, as Foundry's rich-text editor leaves it. A page whose revision isn't its flags'
 `hash`, or that has none, was changed in Foundry: `modifiedIn` `"foundry"`, with
-`_stats.modifiedTime` and `lastModifiedBy`; otherwise `"app"`, with its flags' `modified`. The
+`_stats.modifiedTime` and `lastModifiedBy`, or what its flags' `foundry` kept of them before the
+module's own write of its place or owners; otherwise `"app"`, with its flags' `modified`. The
 module's own sorts, flags and ownership change no revision, and text the Gamemaster writes under a
 chapter never makes its rename a conflict.
 
@@ -2824,7 +2836,7 @@ written, as Foundry holds the journal then, in this order:
 | `"unknown"` | The book's actor isn't one of the campaign's characters, or groups, with an actor; or a player's writer isn't one of its characters. |
 | `"private"` | A party none of the campaign's characters may see in Foundry. |
 | `"not-member"` | A player's writer may no longer see the party in Foundry. |
-| `"gone"` | An update of a note or chapter that isn't in the journal, or isn't sent, or with no journal at all. A create whose page is already there is done, writing nothing; a delete of one that's gone, or isn't sent, is done. |
+| `"gone"` | An update of a note or chapter that isn't in the journal, or isn't sent, or with no journal at all; and a create whose page is already there but isn't sent, as one the Gamemaster has hidden since, so a note made again from the app after a `"gone"` is never taken as made already. A create whose page is there and sent is done, writing nothing; a delete of one that's gone, or isn't sent, is done. |
 | `"changed"` | The page isn't the command's `role` now, as one whose level was changed in Foundry; or, after the next checks, `base` isn't its revision now: it was changed in Foundry. |
 | `"not-yours"` | A player's update or delete of a party note their character didn't write, or one written in Foundry. |
 | `"foundry-only"` | An update of a note the app shows read only: kept as HTML, sent as HTML for its secret, cut, or with Markdown over 20,000 characters. |
@@ -2832,7 +2844,7 @@ written, as Foundry holds the journal then, in this order:
 | `"headings"`, `"error"` | The note's HTML has a level 1 or 2 heading; there's no converter or cleaner. |
 
 An update already holding exactly what's asked, its title and text, is done before `base` is
-compared, writing nothing but moving the note where its chapter isn't the one asked.
+compared, writing nothing but moving the note where the chapter asked isn't the one it was sent in.
 
 **What's written.** A create: the journal, where there's none; then the page, in a
 `createEmbeddedDocuments` of its own, with `keepId`, its flags in it, and nothing written after it
@@ -2840,12 +2852,14 @@ but its place. One that makes no page fails `"error"`, "A write was refused", an
 with another id is deleted again and fails "Foundry didn’t keep the note’s id". An update: one
 `update` of its name, its title's level, an entry's format, Markdown and HTML, and its flags, whole,
 a page first written in Foundry gaining them with no author; a note moved given its place in the same
-update. A delete: `deleteEmbeddedDocuments`. A write a module's hook refuses fails as one that throws
+update. A note is moved only where the update names another chapter than the one it was sent in;
+otherwise it stays in the chapter it's in, by its flag or its place, even one the app isn't sent,
+as one only the Gamemaster sees. A delete: `deleteEmbeddedDocuments`. A write a module's hook refuses fails as one that throws
 would, "A write was refused", and nothing is put back. No note goes to chat.
 
 **Made at most once.** A change is handed over until it's answered, so it may arrive more than once:
-after a reload, or a result lost on its way. A create whose page is there, an update whose page holds
-what's asked, and a delete of a page that's gone are each done, writing nothing. While a change is
+after a reload, or a result lost on its way. A create whose page is there and sent, an update whose
+page holds what's asked, and a delete of a page that's gone are each done, writing nothing. While a change is
 being made, the same command handed over again is ignored, and the run answers it; that lasts until
 its writes end, however long after a `"timeout"`. Once it's answered, the same command handed over
 again is made again, which is then one of the cases above, and answered.
@@ -2861,7 +2875,9 @@ the watchdog too, after the note commands of the same journal fetched before the
 `{ id, rev }`, or `{ id, rev: null, deleted: true }` for a delete; a refusal `"failed"` with `note`
 `{ id, rev }`, the page's revision as Foundry holds it. Before every result, a refusal's from the
 journal's lookup on included, the module sends the book as Foundry then holds it, in
-[`journal.updated`](#journalupdated), so the book always arrives before the result. A late
+[`journal.updated`](#journalupdated), so the book always arrives before the result. A command
+fetched while the campaign's hello is on its way, as one that waited for the Gamemaster is when
+they come back, has its result wait for the hello: the books follow the hello, then the result. A late
 `"done"` after a `"timeout"` is sent; a late refusal isn't, and the next hand-over answers it.
 
 A listener before module 0.34.0 never says `"notes"`, so it's handed no note command and sent no

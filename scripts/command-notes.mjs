@@ -3,9 +3,10 @@ import { getCampaigns } from "./campaigns.mjs";
 import { checkCommand, failedResult, isId, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
 import { accessFor, groupEntry } from "./groups.mjs";
 import {
-  bookActor, compareIds, flagsCount, journalFor, makeJournal, noteRev, notesOn, pageBody, pageCreatedAt, pageOwners,
-  pageRev, pageRole, pageSentAs, pagesInOrder, sendBook, sharedLikeJournal, textPages
+  bookActor, chaptersAsSent, compareIds, flagsCount, journalFor, lastFoundryEdit, makeJournal, noteRev, notesOn, pageBody,
+  pageCreatedAt, pageOwners, pageRev, pageRole, pageSentAs, pagesInOrder, sendBook, sharedLikeJournal, textPages
 } from "./journals.mjs";
+import { helloPending } from "./transport.mjs";
 
 /**
  * Journal notes changed from the Sending Stone app, since module 0.34.0: a note or chapter added to
@@ -51,6 +52,12 @@ const FIELDS = (() => {
     delete: { chapter: list(), entry: list() }
   };
 })();
+
+/**
+ * How often a result waiting for its campaign's hello looks again, in milliseconds.
+ * @type {number}
+ */
+const HELLO_LOOK = 100;
 
 /**
  * The latest note command, which the next waits for, whichever journal.
@@ -169,14 +176,20 @@ async function noteNow(command, passed) {
     if ( (kind === "party") && !accessFor(owner, writer) ) return failed("not-member");
   }
 
-  // From here, Foundry's journal goes ahead of whatever is answered.
-  const post = () => sendBook(kind, owner.id, campaign.id);
-  const refused = (reason, error=null) => {
-    post();
+  // From here, Foundry's journal goes ahead of whatever is answered. No book is sent while the
+  // campaign's hello is on its way, as when a change that waited for the Gamemaster is fetched as
+  // they come back, before the hello is answered: the books follow the hello, so the result waits
+  // for it, and then for this book, to come after them.
+  const post = async () => {
+    while ( helloPending(campaign.id) ) await new Promise(resolve => setTimeout(resolve, HELLO_LOOK));
+    sendBook(kind, owner.id, campaign.id);
+  };
+  const refused = async (reason, error=null) => {
+    await post();
     return failed(reason, error);
   };
-  const done = ({ deleted=false }={}) => {
-    post();
+  const done = async ({ deleted=false }={}) => {
+    await post();
     const result = {
       id: command.id, status: "done", reason: null, error: null, messageId: null, visible: false, rolls: []
     };
@@ -187,7 +200,11 @@ async function noteNow(command, passed) {
   if ( op === "create" ) {
     const there = entry?.pages?.get(note.id) ?? null;
     if ( there ) {
-      page = (there.type === "text") ? there : null;
+      // Made already, as when the same create is handed over again; but a page of this id the app
+      // isn't sent, as one the Gamemaster has hidden since, is gone to it, as a change of it is: a
+      // note the player adds again is never taken as made there, which would lose it.
+      if ( (there.type !== "text") || !sharedLikeJournal(there) ) return refused("gone");
+      page = there;
       return done();
     }
   } else {
@@ -214,9 +231,9 @@ async function noteNow(command, passed) {
     if ( op === "update" ) {
       const title = note.title.trim();
       // Already what's asked, as when the same change is handed over again after it was made: done,
-      // the note moved if its chapter isn't the one asked.
+      // the note moved if the chapter asked isn't the one it was sent in.
       if ( noteRev(role, title, 2, note.markdown ?? "") === pageRev(page) ) {
-        if ( (role === "entry") && (chapterOf(entry, page) !== note.chapter) ) {
+        if ( (role === "entry") && (shownIn(entry, page) !== note.chapter) ) {
           try {
             await updatePage(entry, page, note, { gm, content: page.text?.content ?? "" });
           } catch (err) {
@@ -333,8 +350,9 @@ async function createPage(entry, note, { gm, content, author }) {
 /**
  * Change a page to what's asked, in one update: its title, its level, a note's Markdown and HTML,
  * and its flags, whole; a page first written in Foundry gains them here, with no author. A note
- * moved to another chapter is given its place there in the same update, and the journal is put in
- * order after it where it must be.
+ * moved to another chapter than the one the app was shown it in is given its place there in the
+ * same update, and the journal is put in order after it where it must be; one that isn't moved stays
+ * in the chapter it's in, by its flag or its place, though that may be one the app isn't shown.
  * @param {JournalEntry} entry
  * @param {JournalEntryPage} page
  * @param {object} note
@@ -346,13 +364,15 @@ async function createPage(entry, note, { gm, content, author }) {
  */
 async function updatePage(entry, page, note, { gm, content }) {
   const title = note.title.trim();
-  const chapter = (note.role === "entry") ? note.chapter : null;
+  const moved = (note.role === "entry") && (shownIn(entry, page) !== note.chapter);
+  const chapter = (note.role !== "entry") ? null : (moved ? note.chapter : chapterOf(entry, page));
   const markdown = (note.role === "entry") ? note.markdown : "";
   const before = flagsCount(page) ? page.flags[MODULE_ID]
     : { page: page.id, role: note.role, chapter: null, author: null, createdAt: pageCreatedAt(page), granted: [] };
-  const moved = (note.role === "entry") && (chapterOf(entry, page) !== chapter);
+  // What the app writes is the last change, so who changed it in Foundry before is kept no longer.
   const flags = {
-    ...before, role: note.role, chapter, modified: { actor: note.writer, gm, at: note.at }, hash: noteRev(note.role, title, 2, markdown)
+    ...before, role: note.role, chapter, modified: { actor: note.writer, gm, at: note.at }, hash: noteRev(note.role, title, 2, markdown),
+    foundry: null
   };
   const changes = { name: title, "title.level": (note.role === "chapter") ? 1 : 2, [`flags.${MODULE_ID}`]: flags };
   if ( note.role === "entry" ) {
@@ -377,7 +397,8 @@ async function updatePage(entry, page, note, { gm, content }) {
 
 /**
  * The chapter a page is in, as its order in Foundry would keep it: by its flag where its flags
- * count, whether or not that chapter is there yet; else the nearest chapter before it.
+ * count, whether or not that chapter is there yet; else the nearest chapter before it, whoever may
+ * see it.
  * @param {JournalEntry} entry
  * @param {JournalEntryPage} page
  * @returns {string|null}
@@ -390,6 +411,17 @@ function chapterOf(entry, page) {
     if ( pageRole(other) === "chapter" ) chapter = other.id;
   }
   return chapter;
+}
+
+/**
+ * The chapter an entry was sent to the app in, which a change of it from the app names again where
+ * it isn't moving it (`chaptersAsSent`).
+ * @param {JournalEntry} entry
+ * @param {JournalEntryPage} page
+ * @returns {string|null}
+ */
+function shownIn(entry, page) {
+  return chaptersAsSent(entry).get(page.id) ?? null;
 }
 
 /**
@@ -480,8 +512,14 @@ async function sortJournal(entry, { renumber=false }={}) {
     const sorts = order.map(id => Number(entry.pages.get(id)?.sort) || 0);
     if ( sorts.every((sort, n) => !n || (sort > sorts[n - 1])) ) return;
   }
+  // A note changed in Foundry keeps who changed it there, which a write of its place alone would
+  // make the Gamemaster's, now.
   const updates = order.map((id, n) => ({ _id: id, sort: (n + 1) * DENSITY }))
-    .filter(({ _id, sort }) => (Number(entry.pages.get(_id)?.sort) || 0) !== sort);
+    .filter(({ _id, sort }) => (Number(entry.pages.get(_id)?.sort) || 0) !== sort)
+    .map(update => {
+      const edit = lastFoundryEdit(entry.pages.get(update._id));
+      return edit ? { ...update, [`flags.${MODULE_ID}.foundry`]: edit } : update;
+    });
   if ( !updates.length ) return;
   const written = await entry.updateEmbeddedDocuments("JournalEntryPage", updates);
   if ( Array.from(written ?? []).length < updates.length ) throw new Error("A write was refused");
