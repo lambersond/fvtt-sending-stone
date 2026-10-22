@@ -1057,7 +1057,7 @@ Dice is switched on or off while a campaign allows its players to enter their di
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls, gmRollMessages, manualDice, midiPrompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; since module 0.29.0 `"endConcentration"` wherever players' rolls are made, and `"spend"` and `"inspiration"` wherever the Gamemaster lets them attack and cast, whether or not the game can make their attacks now, as while the attack self-test fails or **Run players' attacks through Midi** is off; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). And since module 0.25.0 `gmRollMessages`, `true` wherever `gmRolls` is: such a roll's [`command.result`](#commandresult) lists the chat messages it made, `messages`. And since module 0.26.0 `manualDice`, whether the campaign's players may enter what their own dice show in the app: `true` only while players' rolls are made (`enabled`), the Gamemaster allows it and [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) is on, else `false`. Since module 0.32.0 a player enters them where their character's [`manualDice`](#character) is also `true`, sending the roll [`typed`](#fetching-rolls); before it, nothing was entered. And since module 0.27.0 `midiPrompts`: `true` where `prompts` is and this Midi-QOL has what [asking its own saves](#midi-qols-own-saves) needs, else `false`; a listener needs nothing from it, as Midi prompts are sent only to one that says it reads them. See [Rolls from the app](#rolls-from-the-app). Since module 0.31.0, beside `rolls`, never inside it, and under any system, `transfers`: `{ enabled, kinds, reason }`, whether the campaign's players may [move items and coins](#moving-items-and-coins) from the app: `{ enabled: false, kinds: [], reason: "off" }` until the Gamemaster turns **Players move items and coins** on; `reason` `"system"` with it on under a system other than D&D Fifth Edition; and with it on under dnd5e, `{ enabled: true, kinds: ["transfer"], reason: null }`. Since module 0.32.0 it ends with `partySends` and `distribute`, `true` both wherever `enabled` is and `false` otherwise: `partySends`, a party's items and coins may be [sent](#moving-items-and-coins) by a player whose character's users own it to any of the campaign's characters or another of its parties they own, and by the Gamemaster to any of them, party to party no longer refused; `distribute`, a `transfer` may share a party's coin among its characters, `among`. It reads neither the rolls, nor the self-test, nor whether the world has groups. Since module 0.33.0, beside them, under any system, `removals`: `{ enabled, kinds, reason }`, whether an item may be [removed](#removing-an-item) from a character from the app: `{ enabled: true, kinds: ["remove"], reason: null }` under dnd5e, otherwise `{ enabled: false, kinds: [], reason: "system" }`; there's no switch. Since module 0.34.0, beside them, `notes`: `{ enabled, kinds, reason, journals }`, whether [journal notes](#journal-notes) are kept here (always, under any system: `{ enabled: true, kinds: ["personal", "party"], reason: null }`), and `journals`, the campaign's characters and parties whose journal for this campaign exists in Foundry, as `{ kind, actorId }`, `kind` `"personal"` or `"party"`: `[]` where none has one. A book it doesn't list has no journal; one it lists follows the hello in a [`journal.updated`](#journalupdated). |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls, gmRollMessages, manualDice, midiPrompts } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; since module 0.29.0 `"endConcentration"` wherever players' rolls are made, and `"spend"` and `"inspiration"` wherever the Gamemaster lets them attack and cast, whether or not the game can make their attacks now, as while the attack self-test fails or **Run players' attacks through Midi** is off; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). And since module 0.25.0 `gmRollMessages`, `true` wherever `gmRolls` is: such a roll's [`command.result`](#commandresult) lists the chat messages it made, `messages`. And since module 0.26.0 `manualDice`, whether the campaign's players may enter what their own dice show in the app: `true` only while players' rolls are made (`enabled`), the Gamemaster allows it and [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) is on, else `false`. Since module 0.32.0 a player enters them where their character's [`manualDice`](#character) is also `true`, sending the roll [`typed`](#fetching-rolls); before it, nothing was entered. And since module 0.27.0 `midiPrompts`: `true` where `prompts` is and this Midi-QOL has what [asking its own saves](#midi-qols-own-saves) needs, else `false`; a listener needs nothing from it, as Midi prompts are sent only to one that says it reads them. See [Rolls from the app](#rolls-from-the-app). Since module 0.31.0, beside `rolls`, never inside it, and under any system, `transfers`: `{ enabled, kinds, reason }`, whether the campaign's players may [move items and coins](#moving-items-and-coins) from the app: `{ enabled: false, kinds: [], reason: "off" }` until the Gamemaster turns **Players move items and coins** on; `reason` `"system"` with it on under a system other than D&D Fifth Edition; and with it on under dnd5e, `{ enabled: true, kinds: ["transfer"], reason: null }`. Since module 0.32.0 it ends with `partySends` and `distribute`, `true` both wherever `enabled` is and `false` otherwise: `partySends`, a party's items and coins may be [sent](#moving-items-and-coins) by a player whose character's users own it to any of the campaign's characters or another of its parties they own, and by the Gamemaster to any of them, party to party no longer refused; `distribute`, a `transfer` may share a party's coin among its characters, `among`. It reads neither the rolls, nor the self-test, nor whether the world has groups. Since module 0.33.0, beside them, under any system, `removals`: `{ enabled, kinds, reason }`, whether an item may be [removed](#removing-an-item) from a character from the app: `{ enabled: true, kinds: ["remove"], reason: null }` under dnd5e, otherwise `{ enabled: false, kinds: [], reason: "system" }`; there's no switch. Since module 0.34.0, beside them, `notes`: `{ enabled, kinds, reason, journals }`, whether [journal notes](#journal-notes) are kept here (always, under any system: `{ enabled: true, kinds: ["personal", "party"], reason: null }`), and `journals`, the campaign's characters and parties whose journal for this campaign exists in Foundry, as `{ kind, actorId }`, `kind` `"personal"` or `"party"`: `[]` where none has one. A book it doesn't list has no journal; one it lists follows the hello in a [`journal.updated`](#journalupdated). Since module 0.35.0 `notes` also says `orders: true`, that it takes the app's [`order`](#journal-notes) of a group's notes and keeps Foundry's order, and `changes: true`, that it says who deleted or reordered notes in Foundry, in `journal.updated`'s `journal.changed`, to a listener that answers `"notes": 2`. |
 | `characters` | Every [character](#character) in the campaign: since module 0.22.0 without its `sheet`, which follows in `character.updated`; since module 0.26.0 each with `manualDice`, whether its player may enter its dice results in the app, as [Character](#character) says: always `false` before module 0.32.0. |
 | `groups` | Since module 0.30.0, the campaign's [groups](#group), its parties, in the order the Gamemaster listed them, each without its sheet: `[]` where it has none, and under any system but D&D Fifth Edition. Actors that no longer exist, or aren't of dnd5e's Group type, are left out. Each group's sheet follows in [`group.updated`](#groupupdated) to a listener that reads groups. |
 | `settings` | Since module 0.30.0, [what Foundry says of itself](#bridgesettings) for the campaign's Gamemaster: the modules Sending Stone works with and their versions, the campaign's switches and every campaign's, the dnd5e and Midi-QOL settings that decide what players see in chat, and what players see. |
@@ -1145,14 +1145,16 @@ You may be told of the removal of one you don't have: ignore it.
 
 Since module 0.34.0, a character's or a party's [journal of notes](#journal-notes), whole, as
 Foundry holds it, for one campaign. Part of the event stream. Sent only to a listener whose latest
-answer to the campaign's hello or heartbeat said `"notes": 1`, as an integer of 1 or more: never to
-one that didn't, and none while the campaign's hello is on its way, which every book follows.
+answer to the campaign's hello or heartbeat said `"notes": 1`, as an integer of 1 or more; `changed`
+only where it said 2 or more. Never to one that didn't, and none while the campaign's hello is on
+its way, which every book follows.
 
 ```
 {
   kind: "personal"|"party",
   actorId: <the character's or the group's id>,
-  journal: { id: <JournalEntry id>, name: <string, at most 200>, notes: Note[] } | null,
+  journal: { id: <JournalEntry id>, name: <string, at most 200>, notes: Note[],
+             changed?: { what: "delete"|"order", by: <name, at most 200>, at: <ms> } } | null,
   withheld?: { reason: "private" } | { reason: "tooLarge", bytes: <int>, limit: <int> }
 }
 Note = {
@@ -1169,7 +1171,8 @@ Note = {
 | Field | Meaning |
 | --- | --- |
 | `kind`, `actorId` | The book: a character's own notes in this campaign, by the character's id, or a party's, by the group's. |
-| `journal` | `null` with no `withheld`: the book has no journal in Foundry, never made or deleted there; drop the notes you hold of it. Otherwise its `id`, its `name` as it's called in Foundry now, cut to 200 characters, and its `notes` in Foundry's page order, at most 400: sort them yourself. |
+| `journal` | `null` with no `withheld`: the book has no journal in Foundry, never made or deleted there; drop the notes you hold of it. Otherwise its `id`, its `name` as it's called in Foundry now, cut to 200 characters, and its `notes` in Foundry's page order, at most 400: the notes that share a `chapter`, `null` for none, are in that group's order, and the chapters in theirs. |
+| `changed` | Since module 0.35.0, only to a listener that answered `"notes": 2` or more: the last time someone deleted a page the app is sent, or wrote the `sort` of an entry page the app is sent, in Foundry, other than the module's own writes. `what` `"delete"` or `"order"`; `by` the user, named as `modifiedBy` names them (`"Gamemaster"`, a player by the one character of the campaign's they own, else by their own name, and `"Someone in Foundry"` for a user that's gone), cut to 200 characters; and `at` Foundry's server time of it, whole milliseconds. Left out, never `null`, where the journal has recorded none. See [Journal notes](#journal-notes). |
 | `withheld` | The book isn't told now, and `journal` is `null`: keep what you hold. `"private"`: a party none of the campaign's characters may see in Foundry, as its [`group.updated`](#groupupdated) withholds its sheet. `"tooLarge"`: more than 400 notes, or a post larger than the listener takes, `bytes` the post's size and `limit` the most it takes; the Gamemaster is warned once a page load. |
 | `id` | The page's id. For a note made from the app it's the id the app chose (`keepId`); a page added in Foundry has Foundry's. A duplicated page has a new one: it's a note of its own. |
 | `role`, `chapter` | A chapter, or an entry under one: by the module's flag where the page's flags count, otherwise a page whose title is a level 1 heading is a chapter and any other an entry, in the nearest chapter before it. An entry in a chapter that isn't sent, as one only the Gamemaster sees, is in the nearest chapter before it that is, as players see it in Foundry. `chapter` is `null` for a chapter, for an entry in none, and for one whose chapter isn't in the journal, as one made before its chapter reached Foundry. |
@@ -1181,16 +1184,16 @@ Note = {
 | `rev` | The page's revision: a hash of its title and, for an entry, its format and text, which changes with every change made in Foundry and never with the module's own sorts, flags or ownership. Send it back as a change's `base`. |
 
 **When.** After each answered hello, after its groups, one for each book whose journal it lists;
-when the listener first says `"notes": 1` in a heartbeat's answer, every book afresh; 500 ms after
-the last change the bridge hears of to a journal or its pages, its ownership included, as a page
-made, changed or deleted in Foundry, or the journal deleted; when a character's or a party's
-ownership changes, its books and every party book of its campaigns, whose privacy may have changed;
-when what the listener takes of sheets changes; and before the result of every
-[note command](#journal-notes), a refusal's included, so the book always comes before the result
-that follows it. A book is sent only where it's the campaign's own, a personal book while the
-campaign's characters include the actor, a party book while its groups do and its listener reads
-groups; and never twice the same, until the campaign's next hello. One lost to failures that might
-not last sends the hello again 30 seconds later, which every book follows.
+when the listener first says `"notes": 1` in a heartbeat's answer, or since module 0.35.0 a higher
+format than it said before, every book afresh; 500 ms after the last change the bridge hears of to a
+journal or its pages, its ownership included, as a page made, changed or deleted in Foundry, or the
+journal deleted; when a character's or a party's ownership changes, its books and every party book
+of its campaigns, whose privacy may have changed; when what the listener takes of sheets changes;
+and before the result of every [note command](#journal-notes), a refusal's included, so the book
+always comes before the result that follows it. A book is sent only where it's the campaign's own, a
+personal book while the campaign's characters include the actor, a party book while its groups do
+and its listener reads groups; and never twice the same, until the campaign's next hello. One lost
+to failures that might not last sends the hello again 30 seconds later, which every book follows.
 
 **What's never sent.** A page that isn't text, as an image; a page shown to fewer of the journal's
 players than the journal is, or to the Gamemaster alone; a secret its readers couldn't read in
@@ -1270,7 +1273,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | --- | --- |
 | `id` | The roll's `id`, as fetched. |
 | `status` | `"done"`, or `"failed"` when it wasn't made. |
-| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for hit dice spent at once (module 0.20.0), those and `"full-hp"` (the character is at full hit points); for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). Since module 0.21.0, for an enchant activity's use, also `"profile"`, `"enchant-target"`, `"applied"` and `"enchant"`, and for ending an enchantment, `"enchantment"`, besides those of a use; see [Enchantments](#enchantments). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). Since module 0.29.0, for ending a concentration, also `"concentration"` and `"cancelled"`; for spending charges, `"attacks-off"`, `"item"`, `"uses"` and `"short"`; and for Heroic Inspiration, `"attacks-off"`, `"not-inspired"` and `"inspired"`; see [Concentration, charges and Heroic Inspiration](#concentration-charges-and-heroic-inspiration). For an ask, a description's roll, damage or healing, or a save or check rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). Since module 0.31.0, for a move of items and coins, `"off"`, `"transfers-off"`, `"invalid"`, `"unknown"`, `"not-yours"`, `"not-owner"`, `"gone"`, `"short"`, `"container"`, `"nested"`, `"deep"`, `"error"` and `"timeout"`, and since module 0.32.0 `"members"` and `"split"`, for a party's coin shared among its characters; see [Moving items and coins](#moving-items-and-coins). Since module 0.33.0, for an item removed, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"short"`, `"changed"` (the stack isn't as many as the app's sheet showed now), `"error"` and `"timeout"`; see [Removing an item](#removing-an-item). Since module 0.34.0, for a note command, `"off"`, `"invalid"`, `"unknown"`, `"private"`, `"not-member"`, `"not-yours"`, `"foundry-only"`, `"headings"`, `"full"`, `"error"` and `"timeout"`, and `"changed"` and `"gone"` where it was changed or deleted in Foundry since; see [Journal notes](#journal-notes). `null` when done. |
+| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for hit dice spent at once (module 0.20.0), those and `"full-hp"` (the character is at full hit points); for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). Since module 0.21.0, for an enchant activity's use, also `"profile"`, `"enchant-target"`, `"applied"` and `"enchant"`, and for ending an enchantment, `"enchantment"`, besides those of a use; see [Enchantments](#enchantments). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). Since module 0.29.0, for ending a concentration, also `"concentration"` and `"cancelled"`; for spending charges, `"attacks-off"`, `"item"`, `"uses"` and `"short"`; and for Heroic Inspiration, `"attacks-off"`, `"not-inspired"` and `"inspired"`; see [Concentration, charges and Heroic Inspiration](#concentration-charges-and-heroic-inspiration). For an ask, a description's roll, damage or healing, or a save or check rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). Since module 0.31.0, for a move of items and coins, `"off"`, `"transfers-off"`, `"invalid"`, `"unknown"`, `"not-yours"`, `"not-owner"`, `"gone"`, `"short"`, `"container"`, `"nested"`, `"deep"`, `"error"` and `"timeout"`, and since module 0.32.0 `"members"` and `"split"`, for a party's coin shared among its characters; see [Moving items and coins](#moving-items-and-coins). Since module 0.33.0, for an item removed, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"short"`, `"changed"` (the stack isn't as many as the app's sheet showed now), `"error"` and `"timeout"`; see [Removing an item](#removing-an-item). Since module 0.34.0, for a note command, `"off"`, `"invalid"`, `"unknown"`, `"private"`, `"not-member"`, `"not-yours"`, `"foundry-only"`, `"headings"`, `"full"`, `"error"` and `"timeout"`, and `"changed"` and `"gone"` where it was changed or deleted in Foundry since; see [Journal notes](#journal-notes). Since module 0.35.0, for an order, `"off"`, `"invalid"`, `"unknown"`, `"private"`, `"not-member"`, `"gone"`, `"changed"`, `"error"` and `"timeout"`. `null` when done. |
 | `error` | What went wrong, for `"invalid"` and `"error"`, what dnd5e said for `"consume"`, and why for `"prompt"`; otherwise `null`. |
 | `messageId` | The chat message the roll made; for hit dice, the last of their cards. Since module 0.21.0, an enchant activity's use that failed once used, `"enchant"` or `"midi"`, has its card's while the card is there, with `visible`, for the Gamemaster to apply it from; one with no card, as a module stopped dnd5e posting it or Midi-QOL deleted it, or with a card no one can apply it from, as one naming a concentration that has since ended, has `null`, with `visible` `true`, and so does the end of an enchantment, and since module 0.29.0 the end of a concentration. Charges spent and Heroic Inspiration have the line they posted, and `null`, with `visible` `true`, where it couldn't be posted. Since module 0.27.0, an answer to a [Midi prompt](#midi-qols-own-saves) has `null` where Midi makes no message for the roll, as when the Gamemaster's browser rolls it and Midi doesn't show saves, with `visible` `true`: its dice are the player's own. |
 | `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check; for hit dice, `false` unless they may see every card. |
@@ -1285,6 +1288,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | `transfer` | For a move of items and coins (module 0.31.0) that moved anything: `{ from, to, items, currency }`, its ends' actor ids, each item moved `{ id, quantity, created, stacked }`, in the command's order, and the coins moved, `{ <key>: <count> }`, or `null` for none; on `"done"`, and on `"error"` after some moved, listing only those. Never a name, nor what a container held. Since module 0.32.0, for a party's coin shared among its characters, `{ from, to: null, items: [], currency, among }`: `currency` the coins given out, `{ <key>: <share × those given one> }`, and `among` the characters given their share, in order, every one of them when done; on `"error"` only where any was given one. Left out on any other failure. See [Moving items and coins](#moving-items-and-coins). |
 | `removed` | For an item removed (module 0.33.0): `{ item, quantity }`, the item's id and how many of it were removed; on `"done"`, and on `"error"` where the item itself was lowered or deleted. Never a name, nor what a container held. See [Removing an item](#removing-an-item). |
 | `note` | For a note command (module 0.34.0): `{ id, rev, deleted? }`, the note's id, its page's revision now, and `deleted: true` for a delete. `rev` is `null` for a delete. On a refusal, `{ id, rev }`, the page's revision as Foundry holds it, or `null` where there's none, or it isn't sent, as one only the Gamemaster sees. Never its text. See [Journal notes](#journal-notes). |
+| `order` | For an order of a group's notes (module 0.35.0): `{ chapter, ids }`, the group's order in Foundry after it, as the book sent before lists it; on a refusal once the group is found, `"changed"` or `"error"`, its order then, and left out on any other. Never a title. No `note`. See [Journal notes](#journal-notes). |
 | `outcome` | For a save answering a prompt: `"success"` or `"failure"`, where its player may see whether they saved, as the card would show them, or since module 0.31.0 always, with **Hit/miss and save results in the app** Always, the DC still never sent; since module 0.27.0, for an answer to a [Midi prompt](#midi-qols-own-saves), Midi's own verdict, where its DC was sent and Midi shows players whether they saved, or since module 0.31.0, with that setting Always, wherever Midi checks saves at all, its *Auto check Saves* not "Off"; since module 0.17.0, for a save rolled for a [description's link](#descriptions-that-roll), and since 0.18.0 a check, whether it met the DC it was rolled against, as its card shows the player, when `visible`; otherwise `null`. |
 
 A roll made after the module reported its `"timeout"`, as once the Gamemaster has answered what a
@@ -1817,6 +1821,19 @@ A prompt:
   `"not-yours"`, `"foundry-only"`, `"headings"` and `"full"`, with `"changed"` and `"gone"` where it
   was changed or deleted in Foundry since. A listener before 0.34.0 never says `notes`, so it's
   handed no note command and sent no `journal.updated`, and it ignores the hello's `features.notes`.
+- Module 0.35.0 keeps each group's order of notes, a chapter's or those in no chapter, in Foundry's
+  page order, which `journal.updated` lists them in, and takes an order from the app. Every hello's
+  `features.notes` ends with `orders: true` and `changes: true`. A [`note`](#journal-notes) command
+  may be an order, `{ book, op: "order", chapter, ids, was, writer, at }`, from anyone who may see
+  the party, with no author check, refused `"invalid"`, `"off"`, `"unknown"`, `"private"`,
+  `"not-member"`, `"gone"`, `"changed"` (the same notes reordered in Foundry since) or `"error"`;
+  notes added, deleted or moved meanwhile are merged. Its result has `order`, `{ chapter, ids }`,
+  the group's order in Foundry then, in place of `note`. Foundry's order is kept: a reorder made
+  there stays, and a note made or moved goes last in its group, no longer by when it was written. A
+  listener that answers `"notes": 2` is told who last deleted or reordered a page it's sent in
+  Foundry, and when, as `journal.updated`'s `journal.changed`, `{ what, by, at }`. A listener before
+  0.35.0 never sends an order and answers `"notes": 1`, so it's sent no `journal.changed`; it may
+  ignore `orders` and `changes`.
 
 ## Changes from protocol 1
 
@@ -1853,7 +1870,7 @@ campaign, with **Players roll in the app** on its Player actions tab. It is made
 | `inspiration` | Not a roll: the character's [Heroic Inspiration](#concentration-charges-and-heroic-inspiration) used or gained. Module 0.29.0. | `inspiration`: `"use"` or `"gain"`. |
 | `transfer` | Not a roll: items and coins [moved](#moving-items-and-coins) between the character and a party, or another character; since module 0.32.0 also a party's sent elsewhere, party to party too, or a party's coin shared among its characters. Module 0.31.0, among `features.transfers`' `kinds`, never `features.rolls`'. | `transfer`: `{ from, to, items?, currency? }`, or since module 0.32.0 `{ from, among, currency }`. |
 | `remove` | Not a roll: an item, or part of its stack, [removed](#removing-an-item) from the character. Module 0.33.0, among `features.removals`' `kinds`, never `features.rolls`'. | `remove`: `{ item, quantity, held }`. |
-| `note` | Not a roll: a journal note or chapter added, changed, or a note deleted (module 0.34.0). | `note`: `{ book, op, id, role, base, writer, at, title?, markdown?, chapter?, createdAt? }`; see [Journal notes](#journal-notes). |
+| `note` | Not a roll: a journal note or chapter added, changed, or a note deleted (module 0.34.0), or since 0.35.0 a group's notes put in order. | `note`: `{ book, op, id, role, base, writer, at, title?, markdown?, chapter?, createdAt? }`, or `{ book, op: "order", chapter, ids, was, writer, at }`; see [Journal notes](#journal-notes). |
 
 ### Fetching rolls
 
@@ -2718,7 +2735,8 @@ app, never on a hello, in a folder found by its flag, `flags["sending-stone"].fo
 made where there's none, "Sending Stone notes". It's named "{name}'s notes" or "{name}: party
 notes", `{name}` the actor's name then, with " ({campaign})" after it where the actor is in more
 than one campaign then, as "Thorin's notes (Erebor)"; a rename in Foundry stays. Its table of
-contents is locked (`flags.core.locked`) against being dragged into a new order.
+contents is locked (`flags.core.locked`) against casual dragging: a Gamemaster who unlocks it and
+reorders notes there keeps that order, which the app shows.
 
 **Each page's flags**, written whole in the same call that makes it, as its id is known before:
 `flags["sending-stone"]` `{ page, role, chapter, author, createdAt, modified, hash, granted }`:
@@ -2775,15 +2793,27 @@ module's own write of its place or owners; otherwise `"app"`, with its flags' `m
 module's own sorts, flags and ownership change no revision, and text the Gamemaster writes under a
 chapter never makes its rename a conflict.
 
-**Order.** The app sorts notes by when they were written. Foundry's order follows it as `sort`
-allows: notes in no chapter first, by when each was written, then each chapter by when it was,
-followed by its notes; ties by id. A page written in Foundry is in the chapter before it, placed by
-when it was made, and a page that isn't text keeps its place after the note it follows. Only a
-create, or an update moving a note to another chapter, places a page: midway between the pages it
-falls between, or where no whole number fits, every page renumbered `100000` apart in one
-`updateEmbeddedDocuments`, writing only those whose `sort` changes; and wherever the whole order
-then still differs, as a note made before its chapter reached Foundry, waiting at the top until the
-chapter comes, the journal is renumbered the same way. Reading never sorts.
+**Order.** A journal's order is its pages' order in Foundry, by `sort`, and nothing else holds it;
+[`journal.updated`](#journalupdated) lists the notes in it. The chapter pages divide it into groups:
+the notes in no chapter first, then each chapter, by when it was written, ties by id, followed by
+its notes. Since module 0.35.0 each group's notes keep the order Foundry holds them in, as the app
+sets it with an order (below), or a Gamemaster who unlocks the journal's contents drags them there;
+before it, every create and move put each group back in the order its notes were written. Chapters
+aren't reordered: one dragged in Foundry is put back by when it was written at the next create or
+move from the app. A note made, or moved to another chapter, goes last in its group, whenever it was
+written, and a chapter made goes among the chapters by when it was written. A page written in
+Foundry is in the chapter before it; a note whose chapter isn't in the journal yet is in none until
+the chapter comes, and is then gathered under it; and a page that isn't text keeps its place after
+the note it follows. Only a create, a move to another chapter and an order place pages. A create
+places its page, and a move its note, midway between the pages it falls between. Where no whole
+number fits there, a create makes its page at the journal's end and a move leaves its note where it
+was, and the journal is then renumbered, every page `100000` apart, in one `updateEmbeddedDocuments`
+writing only those whose `sort` changes, the moved note last in its new chapter. A note a page that
+isn't text follows is given no place of its own: the journal is put in order after the move, as
+below, the note and that page together. Wherever the whole order still differs from this, as after
+a chapter was dragged in Foundry, the pages are put back in one `updateEmbeddedDocuments`, each
+taking the `sort` of the page that held its place, so only the pages whose place changes are
+written; where two pages share a `sort`, the journal is renumbered instead. Reading never sorts.
 
 **Markdown, and the level 1 and 2 headings.** A note's text is Markdown as Foundry's showdown,
 2.1.0 with Foundry's options, renders it: paragraphs, emphasis, strikethrough, lists, quotes, fenced
@@ -2846,20 +2876,69 @@ written, as Foundry holds the journal then, in this order:
 An update already holding exactly what's asked, its title and text, is done before `base` is
 compared, writing nothing but moving the note where the chapter asked isn't the one it was sent in.
 
+**An order** (module 0.35.0). A group's notes, a chapter's or those in no chapter, put in the order
+a player or the Gamemaster set in the app:
+
+```
+{ id: "<order id>.<seq>", actorId: <the book's actor id>, kind: "note", by?: "gm",
+  note: { book, op: "order", chapter, ids, was, writer, at },
+  mode: 0, explicit: false, extras: [], dice: [] }
+```
+
+| Roll field | Meaning |
+| --- | --- |
+| `id` | The order's: it changes whenever the waiting order does, and stays the same each time the same order is handed over. At most 64 characters. |
+| `note.book`, `note.op` | `"personal"` or `"party"`; `"order"`. |
+| `note.chapter` | The group: a chapter's id, or `null` for the notes in no chapter. |
+| `note.ids` | The group's notes in the new order, as the app showed them: 1 to 400 distinct note ids. |
+| `note.was` | The group's notes in the order Foundry held them when the order was made, as the app's copy of the journal had them: 0 to 400 distinct note ids. |
+| `note.writer`, `note.at` | As a note's: the writing character, a player's own, for a personal book the book's character, `null` for the Gamemaster; and when the order was saved in the app. |
+
+Exactly these fields: no `id`, `role`, `base`, `title`, `markdown` or `createdAt`. One refused for
+what it is is `"invalid"`, with `error` `"note"` (not an object of exactly these fields, an unknown
+book, `ids` empty or longer than 400, `was` longer than 400, either not a list of distinct note ids,
+`at` not a positive whole number, or a roll's field, a `transfer`, `remove` or `typed` beside it),
+`"chapter"` (neither `null` nor a note id), `"writer"`, `"dice"` or `"by"`, as a note's. Everything
+is checked before anything is written, in this order: `"off"`, `"invalid"`, `"unknown"`, `"private"`
+and `"not-member"` as for a note. No author check: anyone who may see the party puts its notes in
+order, as it writes only where pages sit, never a note's title, text, chapter or owner. From here
+the book goes before the result. `"gone"` where there's no journal, or `chapter` isn't a chapter the
+app is sent now: deleted in Foundry, hidden since, or made a note. The group is its notes as the app
+is sent them, in Foundry's order: the notes `ids` lists that are still in it take its order, and the
+rest follow in Foundry's; one it lists that isn't there now is left out. Where Foundry holds the
+group as the order would make it, it's done, writing nothing, as when the same order is handed over
+again after it was made, one made only as far as a chapter only the Gamemaster sees allowed (below)
+too. Otherwise, where the notes of `was` still in the group are in another order in Foundry than
+`was` has them, someone reordered them there since, and it's refused `"changed"`: Foundry's order
+stays, for the app to offer its player theirs beside it. Notes added to the group meanwhile,
+deleted, or moved out of it never refuse it. A write that throws, or writes less than asked, is
+`"error"`. Where a chapter only the Gamemaster sees falls between a group's notes, as the app is
+shown them, the order is made within each of Foundry's chapters, as far as they allow, and the
+result says the order made. Its result has [`order`](#commandresult), `{ chapter, ids }`, the
+group's order in Foundry then, on `"done"`, `"changed"` and `"error"`, and no `note`. Orders are
+made one at a time with the note changes, after those of the same journal fetched before them, the
+book first.
+
 **What's written.** A create: the journal, where there's none; then the page, in a
 `createEmbeddedDocuments` of its own, with `keepId`, its flags in it, and nothing written after it
 but its place. One that makes no page fails `"error"`, "A write was refused", and one Foundry makes
 with another id is deleted again and fails "Foundry didn’t keep the note’s id". An update: one
 `update` of its name, its title's level, an entry's format, Markdown and HTML, and its flags, whole,
-a page first written in Foundry gaining them with no author; a note moved given its place in the same
-update. A note is moved only where the update names another chapter than the one it was sent in;
-otherwise it stays in the chapter it's in, by its flag or its place, even one the app isn't sent,
-as one only the Gamemaster sees. A delete: `deleteEmbeddedDocuments`. A write a module's hook refuses fails as one that throws
-would, "A write was refused", and nothing is put back. No note goes to chat.
+a page first written in Foundry gaining them with no author; a note moved given its place in the
+same update, or, where none fits there or a page that isn't text follows it, by the journal's sort
+after it (Order, above). A note is moved only where the update names another chapter than the one
+it was sent in; otherwise it stays in the chapter it's in, by its flag or its place, even one the
+app isn't sent, as one only the Gamemaster sees. A delete: `deleteEmbeddedDocuments`. An order: one
+`updateEmbeddedDocuments` of `sort` (and the kept `foundry` flag) of the group's pages whose place
+changes, each taking the slot of the page that held its new place, with the pages that aren't text
+and follow them; where the journal was out of its layout, the pages that put it back, as a create's
+sort does; no page changes chapter. A write a module's hook refuses fails as one that throws would,
+"A write was refused", and nothing is put back. No note goes to chat.
 
 **Made at most once.** A change is handed over until it's answered, so it may arrive more than once:
 after a reload, or a result lost on its way. A create whose page is there and sent, an update whose
-page holds what's asked, and a delete of a page that's gone are each done, writing nothing. While a change is
+page holds what's asked, and a delete of a page that's gone are each done, writing nothing; since
+module 0.35.0, so is an order whose group Foundry holds as the order would make it. While a change is
 being made, the same command handed over again is ignored, and the run answers it; that lasts until
 its writes end, however long after a `"timeout"`. Once it's answered, the same command handed over
 again is made again, which is then one of the cases above, and answered.
@@ -2868,6 +2947,27 @@ again is made again, which is then one of the cases above, and answered.
 command's `base` isn't the page's revision now, and it's refused `"changed"` with Foundry's version
 kept, which the book sent before the result holds, for the app to offer its player theirs beside
 it. A change of a page deleted in Foundry is refused `"gone"`, and a delete of one is done.
+
+**Who changed it in Foundry** (module 0.35.0). Each note says who last changed it, in the app or in
+Foundry, but a page deleted in Foundry leaves nothing behind, and a reorder there changes no note.
+So the journal keeps who last deleted or reordered a page the app is sent in Foundry, and when:
+`flags["sending-stone"].changed`, `{ what, by, at }`, on the JournalEntry beside `journal`, never in
+it; `what` `"delete"` or `"order"`, `by` the user's id, or `null`, and `at` Foundry's server time
+(`game.time.serverTime`), whole milliseconds. The bridge hears it from the page hooks, with the user
+who made each change: the delete of a page the app is sent, or a write of the `sort` of an entry
+page it's sent (a chapter's doesn't count: chapters keep the order they were written in), in the
+book's own journal. Never the module's own writes, which carry `{ "sending-stone": true }` in their
+options and, where core doesn't hand a write's options to its hooks, are known by the pages being
+written; nor a page made, a title or text edited (each note says those), a level or ownership
+changed, a journal deleted, or a page the app isn't sent: one only the Gamemaster sees, one shown to
+some of the journal's players, or an image. As the journal's changes settle, 500 ms after the last,
+the latest heard is written to the flag, where it's later than the one there: once for the burst, so
+a drag that writes several pages' sorts is one change. The write is the module's own, and doesn't
+redraw the journal where it's open (`render: false`). The book follows, with
+[`changed`](#journalupdated) to a listener that answers `"notes": 2`. The flag is kept on the
+journal, through a reload, a hello and another Gamemaster becoming the bridge. A change made in
+Foundry while no Gamemaster is connected isn't recorded: the next hello's book shows what Foundry
+holds, and says the change recorded before it.
 
 **One at a time, the book first.** Note commands are made one after another, whichever journal, past
 the watchdog too, after the note commands of the same journal fetched before them. Each result is

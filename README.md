@@ -373,22 +373,25 @@ removed. An item in a container that hides what it holds isn't offered.
 
 ### Journal notes
 
-Players keep journal notes in the app, in a Notes section on their character's Biography tab and on
-their party sheet's Description tab. Each character's notes are a journal in Foundry that only its
-owners and you can see; a party's are a journal its members can read, each of them owning the notes
-they wrote. A character or party in two campaigns has a journal for each. A chapter is a page whose
-title is a level 1 heading, and each note a page whose title is a level 2 heading, written in
-Markdown, in a "Sending Stone notes" folder. Notes written while Foundry is closed reach it the next
-time you're connected. A note changed in Foundry while a player's edit of it waited keeps Foundry's
-version, and the player chooses whether to use theirs. Change the notes in Foundry as you like:
-notes and chapters you add there show in the app, and a deleted one goes from it. Deleting chapters
-is done in Foundry. To add a note rather than a chapter, set the new page's Level to 2. Pages are
-kept in the order they were written: the journal's page list is locked against dragging, and a
-reorder made after unlocking it is put back the next time a note is added or moved from the app.
-Keep the journal's pages in the Markdown editor: a page edited in Foundry's other editor is shown
-read only in the app. A page you hide from some of the journal's players isn't shown in the app at
-all. A secret you write stays in Foundry wherever a player couldn't read it there: in a party's
-journal, and on a page of a character's journal that its players don't all own. There's no switch.
+Players keep journal notes in the app: a Journal card on their character's Biography tab, and on
+their party sheet's Description tab, opens the journal. Each character's notes are a journal in
+Foundry that only its owners and you can see; a party's are a journal its members can read, each of
+them owning the notes they wrote. A character or party in two campaigns has a journal for each. A
+chapter is a page whose title is a level 1 heading, and each note a page whose title is a level 2
+heading, written in Markdown, in a "Sending Stone notes" folder. Notes written while Foundry is
+closed reach it the next time you're connected. A note changed in Foundry while a player's edit of
+it waited keeps Foundry's version, and the player chooses whether to use theirs. Change the notes in
+Foundry as you like: notes and chapters you add there show in the app, and a deleted one goes from
+it. Deleting chapters is done in Foundry. To add a note rather than a chapter, set the new page's
+Level to 2. Anyone in the party puts the notes of a chapter, or the notes in no chapter, in order
+from the app; Foundry keeps that order, and a note added or moved goes last in its chapter. The
+journal's page list is locked against dragging: unlock it to reorder there, and the app follows.
+When you delete or reorder notes in Foundry, the app's journal says you changed it, and when; it
+can't while no Gamemaster is connected. Keep the journal's pages in the Markdown editor: a page
+edited in Foundry's other editor is shown read only in the app. A page you hide from some of the
+journal's players isn't shown in the app at all. A secret you write stays in Foundry wherever a
+player couldn't read it there: in a party's journal, and on a page of a character's journal that its
+players don't all own. There's no switch.
 
 ### Hit, miss and save results
 
@@ -617,7 +620,7 @@ With **GM-only details** off, the listener receives what players could see:
 | Hit points | The campaign's own characters only. |
 | Character sheets | The campaign's own characters only: what their players can already see in Foundry. |
 | Party sheets | Only to characters whose players have Observer or Owner on the group in Foundry: names and portraits of its members, its inventory and its description, without secrets. |
-| Journal notes | A character's journal for a campaign to that campaign, a party's to it while one of its characters can see the party; a page only Gamemasters, or only some of the journal's players, can see is never sent, and nor is a secret its readers couldn't read in Foundry: a party page's, or one on a character's page its players don't all own. |
+| Journal notes | A character's journal for a campaign to that campaign, a party's to it while one of its characters can see the party; a page only Gamemasters, or only some of the journal's players, can see is never sent, and nor is a secret its readers couldn't read in Foundry: a party page's, or one on a character's page its players don't all own; and who last deleted or reordered a page the app is sent, by name, and when. |
 | Foundry settings | Versions, this campaign's switches, the visibility settings that decide chat results, and what players see, for the campaign's Gamemaster only; never a secret, address or token. |
 | Attack targets | Name only; armor class is withheld. Whether an attack hit each, only where Foundry shows players: dnd5e's *Attack Result Visibility*, and with Midi-QOL its *Auto check if attack hits target*, its highlights and its *GM Attack Roll Display*; or for every target with *Hit/miss and save results in the app* "Always show them to players" ([Hit, miss and save results](#hit-miss-and-save-results)). |
 | Success or failure against a DC | Left out of roll summaries, so a hidden DC is not revealed. A save or check says whether it succeeded only as dnd5e's *Challenge Visibility* shows players for its card or roll, to its author's characters alone where it shows only them, and with Midi-QOL only while Midi keeps dnd5e's highlight; Midi-QOL's card says who saved only where Midi shows players it, a player's character's under "Show all" or "Show only from other players", any other only under "Show all". With *Hit/miss and save results in the app* "Always show them to players", every save and check's success or failure, to everyone, still without the DC. |
@@ -740,8 +743,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
 | `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat |
-| `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command |
-| `scripts/command-notes.mjs` | A note or chapter added, changed or deleted from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, its Markdown converted and cleaned; the journal sent before the result |
+| `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent |
+| `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster |
