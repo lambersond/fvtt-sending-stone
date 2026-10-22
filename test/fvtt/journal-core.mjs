@@ -4,7 +4,8 @@
 // it after stub.mjs, whose `game`, `foundry`, `CONST`, `CONFIG` and `Hooks` it adds to; notes.mjs and
 // the app's e2e suites (through e2e/fvtt) share it. Every write is made as the Gamemaster's client,
 // unless `as(userId, …)` makes it as a player's in Foundry, which core's rules then apply to:
-// `[core, unverified]` where the typings don't say (round 0.34.0 §13.8).
+// `[core, unverified]` where the typings don't say (round 0.34.0 §13.8); and `dragPages`, a reorder
+// made in Foundry (module 0.35.0).
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
@@ -124,8 +125,10 @@ export const writes = []
  * module's pre-hook refuses each write of that kind it matches (`create`, `update`, `delete` of
  * pages; `journal` for a JournalEntry's create): Foundry leaves it out without throwing. `hold(kind,
  * when)`: the next such write waits until let go. `ignoreKeepId`: a page made with an id of its own.
+ * `stripOptions`: the hooks are handed none of a write's own options, as a core that doesn't pass
+ * them on would (module 0.35.0) [core, unverified].
  */
-export const faults = { refusals: [], holds: [], ignoreKeepId: false }
+export const faults = { refusals: [], holds: [], ignoreKeepId: false, stripOptions: false }
 export function refuse(kind, when = () => true) {
   const refusal = { kind, when }
   faults.refusals.push(refusal)
@@ -141,7 +144,10 @@ export function clearFaults() {
   faults.refusals = []
   faults.holds = []
   faults.ignoreKeepId = false
+  faults.stripOptions = false
 }
+/** A write's options as its hooks are handed them: none with `faults.stripOptions`. */
+const heard = options => (faults.stripOptions ? {} : options)
 const refused = (kind, doc, data) => faults.refusals.some(r => (r.kind === kind) && r.when(doc, data))
 async function holding(kind, doc, data) {
   const held = faults.holds.find(h => (h.kind === kind) && h.when(doc, data))
@@ -223,7 +229,7 @@ export class JournalEntryPage extends Document {
     if (refused('update', this, changes)) return undefined
     const changed = this._apply(changes, user)
     if (!changed) return undefined
-    await Hooks.callAll('updateJournalEntryPage', this, changed, options, user?.id)
+    await Hooks.callAll('updateJournalEntryPage', this, changed, heard(options), user?.id)
     return this
   }
   async delete(options = {}) {
@@ -242,7 +248,7 @@ export class JournalEntry extends Document {
     if (refused('journal', null, data)) return undefined
     const entry = new JournalEntry(data, { ...options, user })
     game.journal.set(entry.id, entry)
-    await Hooks.callAll('createJournalEntry', entry, options, user?.id)
+    await Hooks.callAll('createJournalEntry', entry, heard(options), user?.id)
     return entry
   }
   constructor(data, options = {}) {
@@ -274,7 +280,7 @@ export class JournalEntry extends Document {
     if (refused('updateJournal', this, changes)) return undefined
     const changed = this._apply(changes, user)
     if (!changed) return undefined
-    await Hooks.callAll('updateJournalEntry', this, changed, options, user?.id)
+    await Hooks.callAll('updateJournalEntry', this, changed, heard(options), user?.id)
     return this
   }
   async delete(options = {}) {
@@ -283,7 +289,7 @@ export class JournalEntry extends Document {
     writes.push(['deleteJournal', this.id])
     await turn()
     game.journal.delete(this.id)
-    await Hooks.callAll('deleteJournalEntry', this, options, user?.id)
+    await Hooks.callAll('deleteJournalEntry', this, heard(options), user?.id)
     return this
   }
   async createEmbeddedDocuments(type, list, options = {}) {
@@ -302,7 +308,7 @@ export class JournalEntry extends Document {
       this.pages.set(id, page)
       made.push(page)
     }
-    for (const page of made) await Hooks.callAll('createJournalEntryPage', page, options, user?.id)
+    for (const page of made) await Hooks.callAll('createJournalEntryPage', page, heard(options), user?.id)
     return made
   }
   async updateEmbeddedDocuments(type, updates, options = {}) {
@@ -322,7 +328,7 @@ export class JournalEntry extends Document {
       const changed = page._apply(changes, user)
       if (changed) done.push([page, changed])
     }
-    for (const [page, changed] of done) await Hooks.callAll('updateJournalEntryPage', page, changed, options, user?.id)
+    for (const [page, changed] of done) await Hooks.callAll('updateJournalEntryPage', page, changed, heard(options), user?.id)
     return done.map(([page]) => page)
   }
   async deleteEmbeddedDocuments(type, ids, options = {}) {
@@ -338,7 +344,7 @@ export class JournalEntry extends Document {
     await turn()
     const gone = ids.map(id => this.pages.get(id)).filter(page => !refused('delete', page, page.id))
     for (const page of gone) this.pages.delete(page.id)
-    for (const page of gone) await Hooks.callAll('deleteJournalEntryPage', page, options, user?.id)
+    for (const page of gone) await Hooks.callAll('deleteJournalEntryPage', page, heard(options), user?.id)
     return gone
   }
 }
@@ -402,6 +408,18 @@ export async function addPage(userId, entry, data = {}) {
   const sort = Math.max(0, ...entry.pages.map(page => page.sort)) + CONST.SORT_INTEGER_DENSITY
   const [page] = await as(userId, () => entry.createEmbeddedDocuments('JournalEntryPage', [{ type: 'text', sort, ...data }]))
   return page
+}
+/**
+ * Reorder pages as a user in Foundry, as dragging them in its sidebar does (module 0.35.0): the
+ * listed pages take, in the listed order, the sorts of the slots they hold now, in one
+ * `updateEmbeddedDocuments` of `{ _id, sort }` alone, as core's `sortRelative` writes a drag (T14
+ * client/documents/abstract/client-document.d.mts:185-191) [core, types]. Only the pages whose sort
+ * changes are written.
+ */
+export function dragPages(userId, entry, ids) {
+  const slots = ids.map(id => entry.pages.get(id).sort).sort((a, b) => a - b)
+  const updates = ids.map((id, n) => ({ _id: id, sort: slots[n] })).filter(({ _id, sort }) => entry.pages.get(_id).sort !== sort)
+  return as(userId, () => entry.updateEmbeddedDocuments('JournalEntryPage', updates))
 }
 /** Delete a page, or a whole journal, as a user in Foundry. */
 export const deletePage = (userId, page) => as(userId, () => page.parent.deleteEmbeddedDocuments('JournalEntryPage', [page.id]))

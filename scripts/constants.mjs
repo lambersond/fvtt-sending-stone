@@ -275,6 +275,16 @@ export const MOST_NOTES = 400;
 /** A note's id, as the app makes it and Foundry makes a page's: 16 letters and digits. */
 export const NOTE_ID = /^[A-Za-z0-9]{16}$/;
 
+/** The listener's notes format, `features.notes`, from which it's told who changed a journal in Foundry (`journal.changed`), since 0.35.0. */
+export const NOTES_CHANGES = 2;
+
+/**
+ * The options the module's own writes of journals and pages carry, since 0.35.0, so that the hooks
+ * that hear them never take one for a change made in Foundry.
+ * @type {Readonly<object>}
+ */
+export const OWN_WRITE = Object.freeze({ [MODULE_ID]: true });
+
 /**
  * The most charges a player can spend at once from the app.
  * @type {number}

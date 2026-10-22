@@ -1,10 +1,13 @@
-import { MODULE_ID, MOST_BOOK_TEXT, MOST_CHAPTERS, MOST_ENTRIES, MOST_NOTE_BODY, MOST_NOTE_TITLE, NOTE_BOOKS, NOTE_ID } from "./constants.mjs";
+import {
+  MODULE_ID, MOST_BOOK_TEXT, MOST_CHAPTERS, MOST_ENTRIES, MOST_NOTE_BODY, MOST_NOTE_TITLE, MOST_NOTES, NOTE_BOOKS, NOTE_ID, OWN_WRITE
+} from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { checkCommand, failedResult, isId, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
 import { accessFor, groupEntry } from "./groups.mjs";
 import {
-  bookActor, chaptersAsSent, compareIds, flagsCount, journalFor, lastFoundryEdit, makeJournal, noteRev, notesOn, pageBody,
-  pageCreatedAt, pageOwners, pageRev, pageRole, pageSentAs, pagesInOrder, sendBook, sharedLikeJournal, textPages
+  bookActor, chaptersAsSent, compareIds, flagsCount, groupMembers, journalFor, lastFoundryEdit, makeJournal, noteRev, notesOn,
+  ownWrite, pageBody, pageCreatedAt, pageOwners, pageRev, pageRole, pageSentAs, pagesInOrder, sendBook, sentChapters,
+  sharedLikeJournal, textPages
 } from "./journals.mjs";
 import { helloPending } from "./transport.mjs";
 
@@ -31,6 +34,14 @@ import { helloPending } from "./transport.mjs";
  * which the app is told one took too long. The journal as Foundry then holds it goes ahead of each
  * result, a refusal's too, so the app has Foundry's version when it says what became of the change.
  * No note goes to chat, and no result carries a note's title or text.
+ *
+ * Since 0.35.0 the notes of a chapter, and those in none, keep the order Foundry holds them in: a
+ * note made or moved goes last in its chapter, and anyone who may see the party puts a group's notes
+ * in order from the app, which writes only where pages sit, never a note's text, title, chapter or
+ * owner. An order is made as far as the group is as it was when the order was made from it: notes
+ * added, deleted or moved meanwhile are merged, while the same notes reordered in Foundry meanwhile
+ * keep Foundry's order (`changed`). Every write here is the module's own, so the journal never says
+ * it was changed in Foundry by them.
  */
 
 /**
@@ -52,6 +63,12 @@ const FIELDS = (() => {
     delete: { chapter: list(), entry: list() }
   };
 })();
+
+/**
+ * An order's fields, exactly, since 0.35.0 (round 0.35.0 §3.4).
+ * @type {string}
+ */
+const ORDER_FIELDS = ["at", "book", "chapter", "ids", "op", "was", "writer"].sort().join();
 
 /**
  * How often a result waiting for its campaign's hello looks again, in milliseconds.
@@ -79,7 +96,8 @@ const inFlight = new Map();
  * and for a new or changed one its title and, for a note, its Markdown and chapter; exactly those,
  * nothing a roll names, no move, removal or typed dice, and it throws no dice. A chapter is never
  * deleted from the app. A player writes only as their own character in its own journal; the
- * Gamemaster as no character.
+ * Gamemaster as no character. Since 0.35.0 an order of a group's notes: the book, the group, its
+ * notes' ids in the new order and in the order it was made from, who and when; nothing else.
  * @param {object} command
  * @returns {string|null}
  */
@@ -89,6 +107,7 @@ export function checkNoteCommand(command) {
   if ( namesRollFields(command) || given(command.transfer) || given(command.remove) || given(command.typed) || !isObject(note) ) {
     return "note";
   }
+  if ( note.op === "order" ) return checkOrder(command, note);
   if ( !NOTE_BOOKS.includes(note.book) || !Object.hasOwn(FIELDS, note.op) || !["chapter", "entry"].includes(note.role) ) return "note";
   if ( Object.keys(note).sort().join() !== FIELDS[note.op][note.role] ) return "note";
   if ( !isNoteId(note.id) || ((note.op === "delete") && (note.role === "chapter")) ) return "note";
@@ -112,16 +131,42 @@ export function checkNoteCommand(command) {
 }
 
 /**
+ * Why an order of a group's notes isn't one to make, if it isn't (round 0.35.0 §6.3): exactly its
+ * fields; the group, a chapter's id or null for the notes in none; the group's notes in the new
+ * order, 1 to 400 distinct ids, and in the order it was made from, 0 to 400 (a sent journal holds at
+ * most 400, though the app adds at most 300 entries, so a group written in Foundry may hold more);
+ * who and when, as a note's; and no dice.
+ * @param {object} command
+ * @param {object} note
+ * @returns {string|null}
+ */
+function checkOrder(command, note) {
+  if ( !NOTE_BOOKS.includes(note.book) || (Object.keys(note).sort().join() !== ORDER_FIELDS) ) return "note";
+  if ( (note.chapter !== null) && !isNoteId(note.chapter) ) return "chapter";
+  const ids = (list, least) => Array.isArray(list) && (list.length >= least) && (list.length <= MOST_NOTES)
+    && list.every(isNoteId) && (new Set(list).size === list.length);
+  if ( !ids(note.ids, 1) || !ids(note.was, 0) ) return "note";
+  const gm = command.by === "gm";
+  if ( (note.writer === null) ? !gm : !isId(note.writer) ) return "writer";
+  if ( !gm && (note.book === "personal") && (note.writer !== command.actorId) ) return "writer";
+  if ( !(Number.isInteger(note.at) && (note.at > 0)) ) return "note";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
  * Make a note command fetched from the app, once every note command before it has been made, past
- * the watchdog too, so two changes never overlap.
- * @param {object} command      `{note: {book, op, id, role, base, writer, at, …}}`, as fetched.
+ * the watchdog too, so two changes never overlap: a change of a note or chapter, or since 0.35.0 an
+ * order of a group's notes.
+ * @param {object} command      `{note: {book, op, id, role, base, writer, at, …}}`, or `{note: {book,
+ *                              op: "order", chapter, ids, was, writer, at}}`, as fetched.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @returns {Promise<CommandResult>}
  */
 export function runNoteCommand(command, campaign) {
   const id = command.id;
   inFlight.set(id, (inFlight.get(id) ?? 0) + 1);
-  const run = notesChain.then(() => noteNow(command, campaign)).finally(() => {
+  const making = () => ((command.note?.op === "order") ? orderNow(command, campaign) : noteNow(command, campaign));
+  const run = notesChain.then(making).finally(() => {
     const left = (inFlight.get(id) ?? 1) - 1;
     if ( left > 0 ) inFlight.set(id, left);
     else inFlight.delete(id);
@@ -273,19 +318,97 @@ async function noteNow(command, passed) {
   try {
     if ( op === "create" ) {
       entry ??= await makeJournal(kind, owner, campaign);
-      page = await createPage(entry, note, { gm, content, author: (kind === "party") && (role === "entry") ? writer : null });
-      await sortJournal(entry);
+      let renumber;
+      ({ page, renumber } = await createPage(entry, note, { gm, content, author: (kind === "party") && (role === "entry") ? writer : null }));
+      await sortJournal(entry, { renumber });
     }
     else if ( op === "update" ) await updatePage(entry, page, note, { gm, content });
     else {
-      const gone = await entry.deleteEmbeddedDocuments("JournalEntryPage", [page.id]);
-      if ( !Array.from(gone ?? []).some(doc => doc?.id === page.id) ) throw new Error("A write was refused");
+      const id = page.id;
+      const gone = await ownWrite([id], () => entry.deleteEmbeddedDocuments("JournalEntryPage", [id], { ...OWN_WRITE }));
+      if ( !Array.from(gone ?? []).some(doc => doc?.id === id) ) throw new Error("A write was refused");
       page = null;
     }
   } catch (err) {
     return refused("error", messageOf(err));
   }
   return done({ deleted: op === "delete" });
+}
+
+/**
+ * Make an order of a group's notes now, if it may be made (round 0.35.0 §6.4): every check before
+ * any write, as Foundry now holds the journal, as for a note's change but with no author's, as an
+ * order writes only where pages sit; then the one write, and the book, as Foundry then holds it,
+ * ahead of the result. A refusal once the group is found, and the result, say the group's order in
+ * Foundry then.
+ *
+ * The group is its notes as the app is sent them, in Foundry's order. The notes the order lists
+ * that are still in it take its order, and the rest follow in Foundry's; one it lists that isn't
+ * there now is left out. Where Foundry holds the group as the order would make it already, as far as
+ * its chapters allow, as when the same order is handed over again after it was made, it's done,
+ * writing nothing. Otherwise, where the notes it was made from that are still in the group are in
+ * another order in Foundry than it was made from, someone reordered them there meanwhile, and
+ * Foundry's order stays (`changed`): notes added, deleted or moved meanwhile don't refuse it.
+ * @param {object} command
+ * @param {Campaign} passed     The campaign as it was when fetched, which may be a queue's wait old.
+ * @returns {Promise<CommandResult>}
+ */
+async function orderNow(command, passed) {
+  const note = isObject(command.note) ? command.note : {};
+  let entry = null;
+  let found = false;
+  const answer = result => (found ? { ...result, order: { chapter: note.chapter, ids: groupMembers(entry, note.chapter) } } : result);
+
+  const campaign = getCampaigns().find(({ id }) => id === passed?.id);
+  if ( !campaign || !notesOn() ) return failedResult(command, "off");
+  const invalid = checkCommand(command);
+  if ( invalid ) return failedResult(command, "invalid", invalid);
+  const kind = note.book;
+  const owner = bookActor(kind, command.actorId, campaign);
+  if ( !owner ) return failedResult(command, "unknown");
+  if ( (kind === "party") && !Object.keys(groupEntry(owner, campaign).access).length ) return failedResult(command, "private");
+  if ( command.by !== "gm" ) {
+    const writer = (kind === "personal") ? owner : bookActor("personal", note.writer, campaign);
+    if ( !writer ) return failedResult(command, "unknown");
+    if ( (kind === "party") && !accessFor(owner, writer) ) return failedResult(command, "not-member");
+  }
+
+  // From here, Foundry's journal goes ahead of whatever is answered, as for a note's change.
+  const post = async () => {
+    while ( helloPending(campaign.id) ) await new Promise(resolve => setTimeout(resolve, HELLO_LOOK));
+    sendBook(kind, owner.id, campaign.id);
+  };
+  const refused = async (reason, error=null) => {
+    await post();
+    return answer(failedResult(command, reason, error));
+  };
+
+  entry = journalFor(kind, owner.id, campaign.id);
+  if ( !entry || ((note.chapter !== null) && !sentChapters(entry).has(note.chapter)) ) return refused("gone");
+  found = true;
+  const group = groupMembers(entry, note.chapter);
+  const members = new Set(group);
+  const asked = note.ids.filter(id => members.has(id));
+  const listed = new Set(asked);
+  const wanted = [...asked, ...group.filter(id => !listed.has(id))];
+  // The group as the order would make it, which isn't the order asked where a chapter only the
+  // Gamemaster sees falls between its notes: compared with that, an order made that far and handed
+  // over again is done, never taken for a reorder made in Foundry since its `was`.
+  const ranks = new Map(wanted.map((id, n) => [id, n]));
+  const asMade = wantedOrder(pagesInOrder(entry), { ranks }).filter(id => members.has(id));
+  if ( !asMade.every((id, n) => id === group[n]) ) {
+    const was = new Set(note.was);
+    const before = note.was.filter(id => members.has(id));
+    const now = group.filter(id => was.has(id));
+    if ( !before.every((id, n) => id === now[n]) ) return refused("changed");
+    try {
+      await sortJournal(entry, { ranks });
+    } catch (err) {
+      return refused("error", messageOf(err));
+    }
+  }
+  await post();
+  return answer({ id: command.id, status: "done", reason: null, error: null, messageId: null, visible: false, rolls: [] });
 }
 
 /* -------------------------------------------- */
@@ -296,14 +419,17 @@ async function noteNow(command, passed) {
  * Make a note's page, with the id the app chose for it, in a call of its own, so that Foundry keeps
  * when it was made and by whom; with everything it holds, its flags among them, so that nothing is
  * written after it but its place: a reload at any point leaves either no page or a whole one. A
- * party's note is owned by the players of the character who wrote it.
+ * party's note is owned by the players of the character who wrote it. A note goes last in its
+ * chapter, or in none, and a chapter among the chapters by when it was written; where no whole
+ * number fits there, at the journal's end, to be renumbered once it's made.
  * @param {JournalEntry} entry
  * @param {object} note
  * @param {object} options
  * @param {boolean} options.gm             Is it the Gamemaster's?
  * @param {string} options.content         A note's HTML.
  * @param {Actor|null} options.author      For a party's note, the character whose players own it.
- * @returns {Promise<JournalEntryPage>}
+ * @returns {Promise<{page: JournalEntryPage, renumber: boolean}>}   The page, and whether the
+ *   journal must be renumbered to put it in its place.
  * @throws {Error}   Where Foundry made none, or made one with another id, which is deleted again.
  */
 async function createPage(entry, note, { gm, content, author }) {
@@ -313,12 +439,13 @@ async function createPage(entry, note, { gm, content, author }) {
   const title = note.title.trim();
   const owners = pageOwners(author);
   const sheetClass = markdownSheet();
-  const order = wantedOrder(pagesInOrder(entry), { id: note.id, role: note.role, chapter, at: note.createdAt });
+  const order = wantedOrder(pagesInOrder(entry), { placed: { id: note.id, role: note.role, chapter, at: note.createdAt } });
+  const sort = sortBetween(entry, order, note.id, { strict: true });
   const data = {
     _id: note.id,
     name: title,
     type: "text",
-    sort: sortBetween(entry, order, note.id),
+    sort: sort ?? (journalEnd(entry) + DENSITY),
     title: { show: true, level: (note.role === "chapter") ? 1 : 2 },
     text: { format: CONST.JOURNAL_ENTRY_PAGE_FORMATS?.MARKDOWN ?? 2, markdown, content: (note.role === "entry") ? content : "" },
     ownership: { default: INHERIT, ...Object.fromEntries(owners) },
@@ -336,23 +463,25 @@ async function createPage(entry, note, { gm, content, author }) {
       }
     }
   };
-  const made = await entry.createEmbeddedDocuments("JournalEntryPage", [data], { keepId: true });
+  const made = await ownWrite([note.id], () => entry.createEmbeddedDocuments("JournalEntryPage", [data], { keepId: true, ...OWN_WRITE }));
   const page = Array.from(made ?? [])[0] ?? null;
   if ( !page ) throw new Error("A write was refused");
   if ( page.id !== note.id ) {
     // A page with another id would be a second note once the change is handed over again.
-    await entry.deleteEmbeddedDocuments("JournalEntryPage", [page.id]);
+    await ownWrite([page.id], () => entry.deleteEmbeddedDocuments("JournalEntryPage", [page.id], { ...OWN_WRITE }));
     throw new Error("Foundry didn’t keep the note’s id");
   }
-  return page;
+  return { page, renumber: sort === null };
 }
 
 /**
  * Change a page to what's asked, in one update: its title, its level, a note's Markdown and HTML,
  * and its flags, whole; a page first written in Foundry gains them here, with no author. A note
- * moved to another chapter than the one the app was shown it in is given its place there in the
- * same update, and the journal is put in order after it where it must be; one that isn't moved stays
- * in the chapter it's in, by its flag or its place, though that may be one the app isn't shown.
+ * moved to another chapter than the one the app was shown it in is given its place there, last, in
+ * the same update, and the journal is put in order after it where it must be, the note still last
+ * where there was no room for it; a note a page that isn't text follows, as an image, is put there
+ * by that sort alone, so the page goes with it. One that isn't moved stays in the chapter it's in,
+ * by its flag or its place, though that may be one the app isn't shown.
  * @param {JournalEntry} entry
  * @param {JournalEntryPage} page
  * @param {object} note
@@ -381,14 +510,23 @@ async function updatePage(entry, page, note, { gm, content }) {
     });
   }
   let fits = true;
+  let placed = null;
   if ( moved ) {
-    const order = wantedOrder(pagesInOrder(entry), { id: page.id, role: "entry", chapter, at: pageCreatedAt(page) });
-    const sort = sortBetween(entry, order, page.id, { strict: true });
-    fits = sort !== null;
-    if ( fits ) changes.sort = sort;
+    placed = { id: page.id, role: "entry", chapter, at: pageCreatedAt(page) };
+    // A page that isn't text and follows the note goes with it, which a place of the note's own
+    // would leave behind, under the chapter the note leaves: the note keeps its place in this
+    // update, and the sort after it moves the two together.
+    if ( !followed(entry, page) ) {
+      const sort = sortBetween(entry, wantedOrder(pagesInOrder(entry), { placed }), page.id, { strict: true });
+      fits = sort !== null;
+      if ( fits ) changes.sort = sort;
+    }
   }
-  if ( !await page.update(changes) ) throw new Error("A write was refused");
-  if ( moved ) await sortJournal(entry, { renumber: !fits });
+  if ( !await ownWrite([page.id], () => page.update(changes, { ...OWN_WRITE })) ) throw new Error("A write was refused");
+  // With no room, or a page following it, the note keeps its old place until the journal is put in
+  // order, which must still put it last in its new chapter, not where its old place would rank it
+  // there.
+  if ( moved ) await sortJournal(entry, { renumber: !fits, placed });
 }
 
 /* -------------------------------------------- */
@@ -425,37 +563,63 @@ function shownIn(entry, page) {
 }
 
 /**
- * Every page of a journal in the order wanted (round §2.7), the journal reading in Foundry as the app
- * lists it: the notes in no chapter first, by when they were written; then each chapter, by when it
- * was, followed by its notes, by when they were; ties by id. A note whose chapter isn't there yet is
- * in none until it comes. A page first written in Foundry is in the chapter before it, by when it
- * was made; and a page that isn't text, as an image, stays after the page it follows now.
+ * Does a page that isn't text, as an image, follow this one in Foundry's order? It stays after the
+ * page it follows (`wantedOrder`), so it goes wherever that one goes.
+ * @param {JournalEntry} entry
+ * @param {JournalEntryPage} page
+ * @returns {boolean}
+ */
+function followed(entry, page) {
+  const pages = pagesInOrder(entry);
+  const at = pages.findIndex(other => other.id === page.id);
+  return (at >= 0) && ((pages[at + 1]?.type ?? "text") !== "text");
+}
+
+/**
+ * Every page of a journal in the order wanted (round 0.35.0 §2.3), the journal reading in Foundry as
+ * the app lists it: the notes in no chapter first, then each chapter by when it was written,
+ * followed by its notes; each group's notes in the order Foundry holds them now, a page being made
+ * or moved last in its group, and a group being ordered in the order asked, in the slots its notes
+ * hold now; chapters' ties by id. A note whose chapter isn't there yet is in none until it comes. A
+ * page first written in Foundry is in the chapter before it; and a page that isn't text, as an
+ * image, stays after the page it follows now.
  * @param {JournalEntryPage[]} pages   The journal's pages in Foundry's order.
- * @param {{id: string, role: string, chapter: string|null, at: number}} [placed]   A page as it's
- *   about to be, made or moved.
+ * @param {object} [options]
+ * @param {{id: string, role: string, chapter: string|null, at: number}} [options.placed]   A page as
+ *   it's about to be, made or moved.
+ * @param {Map<string, number>} [options.ranks]   An order asked of a group's notes: each note's place
+ *   in it. Each of the module's groups puts the notes it ranks in that order, in their own slots, so
+ *   that no page changes chapter.
  * @returns {string[]}
  */
-function wantedOrder(pages, placed) {
+function wantedOrder(pages, { placed, ranks }={}) {
   const facts = new Map();
   let chapter = null;
-  for ( const page of pages ) {
-    if ( page.type !== "text" ) continue;
+  pages.forEach((page, index) => {
+    if ( page.type !== "text" ) return;
     const role = pageRole(page);
     const counts = flagsCount(page);
     if ( role === "chapter" ) chapter = page.id;
     facts.set(page.id, {
       id: page.id, role,
       chapter: (role === "chapter") ? null : (counts ? page.flags[MODULE_ID].chapter : chapter),
-      at: pageCreatedAt(page)
+      at: pageCreatedAt(page),
+      index
     });
-  }
-  if ( placed ) facts.set(placed.id, placed);
+  });
+  if ( placed ) facts.set(placed.id, { ...placed, index: Infinity });
   const all = Array.from(facts.values());
   const chapters = all.filter(fact => fact.role === "chapter");
   const known = new Set(chapters.map(fact => fact.id));
   const byTime = (a, b) => (a.at - b.at) || compareIds(a.id, b.id);
-  const under = id => all.filter(fact => (fact.role === "entry") && ((known.has(fact.chapter) ? fact.chapter : null) === id))
-    .sort(byTime).map(fact => fact.id);
+  const byPlace = (a, b) => (a.index - b.index) || compareIds(a.id, b.id);
+  const under = id => {
+    const group = all.filter(fact => (fact.role === "entry") && ((known.has(fact.chapter) ? fact.chapter : null) === id))
+      .sort(byPlace).map(fact => fact.id);
+    if ( !ranks ) return group;
+    const ranked = group.filter(other => ranks.has(other)).sort((a, b) => ranks.get(a) - ranks.get(b));
+    return group.map(other => (ranks.has(other) ? ranked.shift() : other));
+  };
   const notes = [...under(null), ...chapters.sort(byTime).flatMap(fact => [fact.id, ...under(fact.id)])];
 
   // Pages that aren't notes, after the note page they follow now.
@@ -490,38 +654,52 @@ function sortBetween(entry, order, id, { strict=false }={}) {
   const middle = Math.floor((before + after) / 2);
   if ( (middle > before) && (middle < after) ) return middle;
   if ( strict ) return null;
-  const last = Math.max(0, ...Array.from(entry.pages.values(), page => Number(page.sort) || 0));
-  return last + DENSITY;
+  return journalEnd(entry) + DENSITY;
+}
+
+/**
+ * The largest sort of a journal's pages, 0 for none.
+ * @param {JournalEntry} entry
+ * @returns {number}
+ */
+function journalEnd(entry) {
+  return Math.max(0, ...Array.from(entry.pages.values(), page => Number(page.sort) || 0));
 }
 
 /**
  * Put a journal's pages in the order wanted where Foundry's differs from it, as when a page was
- * made with no room for it, or a chapter has come that notes written before it were waiting for:
- * every page renumbered a step apart, in one call, writing only the pages whose sort changes.
+ * made with no room for it, a chapter has come that notes written before it were waiting for, or a
+ * group's notes are being put in an order asked: in one call, writing only the pages whose sort
+ * changes. Where Foundry's sorts strictly increase, each page wanted at a place takes the sort of the
+ * page there now, so only the pages whose place changes are written; otherwise, or where asked,
+ * every page is renumbered a step apart.
  * @param {JournalEntry} entry
  * @param {object} [options]
- * @param {boolean} [options.renumber]   Renumber whatever the order.
+ * @param {boolean} [options.renumber]                 Renumber whatever the order.
+ * @param {Map<string, number>} [options.ranks]        An order asked of a group's notes (`wantedOrder`).
+ * @param {object} [options.placed]                    A page just moved, which goes last in its group.
  * @returns {Promise<void>}
  * @throws {Error}   Where Foundry wrote less than asked.
  */
-async function sortJournal(entry, { renumber=false }={}) {
+async function sortJournal(entry, { renumber=false, ranks, placed }={}) {
   const pages = pagesInOrder(entry);
-  const order = wantedOrder(pages);
-  if ( !renumber && order.every((id, n) => pages[n]?.id === id) ) {
-    // In order, unless two pages share a sort, which Foundry may draw either way round.
-    const sorts = order.map(id => Number(entry.pages.get(id)?.sort) || 0);
-    if ( sorts.every((sort, n) => !n || (sort > sorts[n - 1])) ) return;
-  }
+  const order = wantedOrder(pages, { ranks, placed });
+  // In order, unless two pages share a sort, which Foundry may draw either way round.
+  const sorts = pages.map(page => Number(page.sort) || 0);
+  const rising = sorts.every((sort, n) => !n || (sort > sorts[n - 1]));
+  if ( !renumber && rising && order.every((id, n) => pages[n]?.id === id) ) return;
   // A note changed in Foundry keeps who changed it there, which a write of its place alone would
   // make the Gamemaster's, now.
-  const updates = order.map((id, n) => ({ _id: id, sort: (n + 1) * DENSITY }))
+  const reuse = !renumber && rising;
+  const updates = order.map((id, n) => ({ _id: id, sort: reuse ? sorts[n] : (n + 1) * DENSITY }))
     .filter(({ _id, sort }) => (Number(entry.pages.get(_id)?.sort) || 0) !== sort)
     .map(update => {
       const edit = lastFoundryEdit(entry.pages.get(update._id));
       return edit ? { ...update, [`flags.${MODULE_ID}.foundry`]: edit } : update;
     });
   if ( !updates.length ) return;
-  const written = await entry.updateEmbeddedDocuments("JournalEntryPage", updates);
+  const written = await ownWrite(updates.map(update => update._id),
+    () => entry.updateEmbeddedDocuments("JournalEntryPage", updates, { ...OWN_WRITE }));
   if ( Array.from(written ?? []).length < updates.length ) throw new Error("A write was refused");
 }
 

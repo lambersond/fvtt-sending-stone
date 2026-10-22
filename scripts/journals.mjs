@@ -1,4 +1,4 @@
-import { EVENTS, MODULE_ID, MOST_NOTE_TEXT, MOST_NOTE_TITLE, MOST_NOTES, NOTE_BOOKS, NOTE_ID } from "./constants.mjs";
+import { EVENTS, MODULE_ID, MOST_NOTE_TEXT, MOST_NOTE_TITLE, MOST_NOTES, NOTE_BOOKS, NOTE_ID, NOTES_CHANGES, OWN_WRITE } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, playerOwners } from "./characters.mjs";
@@ -28,6 +28,11 @@ import { buildEnvelope, helloPending, inMegabytes, post, termsOf } from "./trans
  *
  * Only the bridge sends, and the hooks are heard only there: what's changed in Foundry while no
  * Gamemaster is connected is read at the next hello.
+ *
+ * Since 0.35.0 each group's notes, a chapter's or those in none, keep the order Foundry holds them
+ * in, which the app may set (command-notes.mjs), and a journal says who last deleted or reordered a
+ * page the app is sent in Foundry, and when, as a note says who last changed it: kept in a flag on
+ * the journal, as the bridge hears it, never for the module's own writes.
  */
 
 /**
@@ -38,10 +43,11 @@ import { buildEnvelope, helloPending, inMegabytes, post, termsOf } from "./trans
 const SETTLE_JOURNAL = 500;
 
 /**
- * The campaigns whose app reads notes, by id, as their latest answer to a hello or heartbeat said.
- * @type {Set<string>}
+ * The notes format of each campaign whose app reads notes, by id, as its latest answer to a hello or
+ * heartbeat said: an integer of 1 or more.
+ * @type {Map<string, number>}
  */
-const readers = new Set();
+const formats = new Map();
 
 /**
  * Each book as it was built when its campaign was last told of it, as JSON, by `bookKey`, so that
@@ -61,6 +67,21 @@ const settling = new Map();
  * @type {Set<string>}
  */
 const warned = new Set();
+
+/**
+ * The latest change heard of in Foundry that the app is told of, a page the app is sent deleted or
+ * an entry's place written, waiting for its journal's changes to settle, by `bookKey`: one for the
+ * burst, so a drag that writes several pages' sorts is one change.
+ * @type {Map<string, {what: "delete"|"order", by: string|null, at: number}>}
+ */
+const heard = new Map();
+
+/**
+ * The pages the module is writing now, by id, which the hooks that hear those writes never count as
+ * a change made in Foundry, where core doesn't hand the hooks the write's own options.
+ * @type {Set<string>}
+ */
+const writing = new Set();
 
 /**
  * A page's revision, as the module writes it to a page's flags: 14 hexadecimal digits.
@@ -95,9 +116,12 @@ export function notesOn() {
 /**
  * What a campaign tells the app of notes in its hello, since 0.34.0 (round §3.1): that they're kept
  * here, in both kinds of journal, and which of its characters and parties have a journal of them
- * for this campaign in Foundry now. There's no switch.
+ * for this campaign in Foundry now. There's no switch. Since 0.35.0 `orders`: it takes the app's
+ * orders of a group's notes and keeps Foundry's order; and `changes`: it says who deleted or
+ * reordered notes in Foundry, to an app that reads it.
  * @param {Campaign} campaign
- * @returns {{enabled: true, kinds: string[], reason: null, journals: {kind: string, actorId: string}[]}}
+ * @returns {{enabled: true, kinds: string[], reason: null, journals: {kind: string, actorId: string}[],
+ *   orders: true, changes: true}}
  */
 export function noteFeatures(campaign) {
   const journals = [];
@@ -110,14 +134,16 @@ export function noteFeatures(campaign) {
       if ( found.has(bookKey(campaign.id, "party", group.id)) ) journals.push({ kind: "party", actorId: group.id });
     }
   }
-  return { enabled: true, kinds: [...NOTE_BOOKS], reason: null, journals };
+  return { enabled: true, kinds: [...NOTE_BOOKS], reason: null, journals, orders: true, changes: true };
 }
 
 /**
  * Note whether a campaign's app reads notes: `features.notes`, 1 or later. One that starts to in a
  * heartbeat's answer, as an app deployed mid-session does, is sent every book at once; after a
  * hello's, they follow its sheets and groups. One that says nothing of them, as an older or rolled
- * back app, is sent none, and fetched from for none.
+ * back app, is sent none, and fetched from for none. Since 0.35.0 the format is kept: from 2 the
+ * listener is told who changed a journal in Foundry, so one that rises to it in a heartbeat's answer
+ * is sent every book afresh too.
  * @param {string} campaignId
  * @param {object|null} features
  * @param {string} [type]   The event answered.
@@ -126,12 +152,12 @@ export function noteFeatures(campaign) {
 export function noteNotesReader(campaignId, features, type) {
   const format = features?.notes;
   if ( !(Number.isInteger(format) && (format >= 1)) ) {
-    readers.delete(campaignId);
+    formats.delete(campaignId);
     return;
   }
-  const was = readers.has(campaignId);
-  readers.add(campaignId);
-  if ( !was && (type === EVENTS.HEARTBEAT) ) booksWanted(campaignId);
+  const was = formats.get(campaignId) ?? 0;
+  formats.set(campaignId, format);
+  if ( (format > was) && (type === EVENTS.HEARTBEAT) ) booksWanted(campaignId);
 }
 
 /**
@@ -140,7 +166,16 @@ export function noteNotesReader(campaignId, features, type) {
  * @returns {boolean}
  */
 export function notesReader(campaignId) {
-  return readers.has(campaignId);
+  return formats.has(campaignId);
+}
+
+/**
+ * A campaign's notes format, as its latest answer said; 0 where it reads none.
+ * @param {string} campaignId
+ * @returns {number}
+ */
+export function notesFormat(campaignId) {
+  return formats.get(campaignId) ?? 0;
 }
 
 /* -------------------------------------------- */
@@ -432,7 +467,7 @@ async function quietly(write) {
   try {
     await write();
   } catch {
-    // Foundry keeps what it had; the next change of ownership tries again.
+    // Foundry keeps what it had; the next such change tries again.
   }
 }
 
@@ -770,6 +805,38 @@ export function chaptersAsSent(entry) {
 }
 
 /**
+ * The chapters of a journal the app is sent now, by id (§2.8): as `readJournal` sends them.
+ * @param {JournalEntry} entry
+ * @returns {Set<string>}
+ */
+export function sentChapters(entry) {
+  return new Set(textPages(entry).filter(page => sentNote(page) && (pageRole(page) === "chapter")).map(page => page.id));
+}
+
+/**
+ * The ids of a group's notes as the app is sent them, in Foundry's order: the entries `readJournal`
+ * sends with this chapter, or with none for null (round 0.35.0 §2.1).
+ * @param {JournalEntry} entry
+ * @param {string|null} chapter
+ * @returns {string[]}
+ */
+export function groupMembers(entry, chapter) {
+  const chapters = chaptersAsSent(entry);
+  return textPages(entry)
+    .filter(page => sentNote(page) && (pageRole(page) === "entry") && ((chapters.get(page.id) ?? null) === chapter))
+    .map(page => page.id);
+}
+
+/**
+ * Is a text page one `readJournal` sends: one the app is sent, with a title?
+ * @param {JournalEntryPage} page
+ * @returns {boolean}
+ */
+function sentNote(page) {
+  return sentToApp(page) && (typeof page.name === "string") && (page.name !== "");
+}
+
+/**
  * A page as the app is told it, a note: who wrote it and when, who changed it last, in the app or
  * in Foundry, and its revision; or null for one with no title, which can't be one.
  * @param {JournalEntryPage} page
@@ -908,7 +975,14 @@ function postBook(kind, actorId, campaign) {
     const read = entry ? readJournal(entry, campaign) : null;
     if ( !entry ) data = { kind, actorId, journal: null };
     else if ( read.withheld ) data = { kind, actorId, journal: null, withheld: read.withheld };
-    else data = { kind, actorId, journal: { id: entry.id, name: cutText(String(entry.name ?? ""), MOST_NAME)[0], notes: read.notes } };
+    else {
+      // Who last deleted or reordered a page the app is sent in Foundry, to an app that reads it.
+      const changed = (notesFormat(campaign.id) >= NOTES_CHANGES) ? changedFlag(entry) : null;
+      data = { kind, actorId, journal: {
+        id: entry.id, name: cutText(String(entry.name ?? ""), MOST_NAME)[0], notes: read.notes,
+        ...(changed && { changed: { what: changed.what, by: cutText(userName(changed.by, campaign), MOST_NAME)[0], at: changed.at } })
+      } };
+    }
   }
   const json = JSON.stringify(data);
   if ( told.get(key) === json ) return;
@@ -994,34 +1068,119 @@ export function forgetBooks(campaignId) {
  * Listen for changes to journals and their pages that hold notes, on the bridge alone: a page made,
  * changed or deleted, and a journal made, changed, as its ownership, or deleted. Each journal is
  * sent once its changes settle, as Foundry then holds it; the module's own writes are sent before
- * their results, so they settle to nothing new.
+ * their results, so they settle to nothing new. Since 0.35.0 a page's delete, and a write of an
+ * entry's place, are heard with who made them, for the journal to say who changed it in Foundry.
  * @returns {void}
  */
 export function registerJournalHooks() {
-  for ( const hook of ["createJournalEntryPage", "updateJournalEntryPage", "deleteJournalEntryPage"] ) {
-    Hooks.on(hook, page => journalChanged(page?.parent));
-  }
+  Hooks.on("createJournalEntryPage", page => journalChanged(page?.parent));
+  Hooks.on("updateJournalEntryPage", (page, change, options, userId) => {
+    const placed = isObject(change) && Object.hasOwn(change, "sort");
+    journalChanged(page?.parent, placed ? changeHeard(page, "order", options, userId) : null);
+  });
+  Hooks.on("deleteJournalEntryPage", (page, options, userId) => journalChanged(page?.parent, changeHeard(page, "delete", options, userId)));
   for ( const hook of ["createJournalEntry", "updateJournalEntry", "deleteJournalEntry"] ) {
     Hooks.on(hook, entry => journalChanged(entry));
   }
 }
 
 /**
+ * A page's delete, or a write of an entry's place, as the journal's change made in Foundry (round
+ * 0.35.0 §6.6.2), where it counts: a page of the book's own journal that the app is sent (a deleted
+ * one as the hook hands it, still holding its ownership), in a write that isn't the module's own. A
+ * chapter's place doesn't count: chapters keep the order they were written in, in the app.
+ * The write's own options say so where core hands them on; the pages being written say so where it
+ * doesn't. Who made it, and Foundry's time of it; null for any other.
+ * @param {JournalEntryPage} page
+ * @param {"delete"|"order"} what
+ * @param {object} [options]   The write's options, as the hook has them.
+ * @param {string} [userId]    Who made it.
+ * @returns {{what: "delete"|"order", by: string|null, at: number}|null}
+ */
+function changeHeard(page, what, options, userId) {
+  if ( !canSend() || (page?.type !== "text") || !sentNote(page) ) return null;
+  if ( (what === "order") && (pageRole(page) !== "entry") ) return null;
+  const flag = journalFlag(page.parent);
+  if ( !flag || (journalFor(flag.kind, flag.actor, flag.campaign) !== page.parent) ) return null;
+  if ( (options?.[MODULE_ID] === true) || ((userId === game.user?.id) && writing.has(page.id)) ) return null;
+  const server = Number(game.time?.serverTime);
+  const at = Math.floor((Number.isFinite(server) && (server > 0)) ? server : Date.now());
+  return { what, by: (typeof userId === "string") ? userId : null, at };
+}
+
+/**
+ * Make writes of a journal's pages as the module's own: their hooks never count as Foundry's change,
+ * whatever options core hands them. A page written in Foundry at the same time, by the Gamemaster on
+ * this client, is taken for the module's own too.
+ * @template T
+ * @param {string[]} ids                  The pages written.
+ * @param {() => Promise<T>} write
+ * @returns {Promise<T>}
+ */
+export async function ownWrite(ids, write) {
+  const mine = ids.filter(id => !writing.has(id));
+  for ( const id of mine ) writing.add(id);
+  try {
+    return await write();
+  } finally {
+    for ( const id of mine ) writing.delete(id);
+  }
+}
+
+/**
  * Note that a journal of notes may have changed, and send its book once its changes settle. A
- * deleted journal's book goes with no journal, unless another claims it.
+ * deleted journal's book goes with no journal, unless another claims it. Since 0.35.0 the latest
+ * change heard of in Foundry, who deleted or reordered a page the app is sent, is written to the
+ * journal as it settles, once for the burst, where it's later than the one there; and the book then
+ * says it.
  * @param {JournalEntry|null|undefined} entry
+ * @param {{what: string, by: string|null, at: number}|null} [change]   Who changed it in Foundry.
  * @returns {void}
  */
-function journalChanged(entry) {
+function journalChanged(entry, change=null) {
   if ( !canSend() ) return;
   const flag = journalFlag(entry);
   if ( !flag ) return;
   const key = bookKey(flag.campaign, flag.kind, flag.actor);
+  if ( change && !(heard.get(key)?.at > change.at) ) heard.set(key, change);
   clearTimeout(settling.get(key));
   settling.set(key, setTimeout(() => {
     settling.delete(key);
-    sendBook(flag.kind, flag.actor, flag.campaign);
+    void journalSettled(key, flag);
   }, SETTLE_JOURNAL));
+}
+
+/**
+ * A journal's changes have settled: write who changed it in Foundry, where that was heard and is
+ * later than what the journal says, and send its book. The change is taken as the write starts, so
+ * the settle that write causes writes nothing; one heard meanwhile settles on its own. The write is
+ * the module's own, and doesn't redraw the journal where the Gamemaster has it open.
+ * @param {string} key
+ * @param {{kind: string, actor: string, campaign: string}} flag
+ * @returns {Promise<void>}
+ */
+async function journalSettled(key, flag) {
+  const change = heard.get(key) ?? null;
+  heard.delete(key);
+  const entry = (change && canSend()) ? journalFor(flag.kind, flag.actor, flag.campaign) : null;
+  if ( entry && !(changedFlag(entry)?.at >= change.at) ) {
+    await quietly(() => entry.update({ [`flags.${MODULE_ID}.changed`]: change }, { render: false, ...OWN_WRITE }));
+  }
+  sendBook(flag.kind, flag.actor, flag.campaign);
+}
+
+/**
+ * Who last deleted or reordered a page the app is sent in Foundry, and when, as the journal keeps
+ * it beside its book (`flags["sending-stone"].changed`), where it has its shape; never inside
+ * `journal`, which the module's writes of who may see it rewrite.
+ * @param {JournalEntry} entry
+ * @returns {{what: "delete"|"order", by: string|null, at: number}|null}
+ */
+function changedFlag(entry) {
+  const changed = entry?.flags?.[MODULE_ID]?.changed;
+  if ( !isObject(changed) || !["delete", "order"].includes(changed.what) ) return null;
+  if ( (changed.by !== null) && (typeof changed.by !== "string") ) return null;
+  return (Number.isInteger(changed.at) && (changed.at > 0)) ? changed : null;
 }
 
 /* -------------------------------------------- */
