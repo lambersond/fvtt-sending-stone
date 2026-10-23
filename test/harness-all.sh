@@ -68,4 +68,6 @@ for v in X=1 "X=1 DND5E6=1"; do run notes $v; done
 # and damage on its own and recharges.
 for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run companions $v; done
 for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run alone $v; done
+# Module 0.36.0: ending a turn from the app, the character's or a companion's, by Foundry's Next Turn.
+for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run turns $v; done
 exit $fail

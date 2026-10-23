@@ -37,7 +37,16 @@ export const midi = {
     gmDamageDisplay: 'full',
     mergeCardMultiDamage: false,
     addFakeDice: false,
+    // Workflow.ts:2308-2315: whether a workflow waits, its damage rolled, for the Gamemaster to
+    // confirm it, at Midi's own default, which waits for none.
+    confirmAttackDamage: 'none',
   },
+  /**
+   * Midi's client setting AutoRemoveTargets (settings.ts:1860-1869, 988-991), at its default: which
+   * targets a change of turn releases (Hooks.ts:408-412). "allGM" releases a Gamemaster's every
+   * target; any but "none" those at 0 hit points.
+   */
+  autoRemoveTargets: 'dead',
   activeDefence: false,
   usedReaction: new Set(),
   usedBonus: new Set(),
@@ -389,7 +398,28 @@ class Workflow {
     return this.WorkflowState_Suspend
   }
 
-  WorkflowState_ConfirmRoll() { return this.WorkflowState_DamageRollStarted }
+  /**
+   * Workflow.ts:2308-2315: where the Gamemaster confirms damage, the workflow waits, its damage
+   * rolled, until they do (confirmDamage), still able to take an area's targets from theirs.
+   */
+  async WorkflowState_ConfirmRoll(context) {
+    if (context.attackRoll) return this.WorkflowState_AttackRollComplete
+    if ((midi.settings.confirmAttackDamage !== 'none') && (this.activity.attack || this.activity.damage)) {
+      await this.displayDamageRolls()
+      return this.WorkflowState_Suspend
+    }
+    return this.WorkflowState_DamageRollStarted
+  }
+
+  /** Workflow.ts:2316-2319: the Gamemaster has confirmed it. */
+  WorkflowState_RollConfirmed() { return this.WorkflowState_DamageRollStarted }
+
+  /** The Gamemaster's confirm button on a workflow waiting for it, as Midi's card has it. */
+  confirmDamage() {
+    if (!this.suspended || (this.currentAction !== this.WorkflowState_ConfirmRoll)) return Promise.resolve()
+    this.suspended = false
+    return this.performState(this.WorkflowState_RollConfirmed)
+  }
 
   /**
    * Workflow.ts:2320-2332: an area not auto-targeted takes the Gamemaster's targets once its damage
@@ -757,4 +787,14 @@ export function installMidi() {
     scene: { tokens: { size: placeables.size } },
     tokens: { setTargets },
   }
+  // Hooks.ts:408-412 (utils.ts:2593-2605, 1212-1220), on every client after a combat's write: a
+  // change of turn or round releases a Gamemaster's targets under "allGM" or "all", and under any
+  // setting but "none" the targets at 0 hit points. A player's, released where they control the
+  // previous combatant's token, isn't modelled: the module's targets are the Gamemaster's.
+  Hooks.on('updateCombat', (combat, data) => {
+    if ((data.round === undefined) && (data.turn === undefined)) return
+    if (midi.autoRemoveTargets === 'none') return
+    const all = game.user?.isGM && ['allGM', 'all'].includes(midi.autoRemoveTargets)
+    game.user.targets = new Set(all ? [] : [...(game.user.targets ?? [])].filter(t => !(t.actor?.system?.attributes?.hp?.value <= 0)))
+  })
 }

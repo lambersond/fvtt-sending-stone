@@ -1,6 +1,6 @@
 import {
   ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, ENCHANT_KINDS, MODULE_ID,
-  MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG
+  MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG, TURN_KINDS
 } from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
@@ -8,6 +8,7 @@ import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mj
 import { checkNoteCommand } from "./command-notes.mjs";
 import { commandActor, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
+import { checkEndTurnCommand } from "./command-turn.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
 import {
   claimMidiPrompt, midiAnswerAuthor, midiAnswerConfig, midiAnswerFailed, midiAnswerFlags, midiOutcome,
@@ -231,7 +232,8 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * Inspiration each name what they end, spend or change, and nothing else; and since 0.31.0, a move
  * of items and coins what it moves, from where to where. Since 0.36.0 a command may name the
  * campaign character whose companion it's for, `of`, an id, but for a kind a companion never makes,
- * as Heroic Inspiration or charges spent by hand.
+ * as Heroic Inspiration or charges spent by hand; and an end of a turn names the turn, as the app
+ * was shown it, and nothing else.
  * @param {object} command
  * @returns {string|null}
  */
@@ -239,6 +241,7 @@ export function checkCommand(command) {
   if ( (command.by !== undefined) && (command.by !== null) && (command.by !== "gm") ) return "by";
   if ( !isOptional(command.of, isId) ) return "of";
   if ( isId(command.of) && COMPANION_UNTAKEN.includes(command.kind) ) return "of";
+  if ( TURN_KINDS.includes(command.kind) ) return checkEndTurnCommand(command);
   const named = checkItemCommand(command);
   if ( named ) return named;
   if ( ENCHANT_KINDS.includes(command.kind) ) return checkEnchantCommand(command);

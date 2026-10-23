@@ -214,7 +214,9 @@ await until(() => app.polls.length > 0, 'the first fetch')
 const checks = ['skill', 'tool', 'ability', 'save', 'death', 'initiative', 'hitDie', 'hitDice', 'formula']
 // Ending a concentration is offered wherever rolls are made (module 0.29.0); spending charges and
 // Heroic Inspiration only where the campaign lets its players attack, which this one doesn't.
-const concentration = ['endConcentration']
+// Changed on purpose (round 0.36.0 §6.13): ending a turn is offered wherever rolls are made, right
+// after ending a concentration.
+const concentration = ['endConcentration', 'endTurn']
 // A description's own roll is offered with the rest; asking the table needs dnd5e's roll labels, and
 // a description's damage the attack self-test, which this world has neither of.
 const texts = ['textRoll']
@@ -255,7 +257,8 @@ assert.equal(diceStatus.hitDice, true, `hit die self-test: ${diceStatus.hitDiceE
 // Changed on purpose (round 0.36.0 §4.1, §6.12): `features.companions` says the kinds a companion's
 // rolls take, the campaign's less the seven only a character takes, and that each rolls its own
 // initiative; attacks are off here, so there's no damage on its own or recharge.
-const UNTAKEN = ['inspiration', 'hitDie', 'hitDice', 'spend', 'transfer', 'remove', 'note']
+// Changed on purpose (round 0.36.0 §6.13): nor ending a turn, which is the character's to do.
+const UNTAKEN = ['inspiration', 'hitDie', 'hitDice', 'spend', 'transfer', 'remove', 'note', 'endTurn']
 assert.deepEqual(hellos, {
   Ashlands: { rolls: { enabled: true, kinds: [...checks, ...concentration, ...texts], reason: null, modifiers: false, areaAttacks: false, prompts: false, activityChecks: true, signedDice: true, selfTargets: false, gmRolls: true, gmRollMessages: true, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [...checks, ...concentration, ...texts].filter(kind => !UNTAKEN.includes(kind)), initiative: 'own' } },
   Mirkwood: { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [], initiative: 'own' } },

@@ -906,6 +906,17 @@ function midiQueued(run) {
 }
 
 /**
+ * Settled once every Midi-QOL use from the app on its way now has done with the Gamemaster's
+ * targets, any player's: its attack rolled or the use ended, and an area's damage past where Midi
+ * may take them. At once where none is. It never rejects. Since 0.36.0, what an end of a turn waits
+ * for, as Midi releases the Gamemaster's targets when the turn changes.
+ * @returns {Promise<unknown>}
+ */
+export function midiSettled() {
+  return midiQueue;
+}
+
+/**
  * Why Midi-QOL would stop to ask the Gamemaster something about this use, or not make it, if it
  * would: Active Defence, which has an attack's target roll instead; an area attack whose targets
  * Midi picks itself; an activity that always opens Midi's dialogs, asks which of its effects to

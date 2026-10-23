@@ -186,6 +186,10 @@ while the roll is being made.
   character with Elven Accuracy enters a third d20 for an attack with advantage made with an
   ability it's for. A player's own Manual Dice toggle in Foundry lives in their browser alone, and
   plays no part in the app.
+- **Ending a turn.** Players can end their turn from the app, and their companions' turns: the turn
+  panel's **End Turn**, or the Combat tab held. It's Foundry's own Next Turn, made by your Foundry,
+  so dnd5e's and Midi-QOL's start- and end-of-turn work happens as if you had clicked it. A turn that
+  has moved on by then, as one ended already, isn't ended again.
 
 The app's address must be able to answer the module's fetches of players' rolls, which only the
 Sending Stone app, or a listener that says it can, is asked for; see
@@ -695,6 +699,11 @@ Gamemaster-only information switched on.
 - **Only the active Gamemaster's Foundry moves companions in initiative;** with no Gamemaster
   connected, a character's initiative set meanwhile is followed once one connects, or reloads, by
   each of its companions but one whose initiative you changed since the module last set it.
+- **A companion acting right after its character rolls its spent recharge at the start of its
+  turn,** as dnd5e does, unless the world's Auto Recharge is off.
+- **With Midi-QOL, a turn ended from the app first waits up to 10 seconds** for any use or damage
+  from the app, any player's, that is still using your targets, then ends.
+- **With no Gamemaster connected nothing is made from the app,** End Turn included.
 
 ## Installation
 
@@ -781,6 +790,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-alone.mjs` | An action's damage or healing on its own, dnd5e's card with no targets for the Gamemaster to apply, and a spent recharge rolled, each with the player's dice, outside Midi-QOL's workflow |
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
+| `scripts/command-turn.mjs` | Ending the current turn from the app, the character's or one of its companions', where it's still the turn the app was shown, by Foundry's own Next Turn |
 | `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat |
 | `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |

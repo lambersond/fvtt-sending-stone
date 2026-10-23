@@ -378,12 +378,13 @@ assert.ok(hello.data.companions.every(each => each.of.length === 1 && each.of[0]
 assert.deepEqual(companionsOf(ashlands()).map(({ entry: listedEntry }) => listedEntry.of), EXPECTED.map(() => ['thorin']))
 ok("Vex's list is none: Bob owns none of them")
 
-// The kinds a companion's command takes: the campaign's, less the seven only a character takes.
-const UNTAKEN = ['inspiration', 'hitDie', 'hitDice', 'spend', 'transfer', 'remove', 'note']
+// The kinds a companion's command takes: the campaign's, less those only a character takes.
+// Changed on purpose (round 0.36.0 §6.13): and ending a turn, the character's to do.
+const UNTAKEN = ['inspiration', 'hitDie', 'hitDice', 'spend', 'transfer', 'remove', 'note', 'endTurn']
 assert.deepEqual(hello.data.features.companions, { kinds: hello.data.features.rolls.kinds.filter(kind => !UNTAKEN.includes(kind)), initiative: 'own' })
 assert.ok(hello.data.features.companions.kinds.includes('itemDamage') && hello.data.features.companions.kinds.includes('recharge'))
 assert.ok(!hello.data.features.companions.kinds.some(kind => UNTAKEN.includes(kind)))
-ok("features.companions: the campaign's kinds less inspiration, hit dice, spending, moves, removals and notes, and each its own initiative")
+ok("features.companions: the campaign's kinds less inspiration, hit dice, spending, moves, removals, notes and ending a turn, and each its own initiative")
 
 // The big campaign: fifty listed of sixty, under 64 KB, a name of 300 cut to 200 and an img of 3,000 sent null.
 const bigHello = helloOf('camp-big')

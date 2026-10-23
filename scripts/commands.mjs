@@ -1,6 +1,6 @@
 import {
   ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION,
-  ROLL_KINDS
+  ROLL_KINDS, TURN_KINDS
 } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
@@ -10,6 +10,7 @@ import { runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
+import { runEndTurnCommand } from "./command-turn.mjs";
 import {
   noteRemovalReader, noteTransferReader, removalReader, removalsOn, runRemoveCommand, runTransferCommand,
   transferReader, transfersOn
@@ -159,7 +160,8 @@ const made = new Map();
  * as neither throws dice or goes through Midi-QOL. Since 0.36.0, among the kinds, an action's damage
  * or healing on its own and a spent recharge rolled, where players may attack and damage takes
  * their dice, as a description's damage is offered, under dnd5e 5.x and 6, Midi-QOL or not; and
- * that players may change damage there too.
+ * that players may change damage there too; and ending the current turn, their character's or one
+ * of its companions', wherever their rolls are made, as ending a concentration is.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
@@ -182,6 +184,7 @@ export function rollFeatures(campaign) {
     kinds: [
       ...ROLL_KINDS.filter(kind => !HIT_DICE_KINDS.includes(kind) || diceStatus.hitDice),
       ...CONCENTRATION_KINDS,
+      ...TURN_KINDS,
       ...(attacks ? [...ATTACK_KINDS, ...ENCHANT_KINDS] : []),
       ...(campaign.attacks ? CHARGE_KINDS : []),
       ...texts,
@@ -487,7 +490,9 @@ class Poller {
  * while the same command is being made, until its run settles, however long after its answer. Since
  * 0.36.0 a companion's command waits for its character's earlier ones, and its character's next for
  * it, one player making them one at a time; two companions of one actor, as two wolves, have keys of
- * their own.
+ * their own. An end of a turn waits too for every earlier end of a turn of its combat, any
+ * character's: two players ending the turn of a companion they share would otherwise both find it
+ * current, where the later should find it ended and end nothing more.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -513,7 +518,9 @@ function take(command, campaign) {
   let keys = [String(command.actorId)];
   if ( isId(command.of) ) keys = [String(command.actorId), command.of];
   if ( note ) keys = [`note:${command.actorId}`];
-  else if ( command.kind === "transfer" ) {
+  else if ( command.kind === "endTurn" ) {
+    if ( isId(command.turn?.combatId) ) keys = [...keys, `turn:${command.turn.combatId}`];
+  } else if ( command.kind === "transfer" ) {
     keys = [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to),
       ...(Array.isArray(command.transfer?.among) ? command.transfer.among.map(keyOf) : [])].filter(Boolean))];
   }
@@ -610,6 +617,7 @@ function runCommand(command, campaign, signal) {
     case "damage": return runDamageCommand(command, campaign);
     case "endEnchantment": return runEndEnchantmentCommand(command, campaign);
     case "endConcentration": return runEndConcentrationCommand(command, campaign);
+    case "endTurn": return runEndTurnCommand(command, campaign);
     case "spend": return runSpendCommand(command, campaign);
     case "inspiration": return runInspirationCommand(command, campaign);
     case "ask": return runAskCommand(command, campaign);

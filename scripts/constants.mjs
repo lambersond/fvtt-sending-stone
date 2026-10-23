@@ -285,9 +285,13 @@ export const MOST_COMPANIONS_EACH = 20;
 
 /**
  * The kinds a companion's command is never, since 0.36.0: what an NPC has none of, what isn't asked,
- * and what edits it rather than acting, as charges spent by hand (round 0.36.0 §2.5).
+ * and what edits it rather than acting, as charges spent by hand (round 0.36.0 §2.5), and what's its
+ * character's to do, as ending a turn, which the character's command does for the companion's turn
+ * too (round 0.36.0 §2.8).
  */
-export const COMPANION_UNTAKEN = Object.freeze(["inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "note"]);
+export const COMPANION_UNTAKEN = Object.freeze([
+  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "note", "endTurn"
+]);
 
 /**
  * What a player can have made here from the app from a row of their sheet, since 0.36.0, offered
@@ -311,6 +315,22 @@ export const COMPANION_INITIATIVE = Object.freeze({ OWN: "own", AFTER: "after" }
  * @type {number}
  */
 export const FOLLOW_GAP = 0.001;
+
+/**
+ * What a player can have done here from the app to a combat, since 0.36.0: end the current turn,
+ * their character's or one of its companions', as Foundry's Next Turn does. Offered wherever their
+ * rolls are made, as ending a concentration is: it throws no dice (round 0.36.0 §2.8).
+ * @type {readonly string[]}
+ */
+export const TURN_KINDS = Object.freeze(["endTurn"]);
+
+/**
+ * The longest an end of a turn waits for a Midi-QOL use already on its way, which may hold the
+ * Gamemaster's targets for its damage, before it ends the turn all the same, in milliseconds,
+ * since 0.36.0 (round 0.36.0 §6.13).
+ * @type {number}
+ */
+export const TURN_MIDI_WAIT = 10_000;
 
 /** A note's id, as the app makes it and Foundry makes a page's: 16 letters and digits. */
 export const NOTE_ID = /^[A-Za-z0-9]{16}$/;

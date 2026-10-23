@@ -9,8 +9,9 @@
 // with the synthetic actor; its items' hooks with the synthetic actor as their parent, its delta, or
 // none at all. And a combat whose combatants' initiative the module writes as core does, each write
 // counted, firing `updateCombatant` and `createCombatant` after it, as core fires them on every client
-// (T14/client/hooks.d.mts:1564-1580, 1605-1624). Shared with the e2e through AE/fvtt. Import it after
-// stub.mjs, actor5e.mjs and activity5e.mjs.
+// (T14/client/hooks.d.mts:1564-1580, 1605-1624); and, for End Turn, whose turns move as Next Turn
+// moves them. Shared with the e2e through AE/fvtt. Import it after stub.mjs, actor5e.mjs and
+// activity5e.mjs.
 import { actors, combat, combatant } from './stub.mjs'
 import { Actor5e } from './actor5e.mjs'
 import { equip } from './activity5e.mjs'
@@ -355,6 +356,16 @@ globalThis.fromUuid = async (uuid, options) => {
  * created through `createEmbeddedDocuments` fire `createCombatant`. `rollInitiative` is core's with
  * dnd5e's Combatant5e (actor5e.mjs's), written the same way but uncounted; `setInitiative` stands for
  * a change made on another client, as the Gamemaster typing one or a player's roll in Foundry.
+ *
+ * Since module 0.36.0's End Turn (its contract §6.11, §6.13), its turns move as core's are
+ * remembered to [core, unverified shape]: `nextTurn` as the bridge's Next Turn, `combatTurn` or, at
+ * a round's change, `combatRound` fired before the write, then `updateCombat` and `combatTurnChange`
+ * after it, `advances` counting the calls that wrote, `refuseNext` making the next write nothing, as
+ * a module's `preUpdateCombat` may; `setTurn` as the Gamemaster's Next Turn made on another client,
+ * and `update` as core's own update, each writing and firing the hooks after a write but neither
+ * `combatTurn` nor `combatRound`, uncounted. `started` follows `round`. While started, an initiative
+ * written keeps the current combatant current, as core does [core, unverified], its index moved
+ * with it, firing nothing more; stub.mjs's `combatant` is otherwise whoever sorts at the index.
  * @param {string} id
  * @param {object[]} combatants   `{ id, actor, token?, fields? }`, a token's creature by its token.
  * @returns {object}
@@ -363,12 +374,17 @@ export function combatOf(id, combatants = []) {
   const made = combat(id)
   made.writes = 0
   made.written = []
+  made.advances = 0
+  made.refuseNext = false
+  Object.defineProperty(made, 'started', { configurable: true, enumerable: true, get() { return this.round > 0 } })
   const add = ({ id: combatantId, actor, token = null, fields = {} }) => combatant(made, combatantId, token ? token.actor : actor, {
     ...(token && { token, tokenId: token.id, sceneId: token.parent.id, actorId: token.actorId }),
     ...fields,
   })
   for (const each of combatants) add(each)
   const write = async (updates, options = {}) => {
+    // The combatant whose turn it is stays so, wherever the write sorts it.
+    const current = made.started ? made.combatant : null
     const changed = []
     for (const { _id, ...changes } of updates) {
       const cb = made.combatants.get(_id)
@@ -379,6 +395,7 @@ export function combatOf(id, combatants = []) {
       if (flags) cb.flags = mergeObject(cb.flags ?? {}, deepClone(flags))
       changed.push([cb, changes])
     }
+    if (current) made.turn = made.turns.indexOf(current)
     for (const [cb, changes] of changed) await Hooks.callAll('updateCombatant', cb, changes, options, userId())
   }
   made.updateEmbeddedDocuments = async (type, updates, options = {}) => {
@@ -408,6 +425,53 @@ export function combatOf(id, combatants = []) {
       await ChatMessage.create({ ...data, rolls: [roll] }, { messageMode: messageMode ?? messageOptions.rollMode })
     }
     await write(updates)
+    return made
+  }
+
+  /** Core's HistoryData of the turn as it stands (T14/client/documents/combat.d.mts:1026-1031). */
+  const history = () => {
+    const cb = made.combatant ?? null
+    return { round: made.round, turn: made.turn, tokenId: cb?.tokenId ?? null, combatantId: cb?.id ?? null }
+  }
+  /** The turn written, then what core fires on every client after the write. */
+  const moveTo = async ({ round, turn }, options = {}) => {
+    const prior = history()
+    made.round = round
+    made.turn = turn
+    await Hooks.callAll('updateCombat', made, { round, turn }, options, userId())
+    await Hooks.callAll('combatTurnChange', made, prior, history())
+  }
+  /**
+   * Core's Combat#nextTurn: the next combatant in the order, past the defeated where the tracker
+   * skips them; at round 0, or past the last, the next round from the first not defeated.
+   */
+  made.nextTurn = async () => {
+    const skip = made.settings?.skipDefeated === true
+    const turns = made.turns
+    const from = made.turn ?? -1
+    let next = null
+    for (const [index, cb] of turns.entries()) {
+      if ((index > from) && !(skip && cb.isDefeated)) { next = index; break }
+    }
+    const newRound = (made.round === 0) || (next === null)
+    const update = newRound
+      ? { round: made.round + 1, turn: Math.max(turns.findIndex(cb => !(skip && cb.isDefeated)), 0) }
+      : { round: made.round, turn: next }
+    const options = { direction: 1, worldTime: { delta: newRound ? 6 : 0 } }
+    await Hooks.callAll(newRound ? 'combatRound' : 'combatTurn', made, update, options)
+    if (made.refuseNext) {
+      made.refuseNext = false
+      return made
+    }
+    made.advances++
+    await moveTo(update, options)
+    return made
+  }
+  /** The Gamemaster's own Next Turn, made on another client: the write and its hooks here. */
+  made.setTurn = (round, turn) => moveTo({ round, turn }, { direction: 1 })
+  /** Core's Combat#update of its round and turn: the write and its hooks, never combatTurn or combatRound. */
+  made.update = async (data, options = {}) => {
+    await moveTo({ round: data.round ?? made.round, turn: data.turn ?? made.turn }, options)
     return made
   }
   return made
