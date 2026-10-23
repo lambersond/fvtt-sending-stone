@@ -206,7 +206,8 @@ assert.deepEqual({ ...feature('Second Wind'), text: undefined }, {
   activation: '1 Bonus Action', passive: false, uses: { value: 1, max: 1, recovery: 'Short Rest, Long Rest', counter: { item: 'second-wind' }, spendable: true }, text: undefined,
 })
 assert.deepEqual(feature('Action Surge').uses, { value: 0, max: 1, recovery: 'Short Rest', counter: { item: 'action-surge' }, spendable: true }, 'uses left worked out from those spent')
-assert.deepEqual(feature('Mountain Breath').uses, { value: 0, max: 1, recovery: 'Recharge [5–6]', counter: { item: 'breath' }, spendable: true })
+// Changed on purpose (round 0.36.0 §4.5): a recharge use says the lowest d6 that recharges it.
+assert.deepEqual(feature('Mountain Breath').uses, { value: 0, max: 1, recovery: 'Recharge [5–6]', recharge: 5, counter: { item: 'breath' }, spendable: true })
 assert.equal(feature('Sneak Attack').uses, null)
 assert.equal(feature('Sneak Attack').passive, true, 'nothing to use: passive')
 assert.equal(feature('Dwarven Resilience').passive, true, 'a trait: passive')

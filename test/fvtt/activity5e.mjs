@@ -15,7 +15,11 @@
 // activities-field.mjs's order, by sort, and base-activity.mjs's duration, a spell's concentration
 // in it unless the activity overrides it; and an activity's own uses, spent as
 // consumption-targets-field.mjs's consumeActivityUses spends them. Line references are to 5.3.3. The rolls are dnd5e's own
-// D20Roll and DamageRoll, loaded for real.
+// D20Roll and DamageRoll, loaded for real. Since module 0.36.0 also uses-field.mjs's rollRecharge
+// (5.3.3 and 6.0.5's message), an activation's own consumption, as a legendary action spends its
+// pool (mixin.mjs:426-437, 539-563, where the world's config says so), an attribute's consumption
+// (consumption-targets-field.mjs:152-179), and, where a harness asks (`port.targets`), a card's
+// targets as the Gamemaster's, as mixin.mjs:136-142 has them.
 
 const { mergeObject, deepClone, getProperty, setProperty, isEmpty } = foundry.utils
 
@@ -35,6 +39,86 @@ let concentrations = 0
 
 /** What happened on the Gamemaster's screen that shouldn't: dialogs, warnings, placements. */
 export const screen = { notifications: [], subsequent: [], templates: 0, summons: 0 }
+
+/**
+ * What a harness turns on of dnd5e that the port leaves out by default, so that every other
+ * harness's cards stay as they were (module 0.36.0): `targets`, a use's and a roll's card naming the
+ * Gamemaster's targets, as mixin.mjs:136-142's getTargetDescriptors does.
+ */
+export const port = { targets: false }
+
+/**
+ * mixin.mjs (getTargetDescriptors): the Gamemaster's targets, as a card names them.
+ * @returns {object[]}
+ */
+function targetDescriptors() {
+  return [...(game.user?.targets ?? [])].map(target => {
+    const token = target.document ?? target
+    const actor = token.actor
+    return { name: token.name ?? actor?.name, img: actor?.img, uuid: actor?.uuid, ac: actor?.system?.attributes?.ac?.value ?? null }
+  }).filter(target => target.uuid)
+}
+
+/**
+ * uses-field.mjs:206-277 (5.3.3), and 6.0.5's (:269-347), whose message is typed `recharge` and names
+ * its item or activity: a spent recharge rolled, with dnd5e's own BasicRoll process, its d6 against
+ * the recovery's formula, and the uses recharged on a success, unless dnd5e's hooks say not.
+ * @this {Item5e|Activity}
+ */
+async function rollRecharge(config = {}, dialog = {}, message = {}) {
+  const isItem = this instanceof Item5e
+  const uses = isItem ? this.system.uses : this.uses
+  const recharge = Array.from(uses?.recovery ?? []).find(({ period }) => period === 'recharge')
+  if (!recharge || !uses?.spent) return
+  const sixth = String(game.system.version).startsWith('6')
+  const rollConfig = mergeObject({
+    rolls: [{
+      parts: ['1d6'],
+      data: this.getRollData(),
+      options: {
+        delta: isItem ? { item: this.id, keyPath: 'system.uses.spent' } : { item: this.item.id, keyPath: `system.activities.${this.id}.uses.spent` },
+        target: parseInt(recharge.formula ?? '6'),
+      },
+    }],
+  }, config)
+  rollConfig.hookNames = [...(config.hookNames ?? []), 'recharge']
+  rollConfig.subject = this
+  const dialogConfig = mergeObject({ configure: false }, dialog)
+  const sources = isItem
+    ? { item: { id: this.id, img: this.img, name: this.name, type: this.type, uuid: this.uuid } }
+    : { activity: { id: this.id, name: this.name, type: this.type, uuid: this.uuid }, item: { id: this.item.id, name: this.item.name, type: this.item.type, uuid: this.item.uuid } }
+  const messageConfig = mergeObject({
+    create: true,
+    data: { speaker: ChatMessage.getSpeaker({ actor: this.actor, token: this.actor.token }), ...(sixth && { system: sources, type: 'recharge' }) },
+    rollMode: CONFIG.Dice.BasicRoll.getMessageMode(),
+  }, message)
+  const rolls = await CONFIG.Dice.BasicRoll.buildConfigure(rollConfig, dialogConfig, messageConfig)
+  await CONFIG.Dice.BasicRoll.buildEvaluate(rolls, rollConfig, messageConfig)
+  if (!rolls.length) return
+  messageConfig.data.flavor = `${this.name} recharge check - ${rolls[0].isSuccess ? 'Success' : 'Failure'}`
+  await CONFIG.Dice.BasicRoll.buildPost(rolls, rollConfig, messageConfig)
+  const updates = {}
+  if (rolls[0].isSuccess) {
+    if (isItem) updates['system.uses.spent'] = 0
+    else updates['uses.spent'] = 0
+  }
+  if (Hooks.call('dnd5e.rollRecharge', rolls, { subject: this, updates }) === false) return rolls
+  if (Hooks.call('dnd5e.rollRechargeV2', rolls, { subject: this, updates }) === false) return rolls
+  if ((rollConfig.apply !== false) && !isEmpty(updates)) await this.update(updates)
+  Hooks.callAll('dnd5e.postRollRecharge', rolls, { subject: this })
+  return { rolls, updates }
+}
+
+/**
+ * uses-field.mjs:44-69: `rollRecharge` on uses that recharge, bound to what has them, as dnd5e
+ * defines it on its prepared uses; not enumerable, so the uses read as before.
+ * @param {object|undefined} uses
+ * @param {Item5e|Activity} subject
+ */
+function prepareRecharge(uses, subject) {
+  if (!uses || !Array.from(uses.recovery ?? []).some(recovery => recovery?.period === 'recharge')) return
+  Object.defineProperty(uses, 'rollRecharge', { value: rollRecharge.bind(subject), configurable: true, enumerable: false })
+}
 
 /** The activity class each use makes, by type, as dnd5e's CONFIG.DND5E.activityTypes has it. Midi swaps them. */
 export const activityTypes = {}
@@ -195,6 +279,7 @@ export class Item5e {
       const Activity = activityTypes[type] ?? ACTIVITIES[type]
       return [a.id, new Activity(this, a)]
     }))
+    prepareRecharge(this.system.uses, this)
     for (const prepare of itemPreparers) prepare(this)
   }
 
@@ -400,6 +485,7 @@ export class Activity {
       const max = Number(data.uses.max) || 0
       const spent = Number(data.uses.spent) || 0
       this.uses = { ...deepClone(data.uses), max, spent, value: max ? Math.min(Math.max(max - spent, 0), max) : 0 }
+      prepareRecharge(this.uses, this)
     }
     this.metadata = { usage: { dialog: null, chatCard: 'activity-card.hbs', actions: {} } }
   }
@@ -422,9 +508,11 @@ export class Activity {
     return {
       activity: { type: this.type, id: this.id, uuid: this.uuid },
       item: { type: this.item.type, id: this.item.id, uuid: this.item.uuid },
-      targets: [],
+      targets: port.targets ? targetDescriptors() : [],
     }
   }
+  /** base-activity.mjs: an activity's changes, through its item's (item.mjs:942-946). */
+  async update(changes = {}) { return this.item.updateActivity(this.id, changes) }
   /** mixin.mjs:1174-1178 */
   getLinkedActivity(relativeUUID) {
     if (!this.actor) return null
@@ -546,7 +634,9 @@ export class Activity {
       const hasLinkedConsumption = (linked?.consumption.targets.length > 0) && !ignoreLinkedConsumption
       const hasSpellSlotConsumption = this.requiresSpellSlot && this.consumption.spellSlot
       config.consume ??= {}
-      config.consume.action ??= false
+      // mixin.mjs:426-437: an activation that spends a pool of the creature's, as a legendary action.
+      const activationConfig = CONFIG.DND5E.activityActivationTypes?.[this.activation.type] ?? {}
+      config.consume.action ??= !!activationConfig.consume && (activationConfig.consume.canConsume?.(this) !== false)
       config.consume.resources ??= Array.from(this.consumption.targets.entries()).map(([index]) => index)
       config.consume.spellSlot ??= !linked && hasSpellSlotConsumption
       config.hasConsumption = hasResourceConsumption || hasLinkedConsumption || (!linked && hasSpellSlotConsumption)
@@ -588,6 +678,19 @@ export class Activity {
     const updates = { activity: {}, actor: {}, create: [], delete: [], item: [], rolls: [] }
     if (config.consume === false) return updates
     const errors = []
+    // mixin.mjs:539-563
+    const activationConfig = CONFIG.DND5E.activityActivationTypes?.[this.activation.type]
+    if (((config.consume === true) || config.consume.action) && activationConfig?.consume) {
+      const { property } = activationConfig.consume
+      const containsConsumption = this.consumption.targets.find(t => (t.type === 'attribute') && (t.target === `${property}.value`))
+      const count = this.activation.value ?? 1
+      const current = getProperty(this.actor.system, property)
+      if (current && !containsConsumption) {
+        if (current.value < 1) errors.push(new ConsumptionError('DND5E.ACTIVATION.Warning.NoActions'))
+        else if (count > current.value) errors.push(new ConsumptionError('DND5E.ACTIVATION.Warning.NotEnoughActions'))
+        else updates.actor[`system.${property}.spent`] = current.spent + count
+      }
+    }
     if ((config.consume === true) || config.consume.resources) {
       const indexes = (config.consume === true) || (config.consume.resources === true)
         ? this.consumption.targets.keys() : config.consume.resources
@@ -1369,6 +1472,7 @@ class ConsumptionTarget {
    */
   async consume(config, updates) {
     if (this.type === 'activityUses') return this.#consumeActivityUses(config, updates)
+    if (this.type === 'attribute') return this.#consumeAttribute(config, updates)
     const item = this.target ? this.activity.actor.items.get(this.target) : this.activity.item
     const spent = Number(item.system.uses?.spent) || 0
     const value = Math.max((Number(item.system.uses?.max) || 0) - spent, 0)
@@ -1390,6 +1494,28 @@ class ConsumptionTarget {
     const index = updates.item.findIndex(update => update._id === item.id)
     if (index === -1) updates.item.push({ _id: item.id, ...itemUpdate })
     else Object.assign(updates.item[index], itemUpdate)
+  }
+
+  /**
+   * consumption-targets-field.mjs:152-179: its cost from an attribute of the actor's, as a legendary
+   * action's pool: where the attribute's value is worked out from what's spent, its spent raised.
+   */
+  async #consumeAttribute(config, updates) {
+    const actor = this.activity.actor
+    const keyPath = `system.${this.target}`
+    const roll = this.resolveCost({ config })
+    const cost = roll.isDeterministic ? roll.evaluateSync().total : (await roll.evaluate()).total
+    if (getProperty(actor, keyPath) === undefined) throw new ConsumptionError('DND5E.CONSUMPTION.Warning.MissingAttribute')
+    let current = getProperty(actor, keyPath)
+    let warning
+    if ((cost > 0) && !current) warning = 'DND5E.CONSUMPTION.Warning.None'
+    else if (current < cost) warning = 'DND5E.CONSUMPTION.Warning.NotEnough'
+    if (warning) throw new ConsumptionError(`${warning} ${this.target} ${cost}/${current}`)
+    const adjustedKeyPath = keyPath.replace(/\.value$/, '.spent')
+    if ((adjustedKeyPath !== keyPath) && (getProperty(actor, adjustedKeyPath) !== undefined)) {
+      current = getProperty(actor, adjustedKeyPath)
+      updates.actor[adjustedKeyPath] = current + cost
+    } else updates.actor[keyPath] = current - cost
   }
 
   /**

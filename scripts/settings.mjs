@@ -1,7 +1,8 @@
-import { CHAT_SCOPES, MODULE_ID, RESULTS_MODES, SETTINGS } from "./constants.mjs";
+import { CHAT_SCOPES, COMPANION_INITIATIVE, MODULE_ID, RESULTS_MODES, SETTINGS } from "./constants.mjs";
 import { announce } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { MANUAL_DICE } from "./companions.mjs";
+import { initiativeChosen } from "./creature-initiative.mjs";
 import SettingsWindow from "./apps/settings-window.mjs";
 
 const { ArrayField, BooleanField, SchemaField, SetField, StringField } = foundry.data.fields;
@@ -68,10 +69,21 @@ export function registerSettings() {
       prompts: new BooleanField({ initial: false }),
       manualDice: new BooleanField({ initial: false }),
       // May its players move items and coins from the app? Apart from its rolls.
-      transfers: new BooleanField({ initial: false })
+      transfers: new BooleanField({ initial: false }),
+      // How its characters' companions enter initiative, since 0.36.0: each its own roll, or right
+      // after its character, where this module keeps them.
+      companionInitiative: new StringField({
+        blank: false, choices: Object.values(COMPANION_INITIATIVE), initial: COMPANION_INITIATIVE.OWN
+      })
     })),
     default: [],
-    onChange: () => reannounce()
+    // Since 0.36.0 a campaign switched to keep its companions right after their characters places
+    // them at once, on the active Gamemaster's client alone; any other save places none, so that
+    // the Gamemaster's own change to a companion's initiative stands.
+    onChange: () => {
+      reannounce();
+      void initiativeChosen();
+    }
   });
 
   // Whether a campaign's players may enter their own dice results counts only while Manual Dice

@@ -396,8 +396,9 @@ const checks = ['skill', 'tool', 'ability', 'save', 'death', 'initiative', 'hitD
 // needs dnd5e's roll labels, which this world hasn't.
 // Ending an enchantment wherever uses are made (module 0.21.0). Ending a concentration wherever
 // rolls are made, and spending charges and Heroic Inspiration wherever players may attack (0.29.0).
+// Changed on purpose (round 0.36.0 §3.1): damage on its own and recharges wherever players may attack.
 assert.deepEqual(hellos, {
-  Ashlands: [...checks, 'endConcentration', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'textRoll', 'textDamage'],
+  Ashlands: [...checks, 'endConcentration', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'textRoll', 'textDamage', 'itemDamage', 'recharge'],
   Mirkwood: [...checks, 'endConcentration', 'textRoll'],
 })
 ok('offers uses alongside attacks, only where the Gamemaster lets players attack and cast')

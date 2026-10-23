@@ -1,5 +1,6 @@
 import { sheetFirst } from "./command-enchant.mjs";
 import { checkCommand, failedResult } from "./command-rolls.mjs";
+import { commandActor } from "./creatures.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 
 /**
@@ -18,7 +19,7 @@ import { diceStatus } from "./dice-plan.mjs";
  * End a concentration of a character's, if the campaign's players' rolls are made here, the
  * character is one of the campaign's, and it concentrates on it now; then send their sheet, as it
  * then stands, ahead of the result. A concentration dnd5e's hooks keep, as a module's may, isn't
- * ended (`cancelled`).
+ * ended (`cancelled`). Since 0.36.0 one of a companion of theirs, named by `of`, on its live actor.
  * @param {object} command      `{concentration: {effect}}`, as fetched from the app.
  * @param {Campaign} campaign
  * @returns {Promise<CommandResult>}
@@ -27,14 +28,15 @@ export async function runEndConcentrationCommand(command, campaign) {
   if ( !campaign.rolls || !diceStatus.ready ) return failedResult(command, "off");
   const invalid = checkCommand(command);
   if ( invalid ) return failedResult(command, "invalid", invalid);
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failedResult(command, "unknown");
+  const found = commandActor(command, campaign);
+  if ( !found ) return failedResult(command, "unknown");
+  const { actor } = found;
   // Read now, in its turn: an earlier command, or the Gamemaster, may have ended it meanwhile.
   const effectId = command.concentration.effect;
   const concentrating = Array.from(actor.concentration?.effects ?? []).some(effect => effect.id === effectId);
   if ( !concentrating ) return failedResult(command, "concentration");
   const ended = await actor.endConcentration(effectId);
   if ( !Array.isArray(ended) || !ended.length ) return failedResult(command, "cancelled");
-  sheetFirst(actor);
+  sheetFirst(actor, found.companion);
   return { id: command.id, status: "done", reason: null, error: null, messageId: null, visible: true, rolls: [] };
 }

@@ -55,20 +55,26 @@ export function rollMode(mode) {
 }
 
 /**
- * Limited uses, of an item or one of its activities, which dnd5e keeps alike.
+ * Limited uses, of an item or one of its activities, which dnd5e keeps alike. Since 0.36.0 uses that
+ * recharge say the lowest d6 that recharges them, `recharge`, from the first of their recoveries
+ * that's a recharge, its formula "6" where it names none, as dnd5e defaults it, from 2 to 6.
  * @param {object} [uses]       Such as an item's system.uses.
  * @param {object} [labels]     Its labels, which name a recharge, such as "Recharge [5+]".
- * @returns {{value: number, max: number, recovery: string|null}|null}
+ * @returns {{value: number, max: number, recovery: string|null, recharge?: number}|null}
  */
 export function limitedUses(uses, labels) {
   const max = finite(uses?.max);
   if ( !max ) return null;
   const value = finite(uses.value) ?? Math.max(max - (finite(uses.spent) ?? 0), 0);
-  const periods = (uses.recovery ?? []).map(recovery => {
+  const recoveries = Array.from(uses.recovery ?? []);
+  const periods = recoveries.map(recovery => {
     if ( recovery.period === "recharge" ) return labels?.recharge ?? null;
     return localize(CONFIG.DND5E?.limitedUsePeriods?.[recovery.period]?.label) || null;
   }).filter(Boolean);
-  return { value, max, recovery: periods.length ? listFormat(periods) : null };
+  const recharging = recoveries.find(recovery => recovery?.period === "recharge");
+  const recharge = recharging
+    ? Math.min(Math.max(Number.parseInt(recharging.formula ?? "6") || 6, 2), 6) : null;
+  return { value, max, recovery: periods.length ? listFormat(periods) : null, ...(recharge && { recharge }) };
 }
 
 /**

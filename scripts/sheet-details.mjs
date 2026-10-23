@@ -36,12 +36,16 @@ const PERSONALITY = [
 
 /**
  * The character's biography and the details that go with it: alignment, age and the like,
- * personality, appearance and experience.
+ * personality, appearance and experience. Since 0.36.0, for a companion none of whose players owns
+ * it in Foundry, without its secrets (`secrets: false`), its biography is dnd5e's public one, as
+ * dnd5e shows a creature's to those who don't own it; none where that's blank.
  * @param {Actor} actor
  * @param {SheetTexts} texts    Collects the biography.
+ * @param {object} [options]
+ * @param {boolean} [options.secrets]   Is it described with its secrets, as for its owner?
  * @returns {object}
  */
-export function detailsOf(actor, texts) {
+export function detailsOf(actor, texts, { secrets=true }={}) {
   const details = actor.system?.details ?? {};
   const entries = list => list
     .map(([id, key]) => ({ id, label: localize(key), value: plain(details[id]) }))
@@ -52,7 +56,42 @@ export function detailsOf(actor, texts) {
     personality: entries(PERSONALITY),
     appearance: plain(details.appearance),
     xp: xp === null ? null : { value: xp, max: finite(details.xp.max) },
-    biography: texts.add({ html: details.biography?.value, relativeTo: actor })
+    biography: texts.add({ html: secrets ? details.biography?.value : details.biography?.public, relativeTo: actor })
+  };
+}
+
+/**
+ * What an NPC's sheet says of it as a creature, since 0.36.0, as a companion's view shows it: its
+ * challenge rating, creature type, size and alignment, whether it's important, as dnd5e marks one
+ * that makes death saves, and its legendary actions and resistances, its lair, and its own hit dice,
+ * each where it has them. The type's label is read explicitly, a getter JSON leaves out; the pools'
+ * maximums are dnd5e's prepared ones, its lair's one more among them. Undefined for any other actor,
+ * whose sheet has no such block.
+ * @param {Actor} actor
+ * @returns {object|undefined}
+ */
+export function creatureOf(actor) {
+  if ( actor?.type !== "npc" ) return undefined;
+  const system = actor.system ?? {};
+  const details = system.details ?? {};
+  const resources = system.resources ?? {};
+  const pool = resource => ((finite(resource?.max) ?? 0) > 0)
+    ? { value: finite(resource.value) ?? 0, max: resource.max } : null;
+  const size = CONFIG.DND5E?.actorSizes?.[system.traits?.size];
+  const lair = resources.lair;
+  const hd = system.attributes?.hd;
+  const alignment = plain(details.alignment);
+  return {
+    cr: finite(details.cr),
+    type: (typeof details.type?.label === "string") ? (details.type.label || null) : null,
+    size: size ? (localize(size.label ?? size) || null) : null,
+    alignment: alignment || null,
+    important: (system.traits?.important === true) || ((actor.itemTypes?.class?.length ?? 0) > 0),
+    legendary: pool(resources.legact),
+    resistance: pool(resources.legres),
+    lair: lair?.value ? { inside: lair.inside === true, initiative: finite(lair.initiative) } : null,
+    hitDice: ((finite(hd?.max) ?? 0) > 0)
+      ? { denomination: `d${hd.denomination}`, value: finite(hd.value) ?? 0, max: hd.max } : null
   };
 }
 

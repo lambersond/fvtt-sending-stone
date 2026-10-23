@@ -221,21 +221,23 @@ ok('a named resource with a maximum, with its uses and when it comes back, from 
 assert.deepEqual(find('item', 'rapier'), { type: 'item', id: 'rapier', itemType: 'weapon', name: 'Rapier', img: 'icons/rapier.webp' })
 ok('an item by the id the sheet lists it by, with its type')
 
+// Changed on purpose (round 0.36.0 §4.5): every action and activity row carries `tableDamage`, null where it can't be previewed (as here, with no dnd5e activities).
 assert.deepEqual(find('activity', 'castfire'), {
   type: 'activity', id: 'castfire', itemId: 'staff', itemType: 'weapon', itemName: 'Staff of Fire', name: 'Cast Fireball',
   img: 'systems/dnd5e/icons/svg/activity/save.svg', activation: 'Action', activationType: 'action', range: '150 ft', target: '20 ft Sphere', toHit: null,
   attackId: null, activity: { id: 'castfire', type: 'save', targets: { self: false, area: false, count: null, perLevel: null, affects: null, fromSelf: false } },
   attackModes: null, ammunition: null,
-  save: { ability: 'dex', dc: 15 }, damage: [{ formula: '8d6', type: 'Fire', healing: false }],
+  save: { ability: 'dex', dc: 15 }, damage: [{ formula: '8d6', type: 'Fire', healing: false }], tableDamage: null,
   uses: { value: 2, max: 3, recovery: 'Dawn', counter: { item: 'staff', activity: 'castfire' }, spendable: true },
 })
 ok("an activity on its own, as an action is described: the staff's Fireball, with its save, damage and uses, its own, which may be spent")
 
+// Changed on purpose (round 0.36.0 §4.5): every action and activity row carries `tableDamage`, null where it can't be previewed (as here, with no dnd5e activities).
 assert.deepEqual(find('activity', 'castbolt'), {
   type: 'activity', id: 'castbolt', itemId: 'staff', itemType: 'weapon', itemName: 'Staff of Fire', name: 'Fire Bolt',
   img: 'systems/dnd5e/icons/svg/activity/cast.svg', activation: 'Action', activationType: 'action', range: '120 ft', target: null, toHit: 6,
   attackId: 'castbolt', activity: null, attackModes: null, ammunition: null, save: null,
-  damage: [{ formula: '2d10', type: 'Fire', healing: false }], spellId: 'bolt-copy',
+  damage: [{ formula: '2d10', type: 'Fire', healing: false }], tableDamage: null, spellId: 'bolt-copy',
   cast: { level: 0, concentration: false, charges: 2, short: false, text: find('activity', 'castbolt').cast.text }, uses: { value: 7, max: 10, recovery: 'Dawn' },
 })
 assert.equal(texts[find('activity', 'castbolt').cast.text], '<p>About Fire Bolt.</p>')

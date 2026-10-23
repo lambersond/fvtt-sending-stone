@@ -4,13 +4,13 @@ import {
   appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
 import {
-  damageRollsFor, diceForEach, diceStatus, matchesDice, modifiedDice, plannedDice, readModifiers, takesAway,
-  unmaximizable, withPlan
+  diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable, withPlan
 } from "./dice-plan.mjs";
 import { dnd5eEnchant, enchantChoice, midiEnchantNow } from "./command-enchant.mjs";
 import { resultsAlways } from "./config.mjs";
+import { commandActor } from "./creatures.mjs";
 import { midiPromptWaits } from "./midi-prompts.mjs";
-import { DND5E_ACTIVITIES, ownDamageConfig } from "./sheet-links.mjs";
+import { DND5E_ACTIVITIES, ownDamageConfig, previewDamage } from "./sheet-links.mjs";
 import { enchantInPlay } from "./sheet-enchant.mjs";
 import {
   castCopy, castSpellOf, checkUsable, followUpCheck, forwardTarget, FORWARDED, freeCheck, offeredLevels, USES
@@ -150,7 +150,9 @@ function isMidiActivity(activity) {
 /**
  * Make a player's attack, or their use of a spell or feature, for their character, if the campaign
  * takes them and the character can make it now: use the item, then, for an attack, attack, and for
- * an enchantment, apply it.
+ * an enchantment, apply it. Since 0.36.0 one of a companion of theirs, named by `of`, on its live
+ * actor, as their character's player, what it found carried in the use as `character` and
+ * `companion`.
  * @param {object} command      The player's attack or use, as fetched from the app.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @param {object} [options]
@@ -161,10 +163,13 @@ function isMidiActivity(activity) {
 export async function runUseCommand(command, campaign, { signal }={}) {
   const refusal = commandRefusal(command, campaign);
   if ( refusal ) return failedResult(command, refusal.reason, refusal.error);
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failedResult(command, "unknown");
+  const found = commandActor(command, campaign);
+  if ( !found ) return failedResult(command, "unknown");
+  const { actor } = found;
   const use = await prepareUse(command, actor);
   if ( use.refusal ) return failedResult(command, use.refusal, use.error ?? null);
+  use.character = found.character;
+  use.companion = found.companion;
   if ( !isMidiActivity(use.activity) ) {
     if ( use.enchanting ) return dnd5eEnchant(command, campaign, actor, use);
     return use.attack ? dnd5eAttack(command, campaign, actor, use) : dnd5eUse(command, campaign, actor, use);
@@ -218,6 +223,10 @@ async function prepareUse(command, actor) {
   if ( !castable(item) ) return { refusal: "item" };
   const usable = attack ? (activity?.type === "attack") : USES.has(activity?.type);
   if ( !usable || !activity.canUse ) return { refusal: "activity" };
+  // A legendary or mythic action its creature hasn't enough of its pool left for, as dnd5e would
+  // refuse it, after warning the Gamemaster, or Midi-QOL would ask them in a dialog.
+  const legendary = legendaryRefusal(activity, actor);
+  if ( legendary ) return { refusal: legendary };
   if ( (activity.type === "check") && !checkUsedHere(item, activity) ) return { refusal: "activity" };
   // An enchant activity the sheet leaves to Foundry, as a magic item's template or a choice made
   // once, is used there alone, as only one the sheet offers is ended from here.
@@ -593,14 +602,46 @@ export function targetOf({ combatId, combatantId }) {
 /**
  * The character as a target of their own use: by their token, their combatant's in the combat the
  * Gamemaster has up, else their own on the scene the Gamemaster views; else by no token, the actor
- * alone, which the card names all the same, but Midi-QOL can't target.
+ * alone, which the card names all the same, but Midi-QOL can't target. Since 0.36.0 a token's
+ * creature, as a companion's, is its own token, and its own combatant, by its token and scene,
+ * wherever the Gamemaster's canvas is.
  * @param {Actor} actor
  * @returns {{combatant: Combatant|null, token: TokenDocument|null, actor: Actor}}
  */
 function selfTarget(actor) {
+  if ( actor.isToken && actor.token ) {
+    const { token } = actor;
+    const combatant = game.combat?.combatants?.find?.(each => (each.tokenId === token.id)
+      && (each.sceneId === token.parent?.id)) ?? null;
+    return { combatant, token, actor };
+  }
   const combatant = game.combat?.combatants?.find?.(each => (each.actor?.id ?? each.actorId) === actor.id) ?? null;
   const token = combatant?.token ?? actor.getActiveTokens?.(true, true)?.[0] ?? null;
   return { combatant, token, actor: token?.actor ?? actor };
+}
+
+/**
+ * Why a legendary or mythic action can't be used now, if it can't, as dnd5e's own test has it:
+ * where its kind of activation spends a pool of the creature's, as a legendary action spends its
+ * legendary actions, the creature has that pool, and nothing it consumes already spends it, the use
+ * is refused with none left, even for one that costs none, or with fewer left than it costs, a cost
+ * of none counted as none. dnd5e would abort the use after warning the Gamemaster; under Midi-QOL a
+ * consumption that fails opens a usage dialog on their screen.
+ * @param {Activity} activity
+ * @param {Actor} actor
+ * @returns {"legendary"|null}
+ */
+export function legendaryRefusal(activity, actor) {
+  const consume = CONFIG.DND5E?.activityActivationTypes?.[activity.activation?.type]?.consume;
+  const property = consume?.property;
+  if ( !property || (consume.canConsume?.(activity) === false) ) return null;
+  const current = foundry.utils.getProperty(actor.system ?? {}, property);
+  if ( !current || !Number.isFinite(current.value) ) return null;
+  const spends = Array.from(activity.consumption?.targets ?? [])
+    .some(target => (target.type === "attribute") && (target.target === `${property}.value`));
+  if ( spends ) return null;
+  const count = Number(activity.activation?.value ?? 1);
+  return ((current.value < 1) || (count > current.value)) ? "legendary" : null;
 }
 
 /**
@@ -639,7 +680,7 @@ function cardTargets({ activity, targets }, actor) {
  */
 async function dnd5eAttack(command, campaign, actor, use) {
   const { activity, usage, attackMode, ammunition } = use;
-  const author = authorFor(actor);
+  const author = authorFor(actor, use.character);
   const targets = use.targets.map(targetDescriptor);
   // A forward has the activity it names used, as dnd5e's forward does; the attack is that activity's.
   const results = await (use.forward ?? activity).use(usage, { configure: false }, {
@@ -677,12 +718,12 @@ async function dnd5eAttack(command, campaign, actor, use) {
   const preview = previewDamage(cardActivity(card), { attackMode, ammunition: ammo, isCritical: critical });
   await storeUse(card, {
     path: "dnd5e", type: "attack", attackMode: attackMode ?? null, ammunition: ammo?.id ?? null, critical, targets,
-    preview
+    preview, actor: actor.uuid
   });
   // As dnd5e shows players on the card whether an attack hit each target, if the world lets it, or
   // since 0.31.0 the Gamemaster has players told always.
   const shown = targets.length && ((game.settings.get("dnd5e", "attackRollVisibility") !== "none") || resultsAlways());
-  return attackResult(command, message, actor, campaign, rolls, {
+  return attackResult(command, message, use.character ?? actor, campaign, rolls, {
     critical,
     fumble: roll.isFumble === true,
     ...hits(use, (target, index) => (shown ? outcomeOf(roll, targets[index]) : null))
@@ -701,7 +742,7 @@ async function dnd5eAttack(command, campaign, actor, use) {
  */
 async function dnd5eUse(command, campaign, actor, use) {
   const { activity, usage } = use;
-  const author = authorFor(actor);
+  const author = authorFor(actor, use.character);
   const targets = cardTargets(use, actor);
   // A forward has the activity it names used, as dnd5e's forward does: the card is that activity's.
   const results = await (use.forward ?? activity).use(usage, { configure: false }, {
@@ -714,9 +755,10 @@ async function dnd5eUse(command, campaign, actor, use) {
 
   const preview = previewDamage(cardActivity(card), { isCritical: false });
   await storeUse(card, {
-    path: "dnd5e", type: activity.type, attackMode: null, ammunition: null, critical: false, targets, preview
+    path: "dnd5e", type: activity.type, attackMode: null, ammunition: null, critical: false, targets, preview,
+    actor: actor.uuid
   });
-  return useResult(command, card, actor, campaign, activity, preview);
+  return useResult(command, card, use.character ?? actor, campaign, activity, preview);
 }
 
 /**
@@ -782,11 +824,12 @@ export function cardActivity(card) {
 
 /**
  * Keep what a use's damage needs on its card, so that it can be rolled later, even after the game
- * is reloaded, and only once.
+ * is reloaded, and only once. Since 0.36.0 with the uuid of the actor that used it, `actor`, so that
+ * its damage is its own, whatever the card's speaker names: two tokens of one actor share its id.
  * @param {ChatMessage} card
  * @param {object} use   How it was made: `{path, type, attackMode, ammunition, critical, targets,
- *                       preview}`, and on Midi-QOL's, the targets' `tokenIds` and whether it's an
- *                       `area`'s.
+ *                       preview, actor}`, and on Midi-QOL's, the targets' `tokenIds` and whether
+ *                       it's an `area`'s.
  * @returns {Promise<void>}
  */
 async function storeUse(card, use) {
@@ -968,6 +1011,9 @@ function rollsDamage(activity) {
  */
 async function midiUseNow(command, campaign, actor, use) {
   const { activity, usage, prepared, attackMode, ammunition, attack } = use;
+  // Where Midi averages this creature's damage, it rolls it itself, as a utility's roll: nothing of
+  // its damage waits for the player's dice, so its target never takes it twice.
+  const averaged = midiAverages(actor);
   // Midi works on the targets the Gamemaster's canvas draws; any other, where they allow it, and its
   // user with no token drawn, is only named on the card, for them to apply what it does.
   const tokens = use.targets.map(target => target.token?.object).filter(Boolean);
@@ -983,8 +1029,8 @@ async function midiUseNow(command, campaign, actor, use) {
       autoRollAttack: true,
       fastForwardAttack: true,
       autoFastAttack: true,
-      // The damage waits for the player's dice; a utility's own roll is Midi's.
-      autoRollDamage: rollsFormula(activity) ? "always" : "none",
+      // The damage waits for the player's dice; a utility's own roll is Midi's, and damage Midi averages.
+      autoRollDamage: (rollsFormula(activity) || averaged) ? "always" : "none",
       fastForwardDamage: true,
       targetConfirmation: "none",
       forceCompletion: true,
@@ -1051,14 +1097,15 @@ async function midiUseNow(command, campaign, actor, use) {
     const critical = attack && (workflow.isCritical === true);
     const ammo = attack ? (workflow.ammunition ?? null) : null;
     const mode = attack ? (workflow.attackMode ?? attackMode ?? null) : null;
-    const preview = (state === "waiting")
+    const preview = ((state === "waiting") && !averaged)
       ? previewDamage(workflow.activity, { attackMode: mode ?? undefined, ammunition: ammo, isCritical: critical })
       : null;
     await storeUse(card, {
       path: "midi", type: activity.type, attackMode: mode, ammunition: ammo?.id ?? null, critical, targets,
-      tokenIds: tokens.map(token => token.id), area: Boolean(activity.target?.template?.type), preview
+      tokenIds: tokens.map(token => token.id), area: Boolean(activity.target?.template?.type), preview,
+      actor: actor.uuid
     });
-    if ( !attack ) return useResult(command, card, actor, campaign, activity, preview);
+    if ( !attack ) return useResult(command, card, use.character ?? actor, campaign, activity, preview);
 
     // As Midi shows players whether an attack hit each target: only those the Gamemaster's canvas
     // draws, which Midi checks. Since 0.31.0, with players told always, whatever Midi whispers; and
@@ -1077,7 +1124,7 @@ async function midiUseNow(command, campaign, actor, use) {
       return (workflow.hitTargets?.has(token) || workflow.hitTargetsEC?.has(token)) ? "hit" : "miss";
     };
     // Midi writes its card after its rolls, so they're taken from the workflow.
-    return attackResult(command, card, actor, campaign, [workflow.attackRoll], {
+    return attackResult(command, card, use.character ?? actor, campaign, [workflow.attackRoll], {
       critical,
       fumble: workflow.isFumble === true,
       ...hits(use, outcome)
@@ -1107,6 +1154,18 @@ async function fireAmmunition(activity, ammunition) {
  */
 function rollsFormula(activity) {
   return (activity.type === "utility") && Boolean(activity.roll?.formula);
+}
+
+/**
+ * Does Midi-QOL roll this actor's damage itself, at its average, as its Average Damage setting has
+ * it for every actor, or for actors of its type, such as NPCs, every companion among them? It reads
+ * that before what a use asks of its workflow.
+ * @param {Actor} actor
+ * @returns {boolean}
+ */
+function midiAverages(actor) {
+  const average = globalThis.MidiQOL?.configSettings?.()?.averageDamage;
+  return (average === "all") || ((typeof average === "string") && (average === actor?.type));
 }
 
 /**
@@ -1175,63 +1234,6 @@ export function setTargets(ids) {
 /* -------------------------------------------- */
 
 /**
- * The dice a use's damage or healing will throw, worked out before it's rolled, for its player to
- * roll them in the app: as dnd5e will make up its rolls, for the attack mode and ammunition an
- * attack used, and with a critical hit's dice, its extra dice and critical damage's among them, the
- * critical damage's marked `added`; and each roll's choice of damage types, if it has one. dnd5e's
- * own `getDamageConfig` for the kind of activity is used, not Midi-QOL's, which changes its workflow
- * as it's called.
- * @param {Activity|null} activity
- * @param {object} [config]
- * @param {string} [config.attackMode]
- * @param {Item|null} [config.ammunition]
- * @param {boolean} [config.isCritical]
- * @returns {{critical: boolean, plannable: boolean, healing: boolean, rolls: object[]}|null}   Null
- *   for no damage or healing.
- */
-export function previewDamage(activity, { attackMode, ammunition, isCritical=false }={}) {
-  if ( !DND5E_ACTIVITIES[activity?.type] ) return null;
-  const process = ownDamageConfig(activity, { attackMode, ammunition: ammunition ?? undefined });
-  if ( !process?.rolls?.length ) return null;
-  const rolls = damageRollsFor({ ...process, isCritical });
-  const planned = rolls.map(roll => plannedDice(roll));
-  const plannable = planned.every(plan => plan.plannable);
-  return {
-    critical: isCritical,
-    plannable,
-    healing: activity.type === "heal",
-    rolls: rolls.map((roll, index) => ({
-      formula: roll.formula,
-      type: damageLabel(roll.options.type),
-      types: typeChoices(roll.options.types),
-      dice: plannable ? planned[index].dice : [],
-      perDie: diceForEach({ ...process, isCritical }, index)
-    }))
-  };
-}
-
-/**
- * A kind of damage or healing, as dnd5e names it.
- * @param {string|undefined} type
- * @returns {string|null}
- */
-function damageLabel(type) {
-  if ( !type ) return null;
-  return CONFIG.DND5E.damageTypes?.[type]?.label ?? CONFIG.DND5E.healingTypes?.[type]?.label ?? type;
-}
-
-/**
- * The kinds of damage or healing a roll lets its roller choose among, as dnd5e's damage dialog
- * offers them; null when it has one.
- * @param {string[]|undefined} types
- * @returns {{key: string, label: string}[]|null}
- */
-function typeChoices(types) {
-  if ( !Array.isArray(types) || (types.length < 2) ) return null;
-  return types.map(key => ({ key, label: damageLabel(key) }));
-}
-
-/**
  * Roll a player's damage or healing, with their dice, on the use it follows: once, only with the
  * dice the use said it would throw, changed as they chose, and at its highest only where it takes
  * no die away and has no die Foundry would roll again, as one that explodes, and as the kinds of
@@ -1239,6 +1241,8 @@ function typeChoices(types) {
  * Damage that, once built and changed, can't take every die they rolled, as where a die more was
  * chosen of a part whose only dice are its critical damage's, or a module changed it since its
  * preview, is refused as the dice not its own, and nothing is rolled, so they may roll it again.
+ * Since 0.36.0 a companion's, named by `of`, on its own use alone: by the actor the use kept, two
+ * tokens of one actor sharing its id; a card from before, by its speaker's actor, as before.
  * @param {object} command      The player's damage, as fetched from the app.
  * @param {Campaign} campaign
  * @returns {Promise<CommandResult>}
@@ -1246,14 +1250,17 @@ function typeChoices(types) {
 export async function runDamageCommand(command, campaign) {
   const refusal = commandRefusal(command, campaign);
   if ( refusal ) return failedResult(command, refusal.reason, refusal.error);
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failedResult(command, "unknown");
+  const found = commandActor(command, campaign);
+  if ( !found ) return failedResult(command, "unknown");
+  const { actor, character } = found;
   const card = game.messages.contents.findLast(message => message.flags?.[MODULE_ID]?.use === command.use);
   const flags = card?.flags?.[MODULE_ID];
   // Module 0.11.0 kept an attack's as `attack`.
   const stored = flags?.usage ?? flags?.attack;
   if ( !card || !stored ) return failedResult(command, "gone");
-  if ( card.getAssociatedActor?.()?.id !== actor.id ) return failedResult(command, "unknown");
+  if ( stored.actor ? (stored.actor !== actor.uuid) : (card.getAssociatedActor?.()?.id !== actor.id) ) {
+    return failedResult(command, "unknown");
+  }
   if ( flags.damage ) return failedResult(command, "damaged");
   if ( !stored.preview ) return failedResult(command, "not-waiting");
   const modifiers = readModifiers(command.modifiers);
@@ -1271,14 +1278,14 @@ export async function runDamageCommand(command, campaign) {
   const made = { plan: null };
   const rolls = (stored.path === "midi")
     ? await midiDamage(command, card, stored, made)
-    : await dnd5eDamage(command, card, stored, actor, made);
+    : await dnd5eDamage(command, card, stored, actor, made, character);
   if ( typeof rolls === "string" ) return failedResult(command, rolls);
   if ( !rolls?.length ) {
     return (made.plan?.refusal === "dice") ? failedResult(command, "invalid", "dice") : failedResult(command, "cancelled");
   }
   await card.setFlag(MODULE_ID, "damage", command.id);
   // Midi-QOL rolls damage onto its card; dnd5e posts it on its own.
-  return describeResult(command, rolls[0].parent ?? card, actor, campaign, { rolls });
+  return describeResult(command, rolls[0].parent ?? card, character, campaign, { rolls });
 }
 
 /**
@@ -1288,7 +1295,7 @@ export async function runDamageCommand(command, campaign) {
  * @param {object} preview
  * @returns {boolean}
  */
-function offersTypes(types, preview) {
+export function offersTypes(types, preview) {
   if ( !Array.isArray(types) ) return true;
   if ( types.length > preview.rolls.length ) return false;
   return types.every((type, index) => (type === null)
@@ -1303,14 +1310,15 @@ function offersTypes(types, preview) {
  * @param {object} stored   What the use kept on the card.
  * @param {Actor} actor
  * @param {{plan: DicePlan|null}} made   Given the roll's plan, for why it was called off, if it was.
+ * @param {Actor} [character]   Whose player rolls it.
  * @returns {Promise<Roll[]|string|undefined>}   The rolls, or why not.
  */
-async function dnd5eDamage(command, card, stored, actor, made) {
+async function dnd5eDamage(command, card, stored, actor, made, character=actor) {
   const activity = cardActivity(card);
   if ( !activity ) return "gone";
   const ammunition = ammunitionOf(findMessage(command.use), actor)
     ?? (stored.ammunition ? actor.items.get(stored.ammunition) : null);
-  const author = authorFor(actor);
+  const author = authorFor(actor, character);
   return withPlan(command, plan => {
     made.plan = plan;
     return activity.rollDamage(

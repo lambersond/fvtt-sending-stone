@@ -1,4 +1,6 @@
-import { CHAT_SCOPES, EVENTS, HELLO_DELIVERED_HOOK, MODULE_ID, RESULTS_MODES, SETTINGS } from "./constants.mjs";
+import {
+  CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, HELLO_DELIVERED_HOOK, MODULE_ID, RESULTS_MODES, SETTINGS
+} from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { attacksUnavailable } from "./command-uses.mjs";
@@ -163,7 +165,7 @@ function toggle(id, label, value, note=null) {
 
 /**
  * The campaign's own switches, since 0.31.0 whether its players move items and coins among them,
- * and its groups.
+ * since 0.36.0 how its characters' companions enter initiative, and its groups.
  * @param {Campaign} campaign
  * @returns {object[]}
  */
@@ -184,6 +186,8 @@ function campaignRows(campaign) {
     toggle("prompts", localize("SENDINGSTONE.Config.Actions.Prompts"), campaign.prompts),
     toggle("manualDice", localize("SENDINGSTONE.Config.Actions.DicePlayers"), campaign.manualDice, diceWhy),
     toggle("transfers", localize("SENDINGSTONE.Config.Actions.TransfersPlayers"), campaign.transfers, transfersWhy),
+    row("companionInitiative", localize("SENDINGSTONE.Config.Actions.CompanionInitiative"), campaign.companionInitiative,
+      localize(`SENDINGSTONE.Config.Actions.CompanionInitiative${(campaign.companionInitiative === COMPANION_INITIATIVE.AFTER) ? "After" : "Own"}`)),
     row("groups", localize("SENDINGSTONE.Settings.Groups"), groups.length,
       groups.length ? groups.map(group => group.name).join(", ") : localize("SENDINGSTONE.Settings.None"))
   ];

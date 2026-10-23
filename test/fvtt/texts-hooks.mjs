@@ -20,9 +20,9 @@ export async function load(url, context, next) {
     shortCircuit: true,
     source: `export * from ${real}
 import { findLink as realFindLink } from ${real}
-export async function findLink(actor, hash, n) {
+export async function findLink(actor, hash, n, options) {
   const fixture = globalThis.textFixtures?.get(hash)
-  return fixture ? fixture(actor, n) : realFindLink(actor, hash, n)
+  return fixture ? fixture(actor, n) : realFindLink(actor, hash, n, options)
 }
 `,
   }

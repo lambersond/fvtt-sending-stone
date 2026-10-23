@@ -256,8 +256,9 @@ const checks = ['skill', 'tool', 'ability', 'save', 'death', 'initiative', 'hitD
 // needs dnd5e's roll labels, which this world hasn't.
 // Ending an enchantment wherever uses are made (module 0.21.0). Ending a concentration wherever
 // rolls are made, and spending charges and Heroic Inspiration wherever players may attack (0.29.0).
+// Changed on purpose (round 0.36.0 §3.1): damage on its own and recharges wherever players may attack.
 assert.deepEqual(hellos, {
-  Ashlands: [...checks, 'endConcentration', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'textRoll', 'textDamage'],
+  Ashlands: [...checks, 'endConcentration', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'textRoll', 'textDamage', 'itemDamage', 'recharge'],
   Mirkwood: [...checks, 'endConcentration', 'textRoll'],
 })
 const areas = Object.fromEntries(app.events.filter(e => e.type === 'bridge.hello').map(e => [e.campaign.title, e.data.features.rolls.areaAttacks]))
@@ -1133,7 +1134,8 @@ if (!MIDI) {
   // A description's damage isn't made through Midi's workflow, so it stays, and may still be
   // changed in the app; and so do spending charges and Heroic Inspiration, which need no Midi
   // (module 0.29.0).
-  assert.deepEqual(ashlands().at(-1).data.features.rolls.kinds, [...checks, 'endConcentration', 'spend', 'inspiration', 'textRoll', 'textDamage'])
+  // Changed on purpose (round 0.36.0 §3.1): nor are damage on its own and recharges, outside Midi's workflow.
+  assert.deepEqual(ashlands().at(-1).data.features.rolls.kinds, [...checks, 'endConcentration', 'spend', 'inspiration', 'textRoll', 'textDamage', 'itemDamage', 'recharge'])
   assert.equal(ashlands().at(-1).data.features.rolls.areaAttacks, false)
   assert.equal(ashlands().at(-1).data.features.rolls.modifiers, true)
   const off = await attack()

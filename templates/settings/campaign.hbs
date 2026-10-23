@@ -323,6 +323,21 @@
             {{#if campaign.transfersApp}}<p class="hint sending-stone-warning">{{localize "SENDINGSTONE.Config.Actions.TransfersApp"}}</p>{{/if}}
         </div>
     </fieldset>
+
+    <fieldset class="sending-stone-companions">
+        <legend>{{localize "SENDINGSTONE.Config.Actions.Companions"}}</legend>
+        <div class="form-group">
+            <label for="sending-stone-companion-initiative">{{localize "SENDINGSTONE.Config.Actions.CompanionInitiative"}}</label>
+            <div class="form-fields">
+                <select id="sending-stone-companion-initiative" name="campaign.companionInitiative">
+                    {{#each campaign.initiativeChoices as |choice|}}
+                    <option value="{{choice.value}}" {{#if choice.selected}}selected{{/if}}>{{choice.label}}</option>
+                    {{/each}}
+                </select>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.CompanionInitiativeHint"}}</p>
+        </div>
+    </fieldset>
 </div>
 
 {{else if campaign.tabs.connection}}

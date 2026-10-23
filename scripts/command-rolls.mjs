@@ -1,10 +1,12 @@
 import {
-  ATTACK_KINDS, CONCENTRATION_KINDS, DIE_FACES, ENCHANT_KINDS, MODULE_ID, MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS,
-  ROLL_TAG
+  ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, ENCHANT_KINDS, MODULE_ID,
+  MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG
 } from "./constants.mjs";
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
+import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
+import { commandActor, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
 import {
@@ -54,17 +56,18 @@ const PROMPTED = new Set(["save", "ability", "skill"]);
 const CHECK_TYPES = { ability: "check", skill: "skill", tool: "tool" };
 
 /**
- * The commands that may name an item and one of its activities: an attack, a use and a utility's
- * roll, which must; and a check, which may, rolled for one of the item's check activities.
+ * The commands that may name an item and one of its activities: an attack, a use, a utility's roll
+ * and since 0.36.0 an action's damage on its own, which must; and a check, which may, rolled for one
+ * of the item's check activities. Not a recharge, which may name its item alone.
  * @type {Set<string>}
  */
-const WITH_ITEM = new Set(["attack", "use", "formula", "skill", "tool", "ability"]);
+const WITH_ITEM = new Set(["attack", "use", "formula", "skill", "tool", "ability", "itemDamage"]);
 
 /**
  * Every command a player's roll may be, by kind, for which its item and activity are checked.
  * @type {Set<string>}
  */
-const KNOWN_KINDS = new Set([...ROLL_KINDS, ...ATTACK_KINDS, "ask", "textRoll", "textDamage"]);
+const KNOWN_KINDS = new Set([...ROLL_KINDS, ...ATTACK_KINDS, "ask", "textRoll", "textDamage", "itemDamage"]);
 
 /**
  * The rolls made as they are, with no advantage and nothing added: a hit die, hit dice spent at
@@ -123,7 +126,9 @@ export function failedResult(command, reason, error=null) {
  * app as the character, `by: "gm"`. The message's author is the player's all the same, as the
  * modules that read it expect: only this mark says who rolled. From 0.32.0, where the player typed
  * the dice in from their own physical dice, `typed: true`; never with the Gamemaster's mark, whose
- * page never types. The dice are used the same either way.
+ * page never types. The dice are used the same either way. Since 0.36.0 one made for a companion's
+ * command says which, `companion`, by its key, the command's `actorId`, so that the app places it
+ * however Foundry names its speaker.
  * @param {object} command
  * @param {"request"|"use"|"outcome"} [key]   "request" for a roll, "use" for a use's card, and
  *                                            "outcome" for dnd5e 5.3's message of a death save's.
@@ -131,14 +136,17 @@ export function failedResult(command, reason, error=null) {
  */
 export function appFlags(command, key="request") {
   return { [key]: command.id, ...((command.by === "gm") && { by: "gm" }),
-    ...((command.typed === true) && (command.by !== "gm") && { typed: true }) };
+    ...((command.typed === true) && (command.by !== "gm") && { typed: true }),
+    ...(isId(command.of) && { companion: String(command.actorId) }) };
 }
 
 /* -------------------------------------------- */
 
 /**
  * Make a player's roll for their character, if the campaign takes their rolls and the character
- * can make it now.
+ * can make it now. Since 0.36.0 one for a companion of theirs, named by `of`, on its live actor, as
+ * their character's player; a companion's initiative is refused while the campaign keeps it right
+ * after a character of its in that combat (`follows`).
  * @param {object} command      The player's roll, as fetched from the app.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @param {object} [options]
@@ -152,36 +160,42 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   const invalid = checkCommand(command);
   if ( invalid ) return failed("invalid", invalid);
   if ( HIT_DICE_KINDS.includes(command.kind) && !diceStatus.hitDice ) return failed("self-test");
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failed("unknown");
+  const found = commandActor(command, campaign);
+  if ( !found ) return failed("unknown");
+  const { actor, character, companion } = found;
+  if ( (command.kind === "initiative") && followsCharacter(command, campaign, companion) ) return failed("follows");
   const refusal = checkRoll(command, actor);
   if ( refusal ) return failed(refusal);
-  if ( command.kind === "hitDice" ) return spendHitDice(command, actor, campaign, signal);
+  if ( command.kind === "hitDice" ) return spendHitDice(command, actor, campaign, signal, character);
+  // A companion no player of its characters owns in Foundry was sent its descriptions without the
+  // Gamemaster's secrets, and its links are read from those.
+  const secrets = companion ? ownedByPlayers(actor, companion.of) : true;
   let link = null;
   let check = null;
   if ( CHECK_TYPES[command.kind] && (typeof command.item === "string") ) {
-    const found = activityCheck(command, actor);
-    if ( found.refusal ) return failed(found.refusal);
-    link = { dc: found.dc, usingTool: null, tool: found.tool };
-    check = found.check;
+    const checked = activityCheck(command, actor);
+    if ( checked.refusal ) return failed(checked.refusal);
+    link = { dc: checked.dc, usingTool: null, tool: checked.tool };
+    check = checked.check;
   }
   else if ( isTextHash(command.text) ) {
-    const found = (command.kind === "save") ? await linkedSave(command, actor) : await linkedCheck(command, actor);
-    if ( found.refusal ) return failed(found.refusal);
-    link = found.link;
-    check = found.check ?? null;
+    const linked = (command.kind === "save") ? await linkedSave(command, actor, secrets)
+      : await linkedCheck(command, actor, secrets);
+    if ( linked.refusal ) return failed(linked.refusal);
+    link = linked.link;
+    check = linked.check ?? null;
   }
   let prompt = null;
   if ( command.prompt ) {
-    const found = findPrompt(command.prompt, actor, campaign, command);
-    if ( found.refusal ) return failed("prompt", found.refusal);
+    const asked = findPrompt(command.prompt, actor, campaign, command);
+    if ( asked.refusal ) return failed("prompt", asked.refusal);
     // Midi waits on it: made at once, and told of with no message where Midi makes none.
-    if ( found.midi ) return answerMidiPrompt(command, found.midi);
+    if ( asked.midi ) return answerMidiPrompt(command, asked.midi);
     // A card's asks for a saving throw alone.
-    if ( (command.kind !== "save") || !found.prompt.abilities.includes(command.key) ) {
+    if ( (command.kind !== "save") || !asked.prompt.abilities.includes(command.key) ) {
       return failed("prompt", "ability");
     }
-    prompt = found.prompt;
+    prompt = asked.prompt;
   }
 
   const hp = actor.system.attributes?.hp?.value ?? 0;
@@ -190,9 +204,9 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   try {
     made = await withPlan(command, planned => {
       plan = planned;
-      if ( prompt ) return answerPrompt(command, actor, prompt);
-      if ( check ) return rollLinkedCheck(command, actor, link, check);
-      return link ? rollLinkedSave(command, actor, link) : makeRoll(command, actor);
+      if ( prompt ) return answerPrompt(command, actor, prompt, character);
+      if ( check ) return rollLinkedCheck(command, actor, link, check, character);
+      return link ? rollLinkedSave(command, actor, link, character) : makeRoll(command, actor, character);
     });
   } catch (err) {
     console.error(`${MODULE_ID} | Could not make ${actor.name}'s roll from Sending Stone`, err);
@@ -201,7 +215,7 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   const message = (prompt || link) ? made?.message : made;
   // A roll a module called off, as dnd5e's hooks allow, made nothing; so did one called off here.
   if ( !message ) return failed(plan?.refusal ?? "cancelled");
-  const result = describeResult(command, message, actor, campaign);
+  const result = describeResult(command, message, character, campaign);
   if ( prompt || link ) result.outcome = result.visible ? made.outcome : null;
   // The hit points dnd5e gave the character for a hit die: none where a module kept it from it.
   if ( command.kind === "hitDie" ) result.healed = Math.max((actor.system.attributes?.hp?.value ?? hp) - hp, 0);
@@ -215,12 +229,16 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * answering a prompt; and a check may name the item and check activity it's rolled for instead.
  * Only a use names the enchantment it applies. Ending a concentration, spending charges and Heroic
  * Inspiration each name what they end, spend or change, and nothing else; and since 0.31.0, a move
- * of items and coins what it moves, from where to where.
+ * of items and coins what it moves, from where to where. Since 0.36.0 a command may name the
+ * campaign character whose companion it's for, `of`, an id, but for a kind a companion never makes,
+ * as Heroic Inspiration or charges spent by hand.
  * @param {object} command
  * @returns {string|null}
  */
 export function checkCommand(command) {
   if ( (command.by !== undefined) && (command.by !== null) && (command.by !== "gm") ) return "by";
+  if ( !isOptional(command.of, isId) ) return "of";
+  if ( isId(command.of) && COMPANION_UNTAKEN.includes(command.kind) ) return "of";
   const named = checkItemCommand(command);
   if ( named ) return named;
   if ( ENCHANT_KINDS.includes(command.kind) ) return checkEnchantCommand(command);
@@ -233,7 +251,9 @@ export function checkCommand(command) {
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);
+  if ( command.kind === "itemDamage" ) return checkItemDamageCommand(command);
   if ( ATTACK_KINDS.includes(command.kind) ) return checkAttackCommand(command);
+  if ( command.kind === "recharge" ) return checkRechargeCommand(command);
   if ( !ROLL_KINDS.includes(command.kind) ) return "kind";
   if ( PLAIN.has(command.kind) ) return checkPlainCommand(command);
   if ( KEYED.has(command.kind) !== (typeof command.key === "string") ) return "key";
@@ -576,7 +596,7 @@ export function isId(value) {
  * @param {unknown} value
  * @returns {boolean}
  */
-function isKey(value) {
+export function isKey(value) {
   return (typeof value === "string") && /^[A-Za-z][\w-]{0,31}$/.test(value);
 }
 
@@ -586,7 +606,7 @@ function isKey(value) {
  * @param {(value: unknown) => boolean} valid
  * @returns {boolean}
  */
-function isOptional(value, valid) {
+export function isOptional(value, valid) {
   return (value === undefined) || (value === null) || valid(value);
 }
 
@@ -797,10 +817,12 @@ function activityCheck(command, actor) {
  * the link isn't such a save, or not with that ability (`link`).
  * @param {object} command
  * @param {Actor} actor
+ * @param {boolean} [secrets]   Were its descriptions sent with their secrets, as since 0.36.0 a
+ *                              companion's none of whose players own it weren't?
  * @returns {Promise<{link?: object, refusal?: string}>}
  */
-async function linkedSave(command, actor) {
-  const found = await findLink(actor, command.text, command.link);
+async function linkedSave(command, actor, secrets=true) {
+  const found = await findLink(actor, command.text, command.link, { secrets });
   if ( found.refusal ) return { refusal: found.refusal };
   const { link } = found;
   if ( !["save", "concentration"].includes(link?.kind) ) return { refusal: "link" };
@@ -818,11 +840,12 @@ async function linkedSave(command, actor) {
  * the sheet now (`gone`), or the link isn't a check, or doesn't offer that one (`link`).
  * @param {object} command
  * @param {Actor} actor
+ * @param {boolean} [secrets]   Were its descriptions sent with their secrets?
  * @returns {Promise<{link?: object, check?: {type: string, ability: string, key?: string},
  *   refusal?: string}>}
  */
-async function linkedCheck(command, actor) {
-  const found = await findLink(actor, command.text, command.link);
+async function linkedCheck(command, actor, secrets=true) {
+  const found = await findLink(actor, command.text, command.link, { secrets });
   if ( found.refusal ) return { refusal: found.refusal };
   const { link } = found;
   if ( link?.kind !== "check" ) return { refusal: "link" };
@@ -833,34 +856,56 @@ async function linkedCheck(command, actor) {
 
 /**
  * The character's place in the combat a roll of initiative is for: one without initiative yet, in
- * the combat the Gamemaster has up, which is the one dnd5e rolls initiative in.
+ * the combat the Gamemaster has up, which is the one dnd5e rolls initiative in. Since 0.36.0 a
+ * token's creature, as a companion summoned with an unlinked actor, is that token's combatant, by
+ * its token and scene, never the first of its base actor's, as two wolves of one Wolf share an id.
  * @param {object} command
  * @param {Actor} actor
- * @returns {{refusal?: string, roller?: Actor}}
+ * @returns {{refusal?: string, roller?: Actor, waiting?: Combatant, combat?: Combat}}
  */
 function initiativeTurn(command, actor) {
   const combat = game.combats?.get(command.combatId);
   if ( !combat || (game.combat?.id !== combat.id) ) return { refusal: "not-in-combat" };
-  const own = combat.combatants.filter(combatant => (combatant.actor?.id ?? combatant.actorId) === actor.id);
+  const token = actor.isToken ? actor.token : null;
+  const own = token
+    ? combat.combatants.filter(combatant => (combatant.tokenId === token.id) && (combatant.sceneId === token.parent?.id))
+    : combat.combatants.filter(combatant => (combatant.actor?.id ?? combatant.actorId) === actor.id);
   if ( !own.length ) return { refusal: "not-in-combat" };
   const waiting = own.find(combatant => combatant.initiative === null);
   if ( !waiting ) return { refusal: "already-rolled" };
   // An unlinked token rolls as its own actor.
-  const roller = waiting.actor ?? actor;
+  const roller = token ? actor : (waiting.actor ?? actor);
   if ( roller._cachedInitiativeRoll ) return { refusal: "busy" };
-  return { roller };
+  return { roller, waiting, combat };
+}
+
+/**
+ * Is a companion's own initiative its campaign takes from its character's, since 0.36.0: under
+ * "Right after its character", while one of its characters is a combatant of the combat it's for
+ * (creature-initiative.mjs)? With none of them in it, it rolls its own.
+ * @param {object} command
+ * @param {Campaign} campaign
+ * @param {CompanionEntry|null} companion
+ * @returns {boolean}
+ */
+function followsCharacter(command, campaign, companion) {
+  if ( !companion || (campaign.companionInitiative !== COMPANION_INITIATIVE.AFTER) ) return false;
+  const combat = game.combats?.get(command.combatId);
+  return Boolean(combat?.combatants?.some?.(combatant => companion.of.includes(combatant.actorId)));
 }
 
 /* -------------------------------------------- */
 
 /**
- * Make the roll through dnd5e, without its dialog, as the player's own.
+ * Make the roll through dnd5e, without its dialog, as the player's own: since 0.36.0 a companion's
+ * as its character's player's.
  * @param {object} command
  * @param {Actor} actor
+ * @param {Actor} [character]   Whose player makes it.
  * @returns {Promise<ChatMessage|null>}   The roll's message.
  */
-async function makeRoll(command, actor) {
-  const author = authorFor(actor);
+async function makeRoll(command, actor, character=actor) {
+  const author = authorFor(actor, character);
   const flags = { [MODULE_ID]: appFlags(command) };
   // dnd5e takes the first of these as the roll's own configuration, so each call has its own.
   const config = fields => ({ ...fields, rolls: [{ options: { [ROLL_TAG]: command.id } }] });
@@ -947,10 +992,11 @@ async function rollHitDie(command, actor, message) {
  * @param {Actor} actor
  * @param {Campaign} campaign
  * @param {AbortSignal} [signal]   Aborted once the app has been told they took too long.
+ * @param {Actor} [character]      Whose player spends them.
  * @returns {Promise<CommandResult>}
  */
-async function spendHitDice(command, actor, campaign, signal) {
-  const author = authorFor(actor);
+async function spendHitDice(command, actor, campaign, signal, character=actor) {
+  const author = authorFor(actor, character);
   const message = { rollMode: PUBLIC, data: { author: author.id, flags: { [MODULE_ID]: appFlags(command) } } };
   const { hitDice, ...rest } = command;
   const dice = hitDice.flatMap(({ denomination }, index) => {
@@ -999,7 +1045,7 @@ async function spendHitDice(command, actor, campaign, signal) {
 
   const spent = { count: dice.length, made: cards.length };
   if ( !cards.length ) return { ...failedResult(command, reason, error), spent };
-  const visible = cards.every(card => visibleTo(card, actor, campaign));
+  const visible = cards.every(card => visibleTo(card, character, campaign));
   return {
     id: command.id,
     status: reason ? "failed" : "done",
@@ -1044,10 +1090,11 @@ async function rollFormula(command, actor, message) {
  * @param {object} command
  * @param {Actor} actor
  * @param {RollPrompt} prompt
+ * @param {Actor} [character]   Whose player answers it.
  * @returns {Promise<{message: ChatMessage|null, outcome: string|null}>}
  */
-async function answerPrompt(command, actor, prompt) {
-  const author = authorFor(actor);
+async function answerPrompt(command, actor, prompt, character=actor) {
+  const author = authorFor(actor, character);
   const flags = { [MODULE_ID]: appFlags(command), dnd5e: { originatingMessage: prompt.messageId } };
   const config = {
     ability: command.key,
@@ -1157,11 +1204,12 @@ function rollMidiAnswer(command, entry) {
  * @param {object} command
  * @param {Actor} actor
  * @param {{kind: string, abilities: string[], dc: number|null}} link
+ * @param {Actor} [character]   Whose player rolls it.
  * @returns {Promise<{message: ChatMessage|null, outcome: string|null}>}   The roll's message, and
  *   whether it met its DC, where it was rolled against one, as the card shows its author.
  */
-async function rollLinkedSave(command, actor, link) {
-  const author = authorFor(actor);
+async function rollLinkedSave(command, actor, link, character=actor) {
+  const author = authorFor(actor, character);
   const flags = { [MODULE_ID]: appFlags(command) };
   const target = Number.isInteger(link.dc) ? link.dc : null;
   // dnd5e rolls a concentration check that names no ability with the character's own.
@@ -1193,11 +1241,12 @@ async function rollLinkedSave(command, actor, link) {
  * @param {Actor} actor
  * @param {{dc: number|null, usingTool?: string|null, tool?: {bonus: string, prof: object, item: Item}|null}} link
  * @param {{type: string, ability: string, key?: string}} check   The one of its checks rolled.
+ * @param {Actor} [character]   Whose player rolls it.
  * @returns {Promise<{message: ChatMessage|null, outcome: string|null}>}   The roll's message, and
  *   whether it met its DC, where it was rolled against one, as the card shows its author.
  */
-async function rollLinkedCheck(command, actor, link, check) {
-  const author = authorFor(actor);
+async function rollLinkedCheck(command, actor, link, check, character=actor) {
+  const author = authorFor(actor, character);
   const flags = { [MODULE_ID]: appFlags(command) };
   const target = Number.isInteger(link.dc) ? link.dc : null;
   const tool = link.tool ? { bonus: link.tool.bonus, prof: link.tool.prof, item: link.tool.item } : {};
@@ -1234,14 +1283,17 @@ function outcomeAgainstDC(rolls) {
 
 /**
  * Roll initiative as dnd5e's initiative dialog does, without it: build the roll, then have the
- * actor roll initiative with it in the combat.
+ * actor roll initiative with it in the combat. Since 0.36.0 a token's creature's is rolled by the
+ * combat itself, for its own combatant, as dnd5e's actor finds a token's combatants only on the
+ * Gamemaster's canvas: with the roll cached on its actor, which the combatant's roll takes, between
+ * dnd5e's two hooks, as its actor would fire them.
  * @param {object} command
  * @param {Actor} actor
  * @param {{author: User, flags: object}} message
  * @returns {Promise<ChatMessage|null>}
  */
 async function rollInitiative(command, actor, { author, flags }) {
-  const { roller, refusal } = initiativeTurn(command, actor);
+  const { roller, waiting, combat, refusal } = initiativeTurn(command, actor);
   if ( refusal ) return null;
   const rollConfig = roller.getInitiativeRollConfig();
   if ( !rollConfig ) return null;
@@ -1263,14 +1315,17 @@ async function rollInitiative(command, actor, { author, flags }) {
     roller._cachedInitiativeRoll = new CONFIG.Dice.BasicRoll(String(options.fixed), data, options);
   }
 
+  const initiativeOptions = {
+    messageMode: PUBLIC,
+    messageOptions: { rollMode: PUBLIC, author: author.id, flags }
+  };
   try {
-    await roller.rollInitiative({
-      createCombatants: false,
-      initiativeOptions: {
-        messageMode: PUBLIC,
-        messageOptions: { rollMode: PUBLIC, author: author.id, flags }
-      }
-    });
+    if ( roller.isToken ) {
+      if ( Hooks.call("dnd5e.preRollInitiative", roller, roller._cachedInitiativeRoll) === false ) return null;
+      await combat.rollInitiative([waiting.id], initiativeOptions);
+      Hooks.callAll("dnd5e.rollInitiative", roller, [waiting]);
+    }
+    else await roller.rollInitiative({ createCombatants: false, initiativeOptions });
   } finally {
     // Left by a roll that failed part way, it would be the Gamemaster's next roll.
     if ( roller._cachedInitiativeRoll?.options?.[ROLL_TAG] === command.id ) delete roller._cachedInitiativeRoll;
@@ -1280,14 +1335,18 @@ async function rollInitiative(command, actor, { author, flags }) {
 
 /**
  * The user a player's roll is made as: the one whose character it is, or else its only player,
- * or else the Gamemaster making it.
+ * or else the Gamemaster making it. Since 0.36.0 a companion's is made as its character's, the
+ * seat's player's, whoever owns the companion in Foundry: so that one two players own, or none, as
+ * a familiar the Gamemaster summoned, still rolls as its player, its cards not trimmed as a
+ * Gamemaster's.
  * @param {Actor} actor
+ * @param {Actor} [character]   The campaign character whose player makes it: the actor's own.
  * @returns {User}
  */
-export function authorFor(actor) {
-  const assigned = game.users.find(user => !user.isGM && (user.character?.id === actor.id));
+export function authorFor(actor, character=actor) {
+  const assigned = game.users.find(user => !user.isGM && (user.character?.id === character.id));
   if ( assigned ) return assigned;
-  const owners = playerOwners(actor);
+  const owners = playerOwners(character);
   return (owners.length === 1) ? owners[0] : game.user;
 }
 
@@ -1311,9 +1370,10 @@ export function findMessage(commandId) {
 }
 
 /**
- * May a character's player see a message?
+ * May a character's player see a message? Since 0.36.0 a companion's roll is its character's
+ * player's to see, so it's given the character.
  * @param {ChatMessage} message
- * @param {Actor} actor
+ * @param {Actor} actor   The campaign character whose player is told.
  * @param {Campaign} campaign
  * @returns {boolean}
  */
@@ -1326,7 +1386,7 @@ export function visibleTo(message, actor, campaign) {
  * What became of the roll, as the app is told: the roll, if its player may see its message.
  * @param {object} command
  * @param {ChatMessage} message
- * @param {Actor} actor
+ * @param {Actor} actor   The campaign character whose player is told: a companion's character.
  * @param {Campaign} campaign
  * @param {object} [options]
  * @param {Roll[]} [options.rolls]   The rolls made, when they aren't the message's own, as

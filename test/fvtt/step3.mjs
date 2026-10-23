@@ -372,10 +372,11 @@ ok('left off: an unequipped weapon or cloak, a shield with nothing to use, an an
 ok("a player's own choices in Tidy 5e hold: a dagger taken off the list, a rope put on it, and a feature in a section of its own")
 
 const find = name => sections.flatMap(s => s.actions).find(a => a.name === name)
+// Changed on purpose (round 0.36.0 §4.5): every action and activity row carries `tableDamage`, null where it can't be previewed (as here, with no dnd5e activities).
 assert.deepEqual({ ...find('Longsword'), text: undefined }, {
   id: 'longsword', name: 'Longsword', img: 'icons/longsword.webp', type: 'weapon', activation: 'Action', activationType: 'action', range: 'reach 5 ft', target: '1 Creature',
   toHit: 7, attackId: 'swing', activity: null, attackModes: null, ammunition: null,
-  save: null, damage: [{ formula: '1d8 + 4', type: 'Slashing', healing: false }], uses: null, level: null, castFrom: null,
+  save: null, damage: [{ formula: '1d8 + 4', type: 'Slashing', healing: false }], tableDamage: null, uses: null, level: null, castFrom: null,
   concentration: false, identified: true, text: undefined,
 })
 assert.equal(find('Javelin').range, 'reach 5 ft or range 30/120 ft')
@@ -389,9 +390,10 @@ assert.deepEqual(find('Winged Boots').uses, { value: 3, max: 4, recovery: 'Dawn'
 ok("healing is marked as healing, and an item's uses come with it, saying since module 0.29.0 they're the item's, which may be spent")
 
 const breath = find('Breath Weapon')
+// Changed on purpose (round 0.36.0 §4.5): a recharge use says the lowest d6 that recharges it.
 assert.deepEqual([breath.save, breath.damage, breath.uses, breath.range, breath.target], [
   { ability: 'dex', dc: 13 }, [{ formula: '2d6', type: 'Fire or Force', healing: false }],
-  { value: 1, max: 1, recovery: 'Recharge [5+]', counter: { item: 'breath', activity: breath.activity.id }, spendable: true }, '15 ft', '15 ft Cone',
+  { value: 1, max: 1, recovery: 'Recharge [5+]', recharge: 5, counter: { item: 'breath', activity: breath.activity.id }, spendable: true }, '15 ft', '15 ft Cone',
 ])
 ok("a saving throw's ability and DC, damage of a kind the target chooses, and an activity's own uses with its recharge")
 
@@ -527,10 +529,11 @@ ok('a weapon that casts spells is listed under each kind of action it has, as it
 const [strikeRow, healRow, barbsRow, speechRow] = flameRows
 assert.deepEqual([strikeRow.toHit, strikeRow.attackId, strikeRow.cast], [5, 'strike', undefined])
 const [, wispEntry, charmEntry] = strikeRow.activities
+// Changed on purpose (round 0.36.0 §4.5): every action and activity row carries `tableDamage`, null where it can't be previewed (as here, with no dnd5e activities).
 assert.deepEqual({ ...wispEntry, uses: undefined }, {
   id: 'cast-wisp', name: 'Starry Wisp', type: 'cast', activation: 'Action', activationType: 'action', range: '60 ft', target: null,
   toHit: 6, attackId: 'cast-wisp', activity: null, attackModes: null, ammunition: null, save: null,
-  damage: [{ formula: '1d8', type: 'Radiant', healing: false }], spellId: 'wisp',
+  damage: [{ formula: '1d8', type: 'Radiant', healing: false }], tableDamage: null, spellId: 'wisp',
   cast: { level: 0, concentration: false, charges: 1, short: false, text: spellOf('wisp').text }, uses: undefined,
 })
 assert.deepEqual(wispEntry.uses, { value: 2, max: 10, recovery: 'Dawn' })

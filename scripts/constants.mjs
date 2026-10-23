@@ -80,7 +80,7 @@ export const SETTINGS = Object.freeze({
   CAMPAIGNS_MENU: "campaignsMenu",
 
   /** World-scope list of campaigns: {id, title, characters, groups, rolls, attacks, prompts,
-   *  manualDice, transfers}, characters and groups being actor ids. */
+   *  manualDice, transfers, companionInitiative}, characters and groups being actor ids. */
   CAMPAIGNS: "campaigns",
 
   /** World-scope set of the actor ids of connected characters, from before campaigns. Read once,
@@ -145,6 +145,13 @@ export const EVENTS = Object.freeze({
   /** A character's or a party's journal of notes as Foundry holds it, whole, since 0.34.0: sent
    *  only to an app that says it reads them, `features.notes`. */
   JOURNAL_UPDATED: "journal.updated",
+
+  /** The campaign's characters' companions, whole, since 0.36.0: sent only to an app that says it
+   *  reads them, `features.companions`, whenever they change. */
+  COMPANIONS_LISTED: "companions.listed",
+
+  /** One of a campaign's characters' companions' sheets, since 0.36.0: to such an app alone. */
+  COMPANION_UPDATED: "companion.updated",
 
   /** What the world's settings that decide what players see now are, for the campaign's
    *  Gamemaster: sent only to an app that says it reads them, `features.settings`. */
@@ -271,6 +278,39 @@ export const MOST_ENTRIES = 300;
 export const MOST_CHAPTERS = 50;
 export const MOST_BOOK_TEXT = 1_000_000;
 export const MOST_NOTES = 400;
+
+/** The most companions a campaign's list holds, and a character's, since 0.36.0 (round 0.36.0 §2.1). */
+export const MOST_COMPANIONS = 50;
+export const MOST_COMPANIONS_EACH = 20;
+
+/**
+ * The kinds a companion's command is never, since 0.36.0: what an NPC has none of, what isn't asked,
+ * and what edits it rather than acting, as charges spent by hand (round 0.36.0 §2.5).
+ */
+export const COMPANION_UNTAKEN = Object.freeze(["inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "note"]);
+
+/**
+ * What a player can have made here from the app from a row of their sheet, since 0.36.0, offered
+ * where `textDamage` is: an action's damage or healing on its own, with no attack or use, for the
+ * Gamemaster to apply from dnd5e's card; and a spent recharge rolled.
+ * @type {readonly string[]}
+ */
+export const ALONE_KINDS = Object.freeze(["itemDamage", "recharge"]);
+
+/**
+ * How a campaign's characters' companions enter initiative, as its Gamemaster chooses in Manage
+ * Campaigns, since 0.36.0: each its own roll, or right after its character (round 0.36.0 §2.7).
+ * @type {Readonly<{OWN: "own", AFTER: "after"}>}
+ */
+export const COMPANION_INITIATIVE = Object.freeze({ OWN: "own", AFTER: "after" });
+
+/**
+ * How far below its character's initiative a companion's is set to come right after it, since
+ * 0.36.0: less than the hundredths dnd5e's Dexterity tiebreaker adds, so nothing dnd5e rolls falls
+ * between them (round 0.36.0 §2.7).
+ * @type {number}
+ */
+export const FOLLOW_GAP = 0.001;
 
 /** A note's id, as the app makes it and Foundry makes a page's: 16 letters and digits. */
 export const NOTE_ID = /^[A-Za-z0-9]{16}$/;

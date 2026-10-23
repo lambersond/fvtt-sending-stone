@@ -4,6 +4,7 @@ import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignCharacterId } from "./characters.mjs";
 import { chatAudience, isAudienceShared, serializeMessage } from "./chat-data.mjs";
+import { messageCompanion } from "./creature-sync.mjs";
 import { send } from "./transport.mjs";
 
 /**
@@ -38,7 +39,9 @@ function active() {
 
 /**
  * Does a message belong to a campaign? It does when one of the campaign's characters said it, or
- * when the player of one of its characters can read it, as everyone can a public message.
+ * when the player of one of its characters can read it, as everyone can a public message. Since
+ * 0.36.0, for an app that reads companions, one of their companions' messages counts as said by one
+ * of its characters, under every chat scope.
  * @param {ChatMessage} message
  * @param {object} audience     The message's audience in the campaign.
  * @param {Campaign} campaign
@@ -46,7 +49,8 @@ function active() {
  */
 function isInScope(message, audience, campaign) {
   if ( !isAudienceShared(audience) ) return false;
-  const spokenByCampaign = campaignCharacterId(message.speakerActor, campaign) !== null;
+  const spokenByCampaign = (campaignCharacterId(message.speakerActor, campaign) !== null)
+    || Boolean(messageCompanion(message, campaign));
   if ( chatScope() === CHAT_SCOPES.CONNECTED ) return spokenByCampaign;
   return spokenByCampaign || (audience.characters.length > 0);
 }

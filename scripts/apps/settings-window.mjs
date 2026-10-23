@@ -1,4 +1,6 @@
-import { CHAT_SCOPES, EVENTS, MODULE_ID, RESULTS_MODES, SETTINGS, STATUS_HOOK } from "../constants.mjs";
+import {
+  CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, MODULE_ID, RESULTS_MODES, SETTINGS, STATUS_HOOK
+} from "../constants.mjs";
 import { getCampaigns, manualDiceOn } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
 import { transferReader } from "../command-transfers.mjs";
@@ -150,7 +152,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   /**
    * The campaigns as being edited, each with the secret this browser holds for it.
    * @type {{id: string, title: string, secret: string, characters: Set<string>, groups: Set<string>,
-   *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean}[]}
+   *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean,
+   *   companionInitiative: string}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({ ...campaign, secret: getSecret(campaign.id) }));
 
@@ -260,7 +263,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         attacks: campaign.attacks,
         prompts: campaign.prompts,
         manualDice: campaign.manualDice,
-        transfers: campaign.transfers
+        transfers: campaign.transfers,
+        companionInitiative: campaign.companionInitiative
       }))
     });
   }
@@ -295,6 +299,11 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       if ( has("campaign.secret") ) campaign.secret = String(data["campaign.secret"] ?? "");
       for ( const name of ["rolls", "attacks", "prompts", "manualDice", "transfers"] ) {
         if ( has(`campaign.${name}`) ) campaign[name] = data[`campaign.${name}`] === true;
+      }
+      // A choice, as the General section's are, never a switch.
+      if ( has("campaign.companionInitiative") ) {
+        campaign.companionInitiative = (String(data["campaign.companionInitiative"]) === COMPANION_INITIATIVE.AFTER)
+          ? COMPANION_INITIATIVE.AFTER : COMPANION_INITIATIVE.OWN;
       }
     }
 
@@ -735,7 +744,16 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         ? game.i18n.format("SENDINGSTONE.Config.Actions.Unavailable", {
           reason: game.i18n.localize("SENDINGSTONE.Config.Actions.RollsReason.system")
         }) : null,
-      transfersApp: campaign.transfers && commandsOffered(campaign.id) && !transferReader(campaign.id)
+      transfersApp: campaign.transfers && commandsOffered(campaign.id) && !transferReader(campaign.id),
+      // Since 0.36.0, how its companions enter initiative, which needs no app: it's kept here.
+      initiativeChoices: [
+        { value: COMPANION_INITIATIVE.OWN, key: "CompanionInitiativeOwn" },
+        { value: COMPANION_INITIATIVE.AFTER, key: "CompanionInitiativeAfter" }
+      ].map(({ value, key }) => ({
+        value,
+        label: game.i18n.localize(`SENDINGSTONE.Config.Actions.${key}`),
+        selected: campaign.companionInitiative === value
+      }))
     };
   }
 
@@ -1045,7 +1063,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   static async #onAddCampaign() {
     const campaign = {
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
-      attacks: false, prompts: false, manualDice: false, transfers: false
+      attacks: false, prompts: false, manualDice: false, transfers: false,
+      companionInitiative: COMPANION_INITIATIVE.OWN
     };
     this.#campaigns.push(campaign);
     await this.#show({ section: "campaign", campaignId: campaign.id, tab: "connection" }, "[name='campaign.title']");
@@ -1345,7 +1364,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       attacks: campaign.attacks,
       prompts: campaign.prompts,
       manualDice: campaign.manualDice,
-      transfers: campaign.transfers
+      transfers: campaign.transfers,
+      companionInitiative: campaign.companionInitiative
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {
       const value = this.#general[name];

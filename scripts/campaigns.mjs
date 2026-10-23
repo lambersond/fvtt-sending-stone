@@ -1,4 +1,4 @@
-import { MODULE_ID, SETTINGS } from "./constants.mjs";
+import { COMPANION_INITIATIVE, MODULE_ID, SETTINGS } from "./constants.mjs";
 import { manualDiceEnabled } from "./companions.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 
@@ -35,6 +35,10 @@ import { diceStatus } from "./dice-plan.mjs";
  *                                    and give to its groups they own in Foundry, and give to each
  *                                    other's characters? Off until the Gamemaster turns it on;
  *                                    apart from `rolls`.
+ * @property {string} companionInitiative  How its characters' companions enter initiative, since
+ *                                    0.36.0: `"own"`, each rolls its own; or `"after"`, each in a
+ *                                    combat with its character is kept right after it there, by
+ *                                    creature-initiative.mjs. `"own"` until the Gamemaster chooses.
  */
 
 /**
@@ -43,7 +47,9 @@ import { diceStatus } from "./dice-plan.mjs";
  */
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
-  return stored.map(({ id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers }) => ({
+  return stored.map(({
+    id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, companionInitiative
+  }) => ({
     id,
     title,
     characters: new Set(characters),
@@ -52,7 +58,10 @@ export function getCampaigns() {
     attacks: attacks === true,
     prompts: prompts === true,
     manualDice: manualDice === true,
-    transfers: transfers === true
+    transfers: transfers === true,
+    // A campaign saved before 0.36.0, or holding anything else, rolls its companions' own.
+    companionInitiative: (companionInitiative === COMPANION_INITIATIVE.AFTER)
+      ? COMPANION_INITIATIVE.AFTER : COMPANION_INITIATIVE.OWN
   }));
 }
 

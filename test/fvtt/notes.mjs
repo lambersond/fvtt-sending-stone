@@ -259,7 +259,8 @@ await until(() => helloOf('erebor') && helloOf('mirkwood'), 'the hellos')
 const NONE_YET = { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }
 for (const id of ['erebor', 'mirkwood']) {
   assert.deepEqual(helloOf(id).data.features.notes, NONE_YET)
-  assert.deepEqual(Object.keys(helloOf(id).data.features), ['rolls', 'transfers', 'removals', 'notes'])
+  // Changed on purpose (round 0.36.0 §4.1): and what its companions take.
+  assert.deepEqual(Object.keys(helloOf(id).data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions'])
   assert.deepEqual(Object.keys(helloOf(id).data.features.notes), ['enabled', 'kinds', 'reason', 'journals', 'orders', 'changes'])
   assert.equal(helloOf(id).data.features.rolls.enabled, false)
 }

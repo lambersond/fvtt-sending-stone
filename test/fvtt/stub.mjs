@@ -56,6 +56,8 @@ globalThis.CONST = {
   CHAT_MESSAGE_STYLES: { OTHER: 0, OOC: 1, IC: 2, EMOTE: 3 }, BASE_DOCUMENT_TYPE: 'base',
   // Foundry's token dispositions (common/constants.mjs).
   TOKEN_DISPOSITIONS: { SECRET: -2, HOSTILE: -1, NEUTRAL: 0, FRIENDLY: 1 },
+  // Foundry's ownership levels (common/constants.mjs), which module 0.36.0 reads companions' owners by.
+  DOCUMENT_OWNERSHIP_LEVELS: { INHERIT: -1, NONE: 0, LIMITED: 1, OBSERVER: 2, OWNER: 3 },
 }
 globalThis.CONFIG = { Dice: { DamageRoll: class {} } }
 globalThis.ui = { notifications: { info() {}, warn(m) { console.log('WARN', m) } } }

@@ -626,9 +626,21 @@ const messageMethods = {
   async setFlag(scope, key, value) {
     return this.update({ [`flags.${scope}.${key}`]: value })
   },
-  getAssociatedActor() { return game.actors.get(this.speaker?.actor) ?? null },
+  /**
+   * As dnd5e's (chat-message.mjs:972-979): the actor of the token its speaker names on its scene,
+   * a token's creature's own, where there is one (token-core.mjs's scenes); else the world actor.
+   */
+  getAssociatedActor() { return speakerTokenActor(this.speaker) ?? game.actors.get(this.speaker?.actor) ?? null },
+  /**
+   * As dnd5e's (chat-message.mjs:960-964): by the activity's uuid first, as dnd5e finds a token's
+   * creature's activity whatever its speaker says; here only for a token's (`Scene.` uuids, which only
+   * token-core.mjs makes), so that every other harness finds its activities as before.
+   */
   getAssociatedActivity() {
     const { item, activity } = this.flags?.dnd5e ?? {}
+    const uuid = activity?.uuid
+    const byUuid = ((typeof uuid === 'string') && uuid.startsWith('Scene.')) ? globalThis.fromUuidSync?.(uuid, { strict: false }) : null
+    if (byUuid) return byUuid
     return this.getAssociatedActor()?.items?.get(item?.id)?.system.activities.get(activity?.id) ?? null
   },
   getAssociatedRolls(type) {
@@ -651,6 +663,17 @@ const messageMethods = {
   },
 }
 
+/**
+ * The actor of the token a speaker names on its scene, as Foundry's speakerActor and dnd5e's
+ * getAssociatedActor find it, where the world has scenes (token-core.mjs's); null otherwise.
+ * @param {object} [speaker]
+ * @returns {Actor|null}
+ */
+function speakerTokenActor(speaker) {
+  if (!speaker?.scene || !speaker?.token) return null
+  return game.scenes?.get?.(speaker.scene)?.tokens?.get?.(speaker.token)?.actor ?? null
+}
+
 class ChatMessage {
   constructor(data = {}) { this._data = data }
   toObject() { return { ...this._data } }
@@ -660,11 +683,17 @@ class ChatMessage {
   /**
    * As Foundry's: the actor, and the token given, or else the actor's own as a token's synthetic
    * actor has it, or the one a harness says Foundry would find on the Gamemaster's scene
-   * (`speakerToken`); none, as before, for an actor with none of them.
+   * (`speakerToken`); none, as before, for an actor with none of them. A token on a scene
+   * (token-core.mjs's) names its scene too, as Foundry's speaker does. A synthetic actor whose
+   * `speakerNoToken` is set (token-core.mjs's fault) is spoken for by its actor alone, as a core that
+   * didn't map it to its token would [core, unverified].
    */
   static getSpeaker({ actor, token } = {}) {
-    const tokenId = (token ?? actor?.token ?? actor?.speakerToken)?.id
-    return { actor: actor?.id ?? null, ...(tokenId && { token: tokenId }), alias: actor?.name ?? null }
+    const own = actor?.speakerNoToken ? null : actor?.token
+    const placed = token ?? own ?? actor?.speakerToken
+    const tokenId = placed?.id
+    const sceneId = placed?.parent?.id
+    return { actor: actor?.id ?? null, ...(tokenId && { token: tokenId }), ...(sceneId && { scene: sceneId }), alias: actor?.name ?? null }
   }
   static applyRollMode(data, mode) { applyMode(data, mode) }
   static async create(data, options = {}) {
@@ -676,7 +705,7 @@ class ChatMessage {
       // Foundry's: when it was made, by the server's clock, which its timestamp is too.
       id, uuid: `ChatMessage.${id}`, type: source.type ?? 'base', style: 0, timestamp: now, _stats: { createdTime: now },
       author: game.users.get(source.author), _source: { author: source.author },
-      speaker: source.speaker ?? {}, speakerActor: game.actors.get(source.speaker?.actor) ?? null,
+      speaker: source.speaker ?? {}, speakerActor: speakerTokenActor(source.speaker) ?? game.actors.get(source.speaker?.actor) ?? null,
       alias: source.speaker?.alias ?? '', whisper: source.whisper, blind: source.blind, title: source.title ?? '',
       flavor: source.flavor ?? '', content: source.content ?? '', rolls: source.rolls ?? [],
       flags: source.flags ?? {}, system: source.system ?? null,

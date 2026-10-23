@@ -1315,7 +1315,8 @@ okay("Manage Campaigns' Player actions tab has \"Players move items and coins\" 
 
 const report = () => foundrySettings(getCampaigns()[0])
 const rowsOf = (settings, id) => settings.sections.find(section => section.id === id).rows
-assert.deepEqual(rowsOf(report(), 'campaign').map(row => row.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'groups'])
+// Changed on purpose (round 0.36.0 §6.12): the campaign's companions' initiative after its moves.
+assert.deepEqual(rowsOf(report(), 'campaign').map(row => row.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'companionInitiative', 'groups'])
 assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'transfers'), { id: 'transfers', label: 'Players move items and coins', value: true, text: 'On' })
 game.system.id = 'pf2e'
 assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'transfers').note, 'it needs the D&D Fifth Edition system.')

@@ -48,6 +48,8 @@ function inspect(body) {
   if (envelope?.type === 'character.updated') check(envelope.data?.character?.sheet, envelope.data?.character?.id)
   // Module 0.30.0 (its contract §2.3): a group's sheet slims as a character's does.
   if (envelope?.type === 'group.updated') check(envelope.data?.group?.sheet, envelope.data?.group?.id)
+  // Module 0.36.0 (round 0.36.0 §4.4): a companion's sheet, beside its entry, slims as a character's.
+  if (envelope?.type === 'companion.updated') check(envelope.data?.sheet, envelope.data?.companion?.key)
   if (envelope?.type === 'bridge.hello') for (const c of envelope.data?.characters ?? []) check(c.sheet, c.id)
 }
 
