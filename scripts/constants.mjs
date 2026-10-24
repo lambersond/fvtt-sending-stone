@@ -286,11 +286,11 @@ export const MOST_COMPANIONS_EACH = 20;
 /**
  * The kinds a companion's command is never, since 0.36.0: what an NPC has none of, what isn't asked,
  * and what edits it rather than acting, as charges spent by hand (round 0.36.0 §2.5), and what's its
- * character's to do, as ending a turn, which the character's command does for the companion's turn
- * too (round 0.36.0 §2.8).
+ * character's to do, as ending a turn or taking one back, which the character's command does for the
+ * companion's turn too (round 0.36.0 §2.8).
  */
 export const COMPANION_UNTAKEN = Object.freeze([
-  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "note", "endTurn"
+  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "note", "endTurn", "undoEndTurn"
 ]);
 
 /**
@@ -318,11 +318,12 @@ export const FOLLOW_GAP = 0.001;
 
 /**
  * What a player can have done here from the app to a combat, since 0.36.0: end the current turn,
- * their character's or one of its companions', as Foundry's Next Turn does. Offered wherever their
- * rolls are made, as ending a concentration is: it throws no dice (round 0.36.0 §2.8).
+ * their character's or one of its companions', as Foundry's Next Turn does, and take back the one
+ * they just ended. Offered wherever their rolls are made, as ending a concentration is: it throws no
+ * dice (round 0.36.0 §2.8).
  * @type {readonly string[]}
  */
-export const TURN_KINDS = Object.freeze(["endTurn"]);
+export const TURN_KINDS = Object.freeze(["endTurn", "undoEndTurn"]);
 
 /**
  * The longest an end of a turn waits for a Midi-QOL use already on its way, which may hold the
@@ -331,6 +332,14 @@ export const TURN_KINDS = Object.freeze(["endTurn"]);
  * @type {number}
  */
 export const TURN_MIDI_WAIT = 10_000;
+
+/**
+ * How long after it ended a turn an End Turn from the app may be taken back, in milliseconds, since
+ * 0.36.0: the app offers Undo for 8 seconds, and a command may wait half a minute to be fetched
+ * (round 0.36.0 §6.14).
+ * @type {number}
+ */
+export const TURN_UNDO_WITHIN = 60_000;
 
 /** A note's id, as the app makes it and Foundry makes a page's: 16 letters and digits. */
 export const NOTE_ID = /^[A-Za-z0-9]{16}$/;

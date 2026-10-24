@@ -62,7 +62,7 @@ run failed. A full pass takes about seven minutes.
 |---|---|
 | `stub.mjs` | Foundry core: users, actors, combats, settings, hooks, chat messages; replaces `fetch` |
 | `dice-core.mjs` | Foundry v14's core dice |
-| `token-core.mjs` | Foundry v14's scenes, tokens and synthetic actors, with their deltas and hooks as a fault picks them, a world actor's item changed as core passes it on to its tokens' creatures, companions' world actors (the only maker of an actor's `ownership`), and combats whose initiative and flags are written as core writes them, and whose turns move as Next Turn moves them: what `companions.mjs`, `alone.mjs`, `turns.mjs` and the app's e2e (through `e2e/fvtt`) keep companions and combats on |
+| `token-core.mjs` | Foundry v14's scenes, tokens and synthetic actors, with their deltas and hooks as a fault picks them, a world actor's item changed as core passes it on to its tokens' creatures, companions' world actors (the only maker of an actor's `ownership`), and combats whose initiative and flags are written as core writes them, and whose turns move as Next Turn moves them, or as core's update writes them, its turn events on or off: what `companions.mjs`, `alone.mjs`, `turns.mjs` and the app's e2e (through `e2e/fvtt`) keep companions and combats on |
 | `journal-core.mjs` | Foundry v14's journals, folders and pages, with their ownership, `_stats` and hooks, its showdown and `cleanHTML`: what `notes.mjs` and the app's e2e (through `e2e/fvtt`) keep journal notes in |
 | `actor5e.mjs`, `activity5e.mjs`, `enchant5e.mjs` | dnd5e 5.3.3's actor rolls, items and activities, and enchantments, ported as far as the module uses them |
 | `dnd5e-cards.mjs` | dnd5e's concentration and chat cards, and Midi-QOL's concentration card |

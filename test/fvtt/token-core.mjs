@@ -26,9 +26,11 @@ const OWNER = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER
  * a token's creature's item hooks give ("actor", "delta", or "none", where only `updateActorDelta`
  * fires); `canvasScene`, the scene the Gamemaster is viewing, null for the active one, whose tokens
  * alone a synthetic actor's `getActiveTokens` finds; `speakerNoToken`, a speaker of a synthetic actor
- * given without its token, its speaker's actor then the base.
+ * given without its token, its speaker's actor then the base; and since End Turn's Undo (its contract
+ * §6.11 v6), `turnEventsNotify`, a core that fires `combatTurnChange` for a turn written with its turn
+ * events off, which may or may not be core's way [core, unverified].
  */
-export const faults = { deltaHooks: 'both', syntheticItemParent: 'actor', canvasScene: null, speakerNoToken: false }
+export const faults = { deltaHooks: 'both', syntheticItemParent: 'actor', canvasScene: null, speakerNoToken: false, turnEventsNotify: false }
 
 /** As Foundry's: its values, not its entries, and a collection's finders. */
 export class Collection extends Map {
@@ -366,6 +368,14 @@ globalThis.fromUuid = async (uuid, options) => {
  * `combatTurn` nor `combatRound`, uncounted. `started` follows `round`. While started, an initiative
  * written keeps the current combatant current, as core does [core, unverified], its index moved
  * with it, firing nothing more; stub.mjs's `combatant` is otherwise whoever sorts at the index.
+ *
+ * Since End Turn's Undo (its contract §6.11 v6): `update` records each call in `updates`, honours
+ * `refuseNext` as `nextTurn` does, and fires `combatTurnChange` only where its options don't turn the
+ * turn events off (`turnEvents: false`), or where `faults.turnEventsNotify` says core fires it all the
+ * same; `turnEvents` counts the writes that would run core's turn events, every one but those; and
+ * `previousTurn` is core's as remembered [core, unverified shape], one index back, or to the last of
+ * the round before, firing `combatTurn` or `combatRound`; `getTimeDelta` gives a round's 6 seconds,
+ * signed, and no time for a turn.
  * @param {string} id
  * @param {object[]} combatants   `{ id, actor, token?, fields? }`, a token's creature by its token.
  * @returns {object}
@@ -376,6 +386,8 @@ export function combatOf(id, combatants = []) {
   made.written = []
   made.advances = 0
   made.refuseNext = false
+  made.updates = []
+  made.turnEvents = 0
   Object.defineProperty(made, 'started', { configurable: true, enumerable: true, get() { return this.round > 0 } })
   const add = ({ id: combatantId, actor, token = null, fields = {} }) => combatant(made, combatantId, token ? token.actor : actor, {
     ...(token && { token, tokenId: token.id, sceneId: token.parent.id, actorId: token.actorId }),
@@ -433,13 +445,18 @@ export function combatOf(id, combatants = []) {
     const cb = made.combatant ?? null
     return { round: made.round, turn: made.turn, tokenId: cb?.tokenId ?? null, combatantId: cb?.id ?? null }
   }
-  /** The turn written, then what core fires on every client after the write. */
+  /**
+   * The turn written, then what core fires on every client after the write: `combatTurnChange` where
+   * the turn events run, or where a core is faked that fires it all the same.
+   */
   const moveTo = async ({ round, turn }, options = {}) => {
     const prior = history()
+    const events = options.turnEvents !== false
     made.round = round
     made.turn = turn
+    if (events) made.turnEvents++
     await Hooks.callAll('updateCombat', made, { round, turn }, options, userId())
-    await Hooks.callAll('combatTurnChange', made, prior, history())
+    if (events || faults.turnEventsNotify) await Hooks.callAll('combatTurnChange', made, prior, history())
   }
   /**
    * Core's Combat#nextTurn: the next combatant in the order, past the defeated where the tracker
@@ -469,11 +486,30 @@ export function combatOf(id, combatants = []) {
   }
   /** The Gamemaster's own Next Turn, made on another client: the write and its hooks here. */
   made.setTurn = (round, turn) => moveTo({ round, turn }, { direction: 1 })
-  /** Core's Combat#update of its round and turn: the write and its hooks, never combatTurn or combatRound. */
+  /**
+   * Core's Combat#update of its round and turn: the write and its hooks, never combatTurn or
+   * combatRound; each call recorded, and none written where a module refuses it.
+   */
   made.update = async (data, options = {}) => {
+    made.updates.push({ data: deepClone(data), options: deepClone(options) })
+    if (made.refuseNext) {
+      made.refuseNext = false
+      return made
+    }
     await moveTo({ round: data.round ?? made.round, turn: data.turn ?? made.turn }, options)
     return made
   }
+  /** Core's Combat#previousTurn: one index back, or from the first to the last of the round before. */
+  made.previousTurn = async () => {
+    const first = made.turn === 0
+    const back = first ? { round: made.round - 1, turn: made.turns.length - 1 } : { round: made.round, turn: made.turn - 1 }
+    const options = { direction: -1 }
+    await Hooks.callAll(first ? 'combatRound' : 'combatTurn', made, back, options)
+    await moveTo(back, options)
+    return made
+  }
+  /** Core's Combat#getTimeDelta under dnd5e: 6 seconds a round, signed, and none for a turn. */
+  made.getTimeDelta = (fromRound, fromTurn, toRound) => (toRound - fromRound) * 6
   return made
 }
 

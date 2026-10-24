@@ -93,6 +93,20 @@ function onDeleteCombat(combat) {
  * @returns {void}
  */
 function onTurnChange(combat, prior, current) {
+  reportTurnChange(combat, prior, current);
+}
+
+/**
+ * Tell each campaign in the fight that its turn order moved on, or back, as `combatTurnChange` does;
+ * since 0.36.0 also called by the module itself for a turn it took back with Foundry's turn events
+ * off, where core may not fire that hook (round 0.36.0 §6.14).
+ *
+ * @param {Combat} combat                 The combat whose turn order changed.
+ * @param {CombatHistoryData} prior       The prior turn state, read before the change.
+ * @param {CombatHistoryData} current     The new turn state.
+ * @returns {void}
+ */
+export function reportTurnChange(combat, prior, current) {
   if ( !active() || !combat.started ) return;
 
   const priorRound = prior?.round ?? 0;

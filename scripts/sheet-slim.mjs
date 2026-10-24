@@ -60,13 +60,15 @@ const ROLL_GROUPS = {
 };
 
 /**
- * The keys of an action an app takes from its row, where the action doesn't have its own.
+ * The keys of an action an app takes from its row, where the action doesn't have its own. Since
+ * 0.36.0 `tableDamage` too, which an action has as its row does, so that a spellbook's damage on
+ * its own goes once, not again with each action.
  * @type {string[]}
  */
 export const ACTION_KEYS = [
   "name", "img", "type", "activityName", "activation", "activationType", "range", "target", ...ROLLS, "damage",
-  "attackArea", "rollFormula", "check", "consumesSlot", "cast", "spellId", "forward", "activities", "uses", "level",
-  "castFrom", "concentration", "identified", "consumable", "enchantments", "text"
+  "tableDamage", "attackArea", "rollFormula", "check", "consumesSlot", "cast", "spellId", "forward", "activities",
+  "uses", "level", "castFrom", "concentration", "identified", "consumable", "enchantments", "text"
 ];
 
 /* -------------------------------------------- */

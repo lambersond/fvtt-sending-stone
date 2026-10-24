@@ -2,9 +2,14 @@
 // `endTurn`, the character's command, naming the turn it was shown by its combat, round and current
 // combatant, made by core's own `nextTurn` on the bridge where that turn is still the current one and
 // it's the character's or one of its companions' now; refused `not-started`, `moved` or `not-turn`
-// where not, and nothing more moves. The real module; dnd5e 5.3.3's real dice classes, or 6.0.5's
-// with DND5E6=1; dnd5e's actors, items and activities ported (actor5e.mjs, activity5e.mjs); scenes,
-// tokens and a combat whose turns move as Next Turn moves them (token-core.mjs); with MIDI=1,
+// where not, and nothing more moves. And `undoEndTurn` (its contract §2.8 v6, §6.11 v6, §6.14):
+// the turn an End Turn just ended, taken back for the character whose command ended it, from the
+// module's memory of it, while the combat stands where it left it, by one update of the turn back to
+// the combatant whose turn it ended, found by its id, with Foundry's turn events off; refused
+// `not-undoable`, `moved` or `not-turn` where not, and nothing written. The real module; dnd5e
+// 5.3.3's real dice classes, or 6.0.5's with DND5E6=1; dnd5e's actors, items and activities ported
+// (actor5e.mjs, activity5e.mjs); scenes, tokens and a combat whose turns move as Next Turn moves
+// them, and are written as core's update writes them (token-core.mjs); with MIDI=1,
 // midi-fake.mjs's workflow, its Gamemaster's confirmation of damage and its release of their targets
 // when the turn changes; a stand-in Foundry core and app. The module's long waits are a hundredfold
 // shorter, as companions.mjs has them, but the Midi wait's 10 seconds take 1 s and a command's
@@ -101,7 +106,7 @@ foundry.utils.escapeHTML ??= value => String(value).replace(/[&<>"']/g, ch => ({
 foundry.applications.ux.TextEditor = { implementation: { async enrichHTML(html) { return String(html ?? '') } } }
 port.targets = true
 
-const { changeDelta, combatOf, companionActor, placeToken, scene } = await import('./token-core.mjs')
+const { changeActor, changeDelta, combatOf, companionActor, faults, placeToken, scene } = await import('./token-core.mjs')
 
 // ---- The users ----
 users.activeGM = user('gm', 'Gamemaster', true)
@@ -272,7 +277,7 @@ await Hooks.callAll('ready')
 const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)
 const { rollFeatures, syncPollers } = await import(`${MODULE}/scripts/commands.mjs`)
 const { getCampaigns } = await import(`${MODULE}/scripts/campaigns.mjs`)
-const { runEndTurnCommand } = await import(`${MODULE}/scripts/command-turn.mjs`)
+const { runEndTurnCommand, runUndoTurnCommand } = await import(`${MODULE}/scripts/command-turn.mjs`)
 const { companionList } = await import(`${MODULE}/scripts/creatures.mjs`)
 await until(() => app.polls.length > 0, 'the first fetch')
 await settle()
@@ -299,6 +304,16 @@ assert.deepEqual(companionList(ashlands()).map(entry => [entry.key, entry.of]), 
     assert.ok(!helloOf(id).data.features.companions.kinds.includes('endTurn'), `never a companion's in ${id}`)
   }
   ok("features.rolls.kinds has endTurn right after endConcentration wherever rolls are made, attacks on or off; none with rolls off or before the dice are ready; features.companions.kinds never has it")
+}
+{
+  const kinds = id => helloOf(id).data.features.rolls.kinds
+  for (const id of ['camp-a', 'camp-b']) {
+    assert.equal(kinds(id)[kinds(id).indexOf('endTurn') + 1], 'undoEndTurn', `right after endTurn in ${id}`)
+    const theirs = helloOf(id).data.features.companions.kinds
+    assert.ok(!theirs.includes('endTurn') && !theirs.includes('undoEndTurn'), `neither a companion's in ${id}`)
+  }
+  assert.ok(!kinds('camp-c').includes('undoEndTurn'), 'none with rolls off')
+  ok("features.rolls.kinds has undoEndTurn right after endTurn, attacks on or off; features.companions.kinds has neither")
 }
 
 /* -------------------------------------------- */
@@ -595,6 +610,367 @@ assert.deepEqual(companionList(ashlands()).map(entry => [entry.key, entry.of]), 
 }
 
 /* -------------------------------------------- */
+/*  Undo: taken back                            */
+/* -------------------------------------------- */
+
+/** A taking back of the End Turn given, the turn named as the app shows it. */
+const undoTurn = (ended, turn, fields = {}) => ({ id: `undo-${++ids}`, actorId: 'thorin', kind: 'undoEndTurn', undo: ended.id, turn, ...NO_DICE, ...fields })
+/** Thorin's End Turn, made on his turn in the round as it stands: done, Brakka's turn next. */
+async function endThorins() {
+  await turnTo('cb-thorin')
+  const ended = await send(endTurn(shown()))
+  assert.deepEqual(ended, DONE(ended.id))
+  assert.equal(fight.combatant.id, 'cb-brakka')
+  return ended
+}
+/** The writes of the fight's round and turn the module made, by update. */
+const written = () => fight.updates.length
+
+{
+  // The fight back at round 1, on Thorin.
+  await fight.setTurn(1, 0)
+  assert.equal(fight.combatant.id, 'cb-thorin')
+  const ended = await endThorins()
+  assert.equal(fight.round, 1)
+  const from = app.events.length
+  const was = { ...heard, advances: fight.advances, turnEvents: fight.turnEvents, updates: written() }
+  const back = await send(undoTurn(ended, shown()))
+  assert.deepEqual(back, DONE(back.id))
+  assert.deepEqual([fight.round, fight.combatant.id], [1, 'cb-thorin'], 'Thorin current, round 1')
+  assert.deepEqual(fight.updates.slice(was.updates), [
+    { data: { round: 1, turn: 0 }, options: { direction: -1, turnEvents: false, worldTime: { delta: 0 } } },
+  ], "one update, back to Thorin's index, with the turn events off")
+  assert.equal(fight.advances, was.advances, 'no advance')
+  assert.deepEqual([heard.combatTurn - was.combatTurn, heard.combatRound - was.combatRound], [0, 0], 'neither combatTurn nor combatRound heard')
+  assert.equal(fight.turnEvents, was.turnEvents, "core's turn events not run")
+  const posted = app.events.slice(from).filter(e => e.campaign?.id === 'camp-a')
+  const turns = posted.filter(e => e.type === 'combat.turn')
+  assert.equal(turns.length, 1, 'combat.turn posted once')
+  const [turn] = turns
+  assert.deepEqual([turn.data.combatant?.id, turn.data.round, turn.data.newRound, turn.data.direction, turn.data.previousCombatantId], ['cb-thorin', 1, false, 'backward', 'cb-brakka'])
+  const resultAt = posted.findIndex(e => (e.type === 'command.result') && (e.data.id === back.id))
+  assert.ok(posted.indexOf(turn) < resultAt, `combat.turn posted before the result (${posted.indexOf(turn)}, ${resultAt})`)
+  ok("Thorin's End Turn taken back: done; Thorin current in round 1 again by one update to his index, direction -1, turnEvents false, no world time; no advance, neither combatTurn nor combatRound heard, no turn events run; combat.turn with Thorin, backward, posted once before the result")
+}
+{
+  fight.settings = { skipDefeated: true }
+  for (const cb of fight.combatants.values()) if (cb.id !== 'cb-thorin') cb.isDefeated = true
+  const ended = await send(endTurn(shown()))
+  assert.deepEqual(ended, DONE(ended.id))
+  assert.deepEqual([fight.round, fight.combatant.id], [2, 'cb-thorin'], 'Thorin last in round 1: round 2 begins on him')
+  const from = app.events.length
+  const was = written()
+  const back = await send(undoTurn(ended, shown()))
+  for (const cb of fight.combatants.values()) cb.isDefeated = false
+  delete fight.settings
+  assert.deepEqual(back, DONE(back.id))
+  assert.deepEqual([fight.round, fight.combatant.id], [1, 'cb-thorin'], 'back in round 1, on Thorin')
+  assert.deepEqual(fight.updates.slice(was).map(({ data, options }) => [data, options.worldTime]), [[{ round: 1, turn: 0 }, { delta: -6 }]], "the round's 6 seconds of world time back")
+  const [turn] = ofType(from, 'combat.turn')
+  assert.deepEqual([turn.data.round, turn.data.newRound, turn.data.direction], [1, false, 'backward'])
+  ok("an End Turn that began round 2 taken back: round 1 on Thorin again, world time 6 s back, combat.turn backward and no new round")
+}
+{
+  await turnTo('cb-thorin')
+  // The goblin, defeated, between Thorin and Brakka, and the tracker skipping the defeated.
+  await fight.updateEmbeddedDocuments('Combatant', [{ _id: 'cb-gob', initiative: 19 }])
+  fight.combatants.get('cb-gob').isDefeated = true
+  fight.settings = { skipDefeated: true }
+  assert.deepEqual(fight.turns.slice(0, 3).map(cb => cb.id), ['cb-thorin', 'cb-gob', 'cb-brakka'])
+  const ended = await send(endTurn(shown()))
+  assert.equal(fight.combatant.id, 'cb-brakka', 'End Turn skips the goblin')
+  const back = await send(undoTurn(ended, shown()))
+  fight.combatants.get('cb-gob').isDefeated = false
+  delete fight.settings
+  assert.deepEqual(back, DONE(back.id))
+  assert.equal(fight.combatant.id, 'cb-thorin', 'Thorin, not the goblin')
+  await fight.updateEmbeddedDocuments('Combatant', [{ _id: 'cb-gob', initiative: 12 }])
+  assert.equal(fight.combatant.id, 'cb-thorin')
+
+  const again = await endThorins()
+  // Thorin's initiative written after it, as Right after its character writes them: Brakka still
+  // current, and Thorin after her now.
+  await fight.updateEmbeddedDocuments('Combatant', [{ _id: 'cb-thorin', initiative: 17 }])
+  assert.deepEqual([fight.turns[0].id, fight.turns[1].id, fight.combatant.id], ['cb-brakka', 'cb-thorin', 'cb-brakka'])
+  const from = app.events.length
+  const moved = await send(undoTurn(again, shown()))
+  assert.deepEqual(moved, DONE(moved.id))
+  assert.deepEqual([fight.turn, fight.combatant.id], [1, 'cb-thorin'], 'Thorin at his new index')
+  const [turn] = ofType(from, 'combat.turn')
+  assert.equal(turn.data.direction, 'forward', 'forward, as his index is after the one the End Turn left')
+  await fight.updateEmbeddedDocuments('Combatant', [{ _id: 'cb-thorin', initiative: 20 }])
+  assert.deepEqual([fight.turn, fight.combatant.id], [0, 'cb-thorin'])
+  ok("taken back to the combatant by its id: past a defeated goblin End Turn skipped, Thorin's turn, not the goblin's; after an initiative written that moved Thorin's index, Thorin at his new index")
+}
+
+/* -------------------------------------------- */
+/*  Undo: refused                               */
+/* -------------------------------------------- */
+
+{
+  const ended = await endThorins()
+  const left = shown()
+  const was = written()
+  // The Gamemaster's Next Turn first, the app still showing Brakka's turn.
+  await turnTo('cb-bat')
+  const past = await send(undoTurn(ended, left))
+  assert.deepEqual(refusal(past), ['failed', 'moved', null], 'the Bat current')
+  // Then their Previous Turns back to Thorin: the combat named as it now stands.
+  await turnTo('cb-thorin')
+  const rewound = await send(undoTurn(ended, shown()))
+  assert.deepEqual(refusal(rewound), ['failed', 'moved', null], 'not where that End Turn left it')
+  await turnTo('cb-brakka')
+  const otherRound = await send(undoTurn(ended, { ...left, round: left.round + 1 }))
+  assert.deepEqual(refusal(otherRound), ['failed', 'moved', null], 'another round named')
+  const brakkaCb = fight.combatants.get('cb-brakka')
+  brakkaCb.hidden = true
+  const hidden = []
+  for (const gmContent of [false, true]) {
+    settings.set('gmContent', gmContent)
+    hidden.push(refusal(await send(undoTurn(ended, left))))
+  }
+  settings.set('gmContent', false)
+  brakkaCb.hidden = false
+  assert.deepEqual(hidden, [['failed', 'moved', null], ['failed', 'moved', null]], 'Brakka current but hidden, with Gamemaster-only information off and on')
+  assert.deepEqual([written(), fight.combatant.id], [was, 'cb-brakka'], 'nothing written')
+  // The combat where that End Turn left it again, it's taken back.
+  const back = await send(undoTurn(ended, left))
+  assert.deepEqual(back, DONE(back.id))
+  assert.deepEqual([written(), fight.combatant.id], [was + 1, 'cb-thorin'])
+  ok("Undo refused moved, nothing written: the Gamemaster moved on first; a rewind back to Thorin, named as the combat now stands; another round named; Brakka current but hidden, Gamemaster-only information off and on; then, where the End Turn left it, taken back")
+}
+{
+  // A whole round on and back to Brakka within the minute, so only the round tells it apart: named
+  // as the app was shown it, the live combat's round is another; named as it now stands, it's not
+  // the round that End Turn left. Either check alone refuses one of the two, never both.
+  const ended = await endThorins()
+  const left = shown()
+  const was = written()
+  await turnTo('cb-brakka', left.round + 1)
+  const stale = await send(undoTurn(ended, left))
+  const now = await send(undoTurn(ended, shown()))
+  assert.deepEqual([refusal(stale), refusal(now)], [['failed', 'moved', null], ['failed', 'moved', null]], 'a round on')
+  assert.deepEqual([written(), fight.combatant.id], [was, 'cb-brakka'], 'nothing written')
+  // Back in the round that End Turn left, it's taken back.
+  await turnTo('cb-brakka', left.round)
+  const back = await send(undoTurn(ended, left))
+  assert.deepEqual(back, DONE(back.id))
+  assert.deepEqual([written(), fight.round, fight.combatant.id], [was + 1, left.round, 'cb-thorin'])
+  ok("Undo refused moved a whole round on, on Brakka again, named as the app was shown it or as the combat now stands, nothing written; then, back in the round that End Turn left, taken back")
+}
+{
+  const ended = await endThorins()
+  const back = await send(undoTurn(ended, shown()))
+  assert.deepEqual(back, DONE(back.id))
+  const was = written()
+  const again = await send(undoTurn(ended, shown()))
+  assert.deepEqual(refusal(again), ['failed', 'not-undoable', null], 'taken back already')
+
+  const thorins = await endThorins()
+  const vexes = await send(undoTurn(thorins, shown(), { actorId: 'vex' }))
+  assert.deepEqual(refusal(vexes), ['failed', 'not-undoable', null], "Vex's command, naming Thorin's End Turn")
+  // Vex's wolf made Alice's too, and its turn ended by Thorin's player: Vex's player may end its
+  // turn, but not take back Thorin's End Turn of it.
+  await changeDelta(wolf1, { ownership: { alice: 3 } })
+  await settle()
+  await turnTo('cb-wolf')
+  const wolfs = await send(endTurn(shown()))
+  assert.deepEqual(wolfs, DONE(wolfs.id))
+  const shared = await send(undoTurn(wolfs, shown(), { actorId: 'vex' }))
+  assert.deepEqual(refusal(shared), ['failed', 'not-undoable', null], "Vex's command, naming Thorin's End Turn of the wolf they share")
+  const own = await send(undoTurn(wolfs, shown()))
+  assert.deepEqual(own, DONE(own.id))
+  assert.equal(fight.combatant.id, 'cb-wolf')
+  await changeDelta(wolf1, { ownership: { alice: 0 } })
+  await settle()
+
+  const none = await send(undoTurn({ id: 'turn-never' }, shown()))
+  assert.deepEqual(refusal(none), ['failed', 'not-undoable', null], 'an End Turn there never was')
+  assert.equal(written(), was + 1, "nothing written but Thorin's own taking back")
+  ok("Undo refused not-undoable, nothing written: a second after the first was done; Vex's command naming Thorin's End Turn, of Thorin's turn or of the wolf they share, which Thorin's own takes back; an End Turn there never was")
+}
+{
+  const first = await endThorins()
+  // Thorin's player ends Brakka's turn too: the later End Turn is the one remembered.
+  const second = await send(endTurn(shown()))
+  assert.deepEqual(second, DONE(second.id))
+  assert.equal(fight.combatant.id, 'cb-bat')
+  const was = written()
+  const firsts = await send(undoTurn(first, shown()))
+  assert.deepEqual(refusal(firsts), ['failed', 'not-undoable', null], 'the first, replaced')
+  assert.equal(written(), was)
+  const seconds = await send(undoTurn(second, shown()))
+  assert.deepEqual(seconds, DONE(seconds.id))
+  assert.equal(fight.combatant.id, 'cb-brakka', "Brakka's turn back")
+
+  const late = await endThorins()
+  clock += 61_000
+  const after = await send(undoTurn(late, shown()))
+  assert.deepEqual(refusal(after), ['failed', 'not-undoable', null], 'a minute on')
+  assert.deepEqual([written(), fight.combatant.id], [was + 1, 'cb-brakka'])
+  ok("Undo refused not-undoable: the first of two End Turns of the combat, the later remembered in its place, which is taken back, Brakka current; one more than a minute old")
+}
+{
+  const gone = []
+  for (const how of ['deleted', 'hidden']) {
+    const ended = await endThorins()
+    const thorinCb = fight.combatants.get('cb-thorin')
+    const current = fight.combatant
+    if (how === 'deleted') {
+      fight.combatants.delete('cb-thorin')
+      // As core keeps the current combatant current.
+      fight.turn = fight.turns.indexOf(current)
+    } else thorinCb.hidden = true
+    const was = written()
+    gone.push([how, refusal(await send(undoTurn(ended, shown()))), written() - was])
+    if (how === 'deleted') {
+      fight.combatants.set('cb-thorin', thorinCb)
+      fight.turn = fight.turns.indexOf(current)
+    } else thorinCb.hidden = false
+    assert.equal(fight.combatant.id, 'cb-brakka')
+  }
+  assert.deepEqual(gone, [['deleted', ['failed', 'not-undoable', null], 0], ['hidden', ['failed', 'not-undoable', null], 0]])
+  ok("Undo refused not-undoable, nothing written, with Thorin's combatant deleted from the combat, or hidden, after his End Turn")
+}
+{
+  await endThorins()
+  // Brakka's turn, by Thorin's command; then Alice's Owner taken from Brakka.
+  const brakkas = await send(endTurn(shown()))
+  assert.deepEqual(brakkas, DONE(brakkas.id))
+  assert.equal(fight.combatant.id, 'cb-bat')
+  await changeActor(brakka, { ownership: { alice: 0 } })
+  await settle()
+  const was = written()
+  const theirs = await send(undoTurn(brakkas, shown()))
+  await changeActor(brakka, { ownership: { alice: 3 } })
+  await settle()
+  assert.deepEqual(refusal(theirs), ['failed', 'not-turn', null])
+  assert.deepEqual([written(), fight.combatant.id], [was, 'cb-bat'], 'nothing written')
+  ok("Undo of Brakka's turn, ended by Thorin's command, refused not-turn once Alice's Owner is taken from Brakka, nothing written")
+}
+{
+  const ended = await endThorins()
+  const named = shown()
+  const was = { updates: written(), advances: fight.advances }
+  const answers = []
+  for (const [fields, why] of [
+    [{ actorId: 'brakka', of: 'thorin' }, 'of'],
+    [{ by: 'gm' }, 'by'],
+    [{ undo: undefined }, 'undo'],
+    [{ undo: 12 }, 'undo'],
+    [{ undo: 'u'.repeat(65) }, 'undo'],
+    [{ undo: 'turn 1' }, 'undo'],
+    [{ turn: { combatId: named.combatId, round: named.round } }, 'turn'],
+    [{ turn: { ...named, turn: 1 } }, 'turn'],
+    [{ turn: { ...named, round: 0 } }, 'turn'],
+    [{ item: 'longsword' }, 'turn'],
+    [{ combatId: 'fight' }, 'turn'],
+    [{ dice: [{ faces: 20, results: [10] }] }, 'dice'],
+    [{ mode: 1 }, 'dice'],
+  ]) answers.push([JSON.stringify(fields), refusal(await send(undoTurn(ended, named, fields))), ['failed', 'invalid', why]])
+  for (const [what, got, want] of answers) assert.deepEqual(got, want, what)
+  // An End Turn naming one to take back is no End Turn either.
+  const both = await send(endTurn(named, { undo: ended.id }))
+  assert.deepEqual(refusal(both), ['failed', 'invalid', 'turn'], 'an endTurn with undo')
+  const stranger = await send(undoTurn(ended, named, { actorId: 'pip' }))
+  assert.deepEqual(refusal(stranger), ['failed', 'unknown', null], "another campaign's character")
+  assert.deepEqual([written(), fight.advances, fight.combatant.id], [was.updates, was.advances, 'cb-brakka'], 'nothing written, nothing ended')
+  const back = await send(undoTurn(ended, named))
+  assert.deepEqual(back, DONE(back.id))
+  ok("Undo refused invalid: with of; the Gamemaster's (by); no undo, a number, 65 characters, not an id (undo); a turn without its combatant, with an extra key, of round 0, or an item or combat beside it (turn); with dice (dice); an endTurn naming undo (turn); another campaign's character, unknown; nothing written, and the End Turn still taken back")
+}
+{
+  const ended = await endThorins()
+  const was = written()
+  settings.set('combatEvents', false)
+  const off = await send(undoTurn(ended, shown()))
+  settings.set('combatEvents', true)
+  const nowhere = await send(undoTurn(ended, { ...shown(), combatId: 'nowhere' }))
+  const notOurs = await send(undoTurn(ended, shown(elsewhere)))
+  assert.deepEqual([off, nowhere, notOurs].map(refusal), [0, 1, 2].map(() => ['failed', 'not-in-combat', null]), 'combat events off; no such combat; one none of the campaign are in')
+  const rollsOff = await runUndoTurnCommand(undoTurn(ended, shown()), { ...ashlands(), rolls: false })
+  diceStatus.ready = false
+  const notReady = await runUndoTurnCommand(undoTurn(ended, shown()), ashlands())
+  diceStatus.ready = true
+  assert.deepEqual([rollsOff, notReady].map(refusal), [['failed', 'off', null], ['failed', 'off', null]], 'rolls off, or the dice not ready')
+  // The combat beside, ended by Vex's player, then reset in Foundry before its taking back.
+  const vexes = await send(endTurn(shown(beside), { actorId: 'vex' }))
+  assert.deepEqual(vexes, DONE(vexes.id))
+  const left = shown(beside)
+  Object.assign(beside, { round: 0, turn: null })
+  const reset = await send(undoTurn(vexes, left, { actorId: 'vex' }))
+  Object.assign(beside, { round: left.round, turn: beside.turns.findIndex(cb => cb.id === left.combatantId) })
+  assert.deepEqual(refusal(reset), ['failed', 'not-started', null], 'the combat reset')
+  assert.deepEqual([written(), beside.updates.length, fight.combatant.id], [was, 0, 'cb-brakka'], 'nothing written')
+  const back = await send(undoTurn(ended, shown()))
+  assert.deepEqual(back, DONE(back.id))
+  ok("Undo refused, nothing written: not-in-combat with combat events off, no such combat or one none of the campaign are in; off with rolls off or the dice not ready; not-started for a combat reset since its End Turn")
+}
+{
+  const ended = await endThorins()
+  fight.refuseNext = true
+  const kept = await send(undoTurn(ended, shown()))
+  assert.deepEqual(refusal(kept), ['failed', 'cancelled', null], 'a module kept the turn from moving back')
+  assert.equal(fight.combatant.id, 'cb-brakka')
+  const back = await send(undoTurn(ended, shown()))
+  assert.deepEqual(back, DONE(back.id), 'the End Turn still remembered')
+  assert.equal(fight.combatant.id, 'cb-thorin')
+  ok('an Undo a module keeps from writing: cancelled, the End Turn still remembered and taken back after')
+}
+
+/* -------------------------------------------- */
+/*  Undo: told once; the queue                  */
+/* -------------------------------------------- */
+
+{
+  const ended = await endThorins()
+  faults.turnEventsNotify = true
+  const from = app.events.length
+  const back = await send(undoTurn(ended, shown()))
+  faults.turnEventsNotify = false
+  assert.deepEqual(back, DONE(back.id))
+  assert.equal(fight.combatant.id, 'cb-thorin')
+  const turns = ofType(from, 'combat.turn')
+  assert.deepEqual(turns.map(e => [e.data.combatant?.id, e.data.direction]), [['cb-thorin', 'backward']], 'combat.turn posted once, not twice')
+  ok("under a core that fires combatTurnChange with the turn events off: combat.turn posted once, by core's hook, not again by the module")
+}
+{
+  await turnTo('cb-thorin')
+  const ending = endTurn(shown())
+  const was = { advances: fight.advances, updates: written(), turnEvents: fight.turnEvents }
+  const from = app.events.length
+  const [ended, back] = await sendAll([ending, undoTurn(ending, { ...shown(), combatantId: 'cb-brakka' })])
+  assert.deepEqual([ended, back], [DONE(ending.id), DONE(back.id)])
+  assert.deepEqual([fight.advances - was.advances, written() - was.updates, fight.turnEvents - was.turnEvents, fight.combatant.id], [1, 1, 1, 'cb-thorin'], 'one advance, one step back')
+  const at = id => app.events.findIndex((e, index) => (index >= from) && (e.type === 'command.result') && (e.data.id === id))
+  assert.ok(at(ending.id) < at(back.id), "the End Turn's result, then the Undo's")
+  ok("an End Turn and its Undo sent at once: the End Turn's done, then the Undo's; one advance, one step back, Thorin current")
+}
+{
+  // Vex's wolf made Alice's too. Thorin's player ends the Bat's turn, the goblin and Vex defeated
+  // and skipped: the wolf's turn, which either player may end.
+  await changeDelta(wolf1, { ownership: { alice: 3 } })
+  await settle()
+  await turnTo('cb-bat')
+  fight.settings = { skipDefeated: true }
+  for (const id of ['cb-gob', 'cb-vex']) fight.combatants.get(id).isDefeated = true
+  const bats = await send(endTurn(shown()))
+  for (const id of ['cb-gob', 'cb-vex']) fight.combatants.get(id).isDefeated = false
+  delete fight.settings
+  assert.deepEqual(bats, DONE(bats.id))
+  assert.equal(fight.combatant.id, 'cb-wolf')
+  const was = { advances: fight.advances, updates: written(), round: fight.round }
+  // Vex's player ends the wolf's turn as Thorin's takes back the Bat's: one after the other, by the
+  // combat's own queue, though they're two characters' commands.
+  const [vexes, back] = await sendAll([endTurn(shown(), { actorId: 'vex' }), undoTurn(bats, shown())])
+  await changeDelta(wolf1, { ownership: { alice: 0 } })
+  await settle()
+  assert.deepEqual([vexes, refusal(back)], [DONE(vexes.id), ['failed', 'not-undoable', null]], "the Undo after Vex's End Turn, which replaced the one it names")
+  assert.deepEqual([fight.advances - was.advances, written() - was.updates, fight.round, fight.combatant.id], [1, 0, was.round + 1, 'cb-thorin'], 'one advance, nothing written')
+  ok("Vex's End Turn of the wolf they share and Thorin's Undo of the Bat's turn that left it current, sent at once: the combat's End Turns and Undos one at a time, whoever's; Vex's done, then the Undo not-undoable, nothing written")
+}
+
+/* -------------------------------------------- */
 /*  Midi-QOL                                    */
 /* -------------------------------------------- */
 
@@ -672,6 +1048,31 @@ if (MIDI) {
     assert.deepEqual(refusal(results(ending.id)[0]), ['failed', 'moved', null], 'the checks made after the wait')
     assert.deepEqual([fight.advances, fight.combatant.id], [was, 'cb-brakka'], "Brakka's turn not ended")
     ok("the Gamemaster's Next Turn during the wait: moved after it, Brakka's turn not ended")
+  }
+  {
+    // The End Turn first: a change of turn releases the Gamemaster's targets. Vex has cast his three
+    // Fireballs above, and has his slots back.
+    const ended = await endThorins()
+    vex.system.spells.spell3.value = vex.system.spells.spell3.max
+    const { flow, damage } = await held()
+    const was = written()
+    const back = undoTurn(ended, shown())
+    queue([back])
+    await taken()
+    await wait(25)
+    assert.deepEqual([written(), results(back.id).length], [was, 0], 'not written while the area holds the targets')
+    assert.deepEqual(gmTargets(), ['goblin1'], "the targets the area's still")
+    const confirmed = realNow()
+    await flow.confirmDamage()
+    await until(() => results(back.id).length, 'the taking back')
+    const after = realNow() - confirmed
+    assert.deepEqual(results(back.id)[0], DONE(back.id))
+    assert.ok(after < 300, `written once the damage is done, not when the wait runs out (${after} ms)`)
+    assert.deepEqual([...flow.targets].map(t => t.id), ['goblin1'], "the area's damage at its own targets")
+    assert.equal(results(damage.id)[0]?.status, 'done', 'the damage made first')
+    assert.deepEqual([written(), fight.combatant.id], [was + 1, 'cb-thorin'])
+    assert.deepEqual(gmTargets(), [], "then the turn is written back, and Midi releases the Gamemaster's targets")
+    ok("under Midi-QOL, an area damage of Vex's holding the Gamemaster's targets, then Thorin's Undo: written once the damage is done, the targets the area's until then")
   }
   midi.settings.confirmAttackDamage = 'none'
   midi.autoRemoveTargets = 'dead'

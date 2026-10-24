@@ -10,7 +10,7 @@ import { runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
-import { runEndTurnCommand } from "./command-turn.mjs";
+import { runEndTurnCommand, runUndoTurnCommand } from "./command-turn.mjs";
 import {
   noteRemovalReader, noteTransferReader, removalReader, removalsOn, runRemoveCommand, runTransferCommand,
   transferReader, transfersOn
@@ -492,7 +492,8 @@ class Poller {
  * it, one player making them one at a time; two companions of one actor, as two wolves, have keys of
  * their own. An end of a turn waits too for every earlier end of a turn of its combat, any
  * character's: two players ending the turn of a companion they share would otherwise both find it
- * current, where the later should find it ended and end nothing more.
+ * current, where the later should find it ended and end nothing more. Taking a turn back waits so
+ * too, for the end of the turn it takes back and any other of its combat.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -518,7 +519,7 @@ function take(command, campaign) {
   let keys = [String(command.actorId)];
   if ( isId(command.of) ) keys = [String(command.actorId), command.of];
   if ( note ) keys = [`note:${command.actorId}`];
-  else if ( command.kind === "endTurn" ) {
+  else if ( TURN_KINDS.includes(command.kind) ) {
     if ( isId(command.turn?.combatId) ) keys = [...keys, `turn:${command.turn.combatId}`];
   } else if ( command.kind === "transfer" ) {
     keys = [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to),
@@ -618,6 +619,7 @@ function runCommand(command, campaign, signal) {
     case "endEnchantment": return runEndEnchantmentCommand(command, campaign);
     case "endConcentration": return runEndConcentrationCommand(command, campaign);
     case "endTurn": return runEndTurnCommand(command, campaign);
+    case "undoEndTurn": return runUndoTurnCommand(command, campaign);
     case "spend": return runSpendCommand(command, campaign);
     case "inspiration": return runInspirationCommand(command, campaign);
     case "ask": return runAskCommand(command, campaign);

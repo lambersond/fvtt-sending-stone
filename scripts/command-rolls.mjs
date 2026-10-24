@@ -8,7 +8,7 @@ import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mj
 import { checkNoteCommand } from "./command-notes.mjs";
 import { commandActor, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
-import { checkEndTurnCommand } from "./command-turn.mjs";
+import { checkEndTurnCommand, checkUndoTurnCommand } from "./command-turn.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
 import {
   claimMidiPrompt, midiAnswerAuthor, midiAnswerConfig, midiAnswerFailed, midiAnswerFlags, midiOutcome,
@@ -233,7 +233,7 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * of items and coins what it moves, from where to where. Since 0.36.0 a command may name the
  * campaign character whose companion it's for, `of`, an id, but for a kind a companion never makes,
  * as Heroic Inspiration or charges spent by hand; and an end of a turn names the turn, as the app
- * was shown it, and nothing else.
+ * was shown it, and nothing else, as does taking one back, with the end of the turn it takes back.
  * @param {object} command
  * @returns {string|null}
  */
@@ -241,7 +241,7 @@ export function checkCommand(command) {
   if ( (command.by !== undefined) && (command.by !== null) && (command.by !== "gm") ) return "by";
   if ( !isOptional(command.of, isId) ) return "of";
   if ( isId(command.of) && COMPANION_UNTAKEN.includes(command.kind) ) return "of";
-  if ( TURN_KINDS.includes(command.kind) ) return checkEndTurnCommand(command);
+  if ( TURN_KINDS.includes(command.kind) ) return (command.kind === "undoEndTurn") ? checkUndoTurnCommand(command) : checkEndTurnCommand(command);
   const named = checkItemCommand(command);
   if ( named ) return named;
   if ( ENCHANT_KINDS.includes(command.kind) ) return checkEnchantCommand(command);
