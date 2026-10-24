@@ -913,6 +913,7 @@ companions enter initiative, `features.companions.initiative`:
 | `speaker` | `{ alias, actorId, tokenId, sceneId }`. The ids are `null` when not spoken by an actor. |
 | `character` | The campaign character's actor id if one spoke it, else `null`. |
 | `companion` | Since module 0.36.0, and only to a listener that [reads companions](#companionslisted): the [companion](#companions) it's the campaign's, by its key in the list the campaign was last told: the module's own mark where it made the message for a companion's command (`flags["sending-stone"].companion`), else the listed companion whose live actor spoke it (`speakerActor`), else `null`. Absent for any other listener. A message a companion spoke counts as spoken by the campaign's characters, under chat scope `"connected"` too. |
+| `alone` | Since module 0.36.0, to every listener: `true` on a damage or healing card the app's [`itemDamage`](#damage-on-its-own-and-recharges) made, by the module's own flag on it (`flags["sending-stone"].alone`); left out on any other message, an attack's or a use's damage and a recharge's among them. Like `gmRoll`, it's a claim, as the message's author may change its flags: a listener may say the card was made on its own, but should do nothing more on its word. |
 | `title` | The pop-out title, or `null`. |
 | `flavor`, `content` | As stored, in HTML. Content links are not yet rendered: they appear as `@UUID[…]{Label}`. Since module 0.29.0, unless Gamemaster-only information is on, `content` is cleaned of what cards keep from players there, parsed into an inert document and written back: every element's `data-dc` is removed; dnd5e's labels with DCs (`.visible-dc`) are removed where its *Challenge Visibility* doesn't show players the card's DC, as `ask`'s `dc` below; and Midi-QOL's sections of hits and saves (`.midi-qol-hits-display`, `.midi-qol-saves-display`), which the client that ran its workflow, often the Gamemaster's, draws with armor classes and DCs, are emptied. Since module 0.30.0, on a Gamemaster's card of Midi-QOL's, what Midi's *GM Attack Roll Display* and *GM Damage Roll Display* keep from players goes too, with its attack and damage buttons: see [A Gamemaster's rolls on Midi-QOL's cards](#a-gamemasters-rolls-on-midi-qols-cards). With it on, `content` is as stored. Read results from `dnd5e` below, never from `content`. |
 | `text` | `content` as plain text, with content links reduced to their labels. dnd5e's cards, such as a roll request or a spell's saving throw, give each button two labels, with its DC and without, and show one; since module 0.17.0, only the one players see is kept, as `ask`'s `dc` below. Before, both were. Since module 0.29.0 it's made from `content` as sent, so without Midi's sections' words either, unless Gamemaster-only information is on. |
@@ -1997,7 +1998,8 @@ A prompt:
   `"legendary"`, for a character or a companion. Sheets have `creature`, an NPC's, `uses.recharge`,
   and every damaging row `tableDamage`; and `rolls`' `kinds` gain
   [`itemDamage` and `recharge`](#damage-on-its-own-and-recharges), with the new refusal `"charged"`
-  and a recharge's `outcome`. And it says how the campaign's companions enter initiative,
+  and a recharge's `outcome`; to every listener, a [chat message](#chat-message) of a card
+  `itemDamage` made has `alone: true`. And it says how the campaign's companions enter initiative,
   `features.companions.initiative`, `"own"` or `"after"`: under `"after"` it sets a companion's
   initiative 0.001 below its character's, to thousandths, in Foundry, whenever the character's is
   set, rerolled or cleared, and refuses the companion's own `initiative` `"follows"` while one of its
@@ -2010,9 +2012,9 @@ A prompt:
   before 0.36.0 refuses one `"invalid"`, `error` `"kind"`.
   A listener before 0.36.0 never answers `"companions"`, so it's sent no `companions.listed` or
   `companion.updated`, and its combats and chat are as module 0.35.0 sends them; it may ignore the
-  hello's `companions`, `features.companions`, and the sheets' `creature`, `uses.recharge` and
-  `tableDamage`. It never sends `of`, `itemDamage` or `recharge`; a module before 0.36.0 refuses a
-  companion's command `"unknown"`.
+  hello's `companions`, `features.companions`, the sheets' `creature`, `uses.recharge` and
+  `tableDamage`, and a chat message's `alone`. It never sends `of`, `itemDamage` or `recharge`; a
+  module before 0.36.0 refuses a companion's command `"unknown"`.
 
 ## Changes from protocol 1
 
@@ -3490,7 +3492,9 @@ Since module 0.36.0, where the hello's `rolls` `kinds` have them:
   dnd5e's own damage or healing card for the activity's kind (a save's with its "On save" line),
   public, authored by the player, naming **no targets**, whatever the Gamemaster has targeted (under
   dnd5e 5 `flags.dnd5e.targets` `[]`, under dnd5e 6 `system.targets` `[]`), for the Gamemaster to
-  select tokens and apply it from its tray. Nothing is used or spent. `dice` are those of the row's
+  select tokens and apply it from its tray; flagged `flags["sending-stone"].alone`, so that its
+  [chat message](#chat-message) has `alone: true`. Nothing is used or spent. `dice` are those of
+  the row's
   [`tableDamage`](#what-an-item-rolls) `normal`, or `critical` with `critical: true`, changed by
   `modifiers` as a use's damage is, in order; `types` as a use's damage's. dnd5e's own `rollDamage` is
   called, never a module's in its place: under Midi-QOL no workflow starts and nothing is applied

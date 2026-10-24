@@ -2,7 +2,8 @@
 // §6.11): `itemDamage`, an action's damage or healing rolled with the player's dice as dnd5e's own
 // card with no targets, for the Gamemaster to apply from its tray, outside Midi-QOL's workflow; its
 // preview on every damaging row, `tableDamage`; and `recharge`, a spent recharge rolled as dnd5e's
-// own, with the player's d6. The real module; dnd5e 5.3.3's real dice classes, or 6.0.5's with
+// own, with the player's d6; and the damage card's mark, `alone`, in its flags and its chat message
+// (§20 item 1). The real module; dnd5e 5.3.3's real dice classes, or 6.0.5's with
 // DND5E6=1, whose damage and recharge cards this ports (mixin.mjs:857-914, uses-field.mjs:269-347);
 // dnd5e's items and activities ported (activity5e.mjs), rollRecharge among them; with MIDI=1,
 // midi-fake.mjs's workflow, its damage roll modifiers and the ammunition it keeps; a companion's
@@ -437,6 +438,59 @@ if (MIDI) {
   assert.deepEqual([drake1.actor.items.get('spit').system.uses.spent, drake.items.get('spit').system.uses.spent], [0, 1], "the token's creature's, not its base's")
   assert.equal(messageOf(spit.id).flags['sending-stone'].companion, 'arena-drake1')
   ok(`recharges: the breath's 5 recharges it, dnd5e's card with Alice's d6, public${DND5E6 ? ', typed recharge' : ''}; a 3 leaves it spent; one not spent, charged; two uses one spent, rolled; an activity's own uses; uses with no recharge, gone; two d6, invalid dice; a companion's on its token's creature`)
+}
+
+/* -------------------------------------------- */
+/*  The card's mark (round 0.36.0 §20 item 1)   */
+/* -------------------------------------------- */
+
+// The app is told of chat from here on, so that it can say a damage card was made on its own.
+settings.set('chatEvents', true)
+{
+  const chatEvents = id => app.events.filter(e => ['chat.message.created', 'chat.message.updated'].includes(e.type)
+    && (e.campaign.id === 'camp-a') && (e.data.message?.id === id))
+  /** The message as the app was last told of it, created or updated. */
+  const told = id => chatEvents(id).at(-1)?.data.message
+  const toldOf = async card => {
+    await until(() => told(card.id), `the app told of ${card.id}`)
+    await settle()
+    return told(card.id)
+  }
+  const sword = await itemDamage()
+  const heal = await itemDamage({ item: 'cure', activity: 'cure-heal', dice: [{ faces: 8, results: [4] }] })
+  for (const made of [sword, heal]) {
+    assert.equal(made.status, 'done', JSON.stringify(made))
+    const card = messageOf(made.id)
+    assert.equal(card.flags['sending-stone'].alone, true, 'the card flagged made on its own')
+    assert.equal((await toldOf(card)).alone, true, 'and its message says so')
+  }
+
+  // An attack's damage, by its use, and a recharge: neither card is marked, nor its message.
+  const attack = await send({ id: `atk-${++ids}`, actorId: 'thorin', kind: 'attack', item: 'longsword', activity: 'ls-swing', target: { combatId: 'fight', combatantId: 'cb-gob' }, ...plain, dice: [{ faces: 20, results: [15] }] })
+  assert.equal(attack.status, 'done', JSON.stringify(attack))
+  const dealt = await send({ id: `dmg-${++ids}`, actorId: 'thorin', kind: 'damage', use: attack.id, dice: [{ faces: 8, results: [4] }] })
+  assert.equal(dealt.status, 'done', JSON.stringify(dealt))
+  const recharged = await rechargeOf()
+  assert.equal(recharged.status, 'done', JSON.stringify(recharged))
+  const madeFor = id => [...messages.values()].filter(m => [m.flags?.['sending-stone']?.request, m.flags?.['sending-stone']?.use].includes(id))
+  const others = [...madeFor(attack.id), ...madeFor(dealt.id), ...madeFor(recharged.id)]
+  assert.ok(others.some(card => card.rolls.some(roll => roll instanceof DamageRoll)), "the attack's damage among them")
+  assert.ok(others.some(card => card.flags['sending-stone'].request === recharged.id), "and the recharge's card")
+  for (const card of others) {
+    assert.ok(!Object.hasOwn(card.flags['sending-stone'], 'alone'), `${card.id}: no flag`)
+    assert.ok(!Object.hasOwn(await toldOf(card), 'alone'), `${card.id}: nor in its message`)
+  }
+
+  // Only the module's own flag, true, says so.
+  const odd = await ChatMessage.create({ speaker: { actor: 'thorin', alias: 'Thorin' }, content: 'Mine', flags: { 'sending-stone': { alone: 'true' } } })
+  assert.ok(!Object.hasOwn(await toldOf(odd), 'alone'), 'a flag that is not true says nothing')
+
+  // To every listener: one that reads no companions is told it too.
+  const { serializeMessage } = await import(`${MODULE}/scripts/chat-data.mjs`)
+  const unread = { ...getCampaigns().find(({ id }) => id === 'camp-a'), id: 'camp-none' }
+  assert.equal(serializeMessage(messageOf(sword.id), unread).companion, undefined, 'a listener reading no companions')
+  assert.equal(serializeMessage(messageOf(sword.id), unread).alone, true, 'is told it too')
+  ok(`the card damage on its own makes is flagged alone, a heal's too, and the app is told it in its chat message, as a listener that reads no companions is; ${MIDI ? "Midi's card of an attack and its damage" : "an attack's damage, made on its use,"} and a recharge's card are neither, nor a message flagged "true"`)
 }
 
 console.log(`alone${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

@@ -113,8 +113,10 @@ export function isAudienceShared(audience) {
 
 /**
  * Describe a chat message for a campaign. Since 0.36.0, for an app that reads companions, which of
- * their characters' companions it's a message of, `companion`, as `messageCompanion` has it; for any
- * other app, exactly as before.
+ * their characters' companions it's a message of, `companion`, as `messageCompanion` has it; and to
+ * every app, `alone` on a card made for the app's damage on its own, by the module's own flag. That's
+ * a claim, as any user may flag a message of theirs, and the app takes it as one: it shows words
+ * that apply nothing.
  * @param {ChatMessage} message
  * @param {Campaign} campaign
  * @param {object} [audience]   The message's audience in that campaign, if already computed.
@@ -143,6 +145,7 @@ export function serializeMessage(message, campaign, audience=chatAudience(messag
     },
     character: campaignCharacterId(message.speakerActor, campaign),
     ...((companion !== undefined) && { companion }),
+    ...((message.flags?.[MODULE_ID]?.alone === true) && { alone: true }),
     title: message.title || null,
     flavor: message.flavor ?? "",
     content,

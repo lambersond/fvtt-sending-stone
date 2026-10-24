@@ -94,10 +94,11 @@ export function checkItemDamageCommand(command) {
  * Damage buttons make it: dnd5e's own card for the activity's kind, a heal's healing, with its
  * damage breakdown and a save's "On save" line, naming no target, ever, whatever the Gamemaster has
  * targeted, for them to select tokens and apply it from its tray; authored as the player, their
- * character's for a companion's; public. No use, slot, ammunition or save: the first attack mode,
- * at the spell's own level, as the sheet's `tableDamage` previews it, which the dice must be,
- * changed as the player chose, and a critical hit's only where the activity allows one. Each check
- * is made before anything is rolled.
+ * character's for a companion's; public; flagged `alone`, so that the app's chat can say it was
+ * made on its own. No use, slot, ammunition or save: the first attack mode, at the spell's own
+ * level, as the sheet's `tableDamage` previews it, which the dice must be, changed as the player
+ * chose, and a critical hit's only where the activity allows one. Each check is made before
+ * anything is rolled.
  * @param {object} command      `{item, activity, critical?, dice, types?, modifiers?}`, as fetched.
  * @param {Campaign} campaign
  * @returns {Promise<CommandResult>}
@@ -148,8 +149,9 @@ export async function runItemDamageCommand(command, campaign) {
         { rollMode: PUBLIC, data: {
           author: authorFor(actor, character).id,
           // No targets, ever: the Gamemaster's of the moment aren't the player's. dnd5e 6 keeps
-          // them in its message's own data, which it reads alone.
-          flags: { ...(!sixth && { dnd5e: { targets: [] } }), [MODULE_ID]: appFlags(command) },
+          // them in its message's own data, which it reads alone. Marked made on its own, so that
+          // the app can say it's for the Gamemaster to apply.
+          flags: { ...(!sixth && { dnd5e: { targets: [] } }), [MODULE_ID]: { ...appFlags(command), alone: true } },
           ...(sixth && { system: { targets: [] } })
         } }
       );
