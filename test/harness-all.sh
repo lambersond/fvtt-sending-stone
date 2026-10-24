@@ -63,4 +63,11 @@ for v in X=1 "X=1 DND5E6=1"; do run removals $v SLIM_CHECK=1; done
 # Module 0.34.0: journal notes, personal and party, chapters, kept in step with Foundry (dnd5e 5.3.3 and
 # 6.0.5 stand-ins), fetched with rolls, moves and removals off.
 for v in X=1 "X=1 DND5E6=1"; do run notes $v; done
+# Module 0.36.0: companions (the creatures a character summons, and the NPCs its player owns),
+# found, sent and commanded on their own tokens (dnd5e 5.3.3 and 6.0.5 stand-ins, and Midi-QOL's);
+# and damage on its own and recharges.
+for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run companions $v; done
+for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run alone $v; done
+# Module 0.36.0: ending a turn from the app, the character's or a companion's, by Foundry's Next Turn.
+for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run turns $v; done
 exit $fail

@@ -2,6 +2,10 @@ import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend, resendHello } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, rosterEntry } from "./characters.mjs";
+import {
+  companionsDelivered, companionTermsChanged, creatureChanged, forgetListed, listingDropped, listsChanged,
+  resendCompanion, toldCompanions
+} from "./creature-sync.mjs";
 import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
 import { campaignGroups, groupEntry, groupReader, groupsListing } from "./groups.mjs";
 import { forgetBooks, journalOwnershipChanged, sendBooks } from "./journals.mjs";
@@ -41,6 +45,10 @@ import { typesDice } from "./typed-dice.mjs";
  * `manualDice` (typed-dice.mjs), so it's sent again when who may could have changed: the world's
  * roles' permissions, or a user's role, assigned Character or own permissions, or a user added or
  * removed. Only those whose answer changed are posted.
+ *
+ * Since 0.36.0 a campaign's characters' companions are kept current the same way, to an app that
+ * reads them (creature-sync.mjs): their sheets in the same maps, each keyed `c:<key>`, so that two
+ * tokens of one actor never share one.
  */
 
 /**
@@ -59,7 +67,8 @@ const RESEND_AFTER = 30_000;
 
 /**
  * What each campaign was last told about each of its characters, as JSON, keyed by the campaign's
- * id and the actor's, as `${campaignId}.${actorId}`.
+ * id and the actor's, as `${campaignId}.${actorId}`; since 0.36.0 a companion's by its key, as
+ * `${campaignId}.c:${key}`.
  * @type {Map<string, string>}
  */
 const told = new Map();
@@ -87,8 +96,11 @@ const ownershipChanged = new Set();
 
 /**
  * The hellos and characters lost to failures that might not last, to be sent again, by
- * `hello:${campaignId}` or `${campaignId}.${actorId}`, with when they were lost.
- * @type {Map<string, {campaignId: string, actorId: string|null, at: number}>}
+ * `hello:${campaignId}` or `${campaignId}.${actorId}`, with when they were lost; since 0.36.0 a
+ * campaign's companions' list, by `companions:${campaignId}`, and a companion's sheet, by
+ * `${campaignId}.c:${key}`.
+ * @type {Map<string, {campaignId: string, actorId: string|null, companions?: boolean,
+ *   companionKey?: string, at: number}>}
  */
 const lost = new Map();
 
@@ -151,16 +163,49 @@ export function registerCharacterHooks() {
 }
 
 /**
- * Forget what a campaign was told of its characters, so that each is sent again, as after a hello.
+ * Forget what a campaign was told of its characters, so that each is sent again, as after a hello;
+ * since 0.36.0 of its companions too, their sheets and, but where the listener's terms alone
+ * changed, their list.
  * @param {string} campaignId
+ * @param {object} [options]
+ * @param {boolean} [options.lists]   Forget what it was told of its companions' list.
  * @returns {void}
  */
-export function forgetTold(campaignId) {
+export function forgetTold(campaignId, { lists=true }={}) {
   for ( const key of told.keys() ) {
     if ( !key.startsWith(`${campaignId}.`) ) continue;
     told.delete(key);
     built.delete(key);
   }
+  if ( lists ) forgetListed(campaignId);
+}
+
+/**
+ * Forget what a campaign was told of one actor's sheet, by its key, as of a companion no longer
+ * listed: what was built, lost and warned of it too, and that it was withheld.
+ * @param {string} campaignId
+ * @param {string} key   An actor's id, or a companion's `c:<key>`.
+ * @returns {void}
+ */
+export function forgetActorKey(campaignId, key) {
+  const full = `${campaignId}.${key}`;
+  told.delete(full);
+  built.delete(full);
+  lost.delete(full);
+  warned.delete(full);
+  noteSheetSent(campaignId, key);
+}
+
+/**
+ * Forget only that a campaign was told an actor's sheet, by its key, so that it's sent again as it
+ * now stands however it's built: since 0.36.0 a companion's that went after a list its app never
+ * took, which ignored it as one it didn't list. What was warned of it stays warned.
+ * @param {string} campaignId
+ * @param {string} key   A companion's `c:<key>`.
+ * @returns {void}
+ */
+export function forgetSheetTold(campaignId, key) {
+  told.delete(`${campaignId}.${key}`);
 }
 
 /**
@@ -248,8 +293,9 @@ function sendGroups(campaign) {
  * each in a post of its own after the descriptions its sheet refers to. Every description goes
  * again, as every sheet does: the listener started afresh, and another hello may have followed the
  * one that was answered. Then its groups, and since the hello was built when it was queued, the
- * removal of any group it listed that has been deleted since; and since 0.34.0, every journal of
- * notes the campaign has, to an app that reads them.
+ * removal of any group it listed that has been deleted since; since 0.36.0 its companions, to an
+ * app that reads them, as creature-sync.mjs sends them; and since 0.34.0, every journal of notes the
+ * campaign has, to an app that reads them.
  * @param {string} campaignId
  * @param {object} [hello]    The hello answered.
  * @returns {void}
@@ -263,6 +309,7 @@ export function helloDelivered(campaignId, hello) {
   for ( const actor of campaignActors(campaign) ) sendSheet(campaign, actor);
   sendGroups(campaign);
   removedSince(campaign, hello);
+  companionsDelivered(campaign, hello);
   sendBooks(campaign, hello);
 }
 
@@ -289,16 +336,17 @@ function removedSince(campaign, hello) {
  * Send a campaign every character again as its listener now takes them, as when it says it expands
  * slim sheets, says so no longer, or takes larger posts than before, which a sheet withheld as too
  * large may now fit in. Not while a hello is on its way, which they follow anyway. Since 0.34.0 its
- * journals of notes too, which a larger post may now take.
+ * journals of notes too, which a larger post may now take; and since 0.36.0 its companions' sheets.
  * @param {string} campaignId
  * @returns {void}
  */
 export function sheetTermsChanged(campaignId) {
   const campaign = getCampaigns().find(c => c.id === campaignId);
   if ( !campaign || !canSend() || helloPending(campaign.id) ) return;
-  forgetTold(campaign.id);
+  forgetTold(campaign.id, { lists: false });
   for ( const actor of campaignActors(campaign) ) sendSheet(campaign, actor);
   sendGroups(campaign);
+  companionTermsChanged(campaign);
   forgetBooks(campaign.id);
   sendBooks(campaign);
 }
@@ -353,7 +401,8 @@ function sendGroup(campaign, group) {
  * hasn't been sent, in the slim format the listener expands, if it does. A sheet that can't be
  * described goes as null, so that one actor can't cost the others theirs; one that makes a post
  * larger than the listener takes is withheld, the post saying so, and its descriptions wait for a
- * sheet that fits.
+ * sheet that fits. Since 0.36.0 a companion's too, by the key it's told by, its sheet beside its
+ * entry in `companion.updated` (`apart`), where a withheld one's entry says so.
  * @param {Campaign} campaign
  * @param {Actor} actor
  * @param {object} kind
@@ -361,29 +410,33 @@ function sendGroup(campaign, group) {
  * @param {(options?: {sheet?: boolean}) => {texts: SheetTexts, data: object}} kind.build
  *   Builds the event's data, its one key the actor with its sheet, and the descriptions the sheet
  *   refers to; with `sheet: false`, the actor with a null sheet, and none.
+ * @param {string} [kind.key]     What it's told by: its actor's id, or a companion's `c:<key>`.
+ * @param {string} [kind.name]    What the Gamemaster is told it's called: its actor's name.
+ * @param {boolean} [kind.apart]  Is its sheet beside its entry, `{companion, sheet}`, not in it?
  * @returns {void}
  */
-function sendActor(campaign, actor, { event, build }) {
+export function sendActor(campaign, actor, { event, build, key: id=actor.id, name=actor.name, apart=false }) {
   try {
     let made;
     try {
       made = build();
     } catch (err) {
-      console.error(`${MODULE_ID} | Could not describe the sheet of ${actor.name}`, err);
+      console.error(`${MODULE_ID} | Could not describe the sheet of ${name}`, err);
       made = build({ sheet: false });
     }
     const { texts, data } = made;
     const [[field, entry]] = Object.entries(data);
+    const holder = apart ? data : entry;
     const { slimSheets, maxBytes } = termsOf(campaign.id);
-    if ( slimSheets && entry.sheet ) {
+    if ( slimSheets && holder.sheet ) {
       try {
-        entry.sheet = slimSheet(entry.sheet);
+        holder.sheet = slimSheet(holder.sheet);
       } catch (err) {
-        console.warn(`${MODULE_ID} | Could not make the sheet of ${actor.name} smaller; sending it in full`, err);
+        console.warn(`${MODULE_ID} | Could not make the sheet of ${name} smaller; sending it in full`, err);
       }
     }
-    const json = JSON.stringify(entry);
-    const key = `${campaign.id}.${actor.id}`;
+    const json = JSON.stringify(apart ? data : entry);
+    const key = `${campaign.id}.${id}`;
     // Nothing new if built as it was when the campaign was last told of it, sheet withheld or not.
     if ( told.has(key) && (built.get(key) === json) ) return;
 
@@ -395,41 +448,42 @@ function sendActor(campaign, actor, { event, build }) {
       built.set(key, json);
       sendTexts(campaign, takeUnsent(campaign, texts));
       post(envelope);
-      noteSheetSent(campaign.id, actor.id);
+      noteSheetSent(campaign.id, id);
       return;
     }
+    const sheetWithheld = { reason: "tooLarge", bytes, limit: maxBytes };
     const { sheet, ...rest } = entry;
-    const withheld = { ...rest, sheet: null, sheetWithheld: { reason: "tooLarge", bytes, limit: maxBytes } };
-    envelope.data = { [field]: withheld };
-    told.set(key, JSON.stringify(withheld));
+    envelope.data = apart ? { [field]: { ...entry, sheetWithheld }, sheet: null }
+      : { [field]: { ...rest, sheet: null, sheetWithheld } };
+    told.set(key, JSON.stringify(apart ? envelope.data : envelope.data[field]));
     built.set(key, json);
     post(envelope);
-    warnTooLarge(campaign, actor, bytes, maxBytes);
+    warnTooLarge(campaign, { id, name }, bytes, maxBytes);
   } catch (err) {
-    console.error(`${MODULE_ID} | Could not send ${campaign.title} the sheet of ${actor.name}`, err);
+    console.error(`${MODULE_ID} | Could not send ${campaign.title} the sheet of ${name}`, err);
   }
 }
 
 /**
  * Tell the Gamemaster, once a page load for each character and campaign, that a sheet was too large
  * to send; and whether its player is told why, as an app that expands slim sheets tells them. Manage
- * Campaigns shows it withheld until it's sent.
+ * Campaigns shows it withheld until it's sent. Since 0.36.0 a companion's by its key, and its name.
  * @param {Campaign} campaign
- * @param {Actor} actor
+ * @param {{id: string, name: string}} withheld   The key it's told by, and its name.
  * @param {number} bytes    The post's size.
  * @param {number} limit    The largest the listener takes.
  * @returns {void}
  */
-function warnTooLarge(campaign, actor, bytes, limit) {
-  const key = `${campaign.id}.${actor.id}`;
+function warnTooLarge(campaign, { id, name }, bytes, limit) {
+  const key = `${campaign.id}.${id}`;
   const size = inMegabytes(bytes, Math.ceil);
-  noteWithheld(campaign.id, actor.id, { name: actor.name, bytes, limit });
-  console.warn(`${MODULE_ID} | The sheet of ${actor.name} came to ${size}, more than ${campaign.title} takes`);
+  noteWithheld(campaign.id, id, { name, bytes, limit });
+  console.warn(`${MODULE_ID} | The sheet of ${name} came to ${size}, more than ${campaign.title} takes`);
   if ( warned.has(key) ) return;
   warned.add(key);
   const notice = termsOf(campaign.id).slimSheets ? "SENDINGSTONE.Notify.SheetTooLarge" : "SENDINGSTONE.Notify.SheetTooLargeUntold";
   ui.notifications.warn(game.i18n.format(notice, {
-    name: actor.name, campaign: campaign.title, size, limit: inMegabytes(limit, Math.floor)
+    name, campaign: campaign.title, size, limit: inMegabytes(limit, Math.floor)
   }));
 }
 
@@ -441,8 +495,9 @@ function warnTooLarge(campaign, actor, bytes, limit) {
  * no sheet followed; a character, which the campaign is no longer taken to have been told; or
  * descriptions, which go again with the next sheet that refers to them. Since 0.30.0 a group as a
  * character; and a group's removal, or what the world's settings are, as the hello, which says both
- * again; and since 0.34.0 a journal of notes, as the hello, which every journal follows. What the
- * app refused would be refused again, and isn't.
+ * again; and since 0.34.0 a journal of notes, as the hello, which every journal follows. Since
+ * 0.36.0 a campaign's companions' list, which is taken as untold and compared again; and a
+ * companion's sheet, as a character's. What the app refused would be refused again, and isn't.
  * @param {object} envelope
  * @param {{temporary: boolean}} options
  * @returns {void}
@@ -463,6 +518,18 @@ export function eventDropped(envelope, { temporary }={}) {
       lost.set(key, { campaignId, actorId: entry.id, at: Date.now() });
       break;
     }
+    case EVENTS.COMPANIONS_LISTED:
+      listingDropped(campaignId, envelope);
+      lost.set(`companions:${campaignId}`, { campaignId, actorId: null, companions: true, at: Date.now() });
+      break;
+    case EVENTS.COMPANION_UPDATED: {
+      const companionKey = envelope.data?.companion?.key;
+      if ( typeof companionKey !== "string" ) return;
+      const key = `${campaignId}.c:${companionKey}`;
+      if ( told.get(key) === JSON.stringify(envelope.data) ) told.delete(key);
+      lost.set(key, { campaignId, actorId: null, companionKey, at: Date.now() });
+      break;
+    }
     case EVENTS.GROUP_REMOVED:
     case EVENTS.BRIDGE_SETTINGS:
     case EVENTS.JOURNAL_UPDATED:
@@ -476,15 +543,18 @@ export function eventDropped(envelope, { temporary }={}) {
 
 /**
  * Send again what was lost long enough ago: a hello, with every character after it, or a character
- * or group, which `sendCharacter` sends where it now belongs.
+ * or group, which `sendCharacter` sends where it now belongs; since 0.36.0 a companions' list, by
+ * comparing it again, and a companion's sheet, where it's still listed.
  * @returns {void}
  */
 export function resendLost() {
   const now = Date.now();
-  for ( const [key, { campaignId, actorId, at }] of lost ) {
+  for ( const [key, { campaignId, actorId, companions, companionKey, at }] of lost ) {
     if ( now - at < RESEND_AFTER ) continue;
     lost.delete(key);
-    if ( actorId ) sendCharacter(actorId);
+    if ( companions ) listsChanged({ now: true });
+    else if ( companionKey ) resendCompanion(campaignId, companionKey);
+    else if ( actorId ) sendCharacter(actorId);
     else resendHello(campaignId);
   }
 }
@@ -494,13 +564,16 @@ export function resendLost() {
 /**
  * Note that a character may have changed, and send it once its changes settle. Only the bridge
  * sends; every other client ignores the change. Since 0.30.0 it's noted whether any of the changes
- * settling was to its ownership, which changes who may see its campaigns' groups.
+ * settling was to its ownership, which changes who may see its campaigns' groups. Since 0.36.0 any
+ * actor heard of may be a companion, as a token's synthetic actor is, which is sent as one
+ * (creature-sync.mjs).
  * @param {Actor|null} actor
  * @param {object} [changes]   What an update of the actor changed.
  * @returns {void}
  */
 function characterChanged(actor, changes) {
   if ( !actor?.id || !canSend() ) return;
+  creatureChanged(actor);
   const id = actor.id;
   if ( changes && (typeof changes === "object") && ("ownership" in changes) ) ownershipChanged.add(id);
   clearTimeout(settling.get(id));
@@ -557,16 +630,23 @@ function primaryPartyChanged(setting) {
 
 /**
  * Note that every campaign character with a temporary effect, or an item of theirs with a temporary
- * enchantment, may have changed, since the time it has left is on its sheet.
+ * enchantment, may have changed, since the time it has left is on its sheet; since 0.36.0 every
+ * companion listed with one too.
  * @returns {void}
  */
 function effectsRunningDown() {
   if ( !canSend() ) return;
-  for ( const actor of campaignCharacters() ) {
+  const running = actor => {
     const effects = Array.from(actor.allApplicableEffects?.() ?? []);
     const enchanted = Array.from(actor.items ?? []).some(item => (typeof item.effects?.some === "function")
       && item.effects.some(effect => effect.isAppliedEnchantment && effect.isTemporary));
-    if ( enchanted || effects.some(effect => effect.isTemporary) ) characterChanged(actor);
+    return enchanted || effects.some(effect => effect.isTemporary);
+  };
+  for ( const actor of campaignCharacters() ) {
+    if ( running(actor) ) characterChanged(actor);
+  }
+  for ( const actor of toldCompanions() ) {
+    if ( running(actor) ) creatureChanged(actor);
   }
 }
 
@@ -579,6 +659,7 @@ function effectsRunningDown() {
 function criticalRulesChanged(setting) {
   if ( !CRITICAL_SETTINGS.has(setting?.key) || !canSend() ) return;
   for ( const actor of campaignCharacters() ) characterChanged(actor);
+  for ( const actor of toldCompanions() ) creatureChanged(actor);
 }
 
 /**
@@ -592,6 +673,7 @@ function criticalRulesChanged(setting) {
 function permissionsChanged(setting) {
   if ( (setting?.key !== "core.permissions") || !canSend() ) return;
   for ( const actor of campaignCharacters() ) characterChanged(actor);
+  for ( const actor of toldCompanions() ) creatureChanged(actor);
 }
 
 /**
@@ -616,12 +698,17 @@ function campaignCharacters() {
 }
 
 /**
- * The actor an embedded document, such as an item or an effect, ultimately belongs to.
+ * The actor an embedded document, such as an item or an effect, ultimately belongs to. Since 0.36.0
+ * one an unlinked token's ActorDelta holds belongs to the token's synthetic actor, whichever parent
+ * core gives it.
  * @param {Document} document
  * @returns {Actor|null}
  */
 function owningActor(document) {
   let parent = document?.parent;
-  while ( parent && (parent.documentName !== "Actor") ) parent = parent.parent;
+  while ( parent && (parent.documentName !== "Actor") ) {
+    if ( parent.documentName === "ActorDelta" ) return parent.parent?.actor ?? null;
+    parent = parent.parent;
+  }
   return parent ?? null;
 }

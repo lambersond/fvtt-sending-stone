@@ -8,6 +8,8 @@ import {
 import { migrateConnectedCharacters } from "./campaigns.mjs";
 import { registerChatHooks } from "./chat.mjs";
 import { registerCombatHooks } from "./combat.mjs";
+import { registerFollowHooks } from "./creature-initiative.mjs";
+import { registerCreatureHooks } from "./creature-sync.mjs";
 import { installDicePlans, selfTest } from "./dice-plan.mjs";
 import { registerSettingsWatch } from "./foundry-settings.mjs";
 import { startHeartbeat } from "./heartbeat.mjs";
@@ -20,7 +22,9 @@ Hooks.once("init", () => {
   registerSettings();
   registerChatHooks();
   registerCombatHooks();
+  registerFollowHooks();
   registerCharacterHooks();
+  registerCreatureHooks();
   registerJournalHooks();
   registerPromptHooks();
   registerMidiPromptHooks();

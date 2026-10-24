@@ -1,6 +1,8 @@
 import { describeEnchant, enchantInPlay } from "./sheet-enchant.mjs";
 import { formulaRoll } from "./dice-plan.mjs";
-import { challenge, checkOptions } from "./sheet-links.mjs";
+import {
+  challenge, checkOptions, criticalAdditions, DND5E_ACTIVITIES, ownDamageConfig, previewDamage
+} from "./sheet-links.mjs";
 import { countedUses, finite, limitedUses, localize, RESOURCES } from "./sheet-values.mjs";
 
 /**
@@ -126,8 +128,32 @@ function repeatsForward(forward, earlier) {
 
 /** What an activity rolls, when it rolls nothing, or isn't to be told. */
 const NO_ROLLS = Object.freeze({
-  toHit: null, attackId: null, activity: null, attackModes: null, ammunition: null, save: null, damage: []
+  toHit: null, attackId: null, activity: null, attackModes: null, ammunition: null, save: null, damage: [],
+  tableDamage: null
 });
+
+/**
+ * The dice each activity's damage on its own throws, by its uuid, while one sheet is built, so that
+ * an activity listed in more than one place is worked out once.
+ * @type {Map<string, object|null>|null}
+ */
+let tabled = null;
+
+/**
+ * Build a sheet, working out each activity's damage on its own once.
+ * @template T
+ * @param {() => T} build
+ * @returns {T}
+ */
+export function tablingSheet(build) {
+  const outer = tabled;
+  tabled = outer ?? new Map();
+  try {
+    return build();
+  } finally {
+    tabled = outer;
+  }
+}
 
 /**
  * What an item rolls, as its first activity does: an attack's bonus to hit and the attack's id,
@@ -262,6 +288,7 @@ function activityRolls(item, activity, texts) {
     ammunition: attack ? ammunitionOf(item) : null,
     save: saveOf(activity),
     damage: damageOf(activity),
+    tableDamage: tableDamageOf(item, activity),
     ...(area && { attackArea: area }),
     // With the character's numbers in it, so the app can roll its dice and have it made here.
     ...(roll && { rollFormula: { formula: roll.formula, name: activity.roll.name || null } }),
@@ -269,6 +296,39 @@ function activityRolls(item, activity, texts) {
     ...(check && { check }),
     ...(spendsNoSlot(item, activity) && { consumesSlot: false })
   };
+}
+
+/**
+ * The dice an activity's damage or healing throws on its own, since 0.36.0, for the app to roll and
+ * send with no attack or use made, as `itemDamage`: as the module will make it up, with the
+ * activity's first attack mode and no ammunition, at the spell's own level, as dnd5e's own damage
+ * configuration for its kind of activity has it; and a critical hit's, where the activity allows
+ * one, as dnd5e makes one, never a heal's. None for an item's own activity of another item, as a
+ * spell's copy cast from an item, an item not identified yet, an activity that isn't an attack,
+ * save, damage or heal, one with no damage, or one whose dice can't be planned; nor for one dnd5e or
+ * a module can't work out.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {{normal: object, critical: object|null}|null}
+ */
+function tableDamageOf(item, activity) {
+  if ( !activity || (activity.item?.id !== item.id) || (item.system?.identified === false) ) return null;
+  if ( !DND5E_ACTIVITIES[activity.type] ) return null;
+  const key = activity.uuid;
+  if ( tabled?.has(key) ) return tabled.get(key);
+  let rolls = null;
+  try {
+    const normal = previewDamage(activity);
+    if ( normal?.plannable ) {
+      const process = ownDamageConfig(activity);
+      const allowed = (activity.type !== "heal") && criticalAdditions(process, process?.rolls?.length ?? 0).allowed;
+      rolls = { normal, critical: allowed ? previewDamage(activity, { isCritical: true }) : null };
+    }
+  } catch {
+    rolls = null;
+  }
+  if ( key ) tabled?.set(key, rolls);
+  return rolls;
 }
 
 /**
@@ -429,6 +489,8 @@ function castRolls(item, cast, texts) {
   return {
     ...rolls,
     attackId: rolls.attackId && cast.id,
+    // Its damage on its own would be the copy's: cast it from the item, as its slot and charges are.
+    tableDamage: null,
     // What it spends is the Cast activity's, of the item, never the spell's copy's.
     activity: rolls.activity && withSpends({ ...rolls.activity, id: cast.id },
       (lead.consumption?.spellSlot === false) ? [] : spendsOf(item, cast)),
@@ -839,6 +901,8 @@ function forwardRolls(item, forward, texts) {
   return {
     ...rolls,
     attackId: rolls.attackId && forward.id,
+    // A forward is used as the activity it names, for what the forward spends; never on its own.
+    tableDamage: null,
     activity: rolls.activity
       && withSpends({ ...rolls.activity, id: forward.id, targets: atLevel(rolls.activity.targets) }, spends),
     ...(rolls.attackArea && { attackArea: atLevel(rolls.attackArea) }),

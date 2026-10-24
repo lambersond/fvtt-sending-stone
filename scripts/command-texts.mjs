@@ -1,6 +1,7 @@
 import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import { askFlavor } from "./chat-data.mjs";
 import { appFlags, authorFor, checkCommand, describeResult, failedResult, PUBLIC } from "./command-rolls.mjs";
+import { commandActor, ownedByPlayers } from "./creatures.mjs";
 import {
   changesDamage, damageRollsFor, diceStatus, matchesDice, modifiedDice, plannedDamage, plannedDice, readModifiers,
   takesAway, unmaximizable, withPlan
@@ -16,7 +17,8 @@ import { findLink, linkCritical } from "./sheet-links.mjs";
  * A command names a link by its description's hash and the link's number in it, and the link is
  * read from the description as this module sent it, from the character's sheet as it is now. So a
  * player never sends a formula or a DC of their own: only what a description on their sheet says,
- * as its owner may write it, as in Foundry.
+ * as its owner may write it, as in Foundry. Since 0.36.0 a companion's, named by `of`, from its own
+ * sheet, as it was sent: without the Gamemaster's secrets where none of its players owns it.
  */
 
 /**
@@ -32,8 +34,9 @@ const ASK_EVERY = 10_000;
 const ASK_AGAIN = 30_000;
 
 /**
- * When each character last asked the table, by actor id, and when each link was last asked, by
- * actor id, hash and number, in milliseconds.
+ * When each character last asked the table, by its actor's uuid, and when each link was last asked,
+ * by that, hash and number, in milliseconds: a uuid, so that two tokens of one actor, as two
+ * companions, are apart.
  * @type {Map<string, number>}
  */
 const asked = new Map();
@@ -102,9 +105,10 @@ export async function runAskCommand(command, campaign) {
   if ( !campaign.rolls || !asksOffered() ) return failed("off");
   const invalid = checkCommand(command);
   if ( invalid ) return failed("invalid", invalid);
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failed("unknown");
-  const found = await findLink(actor, command.text, command.link);
+  const who = commandActor(command, campaign);
+  if ( !who ) return failed("unknown");
+  const { actor, character } = who;
+  const found = await findLink(actor, command.text, command.link, { secrets: secretsOf(who) });
   if ( found.refusal ) return failed(found.refusal);
   const { link, origin } = found;
   if ( !["save", "concentration", "check"].includes(link?.kind) ) return failed("link");
@@ -113,10 +117,10 @@ export async function runAskCommand(command, campaign) {
   if ( link.secret ) return failed("secret");
   const now = Date.now();
   if ( askedLately(actor, command, now) ) return failed("busy");
-  const message = await postAsk(command, actor, origin, link);
+  const message = await postAsk(command, actor, origin, link, character);
   if ( !message ) return failed("cancelled");
   noteAsked(actor, command, now);
-  return describeResult(command, message, actor, campaign, { rolls: [] });
+  return describeResult(command, message, character, campaign, { rolls: [] });
 }
 
 /**
@@ -153,7 +157,7 @@ function askedLately(actor, command, now) {
   for ( const [key, at] of asked ) {
     if ( now - at >= ASK_AGAIN ) asked.delete(key);
   }
-  const last = asked.get(actor.id);
+  const last = asked.get(actor.uuid);
   if ( (last !== undefined) && (now - last < ASK_EVERY) ) return true;
   return asked.has(askedKey(actor, command));
 }
@@ -166,7 +170,7 @@ function askedLately(actor, command, now) {
  * @returns {void}
  */
 function noteAsked(actor, command, now) {
-  asked.set(actor.id, now);
+  asked.set(actor.uuid, now);
   asked.set(askedKey(actor, command), now);
 }
 
@@ -177,7 +181,7 @@ function noteAsked(actor, command, now) {
  * @returns {string}
  */
 function askedKey(actor, command) {
-  return `${actor.id} ${command.text} ${command.link}`;
+  return `${actor.uuid} ${command.text} ${command.link}`;
 }
 
 /**
@@ -193,9 +197,10 @@ function askedKey(actor, command) {
  * @param {{name: string, item?: Item}} origin   Where the description comes from.
  * @param {object} link   A save `{kind, abilities, dc, hideDC?}`, or a check `{kind: "check",
  *                        checks, dc, usingTool?, hideDC?}`, as findLink reads it.
+ * @param {Actor} [character]   Whose player asks: since 0.36.0 a companion's character's.
  * @returns {Promise<ChatMessage|null>}
  */
-async function postAsk(command, actor, origin, link) {
+async function postAsk(command, actor, origin, link, character=actor) {
   const { createRollLabel } = dnd5e.enrichers;
   const dc = Number.isInteger(link.dc) ? link.dc : undefined;
   const hideDC = ((dc !== undefined) && (link.hideDC === true)) ? true : undefined;
@@ -216,8 +221,8 @@ async function postAsk(command, actor, origin, link) {
     "systems/dnd5e/templates/chat/roll-request-card.hbs", { buttons }
   );
   return ChatMessage.implementation.create({
-    author: authorFor(actor).id,
-    speaker: ChatMessage.implementation.getSpeaker({ actor }),
+    author: authorFor(actor, character).id,
+    speaker: ChatMessage.implementation.getSpeaker({ actor, token: actor.token ?? undefined }),
     flavor: askFlavor(origin.name),
     content,
     flags: {
@@ -263,9 +268,10 @@ export async function runTextDamageCommand(command, campaign) {
   if ( invalid ) return failed("invalid", invalid);
   const modifiers = readModifiers(command.modifiers);
   if ( changesDamage(modifiers) && !diceStatus.modifiers ) return failed("self-test");
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failed("unknown");
-  const found = await findLink(actor, command.text, command.link);
+  const who = commandActor(command, campaign);
+  if ( !who ) return failed("unknown");
+  const { actor, character } = who;
+  const found = await findLink(actor, command.text, command.link, { secrets: secretsOf(who) });
   if ( found.refusal ) return failed(found.refusal);
   const { link, origin } = found;
   if ( (link?.kind !== "damage") || !link.parts?.length ) return failed("link");
@@ -294,14 +300,14 @@ export async function runTextDamageCommand(command, campaign) {
 
   const label = game.i18n.localize(healing ? "DND5E.HEAL.HealingRoll" : "DND5E.DamageRoll");
   const flavor = `${escapeName(origin.name)} - ${label}`;
-  const message = rollMessage(command, actor, origin, flavor, healing ? "healing" : "damage");
+  const message = rollMessage(command, actor, origin, flavor, healing ? "healing" : "damage", character);
   let plan;
   const rolls = await withPlan(command, made => {
     plan = made;
     return CONFIG.Dice.DamageRoll.build(damageProcess(command, link, types, critical, live), { configure: false }, message);
   });
   if ( !rolls?.length ) return failed(plan?.refusal ?? "cancelled");
-  return describeResult(command, rolls[0].parent, actor, campaign, { rolls });
+  return describeResult(command, rolls[0].parent, character, campaign, { rolls });
 }
 
 /**
@@ -319,9 +325,10 @@ export async function runTextRollCommand(command, campaign) {
   if ( !campaign.rolls || !diceStatus.ready || !textsOffered() ) return failed("off");
   const invalid = checkCommand(command);
   if ( invalid ) return failed("invalid", invalid);
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failed("unknown");
-  const found = await findLink(actor, command.text, command.link);
+  const who = commandActor(command, campaign);
+  if ( !who ) return failed("unknown");
+  const { actor, character } = who;
+  const found = await findLink(actor, command.text, command.link, { secrets: secretsOf(who) });
   if ( found.refusal ) return failed(found.refusal);
   const { link, origin } = found;
   if ( (link?.kind !== "roll") || (typeof link.formula !== "string") ) return failed("link");
@@ -329,7 +336,7 @@ export async function runTextRollCommand(command, campaign) {
   const planned = built ? plannedDice(built) : null;
   if ( !planned?.plannable || !matchesDice(command.dice, planned.dice) ) return failed("dice");
 
-  const message = rollMessage(command, actor, origin, escapeName(origin.name), "generic");
+  const message = rollMessage(command, actor, origin, escapeName(origin.name), "generic", character);
   let plan;
   const rolls = await withPlan(command, made => {
     plan = made;
@@ -340,7 +347,17 @@ export async function runTextRollCommand(command, campaign) {
     );
   });
   if ( !rolls?.length ) return failed(plan?.refusal ?? "cancelled");
-  return describeResult(command, rolls[0].parent, actor, campaign, { rolls });
+  return describeResult(command, rolls[0].parent, character, campaign, { rolls });
+}
+
+/**
+ * Were the descriptions of the actor a command is made for sent with their secrets: a character's,
+ * always; since 0.36.0 a companion's where a player of its characters owns it in Foundry.
+ * @param {{actor: Actor, companion: CompanionEntry|null}} found   As `commandActor` has it.
+ * @returns {boolean}
+ */
+function secretsOf({ actor, companion }) {
+  return companion ? ownedByPlayers(actor, companion.of) : true;
 }
 
 /**
@@ -434,14 +451,16 @@ function basicRoll(formula) {
  * @param {{name: string, item?: Item, spell?: Item}} origin   Where the description comes from.
  * @param {string} flavor                                      HTML, its names escaped.
  * @param {"damage"|"healing"|"generic"} type                  The kind of roll, as dnd5e names it.
+ * @param {Actor} [character]   Whose player rolls it: since 0.36.0 a companion's character's, the
+ *                              companion speaking it through its token, where it's a token's.
  * @returns {object}
  */
-function rollMessage(command, actor, origin, flavor, type) {
+function rollMessage(command, actor, origin, flavor, type, character=actor) {
   return {
     rollMode: PUBLIC,
     data: {
-      author: authorFor(actor).id,
-      speaker: ChatMessage.implementation.getSpeaker({ actor }),
+      author: authorFor(actor, character).id,
+      speaker: ChatMessage.implementation.getSpeaker({ actor, token: actor.token ?? undefined }),
       flavor,
       flags: {
         dnd5e: {

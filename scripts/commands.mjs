@@ -1,22 +1,26 @@
 import {
-  ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION, ROLL_KINDS
+  ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION,
+  ROLL_KINDS, TURN_KINDS
 } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
+import { runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
+import { runEndTurnCommand, runUndoTurnCommand } from "./command-turn.mjs";
 import {
   noteRemovalReader, noteTransferReader, removalReader, removalsOn, runRemoveCommand, runTransferCommand,
   transferReader, transfersOn
 } from "./command-transfers.mjs";
 import { noteInFlight, runNoteCommand } from "./command-notes.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
-import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
+import { failedResult, HIT_DICE_KINDS, isId, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
 import { gmRollOf } from "./chat-data.mjs";
+import { noteCompanionReader } from "./creature-sync.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { noteSettingsReader } from "./foundry-settings.mjs";
 import { noteGroupReader } from "./groups.mjs";
@@ -153,7 +157,11 @@ const made = new Map();
  * from 0.29.0, among the kinds, ending a concentration of theirs, wherever their rolls are made,
  * and spending their charges directly and using or gaining Heroic Inspiration, wherever the
  * Gamemaster lets them attack and cast from the app, whether or not those can be made here now,
- * as neither throws dice or goes through Midi-QOL.
+ * as neither throws dice or goes through Midi-QOL. Since 0.36.0, among the kinds, an action's damage
+ * or healing on its own and a spent recharge rolled, where players may attack and damage takes
+ * their dice, as a description's damage is offered, under dnd5e 5.x and 6, Midi-QOL or not; and
+ * that players may change damage there too; and ending the current turn, their character's or one
+ * of its companions', wherever their rolls are made, as ending a concentration is.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
@@ -170,17 +178,20 @@ export function rollFeatures(campaign) {
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
   const attacks = campaign.attacks && !attacksUnavailable();
   const texts = textKinds(campaign);
+  const alone = campaign.attacks && diceStatus.attacks;
   return {
     enabled: true,
     kinds: [
       ...ROLL_KINDS.filter(kind => !HIT_DICE_KINDS.includes(kind) || diceStatus.hitDice),
       ...CONCENTRATION_KINDS,
+      ...TURN_KINDS,
       ...(attacks ? [...ATTACK_KINDS, ...ENCHANT_KINDS] : []),
       ...(campaign.attacks ? CHARGE_KINDS : []),
-      ...texts
+      ...texts,
+      ...(alone ? ALONE_KINDS : [])
     ],
     reason: null,
-    modifiers: (attacks || texts.includes("textDamage")) && diceStatus.modifiers,
+    modifiers: (attacks || texts.includes("textDamage") || alone) && diceStatus.modifiers,
     areaAttacks: attacks,
     prompts: prompting(campaign),
     activityChecks: checksOffered(),
@@ -213,9 +224,10 @@ export function registerCommandHooks() {
  * fetched from even while its players' rolls aren't made here; and since 0.33.0, whether it takes
  * removals of characters' items, for which it's fetched from even while its players' rolls and
  * moves aren't made here; and since 0.34.0, whether it takes journal notes, for which it's fetched
- * from under any system, and which are sent at once where it starts to in a heartbeat's answer. A
- * hello's answer wakes the campaign's fetching, which may be waiting as an answer given before the
- * hello was taken asked.
+ * from under any system, and which are sent at once where it starts to in a heartbeat's answer; and
+ * since 0.36.0, whether it reads companions, which are sent at once where it starts to in a
+ * heartbeat's answer. A hello's answer wakes the campaign's fetching, which may be waiting as an
+ * answer given before the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -230,6 +242,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteTransferReader(campaignId, features);
   noteRemovalReader(campaignId, features);
   noteNotesReader(campaignId, features, type);
+  noteCompanionReader(campaignId, features, type);
   syncPollers();
   if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.wake?.();
 }
@@ -474,7 +487,13 @@ class Poller {
  * removal waits for its character's earlier rolls and moves, as a roll does, and their next ones for
  * it. Since 0.34.0 a note command waits only for earlier ones of its journal, and is made again when
  * handed over again after it's been answered, as each is made once in effect: one is skipped only
- * while the same command is being made, until its run settles, however long after its answer.
+ * while the same command is being made, until its run settles, however long after its answer. Since
+ * 0.36.0 a companion's command waits for its character's earlier ones, and its character's next for
+ * it, one player making them one at a time; two companions of one actor, as two wolves, have keys of
+ * their own. An end of a turn waits too for every earlier end of a turn of its combat, any
+ * character's: two players ending the turn of a companion they share would otherwise both find it
+ * current, where the later should find it ended and end nothing more. Taking a turn back waits so
+ * too, for the end of the turn it takes back and any other of its combat.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -498,8 +517,11 @@ function take(command, campaign) {
 
   const keyOf = value => ((typeof value === "string") && value) ? value : null;
   let keys = [String(command.actorId)];
+  if ( isId(command.of) ) keys = [String(command.actorId), command.of];
   if ( note ) keys = [`note:${command.actorId}`];
-  else if ( command.kind === "transfer" ) {
+  else if ( TURN_KINDS.includes(command.kind) ) {
+    if ( isId(command.turn?.combatId) ) keys = [...keys, `turn:${command.turn.combatId}`];
+  } else if ( command.kind === "transfer" ) {
     keys = [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to),
       ...(Array.isArray(command.transfer?.among) ? command.transfer.among.map(keyOf) : [])].filter(Boolean))];
   }
@@ -596,11 +618,15 @@ function runCommand(command, campaign, signal) {
     case "damage": return runDamageCommand(command, campaign);
     case "endEnchantment": return runEndEnchantmentCommand(command, campaign);
     case "endConcentration": return runEndConcentrationCommand(command, campaign);
+    case "endTurn": return runEndTurnCommand(command, campaign);
+    case "undoEndTurn": return runUndoTurnCommand(command, campaign);
     case "spend": return runSpendCommand(command, campaign);
     case "inspiration": return runInspirationCommand(command, campaign);
     case "ask": return runAskCommand(command, campaign);
     case "textDamage": return runTextDamageCommand(command, campaign);
     case "textRoll": return runTextRollCommand(command, campaign);
+    case "itemDamage": return runItemDamageCommand(command, campaign);
+    case "recharge": return runRechargeCommand(command, campaign);
     case "transfer": return runTransferCommand(command, campaign);
     case "remove": return runRemoveCommand(command, campaign);
     case "note": return runNoteCommand(command, campaign);

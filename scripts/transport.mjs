@@ -73,10 +73,12 @@ const ANNOUNCING = new Set([EVENTS.HELLO, EVENTS.HEARTBEAT]);
 /**
  * The events whose answers say what the listener takes of sheets: since 0.22.0, a character's
  * update's too, so that an app rolled back to one that doesn't expand slim sheets is noticed at
- * the next sheet it's sent; and since 0.30.0 a group's.
+ * the next sheet it's sent; since 0.30.0 a group's; and since 0.36.0 a companion's.
  * @type {Set<string>}
  */
-const TERMS_FROM = new Set([EVENTS.HELLO, EVENTS.HEARTBEAT, EVENTS.CHARACTER_UPDATED, EVENTS.GROUP_UPDATED]);
+const TERMS_FROM = new Set([
+  EVENTS.HELLO, EVENTS.HEARTBEAT, EVENTS.CHARACTER_UPDATED, EVENTS.GROUP_UPDATED, EVENTS.COMPANION_UPDATED
+]);
 
 /**
  * What the listener takes of each campaign's sheets, from its latest answer that says, by

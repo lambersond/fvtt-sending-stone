@@ -84,7 +84,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -114,6 +114,22 @@ inventory and its description, goes to the app for the campaign's characters who
 Observer or Owner on the group in Foundry; the tab says who sees each group, and warns when no one
 does. A group no player of the campaign can see goes without its sheet. Party sheets need D&D Fifth
 Edition, and an app that reads them.
+
+**Companions.** A character's companions show beside it in the app: the creatures it summons, such
+as a familiar from Find Familiar, while their tokens are on the active scene, whoever cast the
+spell; and the NPCs its player owns in Foundry (give the player Owner on the NPC by name, or on one
+placed token). A linked NPC shows always; an unlinked one while its token is on the active scene.
+Players roll for them, attack and cast with them from the app, as for their character; summoning,
+dismissing and changing them stay in Foundry. A creature its player doesn't own in Foundry goes
+without its secrets, with its public biography. To take one from a player in the app, take their
+Owner away, or hide or delete its token. The saves the game asks of a companion are rolled in
+Foundry. On the campaign's **Player actions** tab, **Companions' initiative** chooses how they enter
+combat: **Its own roll**, each rolled from its tab in the app or here; or **Right after its
+character**: whenever a character's initiative is rolled, changed or cleared, here or in the app,
+each of its companions in that combat is set just below it, so it acts straight after; one tied with
+the character may still come between them. A companion's own roll from the app is then refused while
+its character is in the combat; a change you make to its initiative here stands until its
+character's next, whatever else you save in Manage Campaigns, and through a reload.
 
 ### Players' rolls
 
@@ -170,6 +186,15 @@ while the roll is being made.
   character with Elven Accuracy enters a third d20 for an attack with advantage made with an
   ability it's for. A player's own Manual Dice toggle in Foundry lives in their browser alone, and
   plays no part in the app.
+- **Ending a turn.** Players can end their turn from the app, and their companions' turns: the turn
+  panel's **End turn**, or the Combat tab held for a second. It's Foundry's own Next Turn, made by
+  your Foundry, so dnd5e's and Midi-QOL's start- and end-of-turn work happens as if you had clicked
+  it. A turn that has moved on by then, as one ended already, isn't ended again. **Undo**, in the
+  app's toast for a few seconds after, takes it back: your Foundry puts the turn back on you, with
+  its turn events off, so nothing of the turn's change happens again; what did happen then (uses
+  recovered, a recharge rolled, an effect that ended with the turn, Midi-QOL's saves and damage over
+  time, initiative Midi-QOL rerolled at a new round) stays as it is, and so does whatever the next to
+  act did meanwhile.
 
 The app's address must be able to answer the module's fetches of players' rolls, which only the
 Sending Stone app, or a listener that says it can, is asked for; see
@@ -293,6 +318,10 @@ an attack hit only where the game shows players.
   even damage the game rolls itself, such as a d3's; nor is damage with a die that explodes, or
   rerolls on its highest face, as `1d6x`, which Foundry would roll again.
   A description's damage too; see [Descriptions that roll](#descriptions-that-roll).
+- **Damage on its own:** with the app's *Damage on its own* setting, a player's damage or healing
+  roll with no attack or use made here posts dnd5e's card with no targets; select the tokens and
+  apply it from the card's tray. With Midi-QOL it's the same card, outside Midi's workflow: nothing
+  is applied until you apply it.
 - **Nothing asks you, where it can be helped.** An enchantment's profile and item are chosen in the
   app, so dnd5e's usage dialog never opens. Area attacks Midi targets itself around their user,
   summoning, transforming and other activities dnd5e asks about, Midi's Active Defence, a used
@@ -316,6 +345,7 @@ an attack hit only where the game shows players.
   attacks can be made now. Never a spell's own uses, which casting it spends, an item not identified
   yet, or a potion's, scroll's or other item's that's used up as it runs out, which only using it
   should spend. Nothing is given back from the app: a mis-tap is yours to put right on the sheet.
+- **Recharges.** A spent Recharge 5–6 can be rolled from the app.
 - **Heroic Inspiration.** With the same switch, a player can use or gain Heroic Inspiration, as
   dnd5e's sheet header toggles it.
 - **A line in chat.** dnd5e posts nothing for what's changed on its sheet, so each spend, and each
@@ -617,8 +647,8 @@ With **GM-only details** off, the listener receives what players could see:
 | A blind roll the Gamemaster later reveals | Yes, from then on, as an update. |
 | A message made private after it was sent | The listener is told to delete it. |
 | Hidden combatants | No. Their turns are reported with no combatant. Revealing one reports it joining; hiding one reports it leaving. |
-| Hit points | The campaign's own characters only. |
-| Character sheets | The campaign's own characters only: what their players can already see in Foundry. |
+| Hit points | The campaign's own characters only and, to an app that reads companions, their companions'. |
+| Character sheets | The campaign's own characters only: what their players can already see in Foundry, and their companions' sheets, to an app that reads them: without secrets where their players don't own the creature in Foundry. |
 | Party sheets | Only to characters whose players have Observer or Owner on the group in Foundry: names and portraits of its members, its inventory and its description, without secrets. |
 | Journal notes | A character's journal for a campaign to that campaign, a party's to it while one of its characters can see the party; a page only Gamemasters, or only some of the journal's players, can see is never sent, and nor is a secret its readers couldn't read in Foundry: a party page's, or one on a character's page its players don't all own; and who last deleted or reordered a page the app is sent, by name, and when. |
 | Foundry settings | Versions, this campaign's switches, the visibility settings that decide chat results, and what players see, for the campaign's Gamemaster only; never a secret, address or token. |
@@ -660,6 +690,27 @@ Gamemaster-only information switched on.
   Edition, Foundry's `Roll#evaluate` and `DiceTerm#_roll` are wrapped, through libWrapper when it's
   active, so that a roll made for a player from the app takes their dice. Every other roll is left alone. No core
   or system class is otherwise overridden.
+- **Summons are placed on the scene the summoner is viewing:** one summoned while you view a prep
+  scene shows once its token is on the active scene.
+- **View the active scene while companions act:** Foundry, and Midi-QOL, find a creature's token on
+  your canvas.
+- **With dnd5e's *Automatic Recharge* on,** Foundry rolls a companion's recharge at the start of its
+  turn.
+- **With Midi-QOL's *Auto Remove Summoned Creature*,** a summon's tab goes when its summoner's
+  concentration ends.
+- **Midi-QOL shows less on cards of a creature no player owns,** as it does for any NPC.
+- **Under *Right after its character* a companion rolls no initiative of its own,** so dnd5e's
+  recoveries on rolling initiative don't happen for it.
+- **Only the active Gamemaster's Foundry moves companions in initiative;** with no Gamemaster
+  connected, a character's initiative set meanwhile is followed once one connects, or reloads, by
+  each of its companions but one whose initiative you changed since the module last set it.
+- **A companion acting right after its character rolls its spent recharge at the start of its
+  turn,** as dnd5e does, unless the world's Auto Recharge is off.
+- **With Midi-QOL, a turn ended from the app first waits up to 10 seconds** for any use or damage
+  from the app, any player's, that is still using your targets, then ends.
+- **With no Gamemaster connected nothing is made from the app,** End Turn included.
+- **Undo works only from the app that ended the turn, while its toast offers it,** and only while
+  the tracker is where it left it, for a minute at most; after Foundry reloads, use Previous Turn.
 
 ## Installation
 
@@ -727,6 +778,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-group.mjs` | A group's sheet: its members' names and portraits, its description, and its inventory without what items roll or are used through |
 | `scripts/sheet-slim.mjs` | A sheet in the smaller shape the app expands: actions by reference, defaults left out |
 | `scripts/character-sync.mjs` | Sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes, then each of the campaign's groups, again when it, its members' names or portraits, or its characters' ownership change, or one of its characters is deleted, and its removal when deleted, after the hello if one was on its way; withholding a sheet too large to post or a group's no player sees; sending again what was lost |
+| `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene, and the NPCs its players own by name, each read as its live actor, a token's synthetic actor for an unlinked token; their keys, the characters each is a companion of, and the creature a command names |
+| `scripts/creature-sync.mjs` | Sending each campaign's companions to an app that reads them: the list in its hello and in `companions.listed` when it changes, each companion's sheet in `companion.updated` after the hello and when it changes, without secrets where its players don't own it in Foundry |
 | `scripts/chat.mjs` | Chat hooks |
 | `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack; whether an attack hit each target, who saved and whether a save or check succeeded, by the rules of `results.mjs`; dnd5e 6's typed messages, and their data without what players don't see; its content without what cards keep from players; the Gamemaster's rolls on Midi-QOL's cards trimmed as Midi shows them to players |
 | `scripts/results.mjs` | The rules of what players see of chat results, as dnd5e and Midi-QOL show them, or always where the Gamemaster has players told so, read once per message, and the verdict on them that Manage Campaigns and the app show |
@@ -734,14 +787,17 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/combat.mjs` | Combat hooks |
 | `scripts/combat-data.mjs` | Combat and combatant serialization, each combatant's token's disposition as players see it |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
+| `scripts/creature-initiative.mjs` | Companions' initiative "Right after its character": each of a character's companions in its combat set just below the character's initiative whenever it's set, rerolled or cleared, by the active Gamemaster's Foundry alone, its own writes marked so that they're never followed |
 | `scripts/commands.mjs` | Fetching players' rolls, attacks, spells, descriptions' links, moves of items and coins, removals and journal notes from the app, one campaign at a time, with which characters it has open, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes |
 | `scripts/prompts.mjs` | The saves the game asks of a campaign's characters on chat cards, told to the app as prompts, and closed as they're answered, or a concentration card's once its character no longer concentrates on what it asked about |
 | `scripts/midi-prompts.mjs` | Midi-QOL's own saves, concentration checks and OverTime turn saves, asked in the app while the character is open there, answered with the player's dice, or left to Midi |
 | `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card, as the Gamemaster's where they made it; a prompt's save on its card, or Midi-QOL's as Midi rolls it; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time |
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name |
+| `scripts/command-alone.mjs` | An action's damage or healing on its own, dnd5e's card with no targets for the Gamemaster to apply, and a spent recharge rolled, each with the player's dice, outside Midi-QOL's workflow |
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
+| `scripts/command-turn.mjs` | Ending the current turn from the app, the character's or one of its companions', where it's still the turn the app was shown, by Foundry's own Next Turn; and taking back the turn one just ended, with Foundry's turn events off |
 | `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat |
 | `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |

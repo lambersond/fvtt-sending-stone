@@ -7,6 +7,9 @@ import { removalFeatures, transferFeatures } from "./command-transfers.mjs";
 import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { roster } from "./characters.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
+import { followAll } from "./creature-initiative.mjs";
+import { companionList } from "./creatures.mjs";
+import { companionFeatures, noteListed } from "./creature-sync.mjs";
 import { foundrySettings, noteSettingsSent } from "./foundry-settings.mjs";
 import { campaignGroups, groupEntry } from "./groups.mjs";
 import { noteFeatures } from "./journals.mjs";
@@ -77,7 +80,10 @@ const resent = new Map();
  * rolls, `features.transfers`, whatever the rolls. Since 0.33.0, whether an item may be removed from
  * a character from the app, `features.removals`, under dnd5e, with no switch. Since 0.34.0, whether
  * journal notes are kept here, `features.notes`, and which of the campaign's characters and parties
- * have a journal of them.
+ * have a journal of them. Since 0.36.0 it lists the campaign's characters' companions, `companions`,
+ * each without its sheet, which follows to an app that reads them, and says which of a companion's
+ * rolls are made here, and how companions enter initiative, `features.companions`. Its combats are
+ * described by the companions it lists.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -101,22 +107,26 @@ export function announce({ campaignId }={}) {
   forgetCombats(campaignId);
   for ( const campaign of getCampaigns() ) {
     if ( (campaignId !== undefined) && (campaign.id !== campaignId) ) continue;
-    const combats = combatEnabled() ? game.combats.filter(combat => involvesCampaign(combat, campaign)) : [];
-    for ( const combat of combats ) noteCombatSent(combat.id, campaign.id);
-    // The listener starts afresh, so every sheet and description goes again after it.
+    // The listener starts afresh, so every sheet and description goes again after it, and since
+    // 0.36.0 its companions as this lists them, which its combats are then told by.
     forgetTold(campaign.id);
     forgetSent(campaign.id);
+    const companions = companionList(campaign);
+    noteListed(campaign.id, companions);
+    const combats = combatEnabled() ? game.combats.filter(combat => involvesCampaign(combat, campaign)) : [];
+    for ( const combat of combats ) noteCombatSent(combat.id, campaign.id);
     const settings = foundrySettings(campaign);
     noteSettingsSent(campaign.id, settings);
     send(EVENTS.HELLO, {
       ...shared,
       features: {
         rolls: rollFeatures(campaign), transfers: transferFeatures(campaign), removals: removalFeatures(),
-        notes: noteFeatures(campaign)
+        notes: noteFeatures(campaign), companions: companionFeatures(campaign)
       },
       sheetsApart: true,
       characters: roster(campaign),
       groups: campaignGroups(campaign).map(group => groupEntry(group, campaign)),
+      companions,
       settings,
       combats: combats.map(combat => snapshotCombat(combat, campaign)),
       prompts: openPrompts(campaign)
@@ -130,8 +140,11 @@ export function announce({ campaignId }={}) {
 /**
  * Announce when this client takes over as the bridge: on load, or when the Gamemaster who held
  * the role disconnects; and since 0.27.0, roll as Midi-QOL would the concentration checks held for
- * the app that no client asks any more, as after a reload. A client that is no longer the bridge
- * stops fetching players' rolls.
+ * the app that no client asks any more, as after a reload. Since 0.36.0 it places the companions
+ * of each campaign set to "Right after its character" after their characters, in case a
+ * character's initiative was set while no Gamemaster was connected: those it placed last, or with
+ * none, so that the Gamemaster's own change to a companion stands (creature-initiative.mjs). A
+ * client that is no longer the bridge stops fetching players' rolls.
  * @returns {void}
  */
 export function checkBridge() {
@@ -139,6 +152,7 @@ export function checkBridge() {
   if ( bridge && !wasBridge ) {
     announce();
     releaseHeldCards();
+    void followAll();
   }
   if ( !bridge && wasBridge ) stopPollers();
   wasBridge = bridge;

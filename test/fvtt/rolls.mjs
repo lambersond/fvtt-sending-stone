@@ -214,7 +214,10 @@ await until(() => app.polls.length > 0, 'the first fetch')
 const checks = ['skill', 'tool', 'ability', 'save', 'death', 'initiative', 'hitDie', 'hitDice', 'formula']
 // Ending a concentration is offered wherever rolls are made (module 0.29.0); spending charges and
 // Heroic Inspiration only where the campaign lets its players attack, which this one doesn't.
-const concentration = ['endConcentration']
+// Changed on purpose (round 0.36.0 §6.13): ending a turn is offered wherever rolls are made, right
+// after ending a concentration.
+// Changed on purpose (round 0.36.0 §6.14): and taking one back, right after it.
+const concentration = ['endConcentration', 'endTurn', 'undoEndTurn']
 // A description's own roll is offered with the rest; asking the table needs dnd5e's roll labels, and
 // a description's damage the attack self-test, which this world has neither of.
 const texts = ['textRoll']
@@ -252,9 +255,15 @@ assert.equal(diceStatus.hitDice, true, `hit die self-test: ${diceStatus.hitDiceE
 // Since module 0.32.0 `features.transfers` says whether a party's things may be sent and distributed,
 // and since 0.33.0 `features.removals` that an item may be removed from a character, with no switch;
 // since 0.34.0 `features.notes` that journal notes are kept, under any system, with none made yet.
+// Changed on purpose (round 0.36.0 §4.1, §6.12): `features.companions` says the kinds a companion's
+// rolls take, the campaign's less the seven only a character takes, and that each rolls its own
+// initiative; attacks are off here, so there's no damage on its own or recharge.
+// Changed on purpose (round 0.36.0 §6.13): nor ending a turn, which is the character's to do.
+// Changed on purpose (round 0.36.0 §6.14): nor taking one back.
+const UNTAKEN = ['inspiration', 'hitDie', 'hitDice', 'spend', 'transfer', 'remove', 'note', 'endTurn', 'undoEndTurn']
 assert.deepEqual(hellos, {
-  Ashlands: { rolls: { enabled: true, kinds: [...checks, ...concentration, ...texts], reason: null, modifiers: false, areaAttacks: false, prompts: false, activityChecks: true, signedDice: true, selfTargets: false, gmRolls: true, gmRollMessages: true, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true } },
-  Mirkwood: { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true } },
+  Ashlands: { rolls: { enabled: true, kinds: [...checks, ...concentration, ...texts], reason: null, modifiers: false, areaAttacks: false, prompts: false, activityChecks: true, signedDice: true, selfTargets: false, gmRolls: true, gmRollMessages: true, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [...checks, ...concentration, ...texts].filter(kind => !UNTAKEN.includes(kind)), initiative: 'own' } },
+  Mirkwood: { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [], initiative: 'own' } },
 })
 ok("passes its self-test, hit dice's too, and tells each campaign whether its players' rolls are made here: a utility's formula always, a hit die once its self-test has passed, a check activity's checks under dnd5e 5, and the Gamemaster's as a character wherever rolls are made")
 if (process.env.LIBWRAPPER) {
@@ -1148,7 +1157,8 @@ await game.settings.set('sending-stone', 'campaigns', [
 ])
 await settle(); await settle()
 const off = app.events.filter(e => e.type === 'bridge.hello' && e.campaign.id === 'camp-a').at(-1)
-assert.deepEqual(off.data.features, { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true } })
+// Changed on purpose (round 0.36.0 §4.1, §6.12): with `features.companions`, none taken, each its own roll.
+assert.deepEqual(off.data.features, { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [], initiative: 'own' } })
 const offAt = app.polls.length
 await settle(); await settle()
 assert.equal(app.polls.length, offAt)

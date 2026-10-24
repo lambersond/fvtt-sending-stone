@@ -26,9 +26,10 @@ tick(win, `roster.${b}.vex`); tick(win, `roster.${b}.thorin`); tick(win, `roster
 actors.delete('ghost')
 await save(win)
 // Module 0.30.0 (its contract §3.2): every campaign is saved with its groups, none here.
+// Changed on purpose (round 0.36.0 §6.12): and with its companions' initiative, each its own roll.
 assert.deepEqual(settings.get('campaigns'), [
-  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false },
-  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false },
+  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, companionInitiative: 'own' },
+  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, companionInitiative: 'own' },
 ])
 assert.equal(win.element.isConnected, false, 'saved, it closes')
 console.log('ok - saves campaigns in order, trims titles, drops unticked and missing characters')
@@ -525,3 +526,47 @@ assert.equal(settings.get('campaigns').find(c => c.id === a).transfers, true, 's
 assert.equal(settings.get('campaigns').find(c => c.id === b).transfers, false, "the other's as it was")
 settings.set('campaigns', settings.get('campaigns').map(c => ({ ...c, transfers: false })))
 console.log("ok - 0.31.0: Players move items and coins has its own fieldset on the Player actions tab, and saves with its campaign")
+
+// Module 0.36.0 (round 0.36.0 §6.12): Companions' initiative, its own fieldset on the Player actions
+// tab after Items and coins, a choice never disabled, saved with its campaign; a new campaign's its
+// own roll; the field in the campaigns setting's schema.
+win = await openSettings()
+await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+const companions = find(win, 'fieldset.sending-stone-companions')
+assert.equal(companions.querySelector('legend').textContent.trim(), 'SENDINGSTONE.Config.Actions.Companions')
+const fieldsets = [...win.element.querySelectorAll('fieldset')].map(each => each.className)
+assert.ok(fieldsets.indexOf('sending-stone-companions') > fieldsets.indexOf('sending-stone-transfers'), 'after Items and coins')
+const initiative = () => find(win, 'select[name="campaign.companionInitiative"]')
+assert.equal(companions.querySelector('label').textContent.trim(), 'SENDINGSTONE.Config.Actions.CompanionInitiative')
+assert.deepEqual([...initiative().options].map(option => [option.value, option.textContent.trim(), option.selected]), [
+  ['own', 'SENDINGSTONE.Config.Actions.CompanionInitiativeOwn', true],
+  ['after', 'SENDINGSTONE.Config.Actions.CompanionInitiativeAfter', false],
+])
+assert.equal(companions.querySelector('.hint').textContent.trim(), 'SENDINGSTONE.Config.Actions.CompanionInitiativeHint')
+const rollsOn = find(win, '[name="campaign.rolls"]').checked
+for (const on of [!rollsOn, rollsOn]) {
+  tick(win, 'campaign.rolls', on)
+  assert.equal(initiative().disabled, false, `never disabled, rolls ${on ? 'on' : 'off'}`)
+}
+type(win, 'campaign.companionInitiative', 'after')
+await save(win)
+assert.equal(settings.get('campaigns').find(c => c.id === a).companionInitiative, 'after', 'saved as the choice')
+assert.equal(settings.get('campaigns').find(c => c.id === b).companionInitiative, 'own', "the other's as it was")
+win = await openSettings()
+await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+assert.equal(initiative().value, 'after', 'shown as saved')
+const kept = settings.get('campaigns')
+await click(win, '[data-action="addCampaign"]')
+type(win, 'campaign.title', 'Rohan')
+await save(win)
+assert.equal(settings.get('campaigns').find(c => c.title === 'Rohan').companionInitiative, 'own', "a new campaign's its own roll")
+settings.set('campaigns', kept.map(c => ({ ...c, companionInitiative: 'own' })))
+{
+  const { registered } = await import('./stub.mjs')
+  const { fields } = registered.get('campaigns').type.element
+  assert.ok(fields.companionInitiative instanceof foundry.data.fields.StringField, 'a StringField')
+  assert.deepEqual([fields.companionInitiative.choices, fields.companionInitiative.initial, fields.companionInitiative.blank], [['own', 'after'], 'own', false])
+}
+const en = JSON.parse((await import('node:fs')).readFileSync(`${MODULE}/lang/en.json`, 'utf8')).SENDINGSTONE.Config.Actions
+assert.deepEqual([en.Companions, en.CompanionInitiative, en.CompanionInitiativeOwn, en.CompanionInitiativeAfter], ['Companions', "Companions' initiative", 'Its own roll', 'Right after its character'])
+console.log("ok - 0.36.0: Companions' initiative has its own fieldset on the Player actions tab after Items and coins, a choice of Its own roll, selected for a campaign saved before, and Right after its character, with its hint, never disabled; saved for its campaign alone as the choice, a new campaign's its own roll, a StringField in the schema")

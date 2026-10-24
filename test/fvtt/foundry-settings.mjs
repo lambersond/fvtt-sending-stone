@@ -66,7 +66,8 @@ ok('the hello says what Foundry says of itself in its exact shape: format 1, the
 const sectionsOf = value => value.sections.map(section => section.id)
 assert.deepEqual(sectionsOf(sent), ['campaign', 'sending-stone', 'dnd5e', ...(MIDI ? ['midi-qol'] : [])])
 const rowsOf = (value, id) => value.sections.find(section => section.id === id)?.rows.map(row => row.id)
-assert.deepEqual(rowsOf(sent, 'campaign'), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'groups'])
+// Changed on purpose (round 0.36.0 §6.12): the campaign's companions' initiative after its moves.
+assert.deepEqual(rowsOf(sent, 'campaign'), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'companionInitiative', 'groups'])
 assert.deepEqual(rowsOf(sent, 'sending-stone'), ['chatEvents', 'chatScope', 'chatResults', 'combatEvents', 'gmContent', ...(MIDI ? ['midiIntegration', 'offCanvasTargets'] : [])])
 assert.deepEqual(rowsOf(sent, 'dnd5e'), ['attackRollVisibility', 'challengeVisibility'])
 assert.equal(sent.sections[0].title, 'This campaign')
@@ -111,6 +112,16 @@ await withSettings({ campaigns: [{ ...settings.get('campaigns')[0], transfers: t
   assert.equal(row(foundrySettings(campaign()), 'campaign', 'transfers').note, words['SENDINGSTONE.Config.Actions.RollsReason.system'])
   game.system.id = 'dnd5e'
 })
+// Module 0.36.0 (round 0.36.0 §6.12): how the campaign's companions enter initiative, each its own
+// roll until the Gamemaster saves "Right after its character".
+assert.deepEqual(row(sent, 'campaign', 'companionInitiative'), { id: 'companionInitiative', label: "Companions' initiative", value: 'own', text: 'Its own roll' })
+await withSettings({ campaigns: [{ ...settings.get('campaigns')[0], companionInitiative: 'after' }] }, () => {
+  assert.deepEqual(row(foundrySettings(campaign()), 'campaign', 'companionInitiative'), { id: 'companionInitiative', label: "Companions' initiative", value: 'after', text: 'Right after its character' })
+})
+await withSettings({ campaigns: [{ ...settings.get('campaigns')[0], companionInitiative: 'first' }] }, () => {
+  assert.equal(row(foundrySettings(campaign()), 'campaign', 'companionInitiative').value, 'own', 'anything else stored is its own roll')
+})
+ok("since 0.36.0 the campaign's companions' initiative, after its moves: Its own roll until \"Right after its character\" is saved")
 // A note on why a switch that's on does nothing here.
 await withSettings({ campaigns: [{ ...settings.get('campaigns')[0], rolls: true, manualDice: true }] }, async () => {
   const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)

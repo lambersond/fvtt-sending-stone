@@ -1,5 +1,5 @@
 import { DIE_FACES, MODULE_ID } from "./constants.mjs";
-import { plannableDamage } from "./dice-plan.mjs";
+import { damageRollsFor, diceForEach, plannableDamage, plannedDice } from "./dice-plan.mjs";
 
 /**
  * The links in a description that the app can act on: saving throws, checks, damage and healing,
@@ -1566,6 +1566,8 @@ function textNodes(root, doc) {
  * @param {Actor} actor
  * @param {string} hash
  * @param {number} n
+ * @param {object} [options]
+ * @param {boolean} [options.secrets]   Was it sent with its secrets?
  * @returns {Promise<{source: object, origin: {name: string, item?: Item, spell?: Item}, link: object}
  *   |{refusal: "gone"|"link"}>}
  *   The description, where it comes from, and the link: a saving throw or concentration check
@@ -1575,14 +1577,16 @@ function textNodes(root, doc) {
  *   "damage", parts: [{formula, types}], healing, critical?, activity?}`, with `critical: false`
  *   where it's never a critical hit's, and the activity dnd5e's own link rolls it by, as noted as it
  *   was sent; or a roll `{kind: "roll", formula}`. Refused as "gone" when the character's sheet has
- *   no such description now, and as "link" when it has no such link.
+ *   no such description now, and as "link" when it has no such link. Since 0.36.0 a companion's
+ *   sent without the Gamemaster's secrets, as one none of its characters' players owns, is read as
+ *   it was sent, without them (`secrets: false`).
  */
-export async function findLink(actor, hash, n) {
+export async function findLink(actor, hash, n, { secrets=true }={}) {
   const { characterSheet } = await import("./sheet.mjs");
   const { SheetTexts, hiddenDCsOf, linkActivitiesOf, textOf } = await import("./sheet-texts.mjs");
-  const texts = new SheetTexts();
+  const texts = new SheetTexts({ secrets });
   try {
-    if ( !characterSheet(actor, texts) ) return { refusal: "gone" };
+    if ( !characterSheet(actor, texts, { secrets }) ) return { refusal: "gone" };
   } catch (err) {
     console.warn(`${MODULE_ID} | Could not read the descriptions of ${actor?.uuid}`, err);
     return { refusal: "gone" };
@@ -1669,4 +1673,66 @@ export function originOf(actor, { relativeTo }) {
   }
   if ( relativeTo && (relativeTo.documentName !== "Actor") && relativeTo.name ) return { name: relativeTo.name };
   return { name: actor.name };
+}
+
+/* -------------------------------------------- */
+/*  Damage previewed                            */
+/* -------------------------------------------- */
+
+/**
+ * The dice a use's damage or healing will throw, worked out before it's rolled, for its player to
+ * roll them in the app: as dnd5e will make up its rolls, for the attack mode and ammunition an
+ * attack used, and with a critical hit's dice, its extra dice and critical damage's among them, the
+ * critical damage's marked `added`; and each roll's choice of damage types, if it has one. dnd5e's
+ * own `getDamageConfig` for the kind of activity is used, not Midi-QOL's, which changes its workflow
+ * as it's called. Here, beside `ownDamageConfig`, since 0.36.0, as the sheet's `tableDamage` previews
+ * it too (sheet-rolls.mjs), which command-uses.mjs, importing the sheet's rows, can't give it.
+ * @param {Activity|null} activity
+ * @param {object} [config]
+ * @param {string} [config.attackMode]
+ * @param {Item|null} [config.ammunition]
+ * @param {boolean} [config.isCritical]
+ * @returns {{critical: boolean, plannable: boolean, healing: boolean, rolls: object[]}|null}   Null
+ *   for no damage or healing.
+ */
+export function previewDamage(activity, { attackMode, ammunition, isCritical=false }={}) {
+  if ( !DND5E_ACTIVITIES[activity?.type] ) return null;
+  const process = ownDamageConfig(activity, { attackMode, ammunition: ammunition ?? undefined });
+  if ( !process?.rolls?.length ) return null;
+  const rolls = damageRollsFor({ ...process, isCritical });
+  const planned = rolls.map(roll => plannedDice(roll));
+  const plannable = planned.every(plan => plan.plannable);
+  return {
+    critical: isCritical,
+    plannable,
+    healing: activity.type === "heal",
+    rolls: rolls.map((roll, index) => ({
+      formula: roll.formula,
+      type: damageLabel(roll.options.type),
+      types: typeChoices(roll.options.types),
+      dice: plannable ? planned[index].dice : [],
+      perDie: diceForEach({ ...process, isCritical }, index)
+    }))
+  };
+}
+
+/**
+ * A kind of damage or healing, as dnd5e names it.
+ * @param {string|undefined} type
+ * @returns {string|null}
+ */
+function damageLabel(type) {
+  if ( !type ) return null;
+  return CONFIG.DND5E.damageTypes?.[type]?.label ?? CONFIG.DND5E.healingTypes?.[type]?.label ?? type;
+}
+
+/**
+ * The kinds of damage or healing a roll lets its roller choose among, as dnd5e's damage dialog
+ * offers them; null when it has one.
+ * @param {string[]|undefined} types
+ * @returns {{key: string, label: string}[]|null}
+ */
+function typeChoices(types) {
+  if ( !Array.isArray(types) || (types.length < 2) ) return null;
+  return types.map(key => ({ key, label: damageLabel(key) }));
 }

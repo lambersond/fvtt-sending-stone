@@ -70,6 +70,34 @@ export function sendCombatEvent(combat, type, payload, { leaving }={}) {
 }
 
 /**
+ * Check a campaign's combats again, as its characters' companions change, since 0.36.0: one it
+ * would be told of now and hasn't been, as a fight with only a familiar in it, reaches it as
+ * combat.created; one it has been and wouldn't now leaves it, as combat.ended; and one it has been
+ * told of, a combatant of which it would be told of otherwise now, as a familiar listed since, goes
+ * again whole, as combat.created, which the app takes as the combat as it now is.
+ * @param {Campaign} campaign
+ * @param {(combatant: Combatant) => boolean} [changed]   Is a combatant described otherwise now?
+ * @returns {void}
+ */
+export function recheckCombats(campaign, changed=() => false) {
+  for ( const combat of game.combats?.filter?.(() => true) ?? [] ) {
+    const involved = involvesCampaign(combat, campaign);
+    const knows = told.get(combat.id)?.has(campaign.id) ?? false;
+    if ( involved && !knows ) {
+      send(EVENTS.COMBAT_CREATED, { combat: snapshotCombat(combat, campaign) }, campaign);
+      noteCombatSent(combat.id, campaign.id);
+    }
+    else if ( !involved && knows ) {
+      send(EVENTS.COMBAT_ENDED, { combat: snapshotCombat(combat, campaign) }, campaign);
+      told.get(combat.id).delete(campaign.id);
+    }
+    else if ( involved && combat.combatants.some(changed) ) {
+      send(EVENTS.COMBAT_CREATED, { combat: snapshotCombat(combat, campaign) }, campaign);
+    }
+  }
+}
+
+/**
  * Tell every campaign that has heard about a combat that it has ended, as it is being deleted.
  * @param {Combat} combat
  * @returns {void}

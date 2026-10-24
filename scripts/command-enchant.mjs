@@ -2,6 +2,8 @@ import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import { sendCharacter } from "./character-sync.mjs";
 import { appFlags, authorFor, describeResult, failedResult, PUBLIC, visibleTo } from "./command-rolls.mjs";
 import { castFromItem, commandRefusal, currentTargets, setTargets, workflowSettled } from "./command-uses.mjs";
+import { commandActor } from "./creatures.mjs";
+import { companionFirst } from "./creature-sync.mjs";
 import {
   availableProfiles, canTake, effectsOf, endable, goingAway, listedOn, originOf, ownName
 } from "./sheet-enchant.mjs";
@@ -92,7 +94,7 @@ export function enchantChoice(command, actor, activity, scaled) {
  */
 export async function dnd5eEnchant(command, campaign, actor, use) {
   const { activity, usage } = use;
-  const author = authorFor(actor);
+  const author = authorFor(actor, use.character);
   const results = await activity.use(usage, { configure: false }, {
     rollMode: PUBLIC,
     data: { author: author.id, flags: { dnd5e: { targets: [] }, [MODULE_ID]: appFlags(command, "use") } }
@@ -100,14 +102,14 @@ export async function dnd5eEnchant(command, campaign, actor, use) {
   castFromItem(use, results);
   if ( !results ) return failedResult(command, "cancelled");
   const card = results.message?.id ? results.message : null;
-  if ( !card ) return notApplied(command, null, actor, campaign, "enchant");
+  if ( !card ) return notApplied(command, null, actor, campaign, "enchant", use);
 
   // As dnd5e's tray has it: one whose card names a concentration that has since ended is applied no
   // more, nor can it be from the card, which then shows no tray; one whose names none is applied
   // with no concentration.
   const named = card.system?.concentration;
   const concentration = named ? (actor.effects?.get(named) ?? null) : null;
-  if ( named && !concentration ) return notApplied(command, null, actor, campaign, "enchant");
+  if ( named && !concentration ) return notApplied(command, null, actor, campaign, "enchant", use);
   return applyChosen(command, campaign, actor, use, card, concentration);
 }
 
@@ -156,11 +158,11 @@ export async function midiEnchantNow(command, campaign, actor, use) {
     castFromItem(use, results);
     if ( !results ) return failedResult(command, "midi");
     const card = results.message?.id ? results.message : null;
-    if ( !card ) return notApplied(command, null, actor, campaign, "midi");
+    if ( !card ) return notApplied(command, null, actor, campaign, "midi", use);
     const workflow = midiUsage.workflow ?? globalThis.MidiQOL?.Workflow?.getWorkflow(card.uuid);
-    if ( !workflow ) return notApplied(command, card, actor, campaign, "midi");
+    if ( !workflow ) return notApplied(command, card, actor, campaign, "midi", use);
     const state = await workflowSettled(workflow);
-    if ( state === "aborted" ) return notApplied(command, card, actor, campaign, "midi");
+    if ( state === "aborted" ) return notApplied(command, card, actor, campaign, "midi", use);
     if ( state === "late" ) return failedResult(command, "timeout");
 
     // Midi begins the concentration it put off once its checks pass, and names it on the card; it
@@ -169,8 +171,8 @@ export async function midiEnchantNow(command, campaign, actor, use) {
     // dnd5e's.
     const named = card.system?.concentration;
     const concentration = named ? (actor.effects?.get(named) ?? null) : null;
-    if ( named && !concentration ) return notApplied(command, null, actor, campaign, "midi");
-    if ( prepared.concentration?.begin && !named ) return notApplied(command, card, actor, campaign, "midi");
+    if ( named && !concentration ) return notApplied(command, null, actor, campaign, "midi", use);
+    if ( prepared.concentration?.begin && !named ) return notApplied(command, card, actor, campaign, "midi", use);
 
     // Applied by Midi itself, as it may be: not again.
     const self = activity.enchant?.self === true;
@@ -180,7 +182,7 @@ export async function midiEnchantNow(command, campaign, actor, use) {
       && (effect.getFlag?.("dnd5e", "enchantmentProfile") === profile));
     if ( applied ) {
       const ended = await endAll(target, enchanting.prior.filter(effect => effect.id !== applied.id));
-      return enchantResult(command, card, actor, campaign, { enchanted: enchantedOf(target, applied, profile), ended });
+      return enchantResult(command, card, actor, campaign, { enchanted: enchantedOf(target, applied, profile), ended }, use);
     }
     return applyChosen(command, campaign, actor, use, card, concentration);
   } finally {
@@ -206,12 +208,12 @@ async function applyChosen(command, campaign, actor, use, card, concentration) {
   const { profile, prior } = enchanting;
   const self = activity.enchant?.self === true;
   const target = self ? activity.item : enchanting.target;
-  if ( !target ) return enchantResult(command, card, actor, campaign, { enchanted: null, ended: null });
+  if ( !target ) return enchantResult(command, card, actor, campaign, { enchanted: null, ended: null }, use);
   // Asked again, as the item may have changed while it was used: with no dialog, as dnd5e 6 no
   // longer asks as the enchantment is made.
-  if ( !self && !canTake(activity, target, actor, prior) ) return notApplied(command, card, actor, campaign, "enchant");
+  if ( !self && !canTake(activity, target, actor, prior) ) return notApplied(command, card, actor, campaign, "enchant", use);
   if ( card.getFlag?.("dnd5e", "use.enchantmentProfile") !== profile ) {
-    return notApplied(command, card, actor, campaign, "enchant");
+    return notApplied(command, card, actor, campaign, "enchant", use);
   }
   const ended = await endAll(target, prior);
   let effect = null;
@@ -222,8 +224,8 @@ async function applyChosen(command, campaign, actor, use, card, concentration) {
   } catch (err) {
     console.error(`${MODULE_ID} | Could not apply ${activity.item?.name}'s enchantment from Sending Stone`, err);
   }
-  if ( !effect ) return notApplied(command, card, actor, campaign, "enchant");
-  return enchantResult(command, card, actor, campaign, { enchanted: enchantedOf(target, effect, profile), ended });
+  if ( !effect ) return notApplied(command, card, actor, campaign, "enchant", use);
+  return enchantResult(command, card, actor, campaign, { enchanted: enchantedOf(target, effect, profile), ended }, use);
 }
 
 /**
@@ -285,11 +287,13 @@ function endedOf(item, effect) {
  * @param {Actor} actor
  * @param {Campaign} campaign
  * @param {{enchanted: object|null, ended: object|null}} enchantment
+ * @param {object} [use]   What `prepareUse` found, with the character whose player is told, and since
+ *                         0.36.0 the companion it was used for, if any.
  * @returns {CommandResult}
  */
-function enchantResult(command, card, actor, campaign, enchantment) {
-  sheetFirst(actor);
-  return describeResult(command, card, actor, campaign, {
+function enchantResult(command, card, actor, campaign, enchantment, use) {
+  sheetFirst(actor, use?.companion);
+  return describeResult(command, card, use?.character ?? actor, campaign, {
     rolls: [], extra: { use: { type: "enchant" }, damage: null, enchantment }
   });
 }
@@ -300,13 +304,16 @@ function enchantResult(command, card, actor, campaign, enchantment) {
  * against the sheet it was sent, so a switch turned straight back is checked against the
  * enchantment as it now is, not as it was. Since 0.29.0 so it goes ahead of the result of a
  * concentration ended, charges spent and Heroic Inspiration used or gained, which say nothing of
- * the counts they changed: the sheet does.
+ * the counts they changed: the sheet does. Since 0.36.0 a companion's, as it's listed, where it was
+ * one's.
  * @param {Actor} actor
+ * @param {CompanionEntry|null} [companion]
  * @returns {void}
  */
-export function sheetFirst(actor) {
+export function sheetFirst(actor, companion=null) {
   try {
-    sendCharacter(actor.id);
+    if ( companion ) companionFirst(actor, companion);
+    else sendCharacter(actor.id);
   } catch (err) {
     console.error(`${MODULE_ID} | Could not send ${actor.name} to Sending Stone`, err);
   }
@@ -322,14 +329,15 @@ export function sheetFirst(actor) {
  * @param {Actor} actor
  * @param {Campaign} campaign
  * @param {string} reason   "enchant", or "midi".
+ * @param {object} [use]    What `prepareUse` found, with the character whose player is told.
  * @returns {CommandResult}
  */
-function notApplied(command, card, actor, campaign, reason) {
+function notApplied(command, card, actor, campaign, reason, use) {
   const messageId = (card?.id && game.messages?.has(card.id)) ? card.id : null;
   return {
     ...failedResult(command, reason),
     messageId,
-    visible: messageId ? visibleTo(card, actor, campaign) : true,
+    visible: messageId ? visibleTo(card, use?.character ?? actor, campaign) : true,
     use: { type: "enchant" },
     damage: null,
     enchantment: null
@@ -353,8 +361,9 @@ function notApplied(command, card, actor, campaign, reason) {
 export async function runEndEnchantmentCommand(command, campaign) {
   const refusal = commandRefusal(command, campaign);
   if ( refusal ) return failedResult(command, refusal.reason, refusal.error);
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failedResult(command, "unknown");
+  const found = commandActor(command, campaign);
+  if ( !found ) return failedResult(command, "unknown");
+  const { actor } = found;
   const item = actor.items.get(command.enchantment.item);
   if ( !item ) return failedResult(command, "item");
   const effect = item.effects?.get(command.enchantment.effect);
@@ -367,7 +376,7 @@ export async function runEndEnchantmentCommand(command, campaign) {
   } catch {
     // Gone already, as with what it was tied to: ended all the same.
   }
-  sheetFirst(actor);
+  sheetFirst(actor, found.companion);
   return {
     id: command.id, status: "done", reason: null, error: null, messageId: null, visible: true, rolls: [],
     enchantment: { enchanted: null, ended }

@@ -256,9 +256,12 @@ const checks = ['skill', 'tool', 'ability', 'save', 'death', 'initiative', 'hitD
 // needs dnd5e's roll labels, which this world hasn't.
 // Ending an enchantment wherever uses are made (module 0.21.0). Ending a concentration wherever
 // rolls are made, and spending charges and Heroic Inspiration wherever players may attack (0.29.0).
+// Changed on purpose (round 0.36.0 §3.1): damage on its own and recharges wherever players may attack.
+// Changed on purpose (round 0.36.0 §6.13): ending a turn wherever rolls are made, after ending a concentration.
+// Changed on purpose (round 0.36.0 §6.14): and taking one back, right after it.
 assert.deepEqual(hellos, {
-  Ashlands: [...checks, 'endConcentration', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'textRoll', 'textDamage'],
-  Mirkwood: [...checks, 'endConcentration', 'textRoll'],
+  Ashlands: [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'textRoll', 'textDamage', 'itemDamage', 'recharge'],
+  Mirkwood: [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'textRoll'],
 })
 const areas = Object.fromEntries(app.events.filter(e => e.type === 'bridge.hello').map(e => [e.campaign.title, e.data.features.rolls.areaAttacks]))
 assert.deepEqual(areas, { Ashlands: true, Mirkwood: false })
@@ -1133,7 +1136,10 @@ if (!MIDI) {
   // A description's damage isn't made through Midi's workflow, so it stays, and may still be
   // changed in the app; and so do spending charges and Heroic Inspiration, which need no Midi
   // (module 0.29.0).
-  assert.deepEqual(ashlands().at(-1).data.features.rolls.kinds, [...checks, 'endConcentration', 'spend', 'inspiration', 'textRoll', 'textDamage'])
+  // Changed on purpose (round 0.36.0 §3.1): nor are damage on its own and recharges, outside Midi's workflow.
+  // Changed on purpose (round 0.36.0 §6.13): nor ending a turn, made wherever rolls are.
+  // Changed on purpose (round 0.36.0 §6.14): nor taking one back.
+  assert.deepEqual(ashlands().at(-1).data.features.rolls.kinds, [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'spend', 'inspiration', 'textRoll', 'textDamage', 'itemDamage', 'recharge'])
   assert.equal(ashlands().at(-1).data.features.rolls.areaAttacks, false)
   assert.equal(ashlands().at(-1).data.features.rolls.modifiers, true)
   const off = await attack()

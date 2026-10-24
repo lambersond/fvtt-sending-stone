@@ -181,7 +181,12 @@
         "Transfers": "Items and coins",
         "TransfersPlayers": "Players move items and coins",
         "TransfersHint": "From the app, they take from and give to the campaign's parties they own in Foundry, and give to each other's characters. You can move anything between its characters and parties. Each move posts a line in chat.",
-        "TransfersApp": "The app this campaign sends to doesn't take moves yet."
+        "TransfersApp": "The app this campaign sends to doesn't take moves yet.",
+        "Companions": "Companions",
+        "CompanionInitiative": "Companions' initiative",
+        "CompanionInitiativeOwn": "Its own roll",
+        "CompanionInitiativeAfter": "Right after its character",
+        "CompanionInitiativeHint": "A character's companions are the creatures it summons and the NPCs its player owns. Its own roll: each rolls its own initiative, from its tab in the app or here. Right after its character: in a combat with its character, each is set just below the character's initiative whenever that's rolled, changed or cleared, here or in the app, and isn't rolled on its own."
       },
       "Connection": {
         "Title": "Title",

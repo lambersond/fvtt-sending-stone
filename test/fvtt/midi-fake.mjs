@@ -37,7 +37,16 @@ export const midi = {
     gmDamageDisplay: 'full',
     mergeCardMultiDamage: false,
     addFakeDice: false,
+    // Workflow.ts:2308-2315: whether a workflow waits, its damage rolled, for the Gamemaster to
+    // confirm it, at Midi's own default, which waits for none.
+    confirmAttackDamage: 'none',
   },
+  /**
+   * Midi's client setting AutoRemoveTargets (settings.ts:1860-1869, 988-991), at its default: which
+   * targets a change of turn releases (Hooks.ts:408-412). "allGM" releases a Gamemaster's every
+   * target; any but "none" those at 0 hit points.
+   */
+  autoRemoveTargets: 'dead',
   activeDefence: false,
   usedReaction: new Set(),
   usedBonus: new Set(),
@@ -72,6 +81,59 @@ export const midi = {
   bonusDamage: null,
   /** Other damage each workflow rolls with its damage, as a poisoned blade's on a failed save: [{ formula, type }], or none. */
   otherDamage: null,
+  /**
+   * The ammunition each attack activity last fired in a workflow, by its uuid, as Midi keeps it on the
+   * activity (AttackActivity.ts:535-536, 576) and adds to its damage rolled after (:268-279), module
+   * 0.36.0's damage on its own among them.
+   */
+  ammunition: new Map(),
+}
+
+/**
+ * MidiActivityMixin.ts:1297-1320 (getDamageRollModifiers): the damage roll modifiers the actor's
+ * effects give a roll, `flags.midi-qol.rollModifiers.damage.<action or item type>.<damage type>`, by
+ * priority.
+ * @param {Activity} activity
+ * @param {object} roll   A roll's configuration.
+ * @returns {string[]}
+ */
+function damageRollModifiers(activity, roll) {
+  const actionType = activity.actionType ?? activity.getActionType?.()
+  const itemType = activity.item?.type
+  const types = roll.options?.types ?? []
+  const changes = []
+  for (const effect of activity.actor?.allApplicableEffects?.() ?? []) {
+    if (effect.disabled || effect.isSuppressed) continue
+    for (const change of effect.system?.changes ?? []) {
+      if (change.key.startsWith('flags.midi-qol.rollModifiers.damage.')) changes.push(change)
+    }
+  }
+  changes.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+  return changes.filter(change => {
+    const [, , , , actionOrItem, damageType] = change.key.split('.')
+    return ['all', actionType, itemType].includes(actionOrItem) && ((damageType === 'all') || types.includes(damageType))
+  }).map(change => change.value)
+}
+
+/**
+ * patching.ts:1198-1208, 1347 (applyDamageModifiers, from Midi's configureDamage wrapper): a
+ * roll's Midi modifiers added to each of its dice. Install it once the module's scripts are loaded
+ * and before it sets up its dice plans, as midi-critical.mjs is.
+ * @param {typeof Roll} DamageRoll   dnd5e's.
+ */
+export function installMidiDamageModifiers(DamageRoll) {
+  const configure = DamageRoll.prototype.configureDamage
+  DamageRoll.prototype.configureDamage = function (...args) {
+    const modifiers = this.options?.['midi-qol']?.modifiers ?? []
+    if (modifiers.length && !this.options['midi-qol'].applied) {
+      for (const term of this.terms) {
+        if (term instanceof foundry.dice.terms.DiceTerm) term.modifiers = [...(term.modifiers ?? []), ...modifiers]
+      }
+      this.options['midi-qol'].applied = true
+      this.resetFormula?.()
+    }
+    return configure.apply(this, args)
+  }
 }
 
 /** Midi's tag on a roll it keeps, which message.rolls keeps with it (Workflow.ts:293-296). */
@@ -325,7 +387,9 @@ class Workflow {
     if (context.damageRoll) return this.WorkflowState_ConfirmRoll
     const hasDamage = (this.activity.damage?.parts?.length > 0) || !!this.activity.healing?.formula
     if (!hasDamage) return this.WorkflowState_WaitForSaves
-    const average = midi.settings.averageDamage === 'all'
+    // Workflow.ts:1272 (shouldRollDamage): averaged for every actor, or for actors of one type, as
+    // "npc" averages every NPC's, companions' among them (module 0.36.0).
+    const average = (midi.settings.averageDamage === 'all') || (midi.settings.averageDamage === this.actor?.type)
     const auto = this.workflowOptions.autoRollDamage
     if (average || (auto === 'always') || ((auto !== 'none') && !this.activity.attack)) {
       this.rollOptions.isCritical = this.isCritical
@@ -334,7 +398,28 @@ class Workflow {
     return this.WorkflowState_Suspend
   }
 
-  WorkflowState_ConfirmRoll() { return this.WorkflowState_DamageRollStarted }
+  /**
+   * Workflow.ts:2308-2315: where the Gamemaster confirms damage, the workflow waits, its damage
+   * rolled, until they do (confirmDamage), still able to take an area's targets from theirs.
+   */
+  async WorkflowState_ConfirmRoll(context) {
+    if (context.attackRoll) return this.WorkflowState_AttackRollComplete
+    if ((midi.settings.confirmAttackDamage !== 'none') && (this.activity.attack || this.activity.damage)) {
+      await this.displayDamageRolls()
+      return this.WorkflowState_Suspend
+    }
+    return this.WorkflowState_DamageRollStarted
+  }
+
+  /** Workflow.ts:2316-2319: the Gamemaster has confirmed it. */
+  WorkflowState_RollConfirmed() { return this.WorkflowState_DamageRollStarted }
+
+  /** The Gamemaster's confirm button on a workflow waiting for it, as Midi's card has it. */
+  confirmDamage() {
+    if (!this.suspended || (this.currentAction !== this.WorkflowState_ConfirmRoll)) return Promise.resolve()
+    this.suspended = false
+    return this.performState(this.WorkflowState_RollConfirmed)
+  }
 
   /**
    * Workflow.ts:2320-2332: an area not auto-targeted takes the Gamemaster's targets once its damage
@@ -534,6 +619,22 @@ export const MidiActivity = Base => class extends Base {
   /** dnd5e's damage dialog stays shut: the workflow rolls damage. */
   _triggerSubsequentActions() {}
 
+  /**
+   * MidiActivityMixin.ts:1288-1294, 1323-1335: Midi's own getDamageConfig, whoever calls it, adds the
+   * actor's damage roll modifiers to each roll (here only where it has some).
+   */
+  getDamageConfig(config = {}) {
+    const rollConfig = super.getDamageConfig(config)
+    for (const roll of rollConfig.rolls ?? []) {
+      const modifiers = damageRollModifiers(this, roll)
+      if (!modifiers.length) continue
+      roll.options ??= {}
+      roll.options['midi-qol'] ??= {}
+      roll.options['midi-qol'].modifiers = [...(roll.options['midi-qol'].modifiers ?? []), ...modifiers]
+    }
+    return rollConfig
+  }
+
   /** MidiActivityMixin.ts:979-1110 */
   async rollDamage(config = {}, dialog = {}, message = {}) {
     const workflow = config.workflow
@@ -595,6 +696,7 @@ export class MidiAttackActivity extends MidiActivity(AttackActivity) {
     if (!rolls?.length) return null
     workflow.attackMode = rolls[0].options.attackMode ?? config.attackMode
     workflow.ammunition = this.actor.items.get(rolls[0].options.ammunition) ?? null
+    if (rolls[0].options.ammunition) midi.ammunition.set(this.uuid, rolls[0].options.ammunition)
     workflow.setAttackRoll(rolls[0])
     workflow.isCritical = rolls[0].isCritical === true
     workflow.isFumble = rolls[0].isFumble === true
@@ -603,6 +705,18 @@ export class MidiAttackActivity extends MidiActivity(AttackActivity) {
     setTimeout(() => { if (workflow.chatCard) workflow.chatCard.rolls = workflow.chatRolls }, 200)
     if (workflow.suspended) workflow.unSuspend({ attackRoll: rolls[0] })
     return rolls
+  }
+
+  /**
+   * AttackActivity.ts:268-279: damage rolled with no ammunition given takes the ammunition the
+   * activity last fired, as its sheet's Damage button rolls it; here outside a workflow alone, which
+   * otherwise takes the workflow's.
+   */
+  async rollDamage(config = {}, dialog = {}, message = {}) {
+    if (!config.workflow && !config.ammunition && midi.ammunition.has(this.uuid)) {
+      config.ammunition = this.actor.items.get(midi.ammunition.get(this.uuid)) ?? undefined
+    }
+    return super.rollDamage(config, dialog, message)
   }
 
   /** MidiActivityMixin.ts:1255-1295: counts damage rolls, and takes the attack mode from the workflow. */
@@ -673,4 +787,14 @@ export function installMidi() {
     scene: { tokens: { size: placeables.size } },
     tokens: { setTargets },
   }
+  // Hooks.ts:408-412 (utils.ts:2593-2605, 1212-1220), on every client after a combat's write: a
+  // change of turn or round releases a Gamemaster's targets under "allGM" or "all", and under any
+  // setting but "none" the targets at 0 hit points. A player's, released where they control the
+  // previous combatant's token, isn't modelled: the module's targets are the Gamemaster's.
+  Hooks.on('updateCombat', (combat, data) => {
+    if ((data.round === undefined) && (data.turn === undefined)) return
+    if (midi.autoRemoveTargets === 'none') return
+    const all = game.user?.isGM && ['allGM', 'all'].includes(midi.autoRemoveTargets)
+    game.user.targets = new Set(all ? [] : [...(game.user.targets ?? [])].filter(t => !(t.actor?.system?.attributes?.hp?.value <= 0)))
+  })
 }

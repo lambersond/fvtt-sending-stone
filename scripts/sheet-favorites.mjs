@@ -3,7 +3,7 @@ import { describeTool } from "./sheet-details.mjs";
 import { castFrom, hiddenCopy } from "./sheet-spells.mjs";
 import { effectIdOf, hiddenFromPlayer } from "./sheet-effects.mjs";
 import { listedFeatures } from "./sheet-features.mjs";
-import { countedUses, finite, limitedUses, localize } from "./sheet-values.mjs";
+import { countedUses, finite, limitedUses, localize, RESOURCES } from "./sheet-values.mjs";
 
 /**
  * A character's favorites, as dnd5e's sheet shows them under Favorites, and Tidy 5e in its own:
@@ -163,13 +163,15 @@ function slotsFavorite(actor, id) {
  * The old-style resources dnd5e lists first among the favorites: each that's named and has a
  * maximum, with its uses left and when it's recovered, since 0.29.0 that they're the resource's,
  * which its player may spend directly, and the feature it stands for, as `resourceLinks` finds it,
- * or null.
+ * or null. Since 0.36.0 only those three, never an NPC's legendary actions, resistances or lair,
+ * which dnd5e keeps among its resources, the first named by their long description.
  * @param {Actor} actor
  * @returns {object[]}
  */
 function resourcesOf(actor) {
   const linkOf = resourceLinks(actor);
-  return Object.entries(actor.system?.resources ?? {}).flatMap(([id, resource]) => {
+  const resources = Object.entries(actor.system?.resources ?? {}).filter(([id]) => RESOURCES.includes(id));
+  return resources.flatMap(([id, resource]) => {
     const max = finite(resource?.max);
     if ( !resource?.label || !max ) return [];
     const recovery = [resource.sr && { period: "sr" }, resource.lr && { period: "lr" }].filter(Boolean);

@@ -16,9 +16,10 @@ const GROUPS = {
   item: ['activation', 'range', 'target', 'concentration', ...ROLLS],
   feature: ['range', 'target', 'concentration', ...ROLLS],
 }
+// Since 0.36.0 with tableDamage, after damage.
 export const ACTION_KEYS = ['name', 'img', 'type', 'activityName', 'activation', 'activationType', 'range', 'target',
-  ...ROLLS, 'damage', 'attackArea', 'rollFormula', 'check', 'consumesSlot', 'cast', 'spellId', 'forward', 'activities',
-  'uses', 'level', 'castFrom', 'concentration', 'identified', 'consumable', 'enchantments', 'text']
+  ...ROLLS, 'damage', 'tableDamage', 'attackArea', 'rollFormula', 'check', 'consumesSlot', 'cast', 'spellId', 'forward',
+  'activities', 'uses', 'level', 'castFrom', 'concentration', 'identified', 'consumable', 'enchantments', 'text']
 
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v)
 const list = v => Array.isArray(v) ? v : []

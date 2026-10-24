@@ -1,5 +1,6 @@
 import { includeGmContent } from "./config.mjs";
 import { campaignCharacterId, hitPoints } from "./characters.mjs";
+import { combatantCompanion } from "./creature-sync.mjs";
 
 /**
  * Turning combats and combatants into plain data for the listener.
@@ -17,7 +18,9 @@ export function isCombatantShared(combatant) {
 }
 
 /**
- * Does a combat include any of a campaign's characters that the listener may be told about?
+ * Does a combat include any of a campaign's characters that the listener may be told about? Since
+ * 0.36.0, for an app that reads companions, any of their companions it was listed counts too, so a
+ * fight with only the familiar in it reaches the campaign.
  * @param {Combat} combat
  * @param {Campaign} campaign
  * @param {string} [leaving]   The id of a combatant to leave out, as it is being removed.
@@ -25,7 +28,7 @@ export function isCombatantShared(combatant) {
  */
 export function involvesCampaign(combat, campaign, leaving) {
   return combat.combatants.some(combatant => (combatant.id !== leaving) && isCombatantShared(combatant)
-    && campaign.characters.has(combatant.actorId));
+    && (campaign.characters.has(combatant.actorId) || Boolean(combatantCompanion(combatant, campaign))));
 }
 
 /**
@@ -33,7 +36,9 @@ export function involvesCampaign(combat, campaign, leaving) {
  *
  * Hit points are included for the campaign's characters, whose players can see them anyway, and
  * for everyone else only when Gamemaster-only information is being sent. Since 0.29.0 its token's
- * disposition is included, as `dispositionOf` has it.
+ * disposition is included, as `dispositionOf` has it. Since 0.36.0, for an app that reads
+ * companions, which of their companions it is, `companion`, by its key in the list the campaign was
+ * last told, and a companion's hit points as a character's; for any other app, exactly as before.
  * @param {Combatant} combatant
  * @param {Campaign} campaign
  * @returns {object}
@@ -41,6 +46,7 @@ export function involvesCampaign(combat, campaign, leaving) {
 export function summarizeCombatant(combatant, campaign) {
   const actor = combatant.actor;
   const character = campaignCharacterId(actor, campaign);
+  const companion = combatantCompanion(combatant, campaign);
   const gmContent = includeGmContent();
   const summary = {
     id: combatant.id,
@@ -53,11 +59,12 @@ export function summarizeCombatant(combatant, campaign) {
     initiative: combatant.initiative ?? null,
     defeated: combatant.isDefeated,
     character,
+    ...((companion !== undefined) && { companion }),
     playerOwned: actor?.hasPlayerOwner ?? false,
     disposition: dispositionOf(combatant)
   };
   if ( gmContent ) summary.hidden = combatant.hidden;
-  if ( character || gmContent ) summary.hp = hitPoints(actor);
+  if ( character || companion || gmContent ) summary.hp = hitPoints(actor);
   return summary;
 }
 

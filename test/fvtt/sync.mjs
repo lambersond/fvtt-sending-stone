@@ -172,7 +172,8 @@ assert.deepEqual(hellos[0].data.characters.map(c => [c.id, c.uuid, c.name, c.img
 ])
 assert.deepEqual(hellos[1].data.characters.map(c => c.id), ['grim', 'vex'])
 // Module 0.30.0 (its contract §2.2): the hello also lists the campaign's groups and its settings.
-assert.deepEqual(Object.keys(hellos[0].data).sort(), ['bridge', 'characters', 'combats', 'config', 'features', 'foundry', 'groups', 'module', 'prompts', 'settings', 'sheetsApart', 'system'])
+// Changed on purpose (round 0.36.0 §4.1): and the characters' companions.
+assert.deepEqual(Object.keys(hellos[0].data).sort(), ['bridge', 'characters', 'combats', 'companions', 'config', 'features', 'foundry', 'groups', 'module', 'prompts', 'settings', 'sheetsApart', 'system'])
 // Grim's sheet, which can't be described, goes as none, and costs Vex nothing.
 const mirkwood = first.filter(e => e.campaign.id === 'camp-b').map(describe)
 assert.deepEqual(mirkwood.filter(d => d.startsWith('character.updated')), ['character.updated Mirkwood grim', 'character.updated Mirkwood vex'])
@@ -452,6 +453,37 @@ assert.ok(!('damage' in expandedTough) && !('toHit' in expandedTough), 'a row wi
 // An activity favorite keeps its own keys; what it holds is slimmed.
 assert.deepEqual([slim8.favorites[0].activity, slim8.favorites[0].attackModes, slim8.favorites[0].damage], [null, null, [{ formula: '1d6 + 2', type: 'Bludgeoning' }]])
 ok('H8: slim format 1: a split staff row keeps its activityName, activation and activities; an unequipped staff\'s one Cast drops its row\'s activities; an unidentified item\'s action, and one in a container in a container, go by reference; a class item no tab lists goes whole; equipped false, prepared 0 and an empty container\'s contents are kept; a row without damage gets nothing added, one with damage [] keeps it; every key comes back')
+
+// Module 0.36.0: an action's damage on its own, `tableDamage`, is its row's, as its damage is, so it
+// goes by reference too: a spellbook's goes once, not again with each of its actions, which would
+// leave the slim sheet little smaller than the full one. An action with its own keeps it, and one
+// without it drops its row's.
+const boltTable = {
+  normal: { critical: false, plannable: true, rolls: [{ formula: '2d10', type: 'Fire', dice: [{ faces: 10, number: 2 }] }] },
+  critical: { critical: true, plannable: true, rolls: [{ formula: '4d10', type: 'Fire', dice: [{ faces: 10, number: 4 }] }] },
+}
+const tabledBolt = { ...bolt, tableDamage: boltTable }
+const boltAction = {
+  id: 'bolt', name: tabledBolt.name, img: tabledBolt.img, activation: tabledBolt.activation, range: tabledBolt.range, target: null,
+  ...Object.fromEntries(Object.keys(NO_ROLLS).map(key => [key, tabledBolt[key]])), uses: null, level: 0, castFrom: null,
+  concentration: false, text: tabledBolt.text,
+}
+const full8b = {
+  ...full,
+  spells: [{ ...full.spells[0], spells: [tabledBolt] }, full.spells[1]],
+  actions: [...full.actions, { id: 'cantrip', label: 'Cantrips', actions: [
+    { ...boltAction, tableDamage: structuredClone(boltTable) },
+    { ...boltAction, tableDamage: null },
+    boltAction,
+  ] }],
+}
+const slim8b = slimSheet(full8b)
+assert.deepEqual(expandSheet(JSON.parse(JSON.stringify(slim8b))), full8b)
+const [sameTable, ownTable, noTable] = slim8b.actions.at(-1).actions
+assert.deepEqual(sameTable, { id: 'bolt', ref: true }, "the row's tableDamage, as built: by reference, nothing of its own")
+assert.deepEqual([ownTable, noTable], [{ id: 'bolt', ref: true, tableDamage: null }, { id: 'bolt', ref: true, drop: ['tableDamage'] }])
+assert.deepEqual(slim8b.spells[0].spells[0].tableDamage, boltTable, 'its row keeps it')
+ok("H8b (0.36.0): an action's tableDamage goes by reference to its row's; its own, null, is kept; none drops its row's; every key comes back")
 
 // ---- H9: no post larger than the app takes ----
 assert.deepEqual(transport.termsOf('camp-a'), { slimSheets: null, maxBytes: 1_000_000 }, "the app's last answer said nothing of it")
