@@ -68,6 +68,22 @@ export const users = new Collection()
 export const actors = new Collection()
 export const combats = new Collection()
 
+// Core's Localization methods read their translations through `this`, so one called apart from
+// game.i18n throws, as `const { localize } = game.i18n; localize(key)` does in Foundry. Whatever a
+// harness puts in their place is held to the same.
+const i18n = { lang: 'en', translations: {} }
+for (const [name, method] of Object.entries({
+  localize(k) { return this.translations[k] ?? k },
+  format(k, d) { return `${this.localize(k)} ${JSON.stringify(d)}` },
+})) {
+  const asCore = given => function (...args) {
+    void this.translations
+    return given.apply(this, args)
+  }
+  let held = asCore(method)
+  Object.defineProperty(i18n, name, { enumerable: true, get: () => held, set: given => { held = asCore(given) } })
+}
+
 globalThis.game = {
   ready: true,
   version: '14.365',
@@ -76,7 +92,7 @@ globalThis.game = {
   system: { id: 'dnd5e', title: 'D&D 5e', version: '5.3.0' },
   modules: new Map([['sending-stone', { version: '0.2.0' }]]),
   documentTypes: { Actor: ['character', 'npc'] },
-  i18n: { lang: 'en', localize: k => k, format: (k, d) => `${k} ${JSON.stringify(d)}` },
+  i18n,
   users, actors, combats,
   get user() { return users.get('gm') },
   // The roles core gives each permission, as its world setting `core.permissions` makes them: Make
