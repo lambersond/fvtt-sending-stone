@@ -34,6 +34,18 @@ export function favoritesOf(actor, texts) {
   ];
 }
 
+/**
+ * Would the sheet list this favorite, since module 0.37.0: does it refer to something the
+ * character's player sees, as `favoritesOf` lists it? So a favorite added from the app is never one
+ * the app, or dnd5e's own sheet, would leave out, such as an item hidden from the sheet.
+ * @param {Actor} actor
+ * @param {{type: string, id: string}} favorite   As dnd5e stores it.
+ * @returns {boolean}
+ */
+export function listedFavorite(actor, favorite) {
+  return describeFavorite(actor, favorite) !== null;
+}
+
 /* -------------------------------------------- */
 
 /**
@@ -120,7 +132,7 @@ function effectFavorite(actor, { item, effect }) {
  * @returns {object|null}
  */
 function skillFavorite(actor, id) {
-  if ( !actor.system?.skills?.[id] ) return null;
+  if ( !ownEntry(actor.system?.skills, id) ) return null;
   return { type: "skill", id, name: localize(CONFIG.DND5E?.skills?.[id]?.label) || id };
 }
 
@@ -132,7 +144,7 @@ function skillFavorite(actor, id) {
  * @returns {object|null}
  */
 function toolFavorite(actor, id) {
-  const tool = actor.system?.tools?.[id];
+  const tool = ownEntry(actor.system?.tools, id);
   if ( !tool ) return null;
   return { type: "tool", ...describeTool(actor, id, tool) };
 }
@@ -145,7 +157,7 @@ function toolFavorite(actor, id) {
  * @returns {object|null}
  */
 function slotsFavorite(actor, id) {
-  const slots = actor.system?.spells?.[id];
+  const slots = ownEntry(actor.system?.spells, id);
   if ( !slots ) return null;
   const level = finite(slots.level) || null;
   const method = CONFIG.DND5E?.spellcasting?.[slots.type];
@@ -264,6 +276,19 @@ function resolve(actor, uuid) {
   if ( embedded === "Activity" ) return { item, activity: item.system?.activities?.get?.(embeddedId) };
   if ( embedded === "ActiveEffect" ) return { item, effect: item.effects?.get?.(embeddedId) };
   return {};
+}
+
+/**
+ * The character's own skill, tool or pool of slots by its key, or undefined. dnd5e keeps them in
+ * plain objects, so a key such as "constructor" would otherwise find what every object has: a
+ * favorite of nothing, which the app could add, and which dnd5e's own sheet fails to draw for a
+ * skill or a tool.
+ * @param {object|undefined} entries   Such as `actor.system.tools`.
+ * @param {string} key
+ * @returns {object|undefined}
+ */
+function ownEntry(entries, key) {
+  return Object.hasOwn(entries ?? {}, key) ? entries[key] : undefined;
 }
 
 /**

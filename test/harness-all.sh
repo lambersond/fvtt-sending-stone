@@ -70,4 +70,7 @@ for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run companions $v; done
 for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run alone $v; done
 # Module 0.36.0: ending a turn from the app, the character's or a companion's, by Foundry's Next Turn.
 for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run turns $v; done
+# Module 0.37.0: favorites added and removed from the app by dnd5e's own methods (dnd5e 5.3.3 and
+# 6.0.5 stand-ins), fetched with rolls, moves, removals and notes off.
+for v in X=1 "X=1 DND5E6=1"; do run favoriting $v SLIM_CHECK=1; done
 exit $fail

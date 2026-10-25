@@ -5,6 +5,7 @@ import {
 import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mjs";
+import { checkFavoriteCommand } from "./command-favorites.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
 import { commandActor, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
@@ -234,6 +235,7 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * campaign character whose companion it's for, `of`, an id, but for a kind a companion never makes,
  * as Heroic Inspiration or charges spent by hand; and an end of a turn names the turn, as the app
  * was shown it, and nothing else, as does taking one back, with the end of the turn it takes back.
+ * And since 0.37.0 a favorite added or removed, what it is.
  * @param {object} command
  * @returns {string|null}
  */
@@ -250,6 +252,7 @@ export function checkCommand(command) {
   if ( command.kind === "inspiration" ) return checkInspirationCommand(command);
   if ( command.kind === "transfer" ) return checkTransferCommand(command);
   if ( command.kind === "remove" ) return checkRemoveCommand(command);
+  if ( command.kind === "favorite" ) return checkFavoriteCommand(command);
   if ( command.kind === "note" ) return checkNoteCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);

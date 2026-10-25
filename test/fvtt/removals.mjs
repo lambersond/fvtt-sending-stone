@@ -495,7 +495,8 @@ assert.ok(listed.some(item => item.id === 'potion') && listed.some(item => item.
 const ON = { enabled: true, kinds: ['remove'], reason: null }
 assert.deepEqual(helloOf().data.features.removals, ON)
 // Changed on purpose (round 0.36.0 §4.1): and what its companions take.
-assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions'])
+// Changed on purpose (round 0.37.0 §6.7): and whether favorites are added and removed here.
+assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites'])
 assert.deepEqual([helloOf().data.features.rolls.enabled, helloOf().data.features.transfers.enabled], [false, false], "the campaign's rolls and moves off")
 // Apart from the rolls, the moves and the dice: whatever they are.
 diceStatus.ready = false

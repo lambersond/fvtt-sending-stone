@@ -3,6 +3,7 @@ import { chatEnabled, chatScope, combatEnabled, getDestination, includeGmContent
 import { forgetCombats, noteCombatSent } from "./campaign-combats.mjs";
 import { forgetTold } from "./character-sync.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { favoriteFeatures } from "./command-favorites.mjs";
 import { removalFeatures, transferFeatures } from "./command-transfers.mjs";
 import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { roster } from "./characters.mjs";
@@ -83,7 +84,8 @@ const resent = new Map();
  * have a journal of them. Since 0.36.0 it lists the campaign's characters' companions, `companions`,
  * each without its sheet, which follows to an app that reads them, and says which of a companion's
  * rolls are made here, and how companions enter initiative, `features.companions`. Its combats are
- * described by the companions it lists.
+ * described by the companions it lists. Since 0.37.0, whether a character's favorites may be added
+ * and removed from the app, `features.favorites`, under dnd5e, with no switch.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -121,7 +123,7 @@ export function announce({ campaignId }={}) {
       ...shared,
       features: {
         rolls: rollFeatures(campaign), transfers: transferFeatures(campaign), removals: removalFeatures(),
-        notes: noteFeatures(campaign), companions: companionFeatures(campaign)
+        notes: noteFeatures(campaign), companions: companionFeatures(campaign), favorites: favoriteFeatures()
       },
       sheetsApart: true,
       characters: roster(campaign),

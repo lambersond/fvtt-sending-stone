@@ -1,7 +1,7 @@
 # The harness
 
 The module's own scripts, run in Node against stand-ins for Foundry VTT 14 and Midi-QOL and against
-dnd5e's real dice classes: 38 harnesses, 84 runs of them in `harness-all.sh`. No Foundry, no browser
+dnd5e's real dice classes: 39 harnesses, 86 runs of them in `harness-all.sh`. No Foundry, no browser
 and no network: `fvtt/stub.mjs` stands in for Foundry's core and replaces `fetch`, so every post the
 module makes lands in the harness, and the stand-in app answers it. None of this is part of the
 module: Foundry reads `module.json` only, and the release workflow leaves `test/`, the package files,
@@ -65,6 +65,7 @@ run failed. A full pass takes about seven minutes.
 | `token-core.mjs` | Foundry v14's scenes, tokens and synthetic actors, with their deltas and hooks as a fault picks them, a world actor's item changed as core passes it on to its tokens' creatures, companions' world actors (the only maker of an actor's `ownership`), and combats whose initiative and flags are written as core writes them, and whose turns move as Next Turn moves them, or as core's update writes them, its turn events on or off: what `companions.mjs`, `alone.mjs`, `turns.mjs` and the app's e2e (through `e2e/fvtt`) keep companions and combats on |
 | `journal-core.mjs` | Foundry v14's journals, folders and pages, with their ownership, `_stats` and hooks, its showdown and `cleanHTML`: what `notes.mjs` and the app's e2e (through `e2e/fvtt`) keep journal notes in |
 | `actor5e.mjs`, `activity5e.mjs`, `enchant5e.mjs` | dnd5e 5.3.3's actor rolls, items and activities, and enchantments, ported as far as the module uses them |
+| `favorites-core.mjs` | dnd5e 5.3.3's favorites (`hasFavorite`, `addFavorite`, `removeFavorite`), for a stand-in character: what `favoriting.mjs` and the app's e2e (through `e2e/fvtt`) add favorites with |
 | `dnd5e-cards.mjs` | dnd5e's concentration and chat cards, and Midi-QOL's concentration card |
 | `midi-fake.mjs`, `midi-saves.mjs`, `midi-critical.mjs` | Midi-QOL 14's workflow, its Gamemaster's confirmation of damage where asked for and its release of their targets when the turn changes, 13's saving throws, and its rules for critical hits |
 | `crit-parentheticals.mjs` | Foundry's parenthetical dice terms |
@@ -101,6 +102,6 @@ e2e: run both, and keep the two repositories' branches in step.
 
 ## Third-party code
 
-See `fvtt/THIRD-PARTY.md`: four stand-ins are ported from dnd5e (MIT, its notice there); three are
+See `fvtt/THIRD-PARTY.md`: five stand-ins are ported from dnd5e (MIT, its notice there); three are
 modelled on Midi-QOL (CC BY 3.0), with no Midi-QOL file copied or run; no Foundry VTT file is used.
 dnd5e itself is fetched at set-up and never committed.

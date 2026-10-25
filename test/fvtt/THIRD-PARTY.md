@@ -5,11 +5,12 @@ The harness in this folder is test code. None of it is in module.zip (the releas
 
 ## dnd5e
 
-actor5e.mjs, activity5e.mjs, enchant5e.mjs and dnd5e-cards.mjs are stand-ins ported from the dnd5e
-system 5.3.3 (https://github.com/foundryvtt/dnd5e), as far as the module's commands use it. dnd5e's
-software is distributed under the MIT license, whose notice follows. The harness also loads dnd5e's
-own dice classes, its lang/en.json and one of its templates at run time, from the releases pinned in
-`test/pins.env`; those are fetched by `test/dnd5e.sh` and never committed here.
+actor5e.mjs, activity5e.mjs, enchant5e.mjs, dnd5e-cards.mjs and favorites-core.mjs are stand-ins
+ported from the dnd5e system 5.3.3 (https://github.com/foundryvtt/dnd5e), as far as the module's
+commands use it. dnd5e's software is distributed under the MIT license, whose notice follows. The
+harness also loads dnd5e's own dice classes, its lang/en.json and one of its templates at run time,
+from the releases pinned in `test/pins.env`; those are fetched by `test/dnd5e.sh` and never
+committed here.
 
 ```
 Copyright 2021 Andrew Clayton

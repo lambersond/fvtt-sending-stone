@@ -1,6 +1,7 @@
 {
   "private": true,
   "type": "module",
+  "homepage": "https://github.com/lambersond/fvtt-sending-stone",
   "scripts": {
     "test": "sh test/harness-all.sh",
     "harness:one": "sh test/run.sh",
