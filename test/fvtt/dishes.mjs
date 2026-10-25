@@ -1354,4 +1354,36 @@ await setWorldTime(game.time.worldTime + 86_400)
 await until(() => !dishEffects(bree).length, "a character no longer the campaign's")
 ok("the sweep deletes a dish effect at its time, not before; only on the bridge, and once on taking over; with the switch off; one already deleted skipped without a throw; lengthened by hand, at its new time; marked expired, at once; a character taken out of its campaign's too")
 
+/* -------------------------------------------- */
+/*  22. Apply… and its dialog                   */
+/* -------------------------------------------- */
+
+// The card's Apply… opens "Who ate …?", core's DialogV2 here a stand-in that answers as its Apply
+// button does: whoever is ticked, the cook. Last, as it serves the cook a dish.
+const dialogs = []
+foundry.applications.api ??= {}
+const DialogV2 = foundry.applications.api.DialogV2
+foundry.applications.api.DialogV2 = class {
+  constructor(options) { this.options = options; dialogs.push(options) }
+  addEventListener() {}
+  async render() {
+    queueMicrotask(() => this.options.submit(this.options.buttons.find(each => each.action === 'apply').callback()))
+    return this
+  }
+}
+const hadDocument = 'document' in globalThis
+globalThis.document ??= new JSDOM('').window.document
+try {
+  const chosen = (await serve(dishOf(BOON()))).card
+  ;(await renderCard(messages.get(chosen.id), { asGm: true })).querySelector('[data-action="dishApply"]').click()
+  await until(() => flagsOf(chosen).state === 'applied', 'served from its dialog')
+  assert.deepEqual([dialogs.length, dialogs[0].window.title, dialogs[0].buttons.map(each => each.label)],
+    [1, 'Who ate Fireberry Glazed Skewers?', ['Apply', 'Set aside']])
+  assert.deepEqual(flagsOf(chosen).applied.map(each => each.actorId), [flagsOf(chosen).cookId])
+} finally {
+  foundry.applications.api.DialogV2 = DialogV2
+  if (!hadDocument) delete globalThis.document
+}
+ok("Apply… opens its dialog, titled and labelled in the module's words, and serves whoever it ticks, the cook")
+
 process.exit(0)

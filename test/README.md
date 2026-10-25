@@ -60,7 +60,7 @@ run failed. A full pass takes about seven minutes.
 
 | file | what it is |
 |---|---|
-| `stub.mjs` | Foundry core: users, actors, combats, settings, hooks, chat messages; replaces `fetch` |
+| `stub.mjs` | Foundry core: users, actors, combats, settings, hooks, chat messages; `game.i18n`, whose `localize` and `format` read `this` as core's do, whatever a harness puts in their place, so one called apart from it throws; replaces `fetch` |
 | `dice-core.mjs` | Foundry v14's core dice |
 | `token-core.mjs` | Foundry v14's scenes, tokens and synthetic actors, with their deltas and hooks as a fault picks them, a world actor's item changed as core passes it on to its tokens' creatures, companions' world actors (the only maker of an actor's `ownership`), and combats whose initiative and flags are written as core writes them, and whose turns move as Next Turn moves them, or as core's update writes them, its turn events on or off: what `companions.mjs`, `alone.mjs`, `turns.mjs` and the app's e2e (through `e2e/fvtt`) keep companions and combats on |
 | `journal-core.mjs` | Foundry v14's journals, folders and pages, with their ownership, `_stats` and hooks, its showdown and `cleanHTML`: what `notes.mjs` and the app's e2e (through `e2e/fvtt`) keep journal notes in |

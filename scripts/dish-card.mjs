@@ -40,6 +40,22 @@ import { send } from "./transport.mjs";
 const TEMPLATE = `modules/${MODULE_ID}/templates/chat/dish.hbs`;
 
 /**
+ * A translation, through game.i18n: its methods read their translations through `this`, so one
+ * taken apart from it throws.
+ * @param {string} key
+ * @returns {string}
+ */
+const localize = key => game.i18n.localize(key);
+
+/**
+ * A translation with its data filled in, through game.i18n, as localize.
+ * @param {string} key
+ * @param {object} data
+ * @returns {string}
+ */
+const format = (key, data) => game.i18n.format(key, data);
+
+/**
  * The dish cards being served on this client, by its user and the card, so a second click waits for
  * nothing and serves no one twice.
  * @type {Set<string>}
@@ -132,7 +148,6 @@ export async function postDishCard(command, campaign) {
  * @returns {object}
  */
 function cardContext(command, cook) {
-  const { localize, format } = game.i18n;
   const body = command.dish.body;
   const { effect } = body;
   const outcome = body.dish.outcome;
@@ -168,7 +183,6 @@ function cardContext(command, cook) {
  * @returns {string}
  */
 function sentWhen(queuedAt) {
-  const { localize, format } = game.i18n;
   const seconds = Math.max(0, (Date.now() - queuedAt) / 1000);
   const ago = (count, one, many) => ((count === 1) ? localize(`SENDINGSTONE.Dish.When.${one}`)
     : format(`SENDINGSTONE.Dish.When.${many}`, { count }));
@@ -209,7 +223,6 @@ export function renderDishCard(message, html) {
   if ( !flags || !game.user?.isGM || !dishSystem() || (typeof html?.querySelector !== "function") ) return;
   const place = html.querySelector(".sending-stone-dish-actions");
   if ( !place ) return;
-  const { localize, format } = game.i18n;
   const made = html.ownerDocument;
   const line = (text, className) => Object.assign(made.createElement("p"), { className, textContent: text });
   const button = (label, action, run) => {
@@ -315,7 +328,6 @@ export function dishDialogContent({ recipe, rows, notice=null }) {
 export async function chooseCharacters(message) {
   const flags = message.getFlag(MODULE_ID, "dish");
   if ( !flags ) return;
-  const { localize, format } = game.i18n;
   const { rows, notice } = dishRows(message);
   const waiting = flags.state === "waiting";
   if ( !rows.length && !waiting ) {
