@@ -70,6 +70,9 @@ export function registerSettings() {
       manualDice: new BooleanField({ initial: false }),
       // May its players move items and coins from the app? Apart from its rolls.
       transfers: new BooleanField({ initial: false }),
+      // Does it take its players' dishes from the Magical Recipe Book, since 0.38.0? Apart from its
+      // rolls, under dnd5e 5.
+      dishes: new BooleanField({ initial: false }),
       // How its characters' companions enter initiative, since 0.36.0: each its own roll, or right
       // after its character, where this module keeps them.
       companionInitiative: new StringField({
@@ -95,6 +98,16 @@ export function registerSettings() {
       if ( (setting?.key === `${MANUAL_DICE}.enabled`) && allowed() ) reannounce();
     });
   }
+
+  // The dish cards deleted before anyone ate them, since 0.38.0, for their app to hear of after a
+  // reload: ids, the Gamemaster's name and the time, never the dish, as every user can read a world
+  // setting. Written by the bridge alone (dish-card.mjs).
+  game.settings.register(MODULE_ID, SETTINGS.DISH_TOMBSTONES, {
+    scope: "world",
+    config: false,
+    type: Array,
+    default: []
+  });
 
   // Kept only so connected characters chosen before campaigns can be moved into one.
   game.settings.register(MODULE_ID, SETTINGS.CHARACTERS, {

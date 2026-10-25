@@ -1,0 +1,10 @@
+<div class="sending-stone-dish sending-stone-dish-{{outcome}}">
+    <header><h3>{{recipe}}</h3><span class="sending-stone-dish-chip">{{chip}}</span></header>
+    <p class="sending-stone-dish-cook">{{cooked}}</p>
+    <p class="sending-stone-dish-seat">{{through}}</p>
+    {{#if message}}<p class="sending-stone-dish-message">{{message}}</p>{{/if}}
+    {{#each ingredients}}<p><strong>{{name}}.</strong> {{text}}</p>{{/each}}
+    {{#each notes}}<p class="hint">{{this}}</p>{{/each}}
+    {{#if lasts}}<p class="hint">{{lasts}}</p>{{/if}}
+    <div class="sending-stone-dish-actions"></div>
+</div>

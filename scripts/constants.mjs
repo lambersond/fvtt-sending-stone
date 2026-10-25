@@ -80,8 +80,14 @@ export const SETTINGS = Object.freeze({
   CAMPAIGNS_MENU: "campaignsMenu",
 
   /** World-scope list of campaigns: {id, title, characters, groups, rolls, attacks, prompts,
-   *  manualDice, transfers, companionInitiative}, characters and groups being actor ids. */
+   *  manualDice, transfers, dishes, companionInitiative}, characters and groups being actor ids. */
   CAMPAIGNS: "campaigns",
+
+  /** World-scope list of the dish cards deleted undecided, since 0.38.0, so that their app hears of
+   *  it after a reload: {app, campaignId, data, at}, ids and the Gamemaster's name alone, never the
+   *  dish; and of those deleted decided, with their `state`, so the same dish handed over again
+   *  posts no card. Written by the bridge. */
+  DISH_TOMBSTONES: "dishTombstones",
 
   /** World-scope set of the actor ids of connected characters, from before campaigns. Read once,
    *  to move them into a campaign. */
@@ -182,6 +188,14 @@ export const EVENTS = Object.freeze({
    *  the app, its card was deleted, or it was left too long. */
   PROMPT_CLOSED: "roll.prompt.closed",
 
+  /** A Gamemaster served a dish from the Magical Recipe Book, since 0.38.0: everyone it was
+   *  served to so far. Sent only to an app that says it reads dishes, `features.dishes`. */
+  DISH_APPLIED: "dish.applied",
+
+  /** A Gamemaster set a dish aside, or its undecided card was deleted, since 0.38.0: to such an
+   *  app alone. */
+  DISH_DISMISSED: "dish.dismissed",
+
   /** What became of a command fetched from the app, such as a player's roll. Not part of the event
    *  stream. */
   COMMAND_RESULT: "command.result"
@@ -275,6 +289,31 @@ export const FAVORITE_TYPES = Object.freeze(["item", "activity", "effect", "skil
 export const FAVORITE_OPS = Object.freeze(["add", "remove"]);
 
 /**
+ * What a player can have done here from the app with a dish they cooked in the Magical Recipe Book,
+ * since module 0.38.0: a card only Gamemasters see, from which they choose who ate it. Offered under
+ * dnd5e 5 where the campaign's Gamemaster turns dishes on: it throws no dice.
+ * @type {readonly string[]}
+ */
+export const DISH_KINDS = Object.freeze(["dish"]);
+
+/** The cookbook body versions this module reads, since 0.38.0. */
+export const DISH_VERSIONS = Object.freeze([1]);
+
+/** A dish's outcomes, as the cookbook sends them, since 0.38.0. */
+export const DISH_OUTCOMES = Object.freeze(["boon", "bane", "standard"]);
+
+/** The most a dish's body holds, and its events carry, since 0.38.0. */
+export const MOST_DISH_INGREDIENTS = 20;
+export const MOST_DISH_CHANGES = 100;
+export const MOST_DISH_TEXT = 200;
+export const MOST_DISH_CHARACTERS = 200;
+export const MOST_DISH_LIST = 100;
+
+/** How many decided dishes go again after each hello, newest first, and how far back, in ms. */
+export const MOST_DISH_RESENDS = 50;
+export const DISH_DECISIONS_RESENT_FOR = 30 * 24 * 60 * 60 * 1000;
+
+/**
  * What a player, or their Gamemaster, can have done here from the app with journal notes, since
  * module 0.34.0: a note or chapter added to a journal, changed, or a note deleted. Offered under any
  * system, with no switch of its own: it throws no dice.
@@ -301,11 +340,12 @@ export const MOST_COMPANIONS_EACH = 20;
 /**
  * The kinds a companion's command is never, since 0.36.0: what an NPC has none of, what isn't asked,
  * and what edits it rather than acting, as charges spent by hand, or its favorites, which an NPC has
- * none of (round 0.36.0 §2.5), and what's its character's to do, as ending a turn or taking one back,
- * which the character's command does for the companion's turn too (round 0.36.0 §2.8).
+ * none of, or a dish, which no companion eats (round 0.36.0 §2.5), and what's its character's to do,
+ * as ending a turn or taking one back, which the character's command does for the companion's turn
+ * too (round 0.36.0 §2.8).
  */
 export const COMPANION_UNTAKEN = Object.freeze([
-  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "favorite", "note", "endTurn", "undoEndTurn"
+  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "favorite", "dish", "note", "endTurn", "undoEndTurn"
 ]);
 
 /**

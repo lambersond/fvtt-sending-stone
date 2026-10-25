@@ -324,6 +324,19 @@
         </div>
     </fieldset>
 
+    <fieldset class="sending-stone-dishes">
+        <legend>{{localize "SENDINGSTONE.Config.Actions.Dishes"}}</legend>
+        <div class="form-group">
+            <label for="sending-stone-dishes">{{localize "SENDINGSTONE.Config.Actions.DishesPlayers"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-dishes" name="campaign.dishes" {{#if campaign.dishes}}checked{{/if}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.DishesHint"}}</p>
+            {{#if campaign.dishesSystem}}<p class="hint sending-stone-warning">{{localize "SENDINGSTONE.Config.Actions.DishesSystem"}}</p>{{/if}}
+            {{#if campaign.dishesApp}}<p class="hint sending-stone-warning">{{localize "SENDINGSTONE.Config.Actions.DishesApp"}}</p>{{/if}}
+        </div>
+    </fieldset>
+
     <fieldset class="sending-stone-companions">
         <legend>{{localize "SENDINGSTONE.Config.Actions.Companions"}}</legend>
         <div class="form-group">

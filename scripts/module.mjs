@@ -10,6 +10,8 @@ import { registerChatHooks } from "./chat.mjs";
 import { registerCombatHooks } from "./combat.mjs";
 import { registerFollowHooks } from "./creature-initiative.mjs";
 import { registerCreatureHooks } from "./creature-sync.mjs";
+import { registerDishHooks, renderDishCard } from "./dish-card.mjs";
+import { topUpAfterRest } from "./dish-effects.mjs";
 import { installDicePlans, selfTest } from "./dice-plan.mjs";
 import { registerSettingsWatch } from "./foundry-settings.mjs";
 import { startHeartbeat } from "./heartbeat.mjs";
@@ -30,6 +32,7 @@ Hooks.once("init", () => {
   registerMidiPromptHooks();
   registerCommandHooks();
   registerSettingsWatch();
+  registerDishHooks();
 });
 
 // Every client registers the hooks, but only the active Gamemaster's posts anything. That role can
@@ -58,3 +61,7 @@ Hooks.on(HELLO_DELIVERED_HOOK, helloDelivered);
 Hooks.on(SHEET_TERMS_HOOK, sheetTermsChanged);
 Hooks.on(EVENT_DROPPED_HOOK, eventDropped);
 Hooks.on("dnd5e.renderChatMessage", markAppRoll);
+// Since 0.38.0 a dish's card is drawn with its buttons for a Gamemaster, and a long rest wakes a
+// character at a maximum a dish raised, on the client that rested.
+Hooks.on("dnd5e.renderChatMessage", renderDishCard);
+Hooks.on("dnd5e.restCompleted", topUpAfterRest);

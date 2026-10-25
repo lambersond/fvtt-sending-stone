@@ -7,6 +7,8 @@ import {
   resendCompanion, toldCompanions
 } from "./creature-sync.mjs";
 import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
+import { dishReader } from "./command-dishes.mjs";
+import { resendDishDecisions, resendLostDish } from "./dish-card.mjs";
 import { campaignGroups, groupEntry, groupReader, groupsListing } from "./groups.mjs";
 import { forgetBooks, journalOwnershipChanged, sendBooks } from "./journals.mjs";
 import { groupSheet } from "./sheet-group.mjs";
@@ -98,9 +100,10 @@ const ownershipChanged = new Set();
  * The hellos and characters lost to failures that might not last, to be sent again, by
  * `hello:${campaignId}` or `${campaignId}.${actorId}`, with when they were lost; since 0.36.0 a
  * campaign's companions' list, by `companions:${campaignId}`, and a companion's sheet, by
- * `${campaignId}.c:${key}`.
+ * `${campaignId}.c:${key}`; and since 0.38.0 a dish's decision, by `dish:${campaignId}.${card}`, a
+ * deleted card's with its event, as the card can't build it again.
  * @type {Map<string, {campaignId: string, actorId: string|null, companions?: boolean,
- *   companionKey?: string, at: number}>}
+ *   companionKey?: string, card?: string, data?: object, at: number}>}
  */
 const lost = new Map();
 
@@ -295,7 +298,8 @@ function sendGroups(campaign) {
  * one that was answered. Then its groups, and since the hello was built when it was queued, the
  * removal of any group it listed that has been deleted since; since 0.36.0 its companions, to an
  * app that reads them, as creature-sync.mjs sends them; and since 0.34.0, every journal of notes the
- * campaign has, to an app that reads them.
+ * campaign has, to an app that reads them; and since 0.38.0, every decided dish of the last 30 days,
+ * to an app that takes them (dish-card.mjs).
  * @param {string} campaignId
  * @param {object} [hello]    The hello answered.
  * @returns {void}
@@ -311,6 +315,7 @@ export function helloDelivered(campaignId, hello) {
   removedSince(campaign, hello);
   companionsDelivered(campaign, hello);
   sendBooks(campaign, hello);
+  if ( dishReader(campaign.id) ) resendDishDecisions(campaign);
 }
 
 /**
@@ -497,7 +502,9 @@ function warnTooLarge(campaign, { id, name }, bytes, limit) {
  * character; and a group's removal, or what the world's settings are, as the hello, which says both
  * again; and since 0.34.0 a journal of notes, as the hello, which every journal follows. Since
  * 0.36.0 a campaign's companions' list, which is taken as untold and compared again; and a
- * companion's sheet, as a character's. What the app refused would be refused again, and isn't.
+ * companion's sheet, as a character's. Since 0.38.0 a dish's decision, by its card, which it's built
+ * from again when due; a deleted card's with the event itself, its card being gone. What the app
+ * refused would be refused again, and isn't.
  * @param {object} envelope
  * @param {{temporary: boolean}} options
  * @returns {void}
@@ -538,21 +545,31 @@ export function eventDropped(envelope, { temporary }={}) {
     case EVENTS.CHARACTER_TEXTS:
       forgetSent(campaignId, Object.keys(envelope.data?.texts ?? {}));
       break;
+    case EVENTS.DISH_APPLIED:
+    case EVENTS.DISH_DISMISSED: {
+      const card = envelope.data?.card;
+      if ( typeof card !== "string" ) return;
+      const kept = (envelope.data.reason === "deleted") ? { data: envelope.data } : {};
+      lost.set(`dish:${campaignId}.${card}`, { campaignId, actorId: null, card, ...kept, at: Date.now() });
+      break;
+    }
   }
 }
 
 /**
  * Send again what was lost long enough ago: a hello, with every character after it, or a character
  * or group, which `sendCharacter` sends where it now belongs; since 0.36.0 a companions' list, by
- * comparing it again, and a companion's sheet, where it's still listed.
+ * comparing it again, and a companion's sheet, where it's still listed; and since 0.38.0 a dish's
+ * decision, told by its card before anything else, as it names no character.
  * @returns {void}
  */
 export function resendLost() {
   const now = Date.now();
-  for ( const [key, { campaignId, actorId, companions, companionKey, at }] of lost ) {
+  for ( const [key, { campaignId, actorId, companions, companionKey, card, data, at }] of lost ) {
     if ( now - at < RESEND_AFTER ) continue;
     lost.delete(key);
-    if ( companions ) listsChanged({ now: true });
+    if ( card ) resendLostDish(campaignId, card, data);
+    else if ( companions ) listsChanged({ now: true });
     else if ( companionKey ) resendCompanion(campaignId, companionKey);
     else if ( actorId ) sendCharacter(actorId);
     else resendHello(campaignId);

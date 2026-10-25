@@ -1,7 +1,7 @@
 # The harness
 
 The module's own scripts, run in Node against stand-ins for Foundry VTT 14 and Midi-QOL and against
-dnd5e's real dice classes: 39 harnesses, 86 runs of them in `harness-all.sh`. No Foundry, no browser
+dnd5e's real dice classes: 40 harnesses, 88 runs of them in `harness-all.sh`. No Foundry, no browser
 and no network: `fvtt/stub.mjs` stands in for Foundry's core and replaces `fetch`, so every post the
 module makes lands in the harness, and the stand-in app answers it. None of this is part of the
 module: Foundry reads `module.json` only, and the release workflow leaves `test/`, the package files,
@@ -66,6 +66,7 @@ run failed. A full pass takes about seven minutes.
 | `journal-core.mjs` | Foundry v14's journals, folders and pages, with their ownership, `_stats` and hooks, its showdown and `cleanHTML`: what `notes.mjs` and the app's e2e (through `e2e/fvtt`) keep journal notes in |
 | `actor5e.mjs`, `activity5e.mjs`, `enchant5e.mjs` | dnd5e 5.3.3's actor rolls, items and activities, and enchantments, ported as far as the module uses them |
 | `favorites-core.mjs` | dnd5e 5.3.3's favorites (`hasFavorite`, `addFavorite`, `removeFavorite`), for a stand-in character: what `favoriting.mjs` and the app's e2e (through `e2e/fvtt`) add favorites with |
+| `dish-core.mjs` | Dishes from the Magical Recipe Book (module 0.38.0): a character's Active Effects as Foundry v14 keeps them, created and deleted through the actor, each firing its hook; what dnd5e prepares of a dish's changes on hit points, traits and senses; world time; a chat card drawn for a Gamemaster or a player; chat messages deleted as core deletes them; dnd5e's rest hook; written from their behaviour, not ported, on `dnd5e-cards.mjs`'s characters: what `dishes.mjs` and the app's e2e (through `e2e/fvtt`) serve dishes with |
 | `dnd5e-cards.mjs` | dnd5e's concentration and chat cards, and Midi-QOL's concentration card |
 | `midi-fake.mjs`, `midi-saves.mjs`, `midi-critical.mjs` | Midi-QOL 14's workflow, its Gamemaster's confirmation of damage where asked for and its release of their targets when the turn changes, 13's saving throws, and its rules for critical hits |
 | `crit-parentheticals.mjs` | Foundry's parenthetical dice terms |

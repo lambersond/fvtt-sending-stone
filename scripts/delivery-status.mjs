@@ -341,6 +341,7 @@ function whatOf(type) {
   if ( kind.startsWith("roll.prompt.") ) return "Prompt";
   if ( kind === EVENTS.COMMAND_RESULT ) return "Result";
   if ( kind === EVENTS.JOURNAL_UPDATED ) return "Journal";
+  if ( (kind === EVENTS.DISH_APPLIED) || (kind === EVENTS.DISH_DISMISSED) ) return "Dish";
   return "Event";
 }
 

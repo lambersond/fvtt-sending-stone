@@ -94,6 +94,7 @@ body:
         - label: Save and concentration prompts
         - label: Allow Players to enter dice results manually
         - label: Players move items and coins
+        - label: Dishes from the Magical Recipe Book
         - label: Chat messages
         - label: Combat tracker
         - label: GM-only details

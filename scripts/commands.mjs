@@ -11,6 +11,7 @@ import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
 import { favoriteReader, favoritesOn, noteFavoriteReader, runFavoriteCommand } from "./command-favorites.mjs";
+import { dishesOn, dishInFlight, dishReader, noteDishReader, runDishCommand } from "./command-dishes.mjs";
 import { runEndTurnCommand, runUndoTurnCommand } from "./command-turn.mjs";
 import {
   noteRemovalReader, noteTransferReader, removalReader, removalsOn, runRemoveCommand, runTransferCommand,
@@ -228,9 +229,12 @@ export function registerCommandHooks() {
  * from under any system, and which are sent at once where it starts to in a heartbeat's answer; and
  * since 0.36.0, whether it reads companions, which are sent at once where it starts to in a
  * heartbeat's answer; and since 0.37.0, whether it takes favorites added and removed, for which it's
- * fetched from under dnd5e, wherever its app takes them, with everything else off. A hello's answer
- * wakes the campaign's fetching, which may be waiting as an answer given before the hello was taken
- * asked.
+ * fetched from under dnd5e, wherever its app takes them, with everything else off; and since 0.38.0,
+ * whether it takes dishes from the Magical Recipe Book, for which it's fetched from where the
+ * campaign's Gamemaster takes them, under dnd5e 5, with everything else off, and to which the
+ * campaign's decided dishes are sent at once where it starts to in a heartbeat's answer. A hello's
+ * answer wakes the campaign's fetching, which may be waiting as an answer given before the hello was
+ * taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -245,6 +249,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteTransferReader(campaignId, features);
   noteRemovalReader(campaignId, features);
   noteFavoriteReader(campaignId, features);
+  noteDishReader(campaignId, features, type);
   noteNotesReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);
   syncPollers();
@@ -256,7 +261,9 @@ export function noteListenerFeatures(campaignId, features, type) {
  * coins from it, or since 0.33.0 remove their characters' items, under dnd5e, wherever its app
  * takes them, or since 0.34.0 keep journal notes, under any system, wherever its app takes them, or
  * since 0.37.0 add and remove their characters' favorites, under dnd5e, wherever its app takes them,
- * and that the app has commands for, while this client is the bridge; and for no other.
+ * or since 0.38.0 take their dishes from the Magical Recipe Book, where its Gamemaster takes them,
+ * under dnd5e 5, wherever its app takes them, and that the app has commands for, while this client is
+ * the bridge; and for no other.
  * @param {object} [options]
  * @param {boolean} [options.retry]   Try again the campaigns whose fetch the app refused, as after
  *                                    a change to the settings.
@@ -284,15 +291,17 @@ export function syncPollers({ retry=false }={}) {
  * whether or not their rolls are made here; or since 0.33.0 removals of their items, under dnd5e,
  * wherever its app takes them, with rolls and moves off too; or since 0.34.0 journal notes, under
  * any system, wherever its app takes them; or since 0.37.0 favorites added and removed, under dnd5e,
- * wherever its app takes them, with rolls, moves, removals and notes off too. A roll fetched while
- * only moves, removals, notes or favorites are is refused as one fetched while rolls are off.
+ * wherever its app takes them, with rolls, moves, removals and notes off too; or since 0.38.0 dishes
+ * from the Magical Recipe Book, by the campaign's own switch, under dnd5e 5, wherever its app takes
+ * them, with rolls, moves, removals, notes and favorites off too. A roll fetched while only moves,
+ * removals, notes, favorites or dishes are is refused as one fetched while rolls are off.
  * @param {Campaign} campaign
  * @returns {boolean}
  */
 function fetchesFor(campaign) {
   return (campaign.rolls && diceStatus.ready) || (transfersOn(campaign) && transferReader(campaign.id))
     || (removalsOn() && removalReader(campaign.id)) || (notesOn() && notesReader(campaign.id))
-    || (favoritesOn() && favoriteReader(campaign.id));
+    || (favoritesOn() && favoriteReader(campaign.id)) || (dishesOn(campaign) && dishReader(campaign.id));
 }
 
 /**
@@ -503,6 +512,9 @@ class Poller {
  * too, for the end of the turn it takes back and any other of its combat. Since 0.37.0 a favorite
  * added or removed, under dnd5e, wherever its app takes them, waits for its character's earlier
  * commands, as a removal does, a removal of the same item among them, and their next ones for it.
+ * Since 0.38.0 a dish from the Magical Recipe Book is made again when handed over again, as a note
+ * is, and skipped only while the same one is being made; it waits only for earlier dishes, never for
+ * its cook's rolls, so a card reaches the Gamemaster whatever their character is doing.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -510,14 +522,15 @@ class Poller {
 function take(command, campaign) {
   if ( typeof command.id !== "string" ) return;
   const note = command.kind === "note";
-  if ( note ) {
-    if ( noteInFlight(command.id) ) return;
+  const dish = command.kind === "dish";
+  if ( note || dish ) {
+    if ( note ? noteInFlight(command.id) : dishInFlight(command.id) ) return;
   } else {
     if ( taken.includes(command.id) ) return;
     taken.push(command.id);
     if ( taken.length > REMEMBERED ) taken.shift();
   }
-  if ( !note && answersMidiPrompt(command) ) {
+  if ( !note && !dish && answersMidiPrompt(command) ) {
     void make(command, campaign).catch(err => {
       console.error(`${MODULE_ID} | Could not report a roll from Sending Stone`, err);
     });
@@ -528,6 +541,7 @@ function take(command, campaign) {
   let keys = [String(command.actorId)];
   if ( isId(command.of) ) keys = [String(command.actorId), command.of];
   if ( note ) keys = [`note:${command.actorId}`];
+  else if ( dish ) keys = ["dish"];
   else if ( TURN_KINDS.includes(command.kind) ) {
     if ( isId(command.turn?.combatId) ) keys = [...keys, `turn:${command.turn.combatId}`];
   } else if ( command.kind === "transfer" ) {
@@ -639,6 +653,7 @@ function runCommand(command, campaign, signal) {
     case "transfer": return runTransferCommand(command, campaign);
     case "remove": return runRemoveCommand(command, campaign);
     case "favorite": return runFavoriteCommand(command, campaign);
+    case "dish": return runDishCommand(command, campaign);
     case "note": return runNoteCommand(command, campaign);
     default: return runRollCommand(command, campaign, { signal });
   }
