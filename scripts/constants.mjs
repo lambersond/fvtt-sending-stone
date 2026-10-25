@@ -260,6 +260,21 @@ export const TRANSFER_KINDS = Object.freeze(["transfer"]);
 export const REMOVE_KINDS = Object.freeze(["remove"]);
 
 /**
+ * What a player can have done here from the app to their character's favorites, since module
+ * 0.37.0: add one, or remove one, by dnd5e's own `addFavorite` and `removeFavorite`, as its sheet's
+ * menus do. Offered wherever the system is D&D Fifth Edition, with no switch of its own, apart from
+ * the rolls: it throws no dice and posts nothing.
+ * @type {readonly string[]}
+ */
+export const FAVORITE_KINDS = Object.freeze(["favorite"]);
+
+/** What a favorite may be, as dnd5e keeps them, since 0.37.0. */
+export const FAVORITE_TYPES = Object.freeze(["item", "activity", "effect", "skill", "tool", "slots"]);
+
+/** What may be done to one, since 0.37.0. */
+export const FAVORITE_OPS = Object.freeze(["add", "remove"]);
+
+/**
  * What a player, or their Gamemaster, can have done here from the app with journal notes, since
  * module 0.34.0: a note or chapter added to a journal, changed, or a note deleted. Offered under any
  * system, with no switch of its own: it throws no dice.
@@ -285,12 +300,12 @@ export const MOST_COMPANIONS_EACH = 20;
 
 /**
  * The kinds a companion's command is never, since 0.36.0: what an NPC has none of, what isn't asked,
- * and what edits it rather than acting, as charges spent by hand (round 0.36.0 §2.5), and what's its
- * character's to do, as ending a turn or taking one back, which the character's command does for the
- * companion's turn too (round 0.36.0 §2.8).
+ * and what edits it rather than acting, as charges spent by hand, or its favorites, which an NPC has
+ * none of (round 0.36.0 §2.5), and what's its character's to do, as ending a turn or taking one back,
+ * which the character's command does for the companion's turn too (round 0.36.0 §2.8).
  */
 export const COMPANION_UNTAKEN = Object.freeze([
-  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "note", "endTurn", "undoEndTurn"
+  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "favorite", "note", "endTurn", "undoEndTurn"
 ]);
 
 /**

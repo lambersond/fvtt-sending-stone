@@ -37,7 +37,7 @@ of event. The full wire format is in [PROTOCOL.md](PROTOCOL.md).
 
 1. **Gamemaster, in the Sending Stone app:** under *Campaigns*, set up each campaign with its
    title, your game's Forge address and a secret.
-2. **Gamemaster, in Foundry:** *Settings → Configure Settings → Sending Stone → Open Settings*.
+2. **Gamemaster, in Foundry:** *Settings → Configure Settings → illagria/sending-stone → Open Settings*.
    Under **General**, enter the **App address**, such as `https://sending-stone.vercel.app`.
    Events go to `/api/events` under it; you don't type that part. Then add each campaign with
    **New campaign**: on its **Connection** tab, the same title and secret as in the app (**Test**
@@ -67,7 +67,7 @@ then only when one is new, since they are most of a sheet's size. Their saving t
 damage, healing, rolls and conditions are marked for the app to act on, and your own links in
 them, such as Request Roll and Apply Status, are left out.
 
-Every setting is in one window, *Settings → Configure Settings → Sending Stone → Open Settings*,
+Every setting is in one window, *Settings → Configure Settings → illagria/sending-stone → Open Settings*,
 with its sections down the side: General, Modules, each campaign and the Roster. Only the open
 section is shown, so a world with many players and campaigns never lists every character once per
 campaign. Edits are kept as you move between sections, and nothing is saved until **Save Changes**.
@@ -401,6 +401,18 @@ players' rolls and moves are made here. Each removal posts a line in chat as the
 marked "GM". Removals are made one at a time with moves, so an item on its way is never also
 removed. An item in a container that hides what it holds isn't offered.
 
+### Favorites
+
+A player can add to their character's favorites from the app, and remove from them: right-click,
+long-press or press the context-menu key on an item, one of its activities or an effect, then
+**Add to favorites** or **Remove from favorites**; and on any of those among the favorites,
+**Remove from favorites**. They're dnd5e's own favorites, so the character's sheet in Foundry
+shows them too, and a new one goes last, as dnd5e adds it. There's no switch: it works under
+D&D Fifth Edition wherever the app takes it, whether or not players' rolls are made here.
+Nothing is posted in chat, as dnd5e posts nothing, so only a character's player does it from the
+app. Skills, tools and spell slots are made favorites in Foundry, and favorites are reordered
+there.
+
 ### Journal notes
 
 Players keep journal notes in the app: a Journal card on their character's Biography tab, and on
@@ -712,6 +724,13 @@ Gamemaster-only information switched on.
 - **Undo works only from the app that ended the turn, while its toast offers it,** and only while
   the tracker is where it left it, for a minute at most; after Foundry reloads, use Previous Turn.
 
+## Reporting a problem or an idea
+
+Open an issue for [the module](https://github.com/lambersond/fvtt-sending-stone/issues/new/choose),
+for anything in Foundry, or for [the app](https://github.com/lambersond/sending-stone-player/issues/new/choose),
+for anything in the app; each form asks for what's needed to look into it. Never paste a
+campaign's secret or an invite link.
+
 ## Installation
 
 In Foundry (or on The Forge), install by manifest URL:
@@ -719,6 +738,8 @@ In Foundry (or on The Forge), install by manifest URL:
 ```
 https://github.com/lambersond/fvtt-sending-stone/releases/latest/download/module.json
 ```
+
+Foundry lists it as **illagria/sending-stone**, from 0.37.0. Its id, and the folder name below, is still `sending-stone`.
 
 ### Local development
 
@@ -768,7 +789,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
-| `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites; and the feature each old-style resource stands for |
+| `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites; and the feature each old-style resource stands for; whether one would be listed, for the app's to be added |
 | `scripts/sheet-enchant.mjs` | Which enchant activities the app may use, with their profiles and the items each may enchant, as dnd5e's rules have it; and the enchantments an item carries, and which of them its player may end |
 | `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through; the levels an item may cast its spell at, and their cost; the checks a check activity calls for, and what a forward is used through and spends; what each use spends |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, their links marked, hashed, and sent only when a campaign lacks them; a group's without secrets and without links to act on, under hashes of their own |
@@ -802,6 +823,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
+| `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch; nothing posted |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster |
 | `templates/settings/` | The settings window's templates, one for each kind of section |

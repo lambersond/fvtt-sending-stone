@@ -10,6 +10,7 @@ import { runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
+import { favoriteReader, favoritesOn, noteFavoriteReader, runFavoriteCommand } from "./command-favorites.mjs";
 import { runEndTurnCommand, runUndoTurnCommand } from "./command-turn.mjs";
 import {
   noteRemovalReader, noteTransferReader, removalReader, removalsOn, runRemoveCommand, runTransferCommand,
@@ -226,8 +227,10 @@ export function registerCommandHooks() {
  * moves aren't made here; and since 0.34.0, whether it takes journal notes, for which it's fetched
  * from under any system, and which are sent at once where it starts to in a heartbeat's answer; and
  * since 0.36.0, whether it reads companions, which are sent at once where it starts to in a
- * heartbeat's answer. A hello's answer wakes the campaign's fetching, which may be waiting as an
- * answer given before the hello was taken asked.
+ * heartbeat's answer; and since 0.37.0, whether it takes favorites added and removed, for which it's
+ * fetched from under dnd5e, wherever its app takes them, with everything else off. A hello's answer
+ * wakes the campaign's fetching, which may be waiting as an answer given before the hello was taken
+ * asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -241,6 +244,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteSettingsReader(campaignId, features, type);
   noteTransferReader(campaignId, features);
   noteRemovalReader(campaignId, features);
+  noteFavoriteReader(campaignId, features);
   noteNotesReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);
   syncPollers();
@@ -250,8 +254,9 @@ export function noteListenerFeatures(campaignId, features, type) {
 /**
  * Fetch for each campaign that lets its players roll from the app, or since 0.31.0 move items and
  * coins from it, or since 0.33.0 remove their characters' items, under dnd5e, wherever its app
- * takes them, or since 0.34.0 keep journal notes, under any system, wherever its app takes them, and
- * that the app has commands for, while this client is the bridge; and for no other.
+ * takes them, or since 0.34.0 keep journal notes, under any system, wherever its app takes them, or
+ * since 0.37.0 add and remove their characters' favorites, under dnd5e, wherever its app takes them,
+ * and that the app has commands for, while this client is the bridge; and for no other.
  * @param {object} [options]
  * @param {boolean} [options.retry]   Try again the campaigns whose fetch the app refused, as after
  *                                    a change to the settings.
@@ -278,14 +283,16 @@ export function syncPollers({ retry=false }={}) {
  * or since 0.31.0, their moves of items and coins, where they may make them and its app takes them,
  * whether or not their rolls are made here; or since 0.33.0 removals of their items, under dnd5e,
  * wherever its app takes them, with rolls and moves off too; or since 0.34.0 journal notes, under
- * any system, wherever its app takes them. A roll fetched while only moves, removals or notes are is
- * refused as one fetched while rolls are off.
+ * any system, wherever its app takes them; or since 0.37.0 favorites added and removed, under dnd5e,
+ * wherever its app takes them, with rolls, moves, removals and notes off too. A roll fetched while
+ * only moves, removals, notes or favorites are is refused as one fetched while rolls are off.
  * @param {Campaign} campaign
  * @returns {boolean}
  */
 function fetchesFor(campaign) {
   return (campaign.rolls && diceStatus.ready) || (transfersOn(campaign) && transferReader(campaign.id))
-    || (removalsOn() && removalReader(campaign.id)) || (notesOn() && notesReader(campaign.id));
+    || (removalsOn() && removalReader(campaign.id)) || (notesOn() && notesReader(campaign.id))
+    || (favoritesOn() && favoriteReader(campaign.id));
 }
 
 /**
@@ -493,7 +500,9 @@ class Poller {
  * their own. An end of a turn waits too for every earlier end of a turn of its combat, any
  * character's: two players ending the turn of a companion they share would otherwise both find it
  * current, where the later should find it ended and end nothing more. Taking a turn back waits so
- * too, for the end of the turn it takes back and any other of its combat.
+ * too, for the end of the turn it takes back and any other of its combat. Since 0.37.0 a favorite
+ * added or removed, under dnd5e, wherever its app takes them, waits for its character's earlier
+ * commands, as a removal does, a removal of the same item among them, and their next ones for it.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -629,6 +638,7 @@ function runCommand(command, campaign, signal) {
     case "recharge": return runRechargeCommand(command, campaign);
     case "transfer": return runTransferCommand(command, campaign);
     case "remove": return runRemoveCommand(command, campaign);
+    case "favorite": return runFavoriteCommand(command, campaign);
     case "note": return runNoteCommand(command, campaign);
     default: return runRollCommand(command, campaign, { signal });
   }

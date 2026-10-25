@@ -1,0 +1,134 @@
+name: Bug report
+description: Something Sending Stone does in Foundry isn't working as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem with the Sending Stone module in Foundry.
+
+        Is it something in the app instead, such as its pages, sheets, buttons or toasts? Report it to the app: https://github.com/lambersond/sending-stone-player/issues/new/choose. Not sure which? File it here; it can be moved.
+
+        **Never paste a campaign's secret or an invite link,** in any field or screenshot.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you saw, and what you expected to see instead.
+      placeholder: A player's Perception check from the app never reached Foundry's chat.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: As exactly as you can, from opening the game.
+      placeholder: |
+        1. Open the game as Gamemaster.
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who did it?
+      options:
+        - The Gamemaster, in Foundry
+        - A player, from the app
+        - The Gamemaster, from the app
+        - Nobody, it happened by itself
+    validations:
+      required: true
+  - type: input
+    id: module-version
+    attributes:
+      label: Sending Stone version
+      description: In Foundry's Manage Modules, where it's listed as illagria/sending-stone from 0.37.0, or in the app on your campaign's card, under Foundry settings, Versions.
+      placeholder: "0.37.0"
+    validations:
+      required: true
+  - type: input
+    id: foundry-version
+    attributes:
+      label: Foundry version
+      description: In Foundry's Settings sidebar, or on the app's campaign card under Foundry settings, Versions.
+      placeholder: "14.365"
+    validations:
+      required: true
+  - type: input
+    id: system-version
+    attributes:
+      label: D&D Fifth Edition (dnd5e) version
+      description: In Foundry's Settings sidebar, under the game system, or on the app's campaign card.
+      placeholder: "5.3.3"
+    validations:
+      required: true
+  - type: dropdown
+    id: hosting
+    attributes:
+      label: Where is the game hosted?
+      options:
+        - The Forge
+        - Somewhere else
+    validations:
+      required: true
+  - type: input
+    id: midi
+    attributes:
+      label: Midi-QOL
+      description: Its version, if it's active, and whether Run players' attacks through Midi and Allow targets off your screen are on, in Sending Stone's settings under General.
+      placeholder: Not installed
+  - type: textarea
+    id: modules
+    attributes:
+      label: Other modules
+      description: Any that roll dice, change chat cards or change the character sheet, such as libWrapper, Manual Dice, Combat Focus, Tidy 5e Sheets or Dice So Nice!. The Modules section of Sending Stone's settings lists what it sees.
+  - type: checkboxes
+    id: switches
+    attributes:
+      label: Which of these were on?
+      description: The campaign's Player actions, and General, in Sending Stone's settings.
+      options:
+        - label: Players roll in the app
+        - label: Attacks, spells and features
+        - label: Save and concentration prompts
+        - label: Allow Players to enter dice results manually
+        - label: Players move items and coins
+        - label: Chat messages
+        - label: Combat tracker
+        - label: GM-only details
+  - type: dropdown
+    id: connection
+    attributes:
+      label: The campaign's connection
+      description: The dot beside the campaign in Sending Stone's settings, or its Connection tab.
+      options:
+        - Delivering
+        - Needs attention
+        - Not delivering
+        - Idle
+        - Not saved
+        - I didn't look
+  - type: textarea
+    id: notification
+    attributes:
+      label: Foundry's message, word for word
+      description: Sending Stone's notifications start "Sending Stone:".
+      render: text
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser console
+      description: Lines starting "sending-stone |" in the Gamemaster's browser console (F12, then Console). Leave out anything that shows a secret.
+      render: text
+  - type: input
+    id: app-address
+    attributes:
+      label: The app's address, and when it happened
+      description: The App address in Sending Stone's settings under General, and the date, time and time zone.
+      placeholder: https://sending-stone.vercel.app, 24 October 2026 at 20:15 BST
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag images here. Crop out any secret or invite link.

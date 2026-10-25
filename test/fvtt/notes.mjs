@@ -260,7 +260,8 @@ const NONE_YET = { enabled: true, kinds: ['personal', 'party'], reason: null, jo
 for (const id of ['erebor', 'mirkwood']) {
   assert.deepEqual(helloOf(id).data.features.notes, NONE_YET)
   // Changed on purpose (round 0.36.0 §4.1): and what its companions take.
-  assert.deepEqual(Object.keys(helloOf(id).data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions'])
+  // Changed on purpose (round 0.37.0 §6.7): and whether favorites are added and removed here.
+  assert.deepEqual(Object.keys(helloOf(id).data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites'])
   assert.deepEqual(Object.keys(helloOf(id).data.features.notes), ['enabled', 'kinds', 'reason', 'journals', 'orders', 'changes'])
   assert.equal(helloOf(id).data.features.rolls.enabled, false)
 }

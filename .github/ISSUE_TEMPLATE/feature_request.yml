@@ -1,0 +1,59 @@
+name: Feature request
+description: An idea for Sending Stone in Foundry, or for the module and the app together.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Is it only about the app's pages, sheets or buttons? Suggest it to the app: https://github.com/lambersond/sending-stone-player/issues/new/choose. An idea that needs both is welcome here.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: What's missing, or hard, today.
+      placeholder: As Gamemaster, I'd like to see which of my players have the app open.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: How it would work, as you picture it.
+    validations:
+      required: true
+  - type: dropdown
+    id: for-whom
+    attributes:
+      label: Who is it for?
+      options:
+        - Players
+        - The Gamemaster
+        - Both
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where would it show?
+      options:
+        - In Foundry
+        - In the app
+        - Both
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
+      description: Any workaround, or another module that does something like it.
+  - type: textarea
+    id: depends
+    attributes:
+      label: Anything it depends on
+      description: A Foundry version, dnd5e, Midi-QOL or another module.
+  - type: textarea
+    id: sketches
+    attributes:
+      label: Sketches or screenshots
+      description: Drag images here.
