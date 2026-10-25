@@ -6,6 +6,7 @@ import { playerOwners } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mjs";
 import { checkFavoriteCommand } from "./command-favorites.mjs";
+import { checkDishCommand } from "./command-dishes.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
 import { commandActor, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
@@ -235,7 +236,8 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * campaign character whose companion it's for, `of`, an id, but for a kind a companion never makes,
  * as Heroic Inspiration or charges spent by hand; and an end of a turn names the turn, as the app
  * was shown it, and nothing else, as does taking one back, with the end of the turn it takes back.
- * And since 0.37.0 a favorite added or removed, what it is.
+ * And since 0.37.0 a favorite added or removed, what it is. And since 0.38.0 a dish from the Magical
+ * Recipe Book, its body.
  * @param {object} command
  * @returns {string|null}
  */
@@ -254,6 +256,7 @@ export function checkCommand(command) {
   if ( command.kind === "remove" ) return checkRemoveCommand(command);
   if ( command.kind === "favorite" ) return checkFavoriteCommand(command);
   if ( command.kind === "note" ) return checkNoteCommand(command);
+  if ( command.kind === "dish" ) return checkDishCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);
@@ -1419,7 +1422,8 @@ export function describeResult(command, message, actor, campaign, { rolls=messag
 /**
  * Mark a roll made from the app on its chat card, for everyone to see; one the Gamemaster made
  * there as the character, "GM"; and since 0.32.0 one whose dice the player typed in from their own,
- * with a keyboard, "Entered by hand".
+ * with a keyboard, "Entered by hand". Since 0.38.0 a dish's card, with a bowl, "Magical Recipe Book
+ * link": the app vouches for the link that sent it, not that the cookbook made it.
  * @param {ChatMessage} message
  * @param {HTMLElement} html
  */
@@ -1427,15 +1431,19 @@ export function markAppRoll(message, html) {
   const flags = message.flags?.[MODULE_ID];
   const gm = flags?.by === "gm";
   const typed = !gm && (flags?.typed === true);
-  if ( !(flags?.request || flags?.use || gm) || !(html instanceof HTMLElement) ) return;
+  const dish = !gm && Boolean(flags?.dish);
+  if ( !(flags?.request || flags?.use || gm || dish) || !(html instanceof HTMLElement) ) return;
   const header = html.querySelector(".message-header .message-metadata") ?? html.querySelector(".message-header");
   if ( !header || header.querySelector(".sending-stone-badge") ) return;
   const badge = document.createElement("span");
-  badge.className = gm ? "sending-stone-badge sending-stone-gm" : (typed ? "sending-stone-badge sending-stone-typed" : "sending-stone-badge");
-  const label = game.i18n.localize(gm ? "SENDINGSTONE.Roll.BadgeGM" : (typed ? "SENDINGSTONE.Roll.BadgeTyped" : "SENDINGSTONE.Roll.Badge"));
+  badge.className = gm ? "sending-stone-badge sending-stone-gm"
+    : (typed ? "sending-stone-badge sending-stone-typed" : (dish ? "sending-stone-badge sending-stone-dish-badge" : "sending-stone-badge"));
+  const label = game.i18n.localize(gm ? "SENDINGSTONE.Roll.BadgeGM"
+    : (typed ? "SENDINGSTONE.Roll.BadgeTyped" : (dish ? "SENDINGSTONE.Dish.Badge" : "SENDINGSTONE.Roll.Badge")));
   badge.dataset.tooltip = label;
   badge.setAttribute("aria-label", label);
-  badge.innerHTML = typed ? '<i class="fa-solid fa-keyboard" inert></i>' : '<i class="fa-solid fa-mobile-screen-button" inert></i>';
+  badge.innerHTML = typed ? '<i class="fa-solid fa-keyboard" inert></i>'
+    : (dish ? '<span class="sending-stone-bowl" inert></span>' : '<i class="fa-solid fa-mobile-screen-button" inert></i>');
   // The author is the player's, so the badge is what says the Gamemaster rolled it.
   if ( gm ) {
     const who = document.createElement("span");

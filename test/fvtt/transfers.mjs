@@ -1309,6 +1309,35 @@ await win.close()
 game.system.id = 'dnd5e'
 okay("Manage Campaigns' Player actions tab has \"Players move items and coins\" in its own fieldset, not greyed by the rolls; ticked and unticked it shows the window changed or not, and saves; a new campaign's is off; a note where the app has commands but takes no moves, and under another system")
 
+// Changed on purpose (round 0.38.0 §D8.3): the dish switch's notes, as the moves' above. Under dnd5e 6,
+// or another system, that dishes need dnd5e 5; with the switch on, where the app has commands but takes
+// no dishes, as one before 0.38.0, that it doesn't take them yet; neither once it does.
+const NEEDS_5 = 'Dishes need dnd5e 5.x for now.'
+const NOT_YET = "Your Sending Stone doesn't take dishes yet."
+const dishNotes = async () => {
+  const opened = await openSettings()
+  await view(opened, 'campaign', { campaignId: 'camp-a', tab: 'actions' })
+  const found = [...opened.element.querySelectorAll('.sending-stone-dishes .sending-stone-warning')].map(note => note.textContent.trim())
+  await opened.close()
+  return found
+}
+const underSystem = DND5E6 ? [NEEDS_5] : []
+assert.deepEqual(await dishNotes(), underSystem, `the switch off: ${DND5E6 ? 'dnd5e 6' : 'no note'}`)
+campaignAs({ dishes: true })
+assert.deepEqual(await dishNotes(), [...underSystem, NOT_YET], 'the switch on, an app with commands that takes no dishes')
+app.features = { commands: true, transfers: 1, groups: 1, dishes: 1 }
+announce({ campaignId: 'camp-a' })
+await settle()
+assert.deepEqual(await dishNotes(), underSystem, 'an app that takes dishes')
+game.system.id = 'pf2e'
+assert.deepEqual(await dishNotes(), [NEEDS_5], 'another system')
+game.system.id = 'dnd5e'
+app.features = { commands: true, transfers: 1, groups: 1 }
+announce({ campaignId: 'camp-a' })
+await settle()
+campaignAs()
+okay(`Manage Campaigns' Dishes from the Magical Recipe Book notes: ${DND5E6 ? 'under dnd5e 6.0.5, that dishes need dnd5e 5' : 'none under dnd5e 5'}; under another system, that they need dnd5e 5; with the switch on, where the app has commands but takes no dishes, that it doesn't yet, and not once it does`)
+
 /* -------------------------------------------- */
 /*  The settings report                         */
 /* -------------------------------------------- */
@@ -1316,7 +1345,17 @@ okay("Manage Campaigns' Player actions tab has \"Players move items and coins\" 
 const report = () => foundrySettings(getCampaigns()[0])
 const rowsOf = (settings, id) => settings.sections.find(section => section.id === id).rows
 // Changed on purpose (round 0.36.0 §6.12): the campaign's companions' initiative after its moves.
-assert.deepEqual(rowsOf(report(), 'campaign').map(row => row.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'companionInitiative', 'groups'])
+// Changed on purpose (round 0.38.0 §D8.3): its dishes from the Magical Recipe Book after its moves, off.
+assert.deepEqual(rowsOf(report(), 'campaign').map(row => row.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'companionInitiative', 'groups'])
+assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'dishes'), { id: 'dishes', label: 'Dishes from the Magical Recipe Book', value: false, text: 'Off' })
+// Changed on purpose (round 0.38.0 §D8.3): on, it says why it does nothing under dnd5e 6 or another system.
+campaignAs({ dishes: true })
+assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'dishes'),
+  { id: 'dishes', label: 'Dishes from the Magical Recipe Book', value: true, text: 'On', ...(DND5E6 && { note: 'Dishes need dnd5e 5.x for now.' }) })
+game.system.id = 'pf2e'
+assert.equal(rowsOf(report(), 'campaign').find(row => row.id === 'dishes').note, 'Dishes need dnd5e 5.x for now.')
+game.system.id = 'dnd5e'
+campaignAs()
 assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'transfers'), { id: 'transfers', label: 'Players move items and coins', value: true, text: 'On' })
 game.system.id = 'pf2e'
 assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'transfers').note, 'it needs the D&D Fifth Edition system.')
@@ -1331,7 +1370,7 @@ assert.deepEqual(rowsOf(report(), 'sending-stone')[2], { id: 'chatResults', labe
 settings.set('chatResults', 'sometimes')
 assert.equal(rowsOf(report(), 'sending-stone')[2].value, 'foundry', 'any other value follows Foundry')
 settings.delete('chatResults')
-okay("the settings report has the campaign's `transfers` after `manualDice`, On or Off, with a note under another system; and the world's `chatResults` after `chatScope`, Follow or Always")
+okay("the settings report has the campaign's `transfers` after `manualDice`, On or Off, with a note under another system, and its `dishes` after them, with a note under dnd5e 6 or another system; and the world's `chatResults` after `chatScope`, Follow or Always")
 
 // ---- END ----
 console.log(`transfers${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

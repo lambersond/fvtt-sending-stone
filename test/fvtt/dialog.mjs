@@ -27,9 +27,10 @@ actors.delete('ghost')
 await save(win)
 // Module 0.30.0 (its contract §3.2): every campaign is saved with its groups, none here.
 // Changed on purpose (round 0.36.0 §6.12): and with its companions' initiative, each its own roll.
+// Changed on purpose (round 0.38.0 §D8.3): and whether it takes dishes from the Magical Recipe Book, off.
 assert.deepEqual(settings.get('campaigns'), [
-  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, companionInitiative: 'own' },
-  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, companionInitiative: 'own' },
+  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, companionInitiative: 'own' },
+  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, companionInitiative: 'own' },
 ])
 assert.equal(win.element.isConnected, false, 'saved, it closes')
 console.log('ok - saves campaigns in order, trims titles, drops unticked and missing characters')
@@ -319,6 +320,8 @@ const { fields: campaignFields } = registered.get('campaigns').type.element
 assert.ok(campaignFields.manualDice instanceof foundry.data.fields.BooleanField, 'manualDice is in the schema')
 // Module 0.31.0: so is transfers, off until it's turned on.
 assert.ok((campaignFields.transfers instanceof foundry.data.fields.BooleanField) && (campaignFields.transfers.initial === false), 'transfers is in the schema')
+// Module 0.38.0 (round 0.38.0 §D8.3): so is dishes, off until it's turned on.
+assert.ok((campaignFields.dishes instanceof foundry.data.fields.BooleanField) && (campaignFields.dishes.initial === false), 'dishes is in the schema')
 assert.equal(campaignFields.manualDice.initial, false)
 assert.deepEqual(Object.keys(campaignFields).sort(), Object.keys(settings.get('campaigns')[0]).sort())
 const hellosNow = () => Object.fromEntries(posts.splice(0).filter(post => post.envelope.type === 'bridge.hello')
@@ -526,6 +529,27 @@ assert.equal(settings.get('campaigns').find(c => c.id === a).transfers, true, 's
 assert.equal(settings.get('campaigns').find(c => c.id === b).transfers, false, "the other's as it was")
 settings.set('campaigns', settings.get('campaigns').map(c => ({ ...c, transfers: false })))
 console.log("ok - 0.31.0: Players move items and coins has its own fieldset on the Player actions tab, and saves with its campaign")
+
+// Module 0.38.0 (round 0.38.0 §D8.3): Dishes from the Magical Recipe Book, its own fieldset on the
+// Player actions tab between Items and coins and Companions, not greyed by the rolls, saved with its
+// campaign.
+win = await openSettings()
+await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+const dishes = find(win, 'fieldset.sending-stone-dishes')
+assert.equal(dishes.querySelector('legend').textContent.trim(), 'SENDINGSTONE.Config.Actions.Dishes')
+assert.equal(dishes.querySelector('label').textContent.trim(), 'SENDINGSTONE.Config.Actions.DishesPlayers')
+assert.equal(dishes.querySelector('.hint').textContent.trim(), 'SENDINGSTONE.Config.Actions.DishesHint')
+const order = [...win.element.querySelectorAll('fieldset')].map(each => each.className)
+assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 3),
+  ['sending-stone-transfers', 'sending-stone-dishes', 'sending-stone-companions'], 'between Items and coins and Companions')
+assert.equal(find(win, '[name="campaign.dishes"]').checked, false)
+assert.equal(find(win, '[name="campaign.dishes"]').disabled, false, 'whatever the rolls')
+tick(win, 'campaign.dishes')
+await save(win)
+assert.equal(settings.get('campaigns').find(c => c.id === a).dishes, true, 'saved')
+assert.equal(settings.get('campaigns').find(c => c.id === b).dishes, false, "the other's as it was")
+settings.set('campaigns', settings.get('campaigns').map(c => ({ ...c, dishes: false })))
+console.log("ok - 0.38.0: Dishes from the Magical Recipe Book has its own fieldset on the Player actions tab, between Items and coins and Companions, and saves with its campaign")
 
 // Module 0.36.0 (round 0.36.0 §6.12): Companions' initiative, its own fieldset on the Player actions
 // tab after Items and coins, a choice never disabled, saved with its campaign; a new campaign's its

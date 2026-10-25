@@ -84,7 +84,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Dishes from the Magical Recipe Book, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -435,6 +435,23 @@ journal's players isn't shown in the app at all. A secret you write stays in Fou
 player couldn't read it there: in a party's journal, and on a page of a character's journal that its
 players don't all own. There's no switch.
 
+### Dishes from the Magical Recipe Book
+
+Players who cook in the Magical Recipe Book can send the dishes they eat there to your game. Turn
+**Dishes from the Magical Recipe Book** on for a campaign, on its Player actions tab: it's off by
+default. A player makes a link code on their character's page in the app and pastes it into the
+cookbook; each dish they eat there then reaches you as a chat card that only Gamemasters see, whether
+or not players' rolls are made here, and waits for a Gamemaster to be connected. The card says what
+the dish does, who cooked it and through whose link it came. **Apply…** (or **Who ate it…** for a
+standard dish, which has no effect) asks you who ate it, the sender ticked; **Set aside** says nobody
+did. Each character you tick gets one effect holding what the dish does, for 24 hours of game time:
+one dish at a time, a new dish replacing the last, the same dish never twice. Its dice were rolled
+once, in the cookbook, so everyone who eats it gets the same, and the card says what was rolled.
+What the module can't apply by itself, the card lists, for you to apply by hand. A dish that raises
+maximum hit points heals by as much, and a long rest wakes the character at the raised maximum; a
+dish's exhaustion is added once and stays until rests remove it. The player's page in the app shows
+what became of each dish. Tested with dnd5e 5.3.3; off under dnd5e 6 for now.
+
 ### Hit, miss and save results
 
 The app shows whether an attack hit each target, and whether a creature saved or passed a check,
@@ -723,6 +740,24 @@ Gamemaster-only information switched on.
 - **With no Gamemaster connected nothing is made from the app,** End Turn included.
 - **Undo works only from the app that ended the turn, while its toast offers it,** and only while
   the tracker is where it left it, for a minute at most; after Foundry reloads, use Previous Turn.
+- **A dish's effect ends only as world time moves:** a table that never advances time keeps it
+  until the next dish replaces it, or you delete it. It ends on the active Gamemaster's Foundry,
+  when time moves or when they connect.
+- **A dish's card never reaches players,** in Foundry or in the app's chat, GM-only details on or
+  off. Foundry may still keep a whispered card's data in every player's browser, where the
+  browser's developer tools could show it: the dish's own text from the cookbook, the cook's name
+  and which character's link sent it, before you've served it.
+- **A standard dish replaces nothing:** a character's earlier dish stays.
+- **The app hears of every choice made on a dish's card,** after a reload or in the next session
+  too, a deleted card's included, for 30 days. A card deleted after its choice, while the app was
+  away and before it heard of that choice, is told of until Foundry is reloaded; the same dish sent
+  again never posts a second card.
+- **Under Midi-QOL, damage that lowers maximum hit points while a dish raises them** writes the
+  raised figure back into the character, so the dish's raise outlives the dish until a long rest.
+- **Two Gamemasters serving one character at the same moment** may each heal it or add its
+  exhaustion, though it keeps one dish effect.
+- **After a downgrade to 0.37.0,** dish effects no longer end by themselves, delete them by hand,
+  and the campaigns it saves lose the dishes switch.
 
 ## Reporting a problem or an idea
 
@@ -824,9 +859,14 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch; nothing posted |
+| `scripts/command-dishes.mjs` | Dishes from the Magical Recipe Book, from 0.38.0: whether a campaign takes them, by its own switch under dnd5e 5; fetching them from an app that takes them; each dish command checked and posted once as its card, answered again from its card or its tombstone |
+| `scripts/dish-card.mjs` | A dish's card, whispered to the Gamemasters: its words, its buttons, the dialog of who ate it, serving it and setting it aside; telling the app what was decided, again after a drop and after every hello; deleted cards' tombstones; one dish effect per character |
+| `scripts/dish-effects.mjs` | A dish's Active Effect: its changes on dnd5e 5.3.3's paths, its one-offs, its duration and flags; cookbook strings made inert for enrichers; dish effects ended once their time has passed; the long rest's top-up |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster |
 | `templates/settings/` | The settings window's templates, one for each kind of section |
+| `templates/chat/` | Chat card templates: a dish's card |
+| `icons/` | The module's own icons: a dish's badge, and a boon's and a bane's effect |
 | `tools/echo-listener.mjs` | Stand-in listener for development |
 | `test/` | The harness: the module's scripts run in Node against stand-ins for Foundry and Midi-QOL and dnd5e's real dice ([test/README.md](test/README.md)); the app's e2e uses its stand-ins too |
 | `PROTOCOL.md` | Event envelope and payload reference |

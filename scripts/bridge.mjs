@@ -4,6 +4,7 @@ import { forgetCombats, noteCombatSent } from "./campaign-combats.mjs";
 import { forgetTold } from "./character-sync.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { favoriteFeatures } from "./command-favorites.mjs";
+import { dishFeatures } from "./command-dishes.mjs";
 import { removalFeatures, transferFeatures } from "./command-transfers.mjs";
 import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { roster } from "./characters.mjs";
@@ -11,6 +12,7 @@ import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
 import { followAll } from "./creature-initiative.mjs";
 import { companionList } from "./creatures.mjs";
 import { companionFeatures, noteListed } from "./creature-sync.mjs";
+import { expireDishEffects } from "./dish-effects.mjs";
 import { foundrySettings, noteSettingsSent } from "./foundry-settings.mjs";
 import { campaignGroups, groupEntry } from "./groups.mjs";
 import { noteFeatures } from "./journals.mjs";
@@ -85,7 +87,9 @@ const resent = new Map();
  * each without its sheet, which follows to an app that reads them, and says which of a companion's
  * rolls are made here, and how companions enter initiative, `features.companions`. Its combats are
  * described by the companions it lists. Since 0.37.0, whether a character's favorites may be added
- * and removed from the app, `features.favorites`, under dnd5e, with no switch.
+ * and removed from the app, `features.favorites`, under dnd5e, with no switch. Since 0.38.0, whether
+ * the campaign takes dishes from the Magical Recipe Book, `features.dishes`, by its own switch under
+ * dnd5e 5.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -123,7 +127,8 @@ export function announce({ campaignId }={}) {
       ...shared,
       features: {
         rolls: rollFeatures(campaign), transfers: transferFeatures(campaign), removals: removalFeatures(),
-        notes: noteFeatures(campaign), companions: companionFeatures(campaign), favorites: favoriteFeatures()
+        notes: noteFeatures(campaign), companions: companionFeatures(campaign), favorites: favoriteFeatures(),
+        dishes: dishFeatures(campaign)
       },
       sheetsApart: true,
       characters: roster(campaign),
@@ -145,7 +150,8 @@ export function announce({ campaignId }={}) {
  * the app that no client asks any more, as after a reload. Since 0.36.0 it places the companions
  * of each campaign set to "Right after its character" after their characters, in case a
  * character's initiative was set while no Gamemaster was connected: those it placed last, or with
- * none, so that the Gamemaster's own change to a companion stands (creature-initiative.mjs). A
+ * none, so that the Gamemaster's own change to a companion stands (creature-initiative.mjs). Since
+ * 0.38.0 it ends the dish effects whose time passed while no client looked (dish-effects.mjs). A
  * client that is no longer the bridge stops fetching players' rolls.
  * @returns {void}
  */
@@ -155,6 +161,7 @@ export function checkBridge() {
     announce();
     releaseHeldCards();
     void followAll();
+    void expireDishEffects();
   }
   if ( !bridge && wasBridge ) stopPollers();
   wasBridge = bridge;

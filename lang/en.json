@@ -182,6 +182,11 @@
         "TransfersPlayers": "Players move items and coins",
         "TransfersHint": "From the app, they take from and give to the campaign's parties they own in Foundry, and give to each other's characters. You can move anything between its characters and parties. Each move posts a line in chat.",
         "TransfersApp": "The app this campaign sends to doesn't take moves yet.",
+        "Dishes": "Magical Recipe Book",
+        "DishesPlayers": "Dishes from the Magical Recipe Book",
+        "DishesHint": "Players send dishes they cook in the Magical Recipe Book. Each arrives as a card only Gamemasters see, and you choose who ate it.",
+        "DishesApp": "Your Sending Stone doesn't take dishes yet.",
+        "DishesSystem": "Dishes need dnd5e 5.x for now.",
         "Companions": "Companions",
         "CompanionInitiative": "Companions' initiative",
         "CompanionInitiativeOwn": "Its own roll",
@@ -309,7 +314,8 @@
       "Prompt": "A save request",
       "Result": "A player's roll result",
       "Journal": "A journal of notes",
-      "Event": "An event"
+      "Event": "An event",
+      "Dish": "A dish served or set aside"
     },
     "Status": {
       "Delivered": "Delivered at {time}.",
@@ -381,6 +387,49 @@
       "InCampaign": "{journal} ({campaign})",
       "Gamemaster": "Gamemaster",
       "Someone": "Someone in Foundry"
+    },
+    "Dish": {
+      "Badge": "Magical Recipe Book link",
+      "Boon": "Boon",
+      "Bane": "Bane",
+      "Standard": "Standard dish",
+      "Cooked": "Cooked by {cook} in the Magical Recipe Book · sent {when}",
+      "Through": "Sent through {seat}'s Magical Recipe Book link",
+      "ThroughGone": "Sent through the link of a character no longer in this campaign",
+      "Rolled": "Rolled once for everyone: {change} {value} ({formula}).",
+      "MaxHitPoints": "Maximum Hit Points",
+      "NotApplied": "Not applied automatically: {type}.",
+      "AttackDamage": "Adds to attack damage only.",
+      "Vision": "Token vision is up to the Gamemaster.",
+      "Lasts": "Lasts {duration} of game time. Replaces any earlier dish.",
+      "DurationHour": "1 hour",
+      "DurationHours": "{hours} hours",
+      "DurationSeconds": "{seconds} seconds",
+      "When": {
+        "Now": "just now",
+        "Minute": "1 minute ago",
+        "Minutes": "{count} minutes ago",
+        "Hour": "1 hour ago",
+        "Hours": "{count} hours ago",
+        "Day": "1 day ago",
+        "Days": "{count} days ago"
+      },
+      "Apply": "Apply…",
+      "WhoAte": "Who ate it…",
+      "ApplyOthers": "Apply to others…",
+      "SetAside": "Set aside",
+      "EatenBy": "Eaten by {names}",
+      "Healed": "{name} regained {hp} HP",
+      "Exhausted": "{name} gained {levels} exhaustion",
+      "Immune": "{name} is immune to exhaustion",
+      "SetAsideBy": "Set aside by {name}",
+      "DialogTitle": "Who ate {recipe}?",
+      "Confirm": "Apply",
+      "AlreadyHas": "Already has it",
+      "Replaces": "Replaces {recipe}",
+      "NoCharacters": "This campaign has no characters to serve it to.",
+      "Failed": "Couldn't serve {recipe} to {names}.",
+      "FailedRemoved": "Couldn't serve {recipe} to {names}; their earlier dish was removed."
     }
   }
 }

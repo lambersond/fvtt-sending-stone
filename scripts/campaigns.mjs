@@ -35,6 +35,9 @@ import { diceStatus } from "./dice-plan.mjs";
  *                                    and give to its groups they own in Foundry, and give to each
  *                                    other's characters? Off until the Gamemaster turns it on;
  *                                    apart from `rolls`.
+ * @property {boolean} dishes         Does it take its players' dishes from the Magical Recipe Book,
+ *                                    since 0.38.0, a card for the Gamemaster each? Off until the
+ *                                    Gamemaster turns it on, apart from `rolls`, under dnd5e 5.
  * @property {string} companionInitiative  How its characters' companions enter initiative, since
  *                                    0.36.0: `"own"`, each rolls its own; or `"after"`, each in a
  *                                    combat with its character is kept right after it there, by
@@ -48,7 +51,7 @@ import { diceStatus } from "./dice-plan.mjs";
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
   return stored.map(({
-    id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, companionInitiative
+    id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, dishes, companionInitiative
   }) => ({
     id,
     title,
@@ -59,6 +62,7 @@ export function getCampaigns() {
     prompts: prompts === true,
     manualDice: manualDice === true,
     transfers: transfers === true,
+    dishes: dishes === true,
     // A campaign saved before 0.36.0, or holding anything else, rolls its companions' own.
     companionInitiative: (companionInitiative === COMPANION_INITIATIVE.AFTER)
       ? COMPANION_INITIATIVE.AFTER : COMPANION_INITIATIVE.OWN

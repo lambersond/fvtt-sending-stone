@@ -4,6 +4,7 @@ import {
 import { getCampaigns, manualDiceOn } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
 import { transferReader } from "../command-transfers.mjs";
+import { dishReader, dishSystem } from "../command-dishes.mjs";
 import { attacksUnavailable } from "../command-uses.mjs";
 import { commandsOffered } from "../commands.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
@@ -153,7 +154,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * The campaigns as being edited, each with the secret this browser holds for it.
    * @type {{id: string, title: string, secret: string, characters: Set<string>, groups: Set<string>,
    *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean,
-   *   companionInitiative: string}[]}
+   *   dishes: boolean, companionInitiative: string}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({ ...campaign, secret: getSecret(campaign.id) }));
 
@@ -264,6 +265,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         prompts: campaign.prompts,
         manualDice: campaign.manualDice,
         transfers: campaign.transfers,
+        dishes: campaign.dishes,
         companionInitiative: campaign.companionInitiative
       }))
     });
@@ -297,7 +299,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     if ( campaign ) {
       if ( has("campaign.title") ) campaign.title = String(data["campaign.title"] ?? "");
       if ( has("campaign.secret") ) campaign.secret = String(data["campaign.secret"] ?? "");
-      for ( const name of ["rolls", "attacks", "prompts", "manualDice", "transfers"] ) {
+      for ( const name of ["rolls", "attacks", "prompts", "manualDice", "transfers", "dishes"] ) {
         if ( has(`campaign.${name}`) ) campaign[name] = data[`campaign.${name}`] === true;
       }
       // A choice, as the General section's are, never a switch.
@@ -710,7 +712,9 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * A campaign's Player actions tab: what its players may do from the app, why any of it can't be
    * done in this game, and whether they may enter their own dice results, which needs Manual Dice;
    * and since 0.31.0, whether they may move items and coins, which needs D&D Fifth Edition and an
-   * app that takes moves, an older one answering with commands but not with `transfers`.
+   * app that takes moves, an older one answering with commands but not with `transfers`; and since
+   * 0.38.0, whether it takes dishes from the Magical Recipe Book, which need dnd5e 5 and an app that
+   * takes them, an older one answering with commands but not with `dishes`.
    * @param {SettingsWindow["#campaigns"][number]} campaign
    * @returns {object}
    */
@@ -745,6 +749,9 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
           reason: game.i18n.localize("SENDINGSTONE.Config.Actions.RollsReason.system")
         }) : null,
       transfersApp: campaign.transfers && commandsOffered(campaign.id) && !transferReader(campaign.id),
+      dishes: campaign.dishes,
+      dishesSystem: !dishSystem(),
+      dishesApp: campaign.dishes && commandsOffered(campaign.id) && !dishReader(campaign.id),
       // Since 0.36.0, how its companions enter initiative, which needs no app: it's kept here.
       initiativeChoices: [
         { value: COMPANION_INITIATIVE.OWN, key: "CompanionInitiativeOwn" },
@@ -1063,7 +1070,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   static async #onAddCampaign() {
     const campaign = {
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
-      attacks: false, prompts: false, manualDice: false, transfers: false,
+      attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false,
       companionInitiative: COMPANION_INITIATIVE.OWN
     };
     this.#campaigns.push(campaign);
@@ -1365,6 +1372,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       prompts: campaign.prompts,
       manualDice: campaign.manualDice,
       transfers: campaign.transfers,
+      dishes: campaign.dishes,
       companionInitiative: campaign.companionInitiative
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {

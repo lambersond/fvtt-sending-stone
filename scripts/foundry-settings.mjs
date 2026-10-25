@@ -3,6 +3,7 @@ import {
 } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { dishSystem } from "./command-dishes.mjs";
 import { attacksUnavailable } from "./command-uses.mjs";
 import { MANUAL_DICE, moduleState } from "./companions.mjs";
 import { chatEnabled, chatScope, combatEnabled, includeGmContent, resultsAlways } from "./config.mjs";
@@ -165,7 +166,8 @@ function toggle(id, label, value, note=null) {
 
 /**
  * The campaign's own switches, since 0.31.0 whether its players move items and coins among them,
- * since 0.36.0 how its characters' companions enter initiative, and its groups.
+ * since 0.38.0 whether it takes their dishes from the Magical Recipe Book, since 0.36.0 how its
+ * characters' companions enter initiative, and its groups.
  * @param {Campaign} campaign
  * @returns {object[]}
  */
@@ -180,12 +182,14 @@ function campaignRows(campaign) {
   const groups = campaignGroups(campaign);
   const transfersWhy = (campaign.transfers && (game.system?.id !== "dnd5e"))
     ? localize("SENDINGSTONE.Config.Actions.RollsReason.system") : null;
+  const dishesWhy = (campaign.dishes && !dishSystem()) ? localize("SENDINGSTONE.Config.Actions.DishesSystem") : null;
   return [
     toggle("rolls", localize("SENDINGSTONE.Config.Actions.Rolls"), campaign.rolls, rollsWhy),
     toggle("attacks", localize("SENDINGSTONE.Config.Actions.Attacks"), campaign.attacks, attacksWhy),
     toggle("prompts", localize("SENDINGSTONE.Config.Actions.Prompts"), campaign.prompts),
     toggle("manualDice", localize("SENDINGSTONE.Config.Actions.DicePlayers"), campaign.manualDice, diceWhy),
     toggle("transfers", localize("SENDINGSTONE.Config.Actions.TransfersPlayers"), campaign.transfers, transfersWhy),
+    toggle("dishes", localize("SENDINGSTONE.Config.Actions.DishesPlayers"), campaign.dishes, dishesWhy),
     row("companionInitiative", localize("SENDINGSTONE.Config.Actions.CompanionInitiative"), campaign.companionInitiative,
       localize(`SENDINGSTONE.Config.Actions.CompanionInitiative${(campaign.companionInitiative === COMPANION_INITIATIVE.AFTER) ? "After" : "Own"}`)),
     row("groups", localize("SENDINGSTONE.Settings.Groups"), groups.length,

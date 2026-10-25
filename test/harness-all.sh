@@ -73,4 +73,7 @@ for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run turns $v; done
 # Module 0.37.0: favorites added and removed from the app by dnd5e's own methods (dnd5e 5.3.3 and
 # 6.0.5 stand-ins), fetched with rolls, moves, removals and notes off.
 for v in X=1 "X=1 DND5E6=1"; do run favoriting $v SLIM_CHECK=1; done
+# Module 0.38.0: dishes from the Magical Recipe Book, a card for the Gamemaster and an effect on
+# each character chosen (dnd5e 5.3.3), and off under dnd5e 6.0.5.
+for v in X=1 "X=1 DND5E6=1"; do run dishes $v SLIM_CHECK=1; done
 exit $fail

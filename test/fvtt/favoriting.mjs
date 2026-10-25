@@ -407,7 +407,9 @@ okay("a character sheet, as dnd5e has it: Ki, then the Rope and the pact slots b
 
 const ON = { enabled: true, kinds: ['favorite'], reason: null }
 assert.deepEqual(helloOf().data.features.favorites, ON)
-assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites'], 'after companions')
+// Changed on purpose (round 0.38.0 §D8.3): dishes from the Magical Recipe Book after favorites, `"off"` with
+// the switch off, under dnd5e 6 too.
+assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes'], 'after companions')
 assert.deepEqual([helloOf().data.features.rolls.enabled, helloOf().data.features.transfers.enabled], [false, false], "the campaign's rolls and moves off")
 // Apart from the rolls, the moves and the dice: whatever they are.
 diceStatus.ready = false
