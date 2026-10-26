@@ -95,6 +95,7 @@ body:
         - label: Allow Players to enter dice results manually
         - label: Players move items and coins
         - label: Dishes from the Magical Recipe Book
+        - label: Allow Players to disable & remove their own active effects
         - label: Chat messages
         - label: Combat tracker
         - label: GM-only details

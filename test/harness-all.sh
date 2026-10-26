@@ -76,4 +76,7 @@ for v in X=1 "X=1 DND5E6=1"; do run favoriting $v SLIM_CHECK=1; done
 # Module 0.38.0: dishes from the Magical Recipe Book, a card for the Gamemaster and an effect on
 # each character chosen (dnd5e 5.3.3), and off under dnd5e 6.0.5.
 for v in X=1 "X=1 DND5E6=1"; do run dishes $v SLIM_CHECK=1; done
+# Module 0.39.0: a player's own effects turned off, on and deleted from the app, by the campaign's
+# switch (dnd5e 5.3.3 and 6.0.5 stand-ins), fetched with every other switch off.
+for v in X=1 "X=1 DND5E6=1"; do run effects $v SLIM_CHECK=1; done
 exit $fail

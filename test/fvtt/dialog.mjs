@@ -28,9 +28,10 @@ await save(win)
 // Module 0.30.0 (its contract §3.2): every campaign is saved with its groups, none here.
 // Changed on purpose (round 0.36.0 §6.12): and with its companions' initiative, each its own roll.
 // Changed on purpose (round 0.38.0 §D8.3): and whether it takes dishes from the Magical Recipe Book, off.
+// Changed on purpose (round 0.39.0 §1.9): and whether its players change their own effects, off.
 assert.deepEqual(settings.get('campaigns'), [
-  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, companionInitiative: 'own' },
-  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, companionInitiative: 'own' },
+  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, companionInitiative: 'own' },
+  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, companionInitiative: 'own' },
 ])
 assert.equal(win.element.isConnected, false, 'saved, it closes')
 console.log('ok - saves campaigns in order, trims titles, drops unticked and missing characters')
@@ -322,6 +323,8 @@ assert.ok(campaignFields.manualDice instanceof foundry.data.fields.BooleanField,
 assert.ok((campaignFields.transfers instanceof foundry.data.fields.BooleanField) && (campaignFields.transfers.initial === false), 'transfers is in the schema')
 // Module 0.38.0 (round 0.38.0 §D8.3): so is dishes, off until it's turned on.
 assert.ok((campaignFields.dishes instanceof foundry.data.fields.BooleanField) && (campaignFields.dishes.initial === false), 'dishes is in the schema')
+// Changed on purpose (round 0.39.0 §1.9): so is effects, off until it's turned on.
+assert.ok((campaignFields.effects instanceof foundry.data.fields.BooleanField) && (campaignFields.effects.initial === false), 'effects is in the schema')
 assert.equal(campaignFields.manualDice.initial, false)
 assert.deepEqual(Object.keys(campaignFields).sort(), Object.keys(settings.get('campaigns')[0]).sort())
 const hellosNow = () => Object.fromEntries(posts.splice(0).filter(post => post.envelope.type === 'bridge.hello')
@@ -540,8 +543,9 @@ assert.equal(dishes.querySelector('legend').textContent.trim(), 'SENDINGSTONE.Co
 assert.equal(dishes.querySelector('label').textContent.trim(), 'SENDINGSTONE.Config.Actions.DishesPlayers')
 assert.equal(dishes.querySelector('.hint').textContent.trim(), 'SENDINGSTONE.Config.Actions.DishesHint')
 const order = [...win.element.querySelectorAll('fieldset')].map(each => each.className)
-assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 3),
-  ['sending-stone-transfers', 'sending-stone-dishes', 'sending-stone-companions'], 'between Items and coins and Companions')
+// Changed on purpose (round 0.39.0 §1.9): Active effects between it and Companions.
+assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 4),
+  ['sending-stone-transfers', 'sending-stone-dishes', 'sending-stone-effects', 'sending-stone-companions'], 'between Items and coins and Active effects')
 assert.equal(find(win, '[name="campaign.dishes"]').checked, false)
 assert.equal(find(win, '[name="campaign.dishes"]').disabled, false, 'whatever the rolls')
 tick(win, 'campaign.dishes')
@@ -594,3 +598,46 @@ settings.set('campaigns', kept.map(c => ({ ...c, companionInitiative: 'own' })))
 const en = JSON.parse((await import('node:fs')).readFileSync(`${MODULE}/lang/en.json`, 'utf8')).SENDINGSTONE.Config.Actions
 assert.deepEqual([en.Companions, en.CompanionInitiative, en.CompanionInitiativeOwn, en.CompanionInitiativeAfter], ['Companions', "Companions' initiative", 'Its own roll', 'Right after its character'])
 console.log("ok - 0.36.0: Companions' initiative has its own fieldset on the Player actions tab after Items and coins, a choice of Its own roll, selected for a campaign saved before, and Right after its character, with its hint, never disabled; saved for its campaign alone as the choice, a new campaign's its own roll, a StringField in the schema")
+
+// Module 0.39.0 (round 0.39.0 §3.3, §3.6): the side list ends with Help, two links to the module's own
+// issue forms, the bug form's with this game's versions filled in; links, never a view the side's
+// clicks would open, each opening apart and saying so to a screen reader. Configure Settings has an
+// entry any user may open, a small window with the same links.
+{
+  const { menus } = await import('./stub.mjs')
+  const ISSUES = 'https://github.com/lambersond/fvtt-sending-stone/issues/new'
+  const BUG = `${ISSUES}?template=bug_report.yml&module-version=0.2.0&foundry-version=14.365&system-version=D%26D+5e+5.3.0`
+  const FEATURE = `${ISSUES}?template=feature_request.yml`
+  win = await openSettings()
+  const nav = find(win, 'nav.sending-stone-nav')
+  assert.equal([...nav.querySelectorAll('.sending-stone-nav-heading')].at(-1).textContent.trim(), 'SENDINGSTONE.Help.Heading', 'Help last')
+  const links = [...nav.children].slice(-2)
+  assert.deepEqual(links.map(link => [link.tagName, link.getAttribute('href'), link.getAttribute('target'), link.getAttribute('rel')]), [
+    ['A', BUG, '_blank', 'noopener noreferrer'],
+    ['A', FEATURE, '_blank', 'noopener noreferrer'],
+  ], 'the two links, last, each opening apart')
+  for (const [link, words, icon] of [[links[0], 'SENDINGSTONE.Help.Bug', 'fa-bug'], [links[1], 'SENDINGSTONE.Help.Feature', 'fa-lightbulb']]) {
+    assert.equal(link.hasAttribute('data-action'), false, `${words}: no view of the window's`)
+    assert.equal(link.querySelector('.sending-stone-nav-label').textContent.trim(), words)
+    assert.equal(link.querySelector('.sending-stone-sr').textContent.trim(), 'SENDINGSTONE.Help.NewTab', `${words}: says it opens a new tab`)
+    assert.ok(link.querySelector(`i.${icon}`).hasAttribute('inert'), `${words}: its icon inert`)
+  }
+  assert.equal(nav.querySelectorAll('a').length, 2, 'no other link')
+  const viewed = [...nav.querySelectorAll('[data-action="view"]')].map(each => each.dataset.section)
+  assert.ok(viewed.every(section => ['general', 'modules', 'roster', 'campaign'].includes(section)), 'the views the side opens, as before')
+  await win.close()
+  const help = menus.get('helpMenu')
+  assert.deepEqual([help?.name, help?.label, help?.hint, help?.icon, help?.restricted],
+    ['SENDINGSTONE.Help.Menu.Name', 'SENDINGSTONE.Help.Menu.Label', 'SENDINGSTONE.Help.Menu.Hint', 'fa-solid fa-bug', false], 'any user may open it')
+  assert.equal(menus.get('campaignsMenu')?.restricted, true, 'the settings window still Gamemasters alone')
+  const helpWindow = await new help.type().render()
+  assert.equal(helpWindow.element.id, 'sending-stone-help')
+  assert.deepEqual([...helpWindow.element.querySelectorAll('a')].map(link => [link.getAttribute('href'), link.getAttribute('target'), link.getAttribute('rel'),
+    link.querySelector('.sending-stone-sr')?.textContent.trim()]), [
+    [BUG, '_blank', 'noopener noreferrer', 'SENDINGSTONE.Help.NewTab'],
+    [FEATURE, '_blank', 'noopener noreferrer', 'SENDINGSTONE.Help.NewTab'],
+  ])
+  assert.equal(helpWindow.element.querySelector('.hint').textContent.trim(), 'SENDINGSTONE.Help.Hint')
+  await helpWindow.close()
+  console.log("ok - 0.39.0: the side list ends with Help, Report a bug with this game's versions filled in and Request a feature, links to the module's own forms that open apart and say so, never a view; Configure Settings' Report a bug or request a feature, which any user may open, shows the same two")
+}

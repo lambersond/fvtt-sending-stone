@@ -64,6 +64,9 @@ globalThis.ui = { notifications: { info() {}, warn(m) { console.log('WARN', m) }
 
 const settings = new Map()
 const registered = new Map()
+// Changed on purpose (round 0.39.0 §3.6): each setting menu as registered, by key, as settings are,
+// so that a harness can check who may open it.
+const menus = new Map()
 export const users = new Collection()
 export const actors = new Collection()
 export const combats = new Collection()
@@ -100,7 +103,7 @@ globalThis.game = {
   permissions: { MANUAL_ROLLS: [2, 3, 4] },
   settings: {
     register(module, key, config) { registered.set(key, config) },
-    registerMenu() {},
+    registerMenu(module, key, config) { menus.set(key, config) },
     get(module, key) { return settings.has(key) ? settings.get(key) : registered.get(key)?.default },
     async set(module, key, value) { settings.set(key, value); await registered.get(key)?.onChange?.(value) },
   },
@@ -170,7 +173,7 @@ globalThis.fetch = async (url, init) => {
 
 export const settle = () => new Promise(resolve => setTimeout(resolve, 20))
 // What's stored, and each setting as registered (its `type` among them), by key.
-export { settings, registered }
+export { settings, registered, menus }
 
 // The browser's HTML parser, jsdom's, for the module to read chat cards and to normalise the links
 // in descriptions with.

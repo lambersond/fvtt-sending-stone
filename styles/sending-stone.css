@@ -27,7 +27,8 @@
   overflow: hidden;
 }
 
-#sending-stone-settings .sending-stone-sr {
+#sending-stone-settings .sending-stone-sr,
+#sending-stone-help .sending-stone-sr {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -105,6 +106,19 @@
 
 #sending-stone-settings .sending-stone-nav-item[aria-current="page"] {
   font-weight: bold;
+}
+
+/* The Help links at the side's end (module 0.39.0) are links, drawn as the side's buttons. */
+#sending-stone-settings a.sending-stone-nav-item,
+#sending-stone-settings a.sending-stone-nav-item:hover {
+  color: inherit;
+  text-decoration: none;
+  text-shadow: none;
+}
+
+#sending-stone-settings a.sending-stone-nav-item:focus-visible {
+  outline: 2px solid var(--ss-accent);
+  outline-offset: -2px;
 }
 
 #sending-stone-settings .sending-stone-nav-item > i {
@@ -851,6 +865,33 @@
   min-width: 10rem;
 }
 
+/* Help window ------------------------------------------------------------ */
+
+/* The module's bug and feature forms (module 0.39.0), for any user: a hint, then a link a line. */
+#sending-stone-help .sending-stone-help {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#sending-stone-help .sending-stone-help .hint {
+  margin: 0;
+}
+
+#sending-stone-help .sending-stone-help-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  text-decoration: none;
+}
+
+#sending-stone-help .sending-stone-help-link:focus-visible {
+  outline: 2px solid var(--color-warm-1, #ee9b3a);
+  outline-offset: 2px;
+}
+
 /* Chat ------------------------------------------------------------------- */
 
 /* Marks a roll a player made from the Sending Stone app. */
@@ -878,8 +919,9 @@
   mask: url("../icons/dish.svg") center / contain no-repeat;
 }
 
-/* A dish from the Magical Recipe Book (module 0.38.0), a card only Gamemasters see. The settings
-   window's tokens live on it alone, so the card has its own, with the same fallbacks. */
+/* A dish from the Magical Recipe Book (module 0.38.0), a card the Gamemasters and, since 0.39.0, the
+   campaign's players see. The settings window's tokens live on it alone, so the card has its own,
+   with the same fallbacks. */
 .chat-message .sending-stone-dish {
   --ss-line: color-mix(in srgb, currentColor 16%, transparent);
   --ss-tint: color-mix(in srgb, currentColor 6%, transparent);

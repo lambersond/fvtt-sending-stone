@@ -1,13 +1,15 @@
 // Dishes from the Magical Recipe Book (module 0.38.0, its contract D§3, D§8.2): the hello's
 // `features.dishes`, after `favorites`, by the campaign's own switch under dnd5e 5; the fetching it
 // needs with every other switch off; the `dish` command handed over until answered, posted once as a
-// card whispered to the Gamemasters; its checks; the card's words and buttons; the dialog's content;
+// card whispered to the Gamemasters and the campaign's players; its checks; the card's words and
+// buttons, a player's view of it, and its chat message in its own campaign alone; the dialog's content;
 // each character's Active Effect, its changes on dnd5e 5.3.3's paths, its one-offs, one dish at a
 // time; the app told in `dish.applied` and `dish.dismissed`, again after a temporary drop, after a
 // hello, each campaign its own, and after a heartbeat that starts the app reading them; a card
 // deleted kept as a tombstone, decided or not, its write held as a server's answer; enricher syntax
-// made inert; two Gamemasters; the long rest; and the expiry sweep. With
-// DND5E6=1, dnd5e 6.0.5: off, and a 5.x dish effect still ends. The real module and its language
+// made inert; two Gamemasters; the long rest; the expiry sweep; and Apply… in a dialog drawn as core
+// draws one, its content copied or adopted. With DND5E6=1, dnd5e 6.0.5: off, and a 5.x dish effect
+// still ends. The real module and its language
 // file; dnd5e 5.3.3's real dice classes for the self-test; a stand-in Foundry core and app; the
 // characters dnd5e-cards.mjs's, given dishes by dish-core.mjs. Timers of a second or more run a
 // hundred times faster, and the clock may be moved on. Run with SLIM_CHECK=1 and --import
@@ -92,13 +94,16 @@ const core = await import('./dish-core.mjs')
 const { withDishes, dishPort, holdCreate, setWorldTime, renderCard, deleteCards, restCompleted, created } = core
 core.installDishCore()
 
-// ---- The world: two Gamemasters, the first the bridge, and two players ----
+// ---- The world: two Gamemasters, the first the bridge, and three players ----
 users.activeGM = user('gm', 'Gamemaster', true)
 const gm = users.get('gm')
 const gm2 = user('gm2', 'Second Gamemaster', true)
 gm2.isActiveGM = false
-user('alice', 'Alice')
+const alice = user('alice', 'Alice')
 user('bob', 'Bob')
+// Changed on purpose (round 0.39.0 §2.9): Carol plays in a third campaign alone, Iron Hills, so a
+// player of only another campaign is there to be left out.
+user('carol', 'Carol')
 const { Character } = await import('./dnd5e-cards.mjs')
 const SKILLS = { prc: { ability: 'wis' }, ste: { ability: 'dex' }, ath: { ability: 'str' } }
 const add = (data, dishes) => {
@@ -111,6 +116,7 @@ const add = (data, dishes) => {
 const thorin = add({ id: 'thorin', name: 'Thorin Oakenshield', owners: ['alice'] }, { hp: { value: 30, max: 40 } })
 const vex = add({ id: 'vex', name: 'Vex', owners: ['bob'] }, { hp: { value: 20, max: 40 }, senses: { units: 'm', ranges: {} } })
 const bree = add({ id: 'bree', name: 'Bree', owners: ['alice'] }, { hp: { value: 30, max: 30 }, ci: ['exhaustion'] })
+add({ id: 'dain', name: 'Dain', owners: ['carol'] }, { hp: { value: 30, max: 30 } })
 /** Who's this client's user while `fn` runs: as another Gamemaster's client would be. */
 function asUser(who, fn) {
   const was = Object.getOwnPropertyDescriptor(game, 'user')
@@ -238,19 +244,20 @@ const cardText = card => {
 await import(`${MODULE}/scripts/module.mjs`)
 await Hooks.callAll('init')
 settings.set('listenerUrl', 'https://stone.example')
-settings.set('campaignSecrets', { 'camp-a': 'ashlands-secret', 'camp-b': 'mirkwood-secret' })
+settings.set('campaignSecrets', { 'camp-a': 'ashlands-secret', 'camp-b': 'mirkwood-secret', 'camp-c': 'iron-hills-secret' })
 const CAMPAIGNS = [
   { id: 'camp-a', title: 'Ashlands', characters: ['thorin', 'vex', 'bree'], rolls: false },
   { id: 'camp-b', title: 'Mirkwood', characters: ['vex'], rolls: false },
+  { id: 'camp-c', title: 'Iron Hills', characters: ['dain'], rolls: false },
 ]
 settings.set('campaigns', CAMPAIGNS)
 await Hooks.callAll('ready')
-await until(() => sent('bridge.hello').length && sent('bridge.hello', 'camp-b').length, 'the hellos')
+await until(() => sent('bridge.hello').length && sent('bridge.hello', 'camp-b').length && sent('bridge.hello', 'camp-c').length, 'the hellos')
 await settle(60)
 const { announce, checkBridge } = await import(`${MODULE}/scripts/bridge.mjs`)
 const { getCampaigns } = await import(`${MODULE}/scripts/campaigns.mjs`)
 const { runDishCommand, dishReader } = await import(`${MODULE}/scripts/command-dishes.mjs`)
-const { applyDish, dismissDish, dishDialogContent, dishRows, dishTombstone, postDishCard } = await import(`${MODULE}/scripts/dish-card.mjs`)
+const { applyDish, chooseCharacters, dismissDish, dishDialogContent, dishRows, dishTombstone, postDishCard } = await import(`${MODULE}/scripts/dish-card.mjs`)
 const { deleteHeld, expireDishEffects, inert, rolledOf } = await import(`${MODULE}/scripts/dish-effects.mjs`)
 const { resendLost } = await import(`${MODULE}/scripts/character-sync.mjs`)
 const { send } = await import(`${MODULE}/scripts/transport.mjs`)
@@ -282,7 +289,8 @@ const OFF = { enabled: false, kinds: [], reason: 'off', versions: [] }
 const ON = { enabled: true, kinds: ['dish'], reason: null, versions: [1] }
 const SYSTEM = { enabled: false, kinds: [], reason: 'system', versions: [] }
 assert.deepEqual(helloOf().features.dishes, OFF, 'off by default')
-assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes'])
+// Changed on purpose (round 0.39.0 §1.9): a player's own effects after dishes.
+assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects'])
 await campaignAs({ dishes: true })
 assert.deepEqual(helloOf().features.dishes, DND5E6 ? SYSTEM : ON)
 assert.deepEqual(helloOf('camp-b').features.dishes, OFF, "another campaign's switch is its own")
@@ -296,7 +304,7 @@ ok(`the hello's features.dishes, last, after favorites: off with the switch off;
 
 if (DND5E6) {
   /* ------------------------------------------ */
-  /*  23. dnd5e 6.0.5                           */
+  /*  24. dnd5e 6.0.5                           */
   /* ------------------------------------------ */
   const polls = app.polls.filter(id => id === 'camp-a').length
   await settle(150)
@@ -354,19 +362,51 @@ const boonBody = BOON()
 const first = await serve(dishOf(boonBody))
 const card = first.card
 assert.ok(card, 'a card')
+// Changed on purpose (round 0.39.0 §2.9): visible, as the cook's player reads the card, whispered to
+// the Gamemasters and the players of the campaign's characters, never a player of another campaign alone.
 assert.deepEqual(first.result, {
-  id: first.command.id, status: 'done', reason: null, error: null, messageId: card.id, visible: false, rolls: [],
+  id: first.command.id, status: 'done', reason: null, error: null, messageId: card.id, visible: true, rolls: [],
   dish: { card: card.id, state: 'waiting' },
 })
 assert.equal(messages.filter(message => message.flags?.['sending-stone']?.dish?.command === first.command.id).length, 1, 'one card')
-assert.deepEqual([...card.whisper].sort(), ['gm', 'gm2'], 'whispered to both Gamemasters')
+assert.deepEqual([...card.whisper].sort(), ['alice', 'bob', 'gm', 'gm2'], "whispered to both Gamemasters and the campaign's players, never Carol")
 assert.equal(card._source.author, 'gm', "authored by the bridge's user")
 assert.deepEqual(card.speaker, { actor: 'thorin', alias: 'Thorin Oakenshield' })
 assert.deepEqual(flagsOf(card), {
   command: first.command.id, app: first.command.id.slice(5), campaignId: 'camp-a', cookId: 'thorin',
   queuedAt: first.command.dish.queuedAt, body: boonBody, state: 'waiting', applied: [], decided: null,
 })
-ok("one card per dish, whispered to every Gamemaster, authored by the bridge's user, the whole dish in its flags; the result done, not visible, its card waiting")
+ok("one card per dish, whispered to every Gamemaster and the campaign's players, Alice and Bob, never Carol, who plays in another campaign alone; authored by the bridge's user, the whole dish in its flags; the result done, visible, its card waiting")
+
+/* -------------------------------------------- */
+/*  3b. Its chat message                        */
+/* -------------------------------------------- */
+
+// Changed on purpose (round 0.39.0 §2.9): with chat events on, a card whispered to its campaign's
+// players reaches that campaign's app chat as text, not Gamemaster-only, its blocks read apart; never
+// Mirkwood's, though Bob, who reads it, plays there too; nor Iron Hills', whose Carol doesn't read it.
+// Two ingredients, and two notes, a change rolled and one not applied, so the lines an each draws
+// are read apart too, the notes' as well as the ingredients'.
+settings.set('chatEvents', true)
+const chatFrom = app.events.length
+const glazed = body({ ...SKEWERS, ingredients: [
+  { name: 'Fireberries', text: 'Gain 3+1d6 Maximum Hit Points and resistance to fire damage.' },
+  { name: 'Honey Glaze', text: 'Sweet enough to share.' },
+], changes: [...SKEWERS.changes, { type: 'tempHitPoints', value: 5 }] })
+const chatted = (await serve(dishOf(glazed))).card
+const chatOf = id => app.events.slice(chatFrom).filter(e => (e.type === 'chat.message.created') && (e.campaign?.id === id) && (e.data.message.id === chatted.id))
+await until(() => chatOf('camp-a').length, "the card's chat message")
+await quiet()
+const chatMessage = chatOf('camp-a')[0].data.message
+assert.deepEqual([chatMessage.audience.public, chatMessage.audience.gmOnly, [...chatMessage.audience.users].sort()], [false, false, ['alice', 'bob']], 'a whisper its players read')
+assert.equal(chatMessage.text, 'Fireberry Glazed Skewers Boon Cooked by Thorin in the Magical Recipe Book · sent just now '
+  + "Sent through Thorin Oakenshield's Magical Recipe Book link Perfectly charred with a bite of heat, leaving you feeling invincible. "
+  + 'Fireberries. Gain 3+1d6 Maximum Hit Points and resistance to fire damage. Honey Glaze. Sweet enough to share. '
+  + 'Rolled once for everyone: Maximum Hit Points +7 (3+1d6). Not applied automatically: tempHitPoints. '
+  + 'Lasts 24 hours of game time. Replaces any earlier dish.', 'each block apart')
+assert.deepEqual([chatOf('camp-b').length, chatOf('camp-c').length], [0, 0], 'never Mirkwood, where Bob plays too, nor Iron Hills')
+settings.set('chatEvents', false)
+ok("with chat events on, a card reaches its own campaign's app chat as a whisper its players read, its text's blocks apart, \"Fireberry Glazed Skewers Boon Cooked by …\"; never another campaign's, though one of its readers plays there, nor that of a campaign whose players don't read it")
 
 /* -------------------------------------------- */
 /*  4. The card's words                         */
@@ -403,6 +443,8 @@ text = cardText(gone.card)
 assert.ok(text.lines.includes('Sent through the link of a character no longer in this campaign'))
 assert.deepEqual([gone.card.speaker.alias, flagsOf(gone.card).cookId], ['Thorin', null], "spoken for by the cookbook's cook")
 assert.equal(gone.result.status, 'done', 'never "unknown"')
+// Changed on purpose (round 0.39.0 §2.9): no cook's character, no cook's player among its readers.
+assert.equal(gone.result.visible, false, "not visible: the cook's character has left the campaign")
 assert.equal(cardText((await serve(dishOf(body({ ...SKEWERS, seconds: 5400 })))).card).lines.at(-1), 'Lasts 5400 seconds of game time. Replaces any earlier dish.')
 assert.equal(cardText((await serve(dishOf(body({ ...SKEWERS, seconds: 3600 })))).card).lines.at(-1), 'Lasts 1 hour of game time. Replaces any earlier dish.', 'one hour, in the singular')
 ok("the card's words: the rolled line, nothing applied by itself, attack damage, vision, how long ago it was sent, whose link, how long it lasts; a standard dish neither lasts nor replaces")
@@ -1241,13 +1283,44 @@ assert.deepEqual(await controls((await serve(dishOf(STANDARD()))).card), [['BUTT
 assert.deepEqual(await controls(tired), [['P', 'Eaten by Vex, Bree'], ['P', 'Vex gained 1 exhaustion'], ['P', 'Bree is immune to exhaustion'], ['BUTTON', 'Apply to others…']])
 assert.deepEqual(await controls(grill), [['P', 'Eaten by Vex'], ['P', 'Vex regained 4 HP'], ['BUTTON', 'Apply to others…']])
 assert.deepEqual(await controls(aside), [['P', 'Set aside by Second Gamemaster']])
-for (const each of [fresh, tired, aside]) assert.deepEqual(await controls(each, false), [], 'none for a player')
+// Changed on purpose (round 0.39.0 §2.9): a player's client draws what became of a dish, every line
+// of it, and never a button; nothing in a waiting card's actions.
+assert.deepEqual(await controls(fresh, false), [], 'a waiting card: nothing for a player')
+assert.deepEqual(await controls(tired, false), [['P', 'Eaten by Vex, Bree'], ['P', 'Vex gained 1 exhaustion'], ['P', 'Bree is immune to exhaustion']])
+assert.deepEqual(await controls(grill, false), [['P', 'Eaten by Vex'], ['P', 'Vex regained 4 HP']])
+assert.deepEqual(await controls(aside, false), [['P', 'Set aside by Second Gamemaster']])
+for (const each of [fresh, tired, grill, aside]) {
+  assert.equal((await renderCard(messages.get(each.id), { asGm: false })).querySelectorAll('button').length, 0, 'no button for a player')
+}
+// A player's console call of what the buttons do changes nothing, and opens no dialog.
+{
+  const dialogsMade = core.drawnDialogs()
+  const DialogV2 = foundry.applications.api.DialogV2
+  foundry.applications.api.DialogV2 = dialogsMade.DialogV2
+  const waiting = (await serve(dishOf(BOON()))).card
+  const before = { flags: JSON.stringify(flagsOf(waiting)), made: created.length, effects: dishEffects(vex).length }
+  let opened
+  try {
+    const choosing = asUser(alice, () => chooseCharacters(messages.get(waiting.id)))
+    const applied = await asUser(alice, () => applyDish(messages.get(waiting.id), ['vex']))
+    const setAside = await asUser(alice, () => dismissDish(messages.get(waiting.id)))
+    await settle(60)
+    opened = dialogsMade.opened.length
+    // A dialog opened after all is closed, so the call it holds settles.
+    for (const dialog of dialogsMade.opened) await dialog.close()
+    assert.deepEqual([await choosing, applied, setAside], [undefined, [], null], 'each returns at once')
+  } finally {
+    foundry.applications.api.DialogV2 = DialogV2
+  }
+  assert.deepEqual([JSON.stringify(flagsOf(waiting)), created.length, dishEffects(vex).length, opened],
+    [before.flags, before.made, before.effects, 0], 'no flag changed, no effect made, no dialog opened')
+}
 const badge = (await renderCard(messages.get(fresh.id), { asGm: false })).querySelector('.sending-stone-badge')
 assert.deepEqual([badge?.className, badge?.getAttribute('aria-label')], ['sending-stone-badge sending-stone-dish-badge', 'Magical Recipe Book link'])
 const drawn = await renderCard(messages.get(fresh.id), { asGm: true })
 drawn.querySelector('[data-action="dishSetAside"]').click()
 await until(() => flagsOf(fresh).state === 'dismissed', 'set aside from its button')
-ok("each state's controls for a Gamemaster, none for a player; the badge; Set aside sets it aside")
+ok("each state's controls for a Gamemaster; for a player, what became of it, every line, never a button; as a player, choosing, applying and setting aside change nothing and open no dialog; the badge; Set aside sets it aside")
 
 /* -------------------------------------------- */
 /*  20. A long rest                             */
@@ -1355,35 +1428,102 @@ await until(() => !dishEffects(bree).length, "a character no longer the campaign
 ok("the sweep deletes a dish effect at its time, not before; only on the bridge, and once on taking over; with the switch off; one already deleted skipped without a throw; lengthened by hand, at its new time; marked expired, at once; a character taken out of its campaign's too")
 
 /* -------------------------------------------- */
-/*  22. Apply… and its dialog                   */
+/*  23. Apply… and its dialog                   */
 /* -------------------------------------------- */
 
-// The card's Apply… opens "Who ate …?", core's DialogV2 here a stand-in that answers as its Apply
-// button does: whoever is ticked, the cook. Last, as it serves the cook a dish.
-const dialogs = []
-foundry.applications.api ??= {}
-const DialogV2 = foundry.applications.api.DialogV2
-foundry.applications.api.DialogV2 = class {
-  constructor(options) { this.options = options; dialogs.push(options) }
-  addEventListener() {}
-  async render() {
-    queueMicrotask(() => this.options.submit(this.options.buttons.find(each => each.action === 'apply').callback()))
-    return this
-  }
-}
+// Changed on purpose (round 0.39.0 §2.9; the map's §6): the card's Apply… opens "Who ate …?" in core's
+// DialogV2, here drawn as core draws one (dish-core.mjs's drawnDialogs) [core, unverified]: its own
+// form, the content in it, copied from the element handed to it or that element itself, which v14 does
+// being unverified, so each is run; a Gamemaster ticks the boxes drawn and clicks its buttons, Apply
+// calling its callback with (event, button, dialog). The stand-in it replaces drew nothing and called
+// the callback with no arguments, so it read the module's own detached boxes, as the module did. Last,
+// as it serves dishes.
 const hadDocument = 'document' in globalThis
 globalThis.document ??= new JSDOM('').window.document
+const DialogV2 = foundry.applications.api.DialogV2
 try {
-  const chosen = (await serve(dishOf(BOON()))).card
-  ;(await renderCard(messages.get(chosen.id), { asGm: true })).querySelector('[data-action="dishApply"]').click()
-  await until(() => flagsOf(chosen).state === 'applied', 'served from its dialog')
-  assert.deepEqual([dialogs.length, dialogs[0].window.title, dialogs[0].buttons.map(each => each.label)],
-    [1, 'Who ate Fireberry Glazed Skewers?', ['Apply', 'Set aside']])
-  assert.deepEqual(flagsOf(chosen).applied.map(each => each.actorId), [flagsOf(chosen).cookId])
+  for (const mode of ['copy', 'adopt']) {
+    const { DialogV2: Drawn, opened } = core.drawnDialogs({ mode })
+    foundry.applications.api.DialogV2 = Drawn
+    /** Open a card's dialog from its button, as a Gamemaster does, and wait until it's drawn. */
+    const openDialog = async (card, action = 'dishApply') => {
+      const before = opened.length
+      const html = await renderCard(messages.get(card.id), { asGm: true })
+      const label = html.querySelector(`[data-action="${action}"]`)?.textContent
+      html.querySelector(`[data-action="${action}"]`).click()
+      await until(() => (opened.length > before) && opened.at(-1).element, 'the dialog drawn')
+      await settle()
+      return { dialog: opened.at(-1), label }
+    }
+    const box = (dialog, id) => dialog.element.querySelector(`input[name="actors"][value="${id}"]`)
+    const button = (dialog, action) => dialog.element.querySelector(`[data-action="${action}"]`)
+    const ate = card => flagsOf(card).applied.map(each => each.actorId).sort()
+    /** Click one of its buttons as a Gamemaster does, a disabled one doing nothing; then wait for the card. */
+    const press = async (dialog, card, action = 'apply') => {
+      const was = JSON.stringify(flagsOf(card))
+      const enabled = !button(dialog, action).disabled
+      button(dialog, action).click()
+      if (enabled) await until(() => JSON.stringify(flagsOf(card)) !== was, 'the card written')
+      await settle()
+      if (!dialog.closed) await dialog.close()
+      await settle()
+      return enabled
+    }
+
+    // (a) The first Apply: the cook unticked and Vex ticked serves Vex alone.
+    const firstCard = (await serve(dishOf(BOON()))).card
+    const one = await openDialog(firstCard)
+    assert.deepEqual([one.label, one.dialog.options.window.title, Object.values(one.dialog.options.buttons).map(each => each.label)],
+      ['Apply…', 'Who ate Fireberry Glazed Skewers?', ['Apply', 'Set aside']], `${mode}: titled and labelled in the module's words`)
+    assert.equal(box(one.dialog, 'thorin').checked, true, `${mode}: the cook ticked as drawn`)
+    box(one.dialog, 'thorin').click()
+    box(one.dialog, 'vex').click()
+    assert.equal(button(one.dialog, 'apply').disabled, false, `${mode}: Apply enabled, Vex ticked`)
+    await press(one.dialog, firstCard)
+    assert.deepEqual(ate(firstCard), ['vex'], `${mode}: (a) whom the Gamemaster ticked, Vex, not the cook`)
+
+    // (b) Apply to others… on an applied card: the cook ticked and fixed, Apply disabled until Vex is ticked.
+    const secondCard = (await serve(dishOf(BOON()))).card
+    await press((await openDialog(secondCard)).dialog, secondCard)
+    assert.deepEqual(ate(secondCard), ['thorin'], `${mode}: the first Apply as ticked, the cook`)
+    const others = await openDialog(secondCard)
+    assert.equal(others.label, 'Apply to others…')
+    assert.deepEqual([box(others.dialog, 'thorin').checked, box(others.dialog, 'thorin').disabled], [true, true], `${mode}: the cook ticked and fixed`)
+    assert.equal(button(others.dialog, 'apply').disabled, true, `${mode}: Apply disabled, no new tick`)
+    assert.equal(button(others.dialog, 'setAside'), null, 'no Set aside once eaten')
+    box(others.dialog, 'vex').click()
+    assert.equal(button(others.dialog, 'apply').disabled, false, `${mode}: ticking Vex enables Apply`)
+    assert.equal(await press(others.dialog, secondCard), true)
+    assert.deepEqual(ate(secondCard), ['thorin', 'vex'], `${mode}: (b) Apply to others… serves Vex`)
+
+    // (c) A card whose cook has left the campaign: nobody ticked; a tick enables Apply, which serves.
+    const thirdCard = (await serve(dishOf(BOON(), { actorId: 'bree' }))).card
+    assert.equal(flagsOf(thirdCard).cookId, null, 'Bree is no longer the campaign\'s')
+    const three = await openDialog(thirdCard)
+    assert.deepEqual([...three.dialog.element.querySelectorAll('input[name="actors"]:checked')].length, 0, `${mode}: nobody ticked`)
+    assert.equal(button(three.dialog, 'apply').disabled, true)
+    box(three.dialog, 'vex').click()
+    assert.equal(button(three.dialog, 'apply').disabled, false, `${mode}: a tick enables Apply`)
+    await press(three.dialog, thirdCard)
+    assert.deepEqual(ate(thirdCard), ['vex'], `${mode}: (c) served`)
+
+    // (d) Closed with its X: nothing served, the card still waiting.
+    const fourthCard = (await serve(dishOf(BOON()))).card
+    const made = created.length
+    const four = await openDialog(fourthCard)
+    await four.dialog.close()
+    await settle(60)
+    assert.deepEqual([flagsOf(fourthCard).state, flagsOf(fourthCard).applied, created.length], ['waiting', [], made], `${mode}: (d) closed, nothing served`)
+
+    // (e) Set aside from the dialog of a waiting card.
+    const fifth = await openDialog(fourthCard)
+    await press(fifth.dialog, fourthCard, 'setAside')
+    assert.deepEqual([flagsOf(fourthCard).state, flagsOf(fourthCard).applied], ['dismissed', []], `${mode}: (e) set aside`)
+  }
 } finally {
   foundry.applications.api.DialogV2 = DialogV2
   if (!hadDocument) delete globalThis.document
 }
-ok("Apply… opens its dialog, titled and labelled in the module's words, and serves whoever it ticks, the cook")
+ok("Apply… in a dialog drawn as core draws one, its content copied and adopted alike: the first Apply serves whom the Gamemaster ticked, the cook unticked; Apply to others… on an applied card, the cook ticked and fixed, Apply disabled until another is ticked, serves them; a card whose cook has left the campaign, nobody ticked, serves whoever is ticked; closed, it serves nothing; Set aside from it sets the card aside")
 
 process.exit(0)

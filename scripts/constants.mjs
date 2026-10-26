@@ -29,6 +29,13 @@ export const EVENTS_PATH = "/api/events";
 export const COMMANDS_PATH = "/api/bridge/commands";
 
 /**
+ * Where a new issue is opened on the module's repository, since 0.39.0: its bug and feature forms,
+ * which the settings window and the Help menu link to (issue-links.mjs).
+ * @type {string}
+ */
+export const ISSUES = "https://github.com/lambersond/fvtt-sending-stone/issues/new";
+
+/**
  * Keys for the settings and setting menus this module registers.
  * @type {Readonly<Record<string, string>>}
  */
@@ -79,8 +86,13 @@ export const SETTINGS = Object.freeze({
    *  it held the campaigns alone. */
   CAMPAIGNS_MENU: "campaignsMenu",
 
+  /** Setting menu key, since 0.39.0, for the window with the links to the module's bug and feature
+   *  forms, which any user may open. */
+  HELP_MENU: "helpMenu",
+
   /** World-scope list of campaigns: {id, title, characters, groups, rolls, attacks, prompts,
-   *  manualDice, transfers, dishes, companionInitiative}, characters and groups being actor ids. */
+   *  manualDice, transfers, dishes, effects, companionInitiative}, characters and groups being actor
+   *  ids. */
   CAMPAIGNS: "campaigns",
 
   /** World-scope list of the dish cards deleted undecided, since 0.38.0, so that their app hears of
@@ -290,14 +302,33 @@ export const FAVORITE_OPS = Object.freeze(["add", "remove"]);
 
 /**
  * What a player can have done here from the app with a dish they cooked in the Magical Recipe Book,
- * since module 0.38.0: a card only Gamemasters see, from which they choose who ate it. Offered under
- * dnd5e 5 where the campaign's Gamemaster turns dishes on: it throws no dice.
+ * since module 0.38.0: a card the Gamemasters and the campaign's players see, from which only
+ * Gamemasters choose who ate it. Offered under dnd5e 5 where the campaign's Gamemaster turns dishes
+ * on: it throws no dice.
  * @type {readonly string[]}
  */
 export const DISH_KINDS = Object.freeze(["dish"]);
 
 /** The cookbook body versions this module reads, since 0.38.0. */
 export const DISH_VERSIONS = Object.freeze([1]);
+
+/**
+ * What a player can have done here from the app to their own character's effects, since module
+ * 0.39.0: one turned off, turned back on or deleted, as `opsOf` says they may (sheet-effects.mjs).
+ * Offered under D&D Fifth Edition where the campaign's Gamemaster lets its players, apart from the
+ * rolls: it throws no dice and posts nothing.
+ * @type {readonly string[]}
+ */
+export const EFFECT_KINDS = Object.freeze(["effect"]);
+
+/** What may be done to an effect, as the state wanted, never a toggle, since 0.39.0. */
+export const EFFECT_OPS = Object.freeze(["disable", "enable", "delete"]);
+
+/**
+ * An effect's id as the sheet names it: its own, on the character, or its item's and its own.
+ * @type {RegExp}
+ */
+export const EFFECT_ID = /^[A-Za-z0-9]{1,64}(\.[A-Za-z0-9]{1,64})?$/;
 
 /** A dish's outcomes, as the cookbook sends them, since 0.38.0. */
 export const DISH_OUTCOMES = Object.freeze(["boon", "bane", "standard"]);
@@ -340,12 +371,14 @@ export const MOST_COMPANIONS_EACH = 20;
 /**
  * The kinds a companion's command is never, since 0.36.0: what an NPC has none of, what isn't asked,
  * and what edits it rather than acting, as charges spent by hand, or its favorites, which an NPC has
- * none of, or a dish, which no companion eats (round 0.36.0 §2.5), and what's its character's to do,
- * as ending a turn or taking one back, which the character's command does for the companion's turn
- * too (round 0.36.0 §2.8).
+ * none of, or a dish, which no companion eats (round 0.36.0 §2.5), or a change to its effects, which
+ * only a character's player makes (round 0.39.0 §1.1), and what's its character's to do, as ending a
+ * turn or taking one back, which the character's command does for the companion's turn too (round
+ * 0.36.0 §2.8).
  */
 export const COMPANION_UNTAKEN = Object.freeze([
-  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "favorite", "dish", "note", "endTurn", "undoEndTurn"
+  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "favorite", "dish", "effect", "note", "endTurn",
+  "undoEndTurn"
 ]);
 
 /**

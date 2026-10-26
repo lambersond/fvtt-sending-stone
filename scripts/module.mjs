@@ -11,6 +11,7 @@ import { registerCombatHooks } from "./combat.mjs";
 import { registerFollowHooks } from "./creature-initiative.mjs";
 import { registerCreatureHooks } from "./creature-sync.mjs";
 import { registerDishHooks, renderDishCard } from "./dish-card.mjs";
+import { registerEffectHooks } from "./command-effects.mjs";
 import { topUpAfterRest } from "./dish-effects.mjs";
 import { installDicePlans, selfTest } from "./dice-plan.mjs";
 import { registerSettingsWatch } from "./foundry-settings.mjs";
@@ -33,6 +34,7 @@ Hooks.once("init", () => {
   registerCommandHooks();
   registerSettingsWatch();
   registerDishHooks();
+  registerEffectHooks();
 });
 
 // Every client registers the hooks, but only the active Gamemaster's posts anything. That role can

@@ -1,4 +1,4 @@
-import { CHAT_SCOPES, EVENTS } from "./constants.mjs";
+import { CHAT_SCOPES, EVENTS, MODULE_ID } from "./constants.mjs";
 import { chatEnabled, chatScope } from "./config.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
@@ -41,13 +41,16 @@ function active() {
  * Does a message belong to a campaign? It does when one of the campaign's characters said it, or
  * when the player of one of its characters can read it, as everyone can a public message. Since
  * 0.36.0, for an app that reads companions, one of their companions' messages counts as said by one
- * of its characters, under every chat scope.
+ * of its characters, under every chat scope. Since 0.39.0 a dish's card belongs to its own campaign
+ * alone: whispered to its players, it would otherwise reach another campaign one of them plays in.
  * @param {ChatMessage} message
  * @param {object} audience     The message's audience in the campaign.
  * @param {Campaign} campaign
  * @returns {boolean}
  */
 function isInScope(message, audience, campaign) {
+  const dish = message.flags?.[MODULE_ID]?.dish;
+  if ( dish && (dish.campaignId !== campaign.id) ) return false;
   if ( !isAudienceShared(audience) ) return false;
   const spokenByCampaign = (campaignCharacterId(message.speakerActor, campaign) !== null)
     || Boolean(messageCompanion(message, campaign));

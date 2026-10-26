@@ -234,7 +234,10 @@ assert.deepEqual(sheet.effects.map(c => [c.id, c.label, c.effects.map(e => e.nam
 ])
 ok("effects are sorted into dnd5e's categories; conditions, enchantments, and what dnd5e hides from players are left out")
 const fx = name => sheet.effects.flatMap(c => c.effects).find(e => e.name === name)
-assert.deepEqual({ ...fx('Bless'), text: undefined }, { id: 'blessed', name: 'Bless', img: 'icons/blessed.webp', source: 'Bless', duration: '9 Rounds', disabled: false, text: undefined })
+// Changed on purpose (round 0.39.0 §1.9): each row says what its player may do to it from the app,
+// `ops`, after `disabled`: nothing here, as Vex's Bless item names no actor who cast it.
+assert.deepEqual({ ...fx('Bless'), text: undefined }, { id: 'blessed', name: 'Bless', img: 'icons/blessed.webp', source: 'Bless', duration: '9 Rounds', disabled: false, ops: [], text: undefined })
+assert.deepEqual(Object.keys(fx('Bless')), ['id', 'name', 'img', 'source', 'duration', 'disabled', 'ops', 'text'])
 assert.equal(fx('Concentrating').duration, '1 Minute')
 assert.equal(fx('Concentrating').source, null, "the Bless item isn't a known document here, so no source")
 assert.deepEqual([fx('Ring of Protection').id, fx('Ring of Protection').source, fx('Ring of Protection').duration], ['ring.protection', 'Ring of Protection', null])
