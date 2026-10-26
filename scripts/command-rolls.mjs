@@ -7,6 +7,7 @@ import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mjs";
 import { checkFavoriteCommand } from "./command-favorites.mjs";
 import { checkDishCommand } from "./command-dishes.mjs";
+import { checkEffectCommand } from "./command-effects.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
 import { commandActor, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
@@ -237,7 +238,8 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * as Heroic Inspiration or charges spent by hand; and an end of a turn names the turn, as the app
  * was shown it, and nothing else, as does taking one back, with the end of the turn it takes back.
  * And since 0.37.0 a favorite added or removed, what it is. And since 0.38.0 a dish from the Magical
- * Recipe Book, its body.
+ * Recipe Book, its body. And since 0.39.0 a change to one of the character's own effects, which and
+ * how.
  * @param {object} command
  * @returns {string|null}
  */
@@ -257,6 +259,7 @@ export function checkCommand(command) {
   if ( command.kind === "favorite" ) return checkFavoriteCommand(command);
   if ( command.kind === "note" ) return checkNoteCommand(command);
   if ( command.kind === "dish" ) return checkDishCommand(command);
+  if ( command.kind === "effect" ) return checkEffectCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);

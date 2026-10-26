@@ -235,9 +235,10 @@ export function sendCompanion(campaign, entry, actor) {
     apart: true,
     build: ({ sheet=true }={}) => {
       const texts = new SheetTexts({ secrets });
+      // A companion's effects take no commands, so its sheet offers none.
       return {
         texts,
-        data: { companion: { ...entry }, sheet: sheet ? characterSheet(actor, texts, { secrets }) : null }
+        data: { companion: { ...entry }, sheet: sheet ? characterSheet(actor, texts, { secrets, ops: false }) : null }
       };
     }
   });

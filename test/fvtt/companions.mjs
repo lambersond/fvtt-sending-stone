@@ -808,16 +808,28 @@ const expanded = sheet => sheet
 }
 {
   // A temporary effect on the Bat, and a round change: its sheet again.
-  bat1.actor.effectsMade = [{ id: 'fx1', name: 'Blessed', img: 'bless.webp', isTemporary: true, disabled: false, statuses: new Set(), duration: { value: 6, remaining: 6, label: '6 seconds' }, changes: [], transfer: false, parent: bat1.actor, getFlag: () => undefined }]
+  // Changed on purpose (round 0.39.0 §1.9): the effect is Thorin's Bless, which on a character's own
+  // sheet its player could turn off and delete; a companion's effects take no commands, so the Bat's
+  // sheet offers none, `ops: []`.
+  const blessUuid = `${thorin.uuid}.Item.bless`
+  const hadFromUuid = Object.hasOwn(globalThis, 'fromUuidSync')
+  const fromUuid = globalThis.fromUuidSync
+  globalThis.fromUuidSync = uuid => ((uuid === blessUuid) ? { documentName: 'Item', name: 'Bless', actor: thorin } : (fromUuid?.(uuid, { strict: false }) ?? null))
+  bat1.actor.effectsMade = [{ id: 'fx1', name: 'Blessed', img: 'bless.webp', isTemporary: true, disabled: false, statuses: new Set(), duration: { value: 6, remaining: 6, label: '6 seconds' }, changes: [], transfer: false, origin: blessUuid, parent: bat1.actor, getFlag: () => undefined }]
   await changeDelta(bat1, { system: { attributes: { hp: { value: 3 } } } })
   await settle(); await settle()
   from = app.events.length
   bat1.actor.effectsMade[0].duration = { value: 6, remaining: 3, label: '3 seconds' }
   await Hooks.callAll('updateCombat', mixed, { round: 2 }, {}, 'gm')
   await settle(); await settle()
-  assert.ok(sheetsSent(from).some(e => e.data.companion.key === 'arena-bat1'), 'its sheet again')
+  const batSheets = sheetsSent(from).filter(e => e.data.companion.key === 'arena-bat1')
+  assert.ok(batSheets.length, 'its sheet again')
+  assert.deepEqual(batSheets.at(-1).data.sheet.effects.flatMap(section => section.effects).map(row => [row.name, row.source, row.ops]), [['Blessed', 'Bless', []]],
+    "Thorin's Bless on the Bat: no ops")
   bat1.actor.effectsMade = []
-  ok("a temporary effect on the Bat runs down with the round: its sheet again")
+  if (hadFromUuid) globalThis.fromUuidSync = fromUuid
+  else delete globalThis.fromUuidSync
+  ok("a temporary effect on the Bat runs down with the round: its sheet again, the effect's row offering its player nothing, as a companion's never do")
 }
 
 /* -------------------------------------------- */

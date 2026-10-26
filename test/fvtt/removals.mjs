@@ -497,7 +497,8 @@ assert.deepEqual(helloOf().data.features.removals, ON)
 // Changed on purpose (round 0.36.0 §4.1): and what its companions take.
 // Changed on purpose (round 0.37.0 §6.7): and whether favorites are added and removed here.
 // Changed on purpose (round 0.38.0 §D8.3): and whether dishes from the Magical Recipe Book are taken, after favorites.
-assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes'])
+// Changed on purpose (round 0.39.0 §1.9): and whether its players change their own effects, after dishes.
+assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects'])
 assert.deepEqual([helloOf().data.features.rolls.enabled, helloOf().data.features.transfers.enabled], [false, false], "the campaign's rolls and moves off")
 // Apart from the rolls, the moves and the dice: whatever they are.
 diceStatus.ready = false

@@ -184,9 +184,13 @@
         "TransfersApp": "The app this campaign sends to doesn't take moves yet.",
         "Dishes": "Magical Recipe Book",
         "DishesPlayers": "Dishes from the Magical Recipe Book",
-        "DishesHint": "Players send dishes they cook in the Magical Recipe Book. Each arrives as a card only Gamemasters see, and you choose who ate it.",
+        "DishesHint": "Players send dishes they cook in the Magical Recipe Book. Each arrives as a card the campaign's players see too, and you choose who ate it.",
         "DishesApp": "Your Sending Stone doesn't take dishes yet.",
         "DishesSystem": "Dishes need dnd5e 5.x for now.",
+        "Effects": "Active effects",
+        "EffectsPlayers": "Allow Players to disable & remove their own active effects",
+        "EffectsHint": "From the app, a player turns off and deletes the effects their party put on their own character, such as an ally's Bless or a dish, and turns off an item's temporary effect, such as Rage. They turn back on only what they turned off there. Never an effect from a monster, one made on the sheet, a condition, or a concentration, which they end with End as before. Nothing is posted in chat.",
+        "EffectsApp": "The app this campaign sends to doesn't let players change effects yet.",
         "Companions": "Companions",
         "CompanionInitiative": "Companions' initiative",
         "CompanionInitiativeOwn": "Its own roll",
@@ -430,6 +434,19 @@
       "NoCharacters": "This campaign has no characters to serve it to.",
       "Failed": "Couldn't serve {recipe} to {names}.",
       "FailedRemoved": "Couldn't serve {recipe} to {names}; their earlier dish was removed."
+    },
+    "Help": {
+      "Heading": "Help",
+      "Bug": "Report a bug",
+      "Feature": "Request a feature",
+      "NewTab": "(opens in a new tab)",
+      "Hint": "Each opens a form on GitHub. Never paste a campaign's secret or an invite link.",
+      "Title": "Report a bug or request a feature",
+      "Menu": {
+        "Name": "Report a bug or request a feature",
+        "Label": "Open",
+        "Hint": "Forms on GitHub for Sending Stone's module, for Gamemasters and players alike."
+      }
     }
   }
 }

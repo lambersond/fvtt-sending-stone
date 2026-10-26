@@ -68,8 +68,10 @@ assert.deepEqual(sectionsOf(sent), ['campaign', 'sending-stone', 'dnd5e', ...(MI
 const rowsOf = (value, id) => value.sections.find(section => section.id === id)?.rows.map(row => row.id)
 // Changed on purpose (round 0.36.0 §6.12): the campaign's companions' initiative after its moves.
 // Changed on purpose (round 0.38.0 §D8.3): its dishes from the Magical Recipe Book after its moves, off.
-assert.deepEqual(rowsOf(sent, 'campaign'), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'companionInitiative', 'groups'])
+// Changed on purpose (round 0.39.0 §1.9): whether its players change their own effects after its dishes, off.
+assert.deepEqual(rowsOf(sent, 'campaign'), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'companionInitiative', 'groups'])
 assert.deepEqual(sent.sections[0].rows.find(row => row.id === 'dishes'), { id: 'dishes', label: 'Dishes from the Magical Recipe Book', value: false, text: 'Off' })
+assert.deepEqual(sent.sections[0].rows.find(row => row.id === 'effects'), { id: 'effects', label: 'Allow Players to disable & remove their own active effects', value: false, text: 'Off' })
 assert.deepEqual(rowsOf(sent, 'sending-stone'), ['chatEvents', 'chatScope', 'chatResults', 'combatEvents', 'gmContent', ...(MIDI ? ['midiIntegration', 'offCanvasTargets'] : [])])
 assert.deepEqual(rowsOf(sent, 'dnd5e'), ['attackRollVisibility', 'challengeVisibility'])
 assert.equal(sent.sections[0].title, 'This campaign')

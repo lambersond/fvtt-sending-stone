@@ -4,7 +4,7 @@ import {
 } from "./constants.mjs";
 import { canSend, isBridge } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { campaignActors, rosterEntry } from "./characters.mjs";
+import { campaignActors, playerOwners, rosterEntry } from "./characters.mjs";
 import { dishReader, dishSystem } from "./command-dishes.mjs";
 import { commandActor } from "./creatures.mjs";
 import {
@@ -13,11 +13,12 @@ import {
 import { send } from "./transport.mjs";
 
 /**
- * A dish's card in Foundry, since module 0.38.0: posted by the bridge, whispered to every Gamemaster,
- * the whole dish in its flags, so that a reload, another Gamemaster or the same command handed over
- * again can act from it. A Gamemaster's client draws its buttons: who ate it, chosen in a dialog from
- * the campaign's characters, or Set aside. Each choice is written to the card's flags, and the bridge
- * tells the app of it, in `dish.applied` or `dish.dismissed`, to an app that takes dishes alone.
+ * A dish's card in Foundry, since module 0.38.0: posted by the bridge, since 0.39.0 whispered to every
+ * Gamemaster and the campaign's players, the whole dish in its flags, so that a reload, another
+ * Gamemaster or the same command handed over again can act from it. A Gamemaster's client draws its
+ * buttons, any client what became of it: who ate it, chosen in a dialog from the campaign's
+ * characters, or Set aside. Each choice is written to the card's flags, and the bridge tells the app
+ * of it, in `dish.applied` or `dish.dismissed`, to an app that takes dishes alone.
  *
  * What the app missed hears of it again: an event lost to failures that might not last 30 seconds
  * later, as other posts are (character-sync.mjs); and after every hello, every decision of the last
@@ -107,9 +108,11 @@ export function registerDishHooks() {
 
 /**
  * Post a dish's card: by this client's user, the bridge, a Gamemaster, never a player, whom a whisper
- * would show it to as its author; whispered to every Gamemaster; spoken by the cook's character
- * where it's still the campaign's, else by the cook's name in the cookbook. A create that fails, or
- * that a hook refuses, throws, so the app hands the dish over again.
+ * would show it to as its author; whispered to every Gamemaster and, since 0.39.0, to every player
+ * who owns one of the campaign's characters as it's posted, who see what became of it but choose
+ * nothing; spoken by the cook's character where it's still the campaign's, else by the cook's name in
+ * the cookbook. A create that fails, or that a hook refuses, throws, so the app hands the dish over
+ * again.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {Promise<ChatMessage>}
@@ -120,7 +123,7 @@ export async function postDishCard(command, campaign) {
   const card = await ChatMessage.implementation.create({
     author: game.user.id,
     speaker: cook ? ChatMessage.implementation.getSpeaker({ actor: cook }) : { alias: inert(body.cook.name) },
-    whisper: game.users.filter(user => user.isGM).map(user => user.id),
+    whisper: readersOf(campaign),
     content: await foundry.applications.handlebars.renderTemplate(TEMPLATE, cardContext(command, cook)),
     flags: { [MODULE_ID]: { dish: {
       command: command.id,
@@ -136,6 +139,18 @@ export async function postDishCard(command, campaign) {
   });
   if ( !card ) throw new Error("The dish's card was not posted");
   return card;
+}
+
+/**
+ * Who a dish's card is whispered to, since 0.39.0: every Gamemaster, and every player who owns one of
+ * the campaign's characters, each once. A player of another campaign alone isn't among them.
+ * @param {Campaign} campaign
+ * @returns {string[]}   User ids.
+ */
+export function readersOf(campaign) {
+  const gamemasters = game.users.filter(user => user.isGM).map(user => user.id);
+  const players = campaignActors(campaign).flatMap(actor => playerOwners(actor).map(user => user.id));
+  return [...new Set([...gamemasters, ...players])];
 }
 
 /**
@@ -209,18 +224,19 @@ function lasting(seconds) {
 /* -------------------------------------------- */
 
 /**
- * Draw a dish card's controls for a Gamemaster, as its state now is, under dnd5e 5, whose paths its
- * effect writes: while it waits, Apply… or, for a standard dish, Who ate it…, and Set aside; once
- * eaten, who ate it, with what each regained or gained, and Apply to others…; once set aside, by
- * whom. A player sees none. The module's own classes, never dnd5e's `.card-buttons`, which dnd5e
- * hides by ownership.
+ * Draw what became of a dish, on its card, as its state now is, under dnd5e 5, whose paths its
+ * effect writes: once eaten, who ate it, with what each regained or gained; once set aside, by whom.
+ * Since 0.39.0 on any client, a player's among them; the buttons on a Gamemaster's alone: while it
+ * waits, Apply… or, for a standard dish, Who ate it…, and Set aside; once eaten, Apply to others….
+ * The module's own classes, never dnd5e's `.card-buttons`, which dnd5e hides by ownership.
  * @param {ChatMessage} message
  * @param {HTMLElement} html
  * @returns {void}
  */
 export function renderDishCard(message, html) {
   const flags = message?.flags?.[MODULE_ID]?.dish;
-  if ( !flags || !game.user?.isGM || !dishSystem() || (typeof html?.querySelector !== "function") ) return;
+  if ( !flags || !dishSystem() || (typeof html?.querySelector !== "function") ) return;
+  const gamemaster = game.user?.isGM === true;
   const place = html.querySelector(".sending-stone-dish-actions");
   if ( !place ) return;
   const made = html.ownerDocument;
@@ -235,7 +251,7 @@ export function renderDishCard(message, html) {
     return element;
   };
   const controls = [];
-  if ( flags.state === "waiting" ) {
+  if ( (flags.state === "waiting") && gamemaster ) {
     const standard = flags.body?.dish?.outcome === "standard";
     controls.push(button(localize(standard ? "SENDINGSTONE.Dish.WhoAte" : "SENDINGSTONE.Dish.Apply"), "dishApply", chooseCharacters));
     controls.push(button(localize("SENDINGSTONE.Dish.SetAside"), "dishSetAside", dismissDish));
@@ -251,7 +267,7 @@ export function renderDishCard(message, html) {
         controls.push(line(format("SENDINGSTONE.Dish.Immune", { name: entry.name }), "hint"));
       }
     }
-    controls.push(button(localize("SENDINGSTONE.Dish.ApplyOthers"), "dishApply", chooseCharacters));
+    if ( gamemaster ) controls.push(button(localize("SENDINGSTONE.Dish.ApplyOthers"), "dishApply", chooseCharacters));
   } else if ( flags.state === "dismissed" ) {
     controls.push(line(format("SENDINGSTONE.Dish.SetAsideBy", { name: flags.decided?.name ?? "" }), "sending-stone-dish-dismissed"));
   }
@@ -294,8 +310,7 @@ export function dishRows(message) {
 
 /**
  * The dialog's content: the dish, then a box for each character, every name escaped and each
- * cookbook string, as the recipe and a replaced dish's, inert first. Pure, so the harness checks it,
- * as it opens no dialog.
+ * cookbook string, as the recipe and a replaced dish's, inert first. Pure, so the harness checks it.
  * @param {object} options
  * @param {string} options.recipe
  * @param {{actorId: string, name: string, img: string, owners: string, ticked: boolean, disabled: boolean,
@@ -321,11 +336,13 @@ export function dishDialogContent({ recipe, rows, notice=null }) {
 /**
  * Ask a Gamemaster who ate a dish, from its card, and serve it to them; or, while it waits, set it
  * aside. Apply needs at least one new tick. A campaign with no one to serve it to says so, offering
- * only Set aside, or nothing once it's decided.
+ * only Set aside, or nothing once it's decided. A player's client opens nothing, since 0.39.0, as a
+ * player may read the card but never decide it.
  * @param {ChatMessage} message
  * @returns {Promise<void>}
  */
 export async function chooseCharacters(message) {
+  if ( !game.user?.isGM ) return;
   const flags = message.getFlag(MODULE_ID, "dish");
   if ( !flags ) return;
   const { rows, notice } = dishRows(message);
@@ -336,10 +353,14 @@ export async function chooseCharacters(message) {
   }
   const content = document.createElement("div");
   content.innerHTML = dishDialogContent({ recipe: flags.body.dish.recipe, rows, notice });
-  const chosen = () => Array.from(content.querySelectorAll('input[name="actors"]:checked:not(:disabled)'), input => input.value);
+  // The boxes are read from the dialog as core drew it, never from `content`, which core may copy.
+  const chosen = root => Array.from(root?.querySelectorAll?.('input[name="actors"]:checked:not(:disabled)') ?? [], input => input.value);
   const buttons = [];
   if ( rows.length ) {
-    buttons.push({ action: "apply", label: localize("SENDINGSTONE.Dish.Confirm"), icon: "fa-solid fa-utensils", default: true, callback: chosen });
+    buttons.push({
+      action: "apply", label: localize("SENDINGSTONE.Dish.Confirm"), icon: "fa-solid fa-utensils", default: true,
+      callback: (_event, button, dialog) => chosen(button?.form ?? dialog?.element)
+    });
   }
   if ( waiting ) buttons.push({ action: "setAside", label: localize("SENDINGSTONE.Dish.SetAside") });
   const result = await new Promise(resolve => {
@@ -351,11 +372,13 @@ export async function chooseCharacters(message) {
     });
     const sync = () => {
       const apply = dialog.element?.querySelector?.('[data-action="apply"]');
-      if ( apply ) apply.disabled = !chosen().length;
+      if ( apply ) apply.disabled = !chosen(dialog.element).length;
     };
-    content.addEventListener("change", sync);
     dialog.addEventListener("close", () => resolve(null), { once: true });
-    void dialog.render({ force: true }).then(sync);
+    void dialog.render({ force: true }).then(() => {
+      dialog.element?.addEventListener?.("change", sync);
+      sync();
+    });
   });
   if ( result === "setAside" ) await dismissDish(message);
   else if ( Array.isArray(result) && result.length ) await applyDish(message, result);
@@ -381,12 +404,13 @@ function decision() {
  * it already is skipped. Every character in every run gets the values the card holds, rolled once in
  * the cookbook. One whose steps throw is left out, so Apply to others… may try it again, and named in
  * one notification. The card is written once, with whoever was served merged into its list by
- * character as it now stands, unless no one was.
+ * character as it now stands, unless no one was. Since 0.39.0 a player's client serves no one.
  * @param {ChatMessage} message
  * @param {string[]} actorIds
  * @returns {Promise<object[]>}   Those served now, as the card lists them.
  */
 export async function applyDish(message, actorIds) {
+  if ( !game.user?.isGM ) return [];
   const key = `${game.user?.id}.${message.id}`;
   if ( serving.has(key) ) return [];
   serving.add(key);
@@ -487,11 +511,13 @@ async function serveNow(message, actorIds) {
 }
 
 /**
- * Set a waiting dish aside, from its card: nobody ate it. A decided card is never set aside.
+ * Set a waiting dish aside, from its card: nobody ate it. A decided card is never set aside, nor, since
+ * 0.39.0, one on a player's client.
  * @param {ChatMessage} message
  * @returns {Promise<ChatMessage|null>}
  */
 export async function dismissDish(message) {
+  if ( !game.user?.isGM ) return null;
   const card = game.messages.get(message.id) ?? message;
   if ( card.getFlag(MODULE_ID, "dish")?.state !== "waiting" ) return null;
   return card.update({

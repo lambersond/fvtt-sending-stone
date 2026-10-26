@@ -30,15 +30,17 @@ import { combinedMode, finite, localize, rollMode } from "./sheet-values.mjs";
  * its enchant activities may enchant is worked out once, however often the sheet lists it. Since
  * 0.36.0 a companion's too, an NPC's sheet carrying its `creature` block; one none of whose players
  * owns it in Foundry goes without its secrets (`secrets: false`), its biography the public one, its
- * texts collected without them.
+ * texts collected without them. Since 0.39.0 each effect says what its player may do to it from the
+ * app, but on a companion's sheet (`ops: false`), whose effects take no commands.
  * @param {Actor} actor
  * @param {SheetTexts} [texts]  Collects the descriptions the sheet refers to.
  * @param {object} [options]
  * @param {boolean} [options.secrets]   Is it described with its secrets, as for its owner?
+ * @param {boolean} [options.ops]       Does each effect say what its player may do to it?
  * @returns {object|null}
  */
-export function characterSheet(actor, texts=new SheetTexts(), { secrets=true }={}) {
-  return enchantingSheet(() => tablingSheet(() => sheetOf(actor, texts, { secrets })));
+export function characterSheet(actor, texts=new SheetTexts(), { secrets=true, ops=true }={}) {
+  return enchantingSheet(() => tablingSheet(() => sheetOf(actor, texts, { secrets, ops })));
 }
 
 /**
@@ -47,9 +49,10 @@ export function characterSheet(actor, texts=new SheetTexts(), { secrets=true }={
  * @param {SheetTexts} texts
  * @param {object} [options]
  * @param {boolean} [options.secrets]
+ * @param {boolean} [options.ops]
  * @returns {object|null}
  */
-function sheetOf(actor, texts, { secrets=true }={}) {
+function sheetOf(actor, texts, { secrets=true, ops=true }={}) {
   const system = actor?.system;
   if ( !system?.abilities || !system.skills ) return null;
   const attributes = system.attributes ?? {};
@@ -78,7 +81,7 @@ function sheetOf(actor, texts, { secrets=true }={}) {
     conditions: conditionsOf(actor, texts),
     concentration: concentrationOf(actor),
     features: featureSections(actor, texts),
-    effects: effectSections(actor, texts),
+    effects: effectSections(actor, texts, { ops }),
     inventory: inventoryOf(actor, texts),
     spellcasting: spellcastingOf(actor),
     spells: spellbookOf(actor, texts),

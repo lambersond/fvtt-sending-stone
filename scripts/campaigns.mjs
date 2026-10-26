@@ -38,6 +38,10 @@ import { diceStatus } from "./dice-plan.mjs";
  * @property {boolean} dishes         Does it take its players' dishes from the Magical Recipe Book,
  *                                    since 0.38.0, a card for the Gamemaster each? Off until the
  *                                    Gamemaster turns it on, apart from `rolls`, under dnd5e 5.
+ * @property {boolean} effects        May its players turn off, turn on and delete their own
+ *                                    characters' effects from the app, since 0.39.0, those their
+ *                                    party put there? Off until the Gamemaster turns it on, apart
+ *                                    from `rolls`, under dnd5e.
  * @property {string} companionInitiative  How its characters' companions enter initiative, since
  *                                    0.36.0: `"own"`, each rolls its own; or `"after"`, each in a
  *                                    combat with its character is kept right after it there, by
@@ -51,7 +55,7 @@ import { diceStatus } from "./dice-plan.mjs";
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
   return stored.map(({
-    id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, dishes, companionInitiative
+    id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, dishes, effects, companionInitiative
   }) => ({
     id,
     title,
@@ -63,6 +67,8 @@ export function getCampaigns() {
     manualDice: manualDice === true,
     transfers: transfers === true,
     dishes: dishes === true,
+    // A campaign saved before 0.39.0 has none: its players change no effects from the app.
+    effects: effects === true,
     // A campaign saved before 0.36.0, or holding anything else, rolls its companions' own.
     companionInitiative: (companionInitiative === COMPANION_INITIATIVE.AFTER)
       ? COMPANION_INITIATIVE.AFTER : COMPANION_INITIATIVE.OWN

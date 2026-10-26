@@ -1346,8 +1346,10 @@ const report = () => foundrySettings(getCampaigns()[0])
 const rowsOf = (settings, id) => settings.sections.find(section => section.id === id).rows
 // Changed on purpose (round 0.36.0 §6.12): the campaign's companions' initiative after its moves.
 // Changed on purpose (round 0.38.0 §D8.3): its dishes from the Magical Recipe Book after its moves, off.
-assert.deepEqual(rowsOf(report(), 'campaign').map(row => row.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'companionInitiative', 'groups'])
+// Changed on purpose (round 0.39.0 §1.9): whether its players change their own effects after its dishes, off.
+assert.deepEqual(rowsOf(report(), 'campaign').map(row => row.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'companionInitiative', 'groups'])
 assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'dishes'), { id: 'dishes', label: 'Dishes from the Magical Recipe Book', value: false, text: 'Off' })
+assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'effects'), { id: 'effects', label: 'Allow Players to disable & remove their own active effects', value: false, text: 'Off' })
 // Changed on purpose (round 0.38.0 §D8.3): on, it says why it does nothing under dnd5e 6 or another system.
 campaignAs({ dishes: true })
 assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'dishes'),

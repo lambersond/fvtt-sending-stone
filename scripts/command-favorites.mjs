@@ -1,4 +1,4 @@
-import { FAVORITE_KINDS, FAVORITE_OPS, FAVORITE_TYPES } from "./constants.mjs";
+import { EFFECT_ID, FAVORITE_KINDS, FAVORITE_OPS, FAVORITE_TYPES } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { checkCommand, failedResult, isKey, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
@@ -29,12 +29,6 @@ const favorers = new Set();
  * @type {RegExp}
  */
 const ID = /^[A-Za-z0-9]{1,64}$/;
-
-/**
- * An effect's id as the sheet names it: its own, on the character, or its item's and its own.
- * @type {RegExp}
- */
-const EFFECT_ID = /^[A-Za-z0-9]{1,64}(\.[A-Za-z0-9]{1,64})?$/;
 
 /* -------------------------------------------- */
 /*  Whether favorites are made here             */

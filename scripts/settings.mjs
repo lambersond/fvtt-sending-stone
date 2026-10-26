@@ -3,6 +3,7 @@ import { announce } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { MANUAL_DICE } from "./companions.mjs";
 import { initiativeChosen } from "./creature-initiative.mjs";
+import HelpWindow from "./apps/help-window.mjs";
 import SettingsWindow from "./apps/settings-window.mjs";
 
 const { ArrayField, BooleanField, SchemaField, SetField, StringField } = foundry.data.fields;
@@ -54,6 +55,17 @@ export function registerSettings() {
     restricted: true
   });
 
+  // Since 0.39.0 the links to the module's bug and feature forms, for players too, who have no
+  // settings window of their own.
+  game.settings.registerMenu(MODULE_ID, SETTINGS.HELP_MENU, {
+    name: "SENDINGSTONE.Help.Menu.Name",
+    label: "SENDINGSTONE.Help.Menu.Label",
+    hint: "SENDINGSTONE.Help.Menu.Hint",
+    icon: "fa-solid fa-bug",
+    type: HelpWindow,
+    restricted: false
+  });
+
   // Which campaign an event belongs to decides what it says, so every campaign is told afresh.
   game.settings.register(MODULE_ID, SETTINGS.CAMPAIGNS, {
     scope: "world",
@@ -73,6 +85,9 @@ export function registerSettings() {
       // Does it take its players' dishes from the Magical Recipe Book, since 0.38.0? Apart from its
       // rolls, under dnd5e 5.
       dishes: new BooleanField({ initial: false }),
+      // May its players turn off, turn on and delete their own characters' effects from the app, since
+      // 0.39.0? Apart from its rolls, under dnd5e.
+      effects: new BooleanField({ initial: false }),
       // How its characters' companions enter initiative, since 0.36.0: each its own roll, or right
       // after its character, where this module keeps them.
       companionInitiative: new StringField({

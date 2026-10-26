@@ -337,6 +337,19 @@
         </div>
     </fieldset>
 
+    <fieldset class="sending-stone-effects">
+        <legend>{{localize "SENDINGSTONE.Config.Actions.Effects"}}</legend>
+        <div class="form-group">
+            <label for="sending-stone-effects">{{localize "SENDINGSTONE.Config.Actions.EffectsPlayers"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-effects" name="campaign.effects" {{#if campaign.effects}}checked{{/if}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.EffectsHint"}}</p>
+            {{#if campaign.effectsUnavailable}}<p class="hint sending-stone-warning">{{campaign.effectsUnavailable}}</p>{{/if}}
+            {{#if campaign.effectsApp}}<p class="hint sending-stone-warning">{{localize "SENDINGSTONE.Config.Actions.EffectsApp"}}</p>{{/if}}
+        </div>
+    </fieldset>
+
     <fieldset class="sending-stone-companions">
         <legend>{{localize "SENDINGSTONE.Config.Actions.Companions"}}</legend>
         <div class="form-group">

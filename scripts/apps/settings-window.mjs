@@ -5,6 +5,7 @@ import { getCampaigns, manualDiceOn } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
 import { transferReader } from "../command-transfers.mjs";
 import { dishReader, dishSystem } from "../command-dishes.mjs";
+import { effectReader } from "../command-effects.mjs";
 import { attacksUnavailable } from "../command-uses.mjs";
 import { commandsOffered } from "../commands.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
@@ -13,6 +14,7 @@ import { campaignStatus, describeProblem } from "../delivery-status.mjs";
 import { diceStatus } from "../dice-plan.mjs";
 import { WATCHED_SETTINGS } from "../foundry-settings.mjs";
 import { candidateGroups, groupEntry, groupsAvailable, memberCount, primaryPartyId } from "../groups.mjs";
+import { issueLinks } from "../issue-links.mjs";
 import { midiPromptStatus } from "../midi-prompts.mjs";
 import { resultsVerdict } from "../results.mjs";
 import { buildEnvelope, deliver, DeliveryError } from "../transport.mjs";
@@ -154,7 +156,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * The campaigns as being edited, each with the secret this browser holds for it.
    * @type {{id: string, title: string, secret: string, characters: Set<string>, groups: Set<string>,
    *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean,
-   *   dishes: boolean, companionInitiative: string}[]}
+   *   dishes: boolean, effects: boolean, companionInitiative: string}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({ ...campaign, secret: getSecret(campaign.id) }));
 
@@ -266,6 +268,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         manualDice: campaign.manualDice,
         transfers: campaign.transfers,
         dishes: campaign.dishes,
+        effects: campaign.effects,
         companionInitiative: campaign.companionInitiative
       }))
     });
@@ -299,7 +302,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     if ( campaign ) {
       if ( has("campaign.title") ) campaign.title = String(data["campaign.title"] ?? "");
       if ( has("campaign.secret") ) campaign.secret = String(data["campaign.secret"] ?? "");
-      for ( const name of ["rolls", "attacks", "prompts", "manualDice", "transfers", "dishes"] ) {
+      for ( const name of ["rolls", "attacks", "prompts", "manualDice", "transfers", "dishes", "effects"] ) {
         if ( has(`campaign.${name}`) ) campaign[name] = data[`campaign.${name}`] === true;
       }
       // A choice, as the General section's are, never a switch.
@@ -428,7 +431,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   }
 
   /**
-   * The sections down the window's side.
+   * The sections down the window's side, and since 0.39.0 the links to the module's bug and feature
+   * forms at its end.
    * @param {Map<string, Campaign>} saved
    * @param {object[]} actors
    * @returns {object}
@@ -452,7 +456,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         count: this.#countOf(campaign),
         current: (section === "campaign") && (campaign.id === campaignId),
         ...this.#stateOf(campaign, saved)
-      }))
+      })),
+      help: issueLinks()
     };
   }
 
@@ -714,7 +719,9 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * and since 0.31.0, whether they may move items and coins, which needs D&D Fifth Edition and an
    * app that takes moves, an older one answering with commands but not with `transfers`; and since
    * 0.38.0, whether it takes dishes from the Magical Recipe Book, which need dnd5e 5 and an app that
-   * takes them, an older one answering with commands but not with `dishes`.
+   * takes them, an older one answering with commands but not with `dishes`; and since 0.39.0, whether
+   * its players may turn off, turn on and delete their own characters' effects, which needs D&D Fifth
+   * Edition and an app that takes them, an older one answering with commands but not with `effects`.
    * @param {SettingsWindow["#campaigns"][number]} campaign
    * @returns {object}
    */
@@ -752,6 +759,12 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       dishes: campaign.dishes,
       dishesSystem: !dishSystem(),
       dishesApp: campaign.dishes && commandsOffered(campaign.id) && !dishReader(campaign.id),
+      effects: campaign.effects,
+      effectsUnavailable: (game.system?.id !== "dnd5e")
+        ? game.i18n.format("SENDINGSTONE.Config.Actions.Unavailable", {
+          reason: game.i18n.localize("SENDINGSTONE.Config.Actions.RollsReason.system")
+        }) : null,
+      effectsApp: campaign.effects && commandsOffered(campaign.id) && !effectReader(campaign.id),
       // Since 0.36.0, how its companions enter initiative, which needs no app: it's kept here.
       initiativeChoices: [
         { value: COMPANION_INITIATIVE.OWN, key: "CompanionInitiativeOwn" },
@@ -1070,7 +1083,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   static async #onAddCampaign() {
     const campaign = {
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
-      attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false,
+      attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false,
       companionInitiative: COMPANION_INITIATIVE.OWN
     };
     this.#campaigns.push(campaign);
@@ -1373,6 +1386,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       manualDice: campaign.manualDice,
       transfers: campaign.transfers,
       dishes: campaign.dishes,
+      effects: campaign.effects,
       companionInitiative: campaign.companionInitiative
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {

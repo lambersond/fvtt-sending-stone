@@ -4,7 +4,8 @@
 // makes of a dish effect's changes on a character's hit points, traits and senses, worked out
 // again after each change, as dnd5e prepares an actor again; world time; a chat card drawn for a
 // Gamemaster or a player; chat messages deleted as core deletes them, a cleared log's among them;
-// and dnd5e's rest hook. Written from dnd5e's behaviour and Foundry's, not ported; built on
+// dnd5e's rest hook; and since module 0.39.0, a DialogV2 drawn as core draws one, its content copied
+// or adopted (drawnDialogs). Written from dnd5e's behaviour and Foundry's, not ported; built on
 // dnd5e-cards.mjs's Character (its `effects`, a list), as concentration.mjs builds its sheets.
 // Import after stub.mjs and dice-core.mjs.
 import { readFileSync } from 'node:fs'
@@ -369,4 +370,85 @@ export async function deleteCards(messages, { deleteAll = false } = {}) {
 export async function restCompleted(actor, result) {
   if (result?.updateData && Object.keys(result.updateData).length) await actor.update(result.updateData)
   await Hooks.callAll('dnd5e.restCompleted', actor, result, {})
+}
+
+/**
+ * Foundry's DialogV2 as core draws one (round 0.39.0 §2.9, the map's §6.1) [core, unverified]: its own
+ * `<dialog>` holding a form, the content in it, a footer of submit buttons, each `[data-action]`, the
+ * default one autofocused; a click on an enabled button calls its callback with (event, button,
+ * dialog), hands what it returns, or else its action, to `submit(result, dialog)`, then closes; a
+ * disabled one does nothing, as the browser has it; closing fires `close`. With `mode: "copy"` the
+ * content is drawn from a copy of its HTML, the element handed to it never in the page; with
+ * `"adopt"`, the element itself is put in the form. Which v14 does is unverified, so the dish
+ * dialog is checked under both.
+ * @param {object} [options]
+ * @param {"copy"|"adopt"} [options.mode]
+ * @returns {{DialogV2: Function, opened: object[]}}   The class to install, and each dialog made.
+ */
+export function drawnDialogs({ mode = 'copy' } = {}) {
+  const opened = []
+  class DialogV2 {
+    constructor(options) {
+      this.options = { ...options, buttons: Object.fromEntries((options.buttons ?? []).map(each => [each.action, each])) }
+      this.listeners = {}
+      this.element = null
+      this.closed = false
+      opened.push(this)
+    }
+
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn) }
+
+    async render() {
+      const made = drawing()
+      const element = made.createElement('dialog')
+      const form = made.createElement('form')
+      form.className = 'dialog-form standard-form'
+      const { content } = this.options
+      const Element = made.defaultView?.HTMLElement ?? globalThis.HTMLElement
+      if ((mode === 'adopt') && (content instanceof Element)) {
+        content.classList.add('dialog-content', 'standard-form')
+        form.append(content)
+      } else {
+        const div = made.createElement('div')
+        div.className = 'dialog-content standard-form'
+        div.innerHTML = (content instanceof Element) ? content.outerHTML : String(content ?? '')
+        form.append(div)
+      }
+      const footer = made.createElement('footer')
+      footer.className = 'form-footer'
+      for (const each of Object.values(this.options.buttons)) {
+        const button = made.createElement('button')
+        Object.assign(button, { type: 'submit', textContent: each.label, autofocus: each.default === true })
+        button.dataset.action = each.action
+        footer.append(button)
+      }
+      form.append(footer)
+      element.append(form)
+      element.addEventListener('click', event => {
+        const target = event.target.closest?.('button[data-action]')
+        if (!target) return
+        event.preventDefault()
+        void this.clickButton(event, target)
+      })
+      made.body.append(element)
+      this.element = element
+      return this
+    }
+
+    async clickButton(event, target) {
+      const button = this.options.buttons[target.dataset.action]
+      const result = (await button?.callback?.(event, target, this)) ?? button?.action
+      await this.options.submit?.(result, this)
+      return this.close()
+    }
+
+    async close() {
+      if (this.closed) return this
+      this.closed = true
+      this.element?.remove()
+      for (const fn of this.listeners.close ?? []) fn()
+      return this
+    }
+  }
+  return { DialogV2, opened }
 }

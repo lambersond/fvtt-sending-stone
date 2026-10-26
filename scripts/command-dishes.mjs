@@ -2,16 +2,19 @@ import {
   DISH_KINDS, DISH_OUTCOMES, DISH_VERSIONS, EVENTS, MODULE_ID, MOST_DISH_CHANGES, MOST_DISH_INGREDIENTS
 } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { playerOwners } from "./characters.mjs";
 import { dnd5eGeneration } from "./command-alone.mjs";
 import { checkCommand, failedResult, isId, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
+import { commandActor } from "./creatures.mjs";
 import { dishTombstone, postDishCard, resendDishDecision, resendDishDecisions, resendTombstone } from "./dish-card.mjs";
 
 /**
  * Dishes from the Magical Recipe Book, since module 0.38.0: a dish a player cooks and eats in the
  * cookbook reaches the app by their link code, and the app hands it here as a `dish` command, which
- * this posts as a card only Gamemasters see. From that card a Gamemaster chooses who ate it, and
- * each gets its effect for the time the cookbook gives it, one dish at a time (dish-card.mjs,
- * dish-effects.mjs); the app hears of the choice in `dish.applied` or `dish.dismissed`.
+ * this posts as a card the Gamemasters and the campaign's players see; only Gamemasters choose who
+ * ate it, from that card, and each gets its effect for the time the cookbook gives it, one dish at a
+ * time (dish-card.mjs, dish-effects.mjs); the app hears of the choice in `dish.applied` or
+ * `dish.dismissed`.
  *
  * The app hands a dish over until a result answers it, as it does journal notes, so the same command
  * may arrive again: after a reload, a result lost on its way, or while its first run still goes. So
@@ -191,7 +194,8 @@ export function runDishCommand(command, campaign) {
  * aside, its deletion going again, and posts nothing, as the app may hand the command over again
  * before it hears of the deletion; and one deleted decided answers its choice from its tombstone,
  * its decision going again where this session kept it, and posts nothing either. Otherwise its card,
- * whose create failing is an error the app hands it over again for.
+ * whose create failing is an error the app hands it over again for. Since 0.39.0 the result says
+ * whether the cook's player reads the card, `visible`; one answered from a tombstone, no card, never.
  * @param {object} command
  * @param {Campaign} passed     The campaign as it was when fetched, which may be a queue's wait old.
  * @returns {Promise<CommandResult>}
@@ -201,8 +205,8 @@ async function dishNow(command, passed) {
   if ( !campaign || !dishesOn(campaign) ) return failedResult(command, "off");
   const invalid = checkCommand(command);
   if ( invalid ) return failedResult(command, "invalid", invalid);
-  const answer = (card, state) => ({
-    id: command.id, status: "done", reason: null, error: null, messageId: card, visible: false, rolls: [],
+  const answer = (card, state, visible=false) => ({
+    id: command.id, status: "done", reason: null, error: null, messageId: card, visible, rolls: [],
     dish: { card, state }
   });
   const found = findDishCard(command.id);
@@ -215,5 +219,20 @@ async function dishNow(command, passed) {
   }
   if ( found ) resendDishDecision(found);
   const card = found ?? await postDishCard(command, campaign);
-  return answer(card.id, card.getFlag(MODULE_ID, "dish")?.state ?? "waiting");
+  return answer(card.id, card.getFlag(MODULE_ID, "dish")?.state ?? "waiting", cookReads(card, command, campaign));
+}
+
+/**
+ * Is the card whispered to a player who owns the cook's character, still the campaign's? A card
+ * module 0.38.x posted, whispered to the Gamemasters alone, isn't.
+ * @param {ChatMessage} card
+ * @param {object} command
+ * @param {Campaign} campaign
+ * @returns {boolean}
+ */
+function cookReads(card, command, campaign) {
+  const cook = commandActor(command, campaign)?.actor;
+  if ( !cook ) return false;
+  const readers = new Set(card.whisper ?? []);
+  return playerOwners(cook).some(user => readers.has(user.id));
 }
