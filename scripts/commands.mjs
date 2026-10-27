@@ -13,6 +13,7 @@ import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
 import { favoriteReader, favoritesOn, noteFavoriteReader, runFavoriteCommand } from "./command-favorites.mjs";
 import { dishesOn, dishInFlight, dishReader, noteDishReader, runDishCommand } from "./command-dishes.mjs";
 import { effectReader, effectsOn, noteEffectReader, runEffectCommand } from "./command-effects.mjs";
+import { noteWildShapeReader, runWildShapeCommand, wildShapeOn, wildShapeReader } from "./command-wildshape.mjs";
 import { runEndTurnCommand, runUndoTurnCommand } from "./command-turn.mjs";
 import {
   noteRemovalReader, noteTransferReader, removalReader, removalsOn, runRemoveCommand, runTransferCommand,
@@ -235,9 +236,11 @@ export function registerCommandHooks() {
  * campaign's Gamemaster takes them, under dnd5e 5, with everything else off, and to which the
  * campaign's decided dishes are sent at once where it starts to in a heartbeat's answer; and since
  * 0.39.0, whether it takes a player's own effects turned off, on and deleted, for which it's fetched
- * from where the campaign's Gamemaster lets its players, under dnd5e, with everything else off. A
- * hello's answer wakes the campaign's fetching, which may be waiting as an answer given before the
- * hello was taken asked.
+ * from where the campaign's Gamemaster lets its players, under dnd5e, with everything else off; and
+ * since 0.40.0, whether it takes Wild Shape, for which it's fetched from where the campaign's
+ * Gamemaster lets its players, under dnd5e, with everything else off, and to which the campaign's
+ * sheets are sent again where it starts or stops in a heartbeat's answer. A hello's answer wakes the
+ * campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -254,6 +257,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteFavoriteReader(campaignId, features);
   noteDishReader(campaignId, features, type);
   noteEffectReader(campaignId, features);
+  noteWildShapeReader(campaignId, features, type);
   noteNotesReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);
   syncPollers();
@@ -267,7 +271,8 @@ export function noteListenerFeatures(campaignId, features, type) {
  * since 0.37.0 add and remove their characters' favorites, under dnd5e, wherever its app takes them,
  * or since 0.38.0 take their dishes from the Magical Recipe Book, where its Gamemaster takes them,
  * under dnd5e 5, wherever its app takes them, or since 0.39.0 change their own effects, where its
- * Gamemaster lets them, under dnd5e, wherever its app takes them, and that the app has commands for,
+ * Gamemaster lets them, under dnd5e, wherever its app takes them, or since 0.40.0 use Wild Shape, where
+ * its Gamemaster lets them, under dnd5e, wherever its app takes it, and that the app has commands for,
  * while this client is the bridge; and for no other.
  * @param {object} [options]
  * @param {boolean} [options.retry]   Try again the campaigns whose fetch the app refused, as after
@@ -300,8 +305,9 @@ export function syncPollers({ retry=false }={}) {
  * from the Magical Recipe Book, by the campaign's own switch, under dnd5e 5, wherever its app takes
  * them, with rolls, moves, removals, notes and favorites off too; or since 0.39.0 a player's own effects
  * turned off, on and deleted, by the campaign's own switch, under dnd5e, wherever its app takes them,
- * with everything else off too. A roll fetched while only moves, removals, notes, favorites, dishes or
- * effects are is refused as one fetched while rolls are off.
+ * with everything else off too; or since 0.40.0 Wild Shape, by the campaign's own switch, under dnd5e,
+ * wherever its app takes it, with everything else off too. A roll fetched while only moves, removals,
+ * notes, favorites, dishes, effects or Wild Shape are is refused as one fetched while rolls are off.
  * @param {Campaign} campaign
  * @returns {boolean}
  */
@@ -309,7 +315,7 @@ function fetchesFor(campaign) {
   return (campaign.rolls && diceStatus.ready) || (transfersOn(campaign) && transferReader(campaign.id))
     || (removalsOn() && removalReader(campaign.id)) || (notesOn() && notesReader(campaign.id))
     || (favoritesOn() && favoriteReader(campaign.id)) || (dishesOn(campaign) && dishReader(campaign.id))
-    || (effectsOn(campaign) && effectReader(campaign.id));
+    || (effectsOn(campaign) && effectReader(campaign.id)) || (wildShapeOn(campaign) && wildShapeReader(campaign.id));
 }
 
 /**
@@ -524,7 +530,9 @@ class Poller {
  * is, and skipped only while the same one is being made; it waits only for earlier dishes, never for
  * its cook's rolls, so a card reaches the Gamemaster whatever their character is doing. Since 0.39.0
  * an effect turned off, on or deleted waits for its character's earlier commands, as a favorite does,
- * and their next ones for it.
+ * and their next ones for it. Since 0.40.0 Wild Shape waits for its character's earlier commands, as an
+ * effect does, but for a list of Beasts, which writes nothing, and waits on a queue of its own; and a
+ * queue settling checks whether a Wild Shape of that character's is due to end (wild-shape.mjs).
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -557,14 +565,54 @@ function take(command, campaign) {
   } else if ( command.kind === "transfer" ) {
     keys = [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to),
       ...(Array.isArray(command.transfer?.among) ? command.transfer.among.map(keyOf) : [])].filter(Boolean))];
+  } else if ( (command.kind === "wildShape") && (command.wildShape?.op === "forms") ) {
+    keys = [`forms:${command.actorId}`];
   }
   const made = Promise.all(keys.map(key => queues.get(key) ?? Promise.resolve()))
     .then(() => make(command, campaign))
     .catch(err => console.error(`${MODULE_ID} | Could not report a roll from Sending Stone`, err));
   for ( const key of keys ) queues.set(key, made);
   void made.finally(() => {
-    for ( const key of keys ) if ( queues.get(key) === made ) queues.delete(key);
+    for ( const key of keys ) {
+      if ( queues.get(key) !== made ) continue;
+      queues.delete(key);
+      onQueueSettled(key);
+    }
   });
+}
+
+/**
+ * What's told when a queue settles, its last command made: since 0.40.0, Wild Shape's check of
+ * whether a form of that character's is due to end, which waits while a command of hers is on its way.
+ * @type {((key: string) => void)[]}
+ */
+const settledListeners = [];
+
+/**
+ * Be told of each queue as it settles, by its key: a character's actor id, among others.
+ * @param {(key: string) => void} fn
+ * @returns {void}
+ */
+export function registerQueueSettled(fn) {
+  settledListeners.push(fn);
+}
+
+/**
+ * Tell what listens that a queue has settled.
+ * @param {string} key
+ * @returns {void}
+ */
+function onQueueSettled(key) {
+  for ( const fn of settledListeners ) fn(key);
+}
+
+/**
+ * Is a command of this queue's on its way, made or waiting?
+ * @param {string} key   A character's actor id, among others.
+ * @returns {boolean}
+ */
+export function queueBusy(key) {
+  return queues.has(key);
 }
 
 /**
@@ -665,6 +713,7 @@ function runCommand(command, campaign, signal) {
     case "favorite": return runFavoriteCommand(command, campaign);
     case "dish": return runDishCommand(command, campaign);
     case "effect": return runEffectCommand(command, campaign);
+    case "wildShape": return runWildShapeCommand(command, campaign);
     case "note": return runNoteCommand(command, campaign);
     default: return runRollCommand(command, campaign, { signal });
   }

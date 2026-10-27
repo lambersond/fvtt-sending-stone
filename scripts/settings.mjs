@@ -1,4 +1,4 @@
-import { CHAT_SCOPES, COMPANION_INITIATIVE, MODULE_ID, RESULTS_MODES, SETTINGS } from "./constants.mjs";
+import { CHAT_SCOPES, COMPANION_INITIATIVE, MODULE_ID, RESULTS_MODES, SETTINGS, WILD_SHAPE_PACKS } from "./constants.mjs";
 import { announce } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { MANUAL_DICE } from "./companions.mjs";
@@ -88,6 +88,10 @@ export function registerSettings() {
       // May its players turn off, turn on and delete their own characters' effects from the app, since
       // 0.39.0? Apart from its rolls, under dnd5e.
       effects: new BooleanField({ initial: false }),
+      // May its players use Wild Shape from the app, since 0.40.0? Apart from its rolls, under dnd5e.
+      wildShape: new BooleanField({ initial: false }),
+      // The compendiums its druids learn Beasts from, since 0.40.0.
+      wildShapePacks: new ArrayField(new StringField({ blank: false }), { initial: () => [...WILD_SHAPE_PACKS] }),
       // How its characters' companions enter initiative, since 0.36.0: each its own roll, or right
       // after its character, where this module keeps them.
       companionInitiative: new StringField({

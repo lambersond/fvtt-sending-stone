@@ -350,6 +350,31 @@
         </div>
     </fieldset>
 
+    <fieldset class="sending-stone-wild-shape">
+        <legend>{{localize "SENDINGSTONE.Config.Actions.WildShape"}}</legend>
+        <div class="form-group">
+            <label for="sending-stone-wild-shape">{{localize "SENDINGSTONE.Config.Actions.WildShapePlayers"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-wild-shape" name="campaign.wildShape" {{#if campaign.wildShape}}checked{{/if}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.WildShapeHint"}}</p>
+            {{#if campaign.wildShapeUnavailable}}<p class="hint sending-stone-warning">{{campaign.wildShapeUnavailable}}</p>{{/if}}
+            {{#if campaign.wildShapeApp}}<p class="hint sending-stone-warning">{{localize "SENDINGSTONE.Config.Actions.WildShapeApp"}}</p>{{/if}}
+        </div>
+        <div class="form-group stacked">
+            <label id="sending-stone-wild-shape-packs">{{localize "SENDINGSTONE.Config.Actions.WildShapePacks"}}</label>
+            <div class="sending-stone-wild-shape-packs" role="group" aria-labelledby="sending-stone-wild-shape-packs">
+                {{#each campaign.wildShapePackChoices as |choice|}}
+                <label class="checkbox">
+                    <input type="checkbox" name="campaign.wildShapePacks.{{choice.id}}" {{#if choice.checked}}checked{{/if}}>
+                    {{choice.label}}
+                </label>
+                {{/each}}
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.WildShapePacksHint"}}</p>
+        </div>
+    </fieldset>
+
     <fieldset class="sending-stone-companions">
         <legend>{{localize "SENDINGSTONE.Config.Actions.Companions"}}</legend>
         <div class="form-group">

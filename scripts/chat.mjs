@@ -2,7 +2,7 @@ import { CHAT_SCOPES, EVENTS, MODULE_ID } from "./constants.mjs";
 import { chatEnabled, chatScope } from "./config.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { campaignCharacterId } from "./characters.mjs";
+import { speakerCharacterId } from "./characters.mjs";
 import { chatAudience, isAudienceShared, serializeMessage } from "./chat-data.mjs";
 import { messageCompanion } from "./creature-sync.mjs";
 import { send } from "./transport.mjs";
@@ -52,7 +52,7 @@ function isInScope(message, audience, campaign) {
   const dish = message.flags?.[MODULE_ID]?.dish;
   if ( dish && (dish.campaignId !== campaign.id) ) return false;
   if ( !isAudienceShared(audience) ) return false;
-  const spokenByCampaign = (campaignCharacterId(message.speakerActor, campaign) !== null)
+  const spokenByCampaign = (speakerCharacterId(message, campaign) !== null)
     || Boolean(messageCompanion(message, campaign));
   if ( chatScope() === CHAT_SCOPES.CONNECTED ) return spokenByCampaign;
   return spokenByCampaign || (audience.characters.length > 0);

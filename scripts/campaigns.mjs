@@ -1,4 +1,4 @@
-import { COMPANION_INITIATIVE, MODULE_ID, SETTINGS } from "./constants.mjs";
+import { COMPANION_INITIATIVE, MODULE_ID, SETTINGS, WILD_SHAPE_PACKS } from "./constants.mjs";
 import { manualDiceEnabled } from "./companions.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 
@@ -42,6 +42,13 @@ import { diceStatus } from "./dice-plan.mjs";
  *                                    characters' effects from the app, since 0.39.0, those their
  *                                    party put there? Off until the Gamemaster turns it on, apart
  *                                    from `rolls`, under dnd5e.
+ * @property {boolean} wildShape      May its players use Wild Shape from the app, since 0.40.0: a
+ *                                    2024 druid's player choosing the Beasts she knows and changing
+ *                                    into them and back? Off until the Gamemaster turns it on, apart
+ *                                    from `rolls`, under dnd5e.
+ * @property {string[]} wildShapePacks  The Actor compendiums, by collection, its druids learn Beasts
+ *                                    from, since 0.40.0: dnd5e's 2024 Actors until the Gamemaster
+ *                                    chooses; one missing since, as a module's uninstalled, left out.
  * @property {string} companionInitiative  How its characters' companions enter initiative, since
  *                                    0.36.0: `"own"`, each rolls its own; or `"after"`, each in a
  *                                    combat with its character is kept right after it there, by
@@ -55,7 +62,8 @@ import { diceStatus } from "./dice-plan.mjs";
 export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
   return stored.map(({
-    id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, dishes, effects, companionInitiative
+    id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, dishes, effects, wildShape, wildShapePacks,
+    companionInitiative
   }) => ({
     id,
     title,
@@ -69,6 +77,11 @@ export function getCampaigns() {
     dishes: dishes === true,
     // A campaign saved before 0.39.0 has none: its players change no effects from the app.
     effects: effects === true,
+    // A campaign saved before 0.40.0 has neither: its players use no Wild Shape from the app, and the
+    // 2024 Actors are its pool.
+    wildShape: wildShape === true,
+    wildShapePacks: Array.isArray(wildShapePacks) ? wildShapePacks.filter(pack => !game.packs || game.packs.get(pack))
+      : [...WILD_SHAPE_PACKS],
     // A campaign saved before 0.36.0, or holding anything else, rolls its companions' own.
     companionInitiative: (companionInitiative === COMPANION_INITIATIVE.AFTER)
       ? COMPANION_INITIATIVE.AFTER : COMPANION_INITIATIVE.OWN

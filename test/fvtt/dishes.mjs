@@ -290,7 +290,8 @@ const ON = { enabled: true, kinds: ['dish'], reason: null, versions: [1] }
 const SYSTEM = { enabled: false, kinds: [], reason: 'system', versions: [] }
 assert.deepEqual(helloOf().features.dishes, OFF, 'off by default')
 // Changed on purpose (round 0.39.0 §1.9): a player's own effects after dishes.
-assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects'])
+// Changed on purpose (round 0.40.0 §10.2): and whether its players use Wild Shape, after effects.
+assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape'])
 await campaignAs({ dishes: true })
 assert.deepEqual(helloOf().features.dishes, DND5E6 ? SYSTEM : ON)
 assert.deepEqual(helloOf('camp-b').features.dishes, OFF, "another campaign's switch is its own")

@@ -155,11 +155,18 @@ export function combat(id) {
   return c
 }
 
+// Since module 0.40.0, `follows: token` makes the combatant's actor its token's, read each time, as
+// core's Combatant#actor reads its token's [core, unverified]: a linked token switched to a form
+// then has the form's. `followsOnly: token` reads it alone, null while the token's actor is gone (a
+// linked token naming a form just deleted), as core's would, never the actor it was made with.
 export const combatant = (parent, id, a, fields = {}) => {
+  const { follows, followsOnly, ...rest } = fields
   const cb = {
     id, parent, name: a?.name ?? id, img: '', actor: a ?? null, actorId: a?.id ?? null, tokenId: `t-${id}`,
-    sceneId: 'scene', _source: { group: null }, initiative: null, isDefeated: false, hidden: false, ...fields,
+    sceneId: 'scene', _source: { group: null }, initiative: null, isDefeated: false, hidden: false, ...rest,
   }
+  if (follows) Object.defineProperty(cb, 'actor', { configurable: true, enumerable: true, get: () => follows?.actor ?? a ?? null })
+  if (followsOnly) Object.defineProperty(cb, 'actor', { configurable: true, enumerable: true, get: () => followsOnly.actor ?? null })
   parent.combatants.set(id, cb)
   return cb
 }

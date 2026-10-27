@@ -1,7 +1,7 @@
 # The harness
 
 The module's own scripts, run in Node against stand-ins for Foundry VTT 14 and Midi-QOL and against
-dnd5e's real dice classes: 41 harnesses, 90 runs of them in `harness-all.sh`. No Foundry, no browser
+dnd5e's real dice classes: 42 harnesses, 93 runs of them in `harness-all.sh`. No Foundry, no browser
 and no network: `fvtt/stub.mjs` stands in for Foundry's core and replaces `fetch`, so every post the
 module makes lands in the harness, and the stand-in app answers it. None of this is part of the
 module: Foundry reads `module.json` only, and the release workflow leaves `test/`, the package files,
@@ -68,6 +68,7 @@ run failed. A full pass takes about seven minutes.
 | `favorites-core.mjs` | dnd5e 5.3.3's favorites (`hasFavorite`, `addFavorite`, `removeFavorite`), for a stand-in character: what `favoriting.mjs` and the app's e2e (through `e2e/fvtt`) add favorites with |
 | `dish-core.mjs` | Dishes from the Magical Recipe Book (module 0.38.0): a character's Active Effects as Foundry v14 keeps them, created and deleted through the actor, each firing its hook; what dnd5e prepares of a dish's changes on hit points, traits and senses; world time; a chat card drawn for a Gamemaster or a player; chat messages deleted as core deletes them; dnd5e's rest hook; since module 0.39.0, a DialogV2 drawn as core draws one, its content copied or adopted (`drawnDialogs`); written from their behaviour, not ported, on `dnd5e-cards.mjs`'s characters: what `dishes.mjs` and the app's e2e (through `e2e/fvtt`) serve dishes with |
 | `effects-core.mjs` | A player's own effects (module 0.39.0): Active Effects on a character and on its items as Foundry v14 keeps them, updated and deleted as Foundry does, the pre-hook first, which may stop the write or add to it, then the hook; dnd5e's `isTemporary`; what a concentration keeps up; who put an effect there, by a fromUuidSync over the world's actors, items and effects; faults that make a write throw or stop; and the contract's fixtures, the party's effects and others': on `dish-core.mjs`'s `withDishes`, for `effects.mjs` and the app's e2e (through `e2e/fvtt`) |
+| `transform5e.mjs` | dnd5e's transformation (module 0.40.0): Actor5e#transformInto and #revertOriginalForm ported from dnd5e 5.3.3, its Wild Shape and Polymorph presets, TransformationSetting and the Transform activity; actors made from dnd5e's own source data and prepared from it (a druid's scale values by druid level), created, updated and deleted as Foundry does, each firing its hooks, `preUpdateItem` first; conditions toggled by their status's static id, with the statuses they imply; scenes' token batches; compendiums with their indexes, folders and documents, holding dnd5e 5.3.3's own 2024 Beasts and a Gamemaster's own; the contract's druids, a rest and a party's rest on dish-core's clock; faults that make a change, a token batch or a return fail: for `wildshape.mjs` and the app's e2e (through `e2e/fvtt`) |
 | `dnd5e-cards.mjs` | dnd5e's concentration and chat cards, and Midi-QOL's concentration card |
 | `midi-fake.mjs`, `midi-saves.mjs`, `midi-critical.mjs` | Midi-QOL 14's workflow, its Gamemaster's confirmation of damage where asked for and its release of their targets when the turn changes, 13's saving throws, and its rules for critical hits |
 | `crit-parentheticals.mjs` | Foundry's parenthetical dice terms |

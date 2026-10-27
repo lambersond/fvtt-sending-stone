@@ -1,6 +1,8 @@
 import { MODULE_ID } from "./constants.mjs";
+import { seatActor } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { appFlags, authorFor, checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
+import { wildShapeReader } from "./command-wildshape.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { activityName, shownActivity } from "./sheet-rolls.mjs";
 import { finite, limitedUses, RESOURCES, spendsDirectly } from "./sheet-values.mjs";
@@ -21,6 +23,10 @@ import { finite, limitedUses, RESOURCES, spendsDirectly } from "./sheet-values.m
  * players' rolls are made here, whether or not attacks can be made here now: neither throws dice or
  * goes through Midi-QOL. The character's sheet as it then stands goes ahead of the result, which
  * says nothing of the counts: the sheet does.
+ *
+ * Since 0.40.0, for an app that takes Wild Shape, a character shaped spends from her form's copies,
+ * the form's sheet being the one it was sent, and her return carries what she spent back onto her
+ * own actor (wild-shape.mjs). Her own actor's resources aren't on the form, which dnd5e gives none.
  */
 
 /* -------------------------------------------- */
@@ -37,8 +43,9 @@ import { finite, limitedUses, RESOURCES, spendsDirectly } from "./sheet-values.m
 export async function runSpendCommand(command, campaign) {
   const refusal = chargeRefusal(command, campaign);
   if ( refusal ) return failedResult(command, refusal.reason, refusal.error);
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failedResult(command, "unknown");
+  const character = characterOf(command, campaign);
+  if ( !character ) return failedResult(command, "unknown");
+  const actor = actingAs(character, campaign);
   const found = counterOf(actor, command.counter);
   if ( found.refusal ) return failedResult(command, found.refusal);
   const { uses, name, spend } = found;
@@ -47,7 +54,7 @@ export async function runSpendCommand(command, campaign) {
   const text = game.i18n.format("SENDINGSTONE.Chat.Spends", {
     count: command.count, name: foundry.utils.escapeHTML(name)
   });
-  return lineResult(command, actor, campaign, await postLine(command, actor, text));
+  return lineResult(command, actor, campaign, await postLine(command, actor, text), character);
 }
 
 /**
@@ -112,20 +119,44 @@ function counterOf(actor, counter) {
 export async function runInspirationCommand(command, campaign) {
   const refusal = chargeRefusal(command, campaign);
   if ( refusal ) return failedResult(command, refusal.reason, refusal.error);
-  const actor = game.actors.get(command.actorId);
-  if ( !actor || !campaign.characters.has(actor.id) ) return failedResult(command, "unknown");
+  const character = characterOf(command, campaign);
+  if ( !character ) return failedResult(command, "unknown");
+  const actor = actingAs(character, campaign);
   const gain = command.inspiration === "gain";
   const inspired = actor.system?.attributes?.inspiration === true;
   if ( !gain && !inspired ) return failedResult(command, "not-inspired");
   if ( gain && inspired ) return failedResult(command, "inspired");
   await actor.update({ "system.attributes.inspiration": gain });
   const text = game.i18n.localize(gain ? "SENDINGSTONE.Chat.InspirationGained" : "SENDINGSTONE.Chat.InspirationUsed");
-  return lineResult(command, actor, campaign, await postLine(command, actor, text));
+  return lineResult(command, actor, campaign, await postLine(command, actor, text), character);
 }
 
 /* -------------------------------------------- */
 /*  Both                                        */
 /* -------------------------------------------- */
+
+/**
+ * The campaign character a spend or Heroic Inspiration is for, as it's now.
+ * @param {object} command
+ * @param {Campaign} campaign
+ * @returns {Actor|null}
+ */
+function characterOf(command, campaign) {
+  const actor = game.actors.get(command.actorId);
+  return (actor && campaign.characters.has(actor.id)) ? actor : null;
+}
+
+/**
+ * The actor a character's charges and Heroic Inspiration are changed on, since 0.40.0: for an app
+ * that takes Wild Shape, the actor she is now, her form while she's shaped; for any other, which was
+ * sent her own sheet, her own.
+ * @param {Actor} character
+ * @param {Campaign} campaign
+ * @returns {Actor}
+ */
+function actingAs(character, campaign) {
+  return wildShapeReader(campaign.id) ? seatActor(character) : character;
+}
 
 /**
  * Why charges or Heroic Inspiration aren't to be changed, before looking at the character: the
@@ -172,19 +203,21 @@ export async function postLine(command, actor, text) {
 
 /**
  * What the app is told of charges spent or Heroic Inspiration changed: its line, and whether its
- * player may see it; the character's sheet as it now stands going first, as `sheetFirst` has it.
+ * player may see it; the character's sheet as it now stands going first, as `sheetFirst` has it,
+ * since 0.40.0 hers for her form's.
  * @param {object} command
  * @param {Actor} actor
  * @param {Campaign} campaign
  * @param {ChatMessage|null} line
+ * @param {Actor} [character]   The campaign character whose player is told.
  * @returns {CommandResult}
  */
-function lineResult(command, actor, campaign, line) {
+function lineResult(command, actor, campaign, line, character=actor) {
   sheetFirst(actor);
   return {
     id: command.id, status: "done", reason: null, error: null,
     messageId: line?.id ?? null,
-    visible: line ? visibleTo(line, actor, campaign) : true,
+    visible: line ? visibleTo(line, character, campaign) : true,
     rolls: []
   };
 }

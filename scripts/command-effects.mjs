@@ -1,5 +1,6 @@
 import { EFFECT_ID, EFFECT_KINDS, EFFECT_OPS, MODULE_ID } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { activeForm } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { checkCommand, failedResult, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
 import { campaignGroups } from "./groups.mjs";
@@ -155,6 +156,8 @@ export async function runEffectCommand(command, passed) {
   const actor = (campaign.characters.has(command.actorId) && !groups.has(command.actorId))
     ? (game.actors.get(command.actorId) ?? null) : null;
   if ( !actor ) return failed("unknown");
+  // Since 0.40.0 none while she's transformed: her form's are copies, and her own wait for her return.
+  if ( activeForm(actor) ) return failed("shaped");
 
   const { op, id } = command.effect;
   const listed = () => Array.from(actor.allApplicableEffects?.() ?? []);

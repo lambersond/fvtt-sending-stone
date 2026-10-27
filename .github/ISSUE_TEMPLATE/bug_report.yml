@@ -96,6 +96,7 @@ body:
         - label: Players move items and coins
         - label: Dishes from the Magical Recipe Book
         - label: Allow Players to disable & remove their own active effects
+        - label: Allow Players to use Wild Shape from the app
         - label: Chat messages
         - label: Combat tracker
         - label: GM-only details

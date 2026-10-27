@@ -1,5 +1,6 @@
 import { MOST_COMPANIONS, MOST_COMPANIONS_EACH } from "./constants.mjs";
-import { campaignActors, playerOwners } from "./characters.mjs";
+import { activeForm, campaignActors, playerOwners, transformed } from "./characters.mjs";
+import { wildShapeReader } from "./command-wildshape.mjs";
 
 /**
  * A campaign's characters' companions, since 0.36.0: the creatures each summoned in Foundry, whose
@@ -76,11 +77,14 @@ export function companionsOf(campaign) {
   const ownersOf = actor => players
     .filter(({ users }) => users.some(user => actor.ownership?.[user.id] === owner))
     .map(({ character }) => character);
-  // The campaign character whose item summoned a live actor, if one did.
+  // The campaign character whose item summoned a live actor, if one did. Since 0.40.0 one summoned
+  // by her form's copy of the item, while she's shaped, is hers too, while the form exists.
+  const forms = new Map(characters.map(character => [character.id, activeForm(character)?.id ?? null]));
   const summonerOf = actor => {
     const origin = foundry.utils.getProperty(actor, "flags.dnd5e.summon.origin");
     if ( typeof origin !== "string" ) return null;
-    return characters.find(character => origin.startsWith(`Actor.${character.id}.Item.`)) ?? null;
+    const by = id => Boolean(id) && origin.startsWith(`Actor.${id}.Item.`);
+    return characters.find(character => by(character.id) || by(forms.get(character.id))) ?? null;
   };
   const found = new Map();
   const note = (key, kind, actor, token, of) => {
@@ -94,6 +98,7 @@ export function companionsOf(campaign) {
     if ( token.hidden ) continue;
     if ( game.actors.get(token.actorId)?.type !== "npc" ) continue;
     const actor = token.actor;
+    // A transformed actor is never one: dnd5e copies its original's type, ownership and flags onto it.
     if ( !actor || (actor.type !== "npc") || transformed(actor) || campaign.characters.has(actor.id) ) continue;
     const key = creatureKey(token);
     const summoner = summonerOf(actor);
@@ -205,33 +210,29 @@ export function ownedByPlayers(actor, characters) {
  * character's own, or since 0.36.0 one of its companions, named by `of` (round 0.36.0 §4.7). The
  * companion's key is the command's `actorId`, never a campaign character's, so a module before
  * 0.36.0, which ignores `of`, refuses it as unknown rather than making it as the character.
+ *
+ * Since 0.40.0, for a campaign whose app takes Wild Shape, a character shaped acts as her form, its
+ * `form`, whose sheet that app was sent under her id, so its rolls and item ids are the form's; the
+ * result is still hers, and queued by her id. Any other app was sent her own sheet, and gets her own.
  * @param {object} command
  * @param {Campaign} campaign
- * @returns {{actor: Actor, character: Actor, companion: CompanionEntry|null}|null}
+ * @returns {{actor: Actor, character: Actor, companion: CompanionEntry|null, form: Actor|null}|null}
  */
 export function commandActor(command, campaign) {
   if ( (command.of === undefined) || (command.of === null) ) {
-    const actor = game.actors.get(command.actorId);
-    return (actor && campaign.characters.has(actor.id)) ? { actor, character: actor, companion: null } : null;
+    const character = game.actors.get(command.actorId);
+    if ( !character || !campaign.characters.has(character.id) ) return null;
+    const form = wildShapeReader(campaign.id) ? activeForm(character) : null;
+    return { actor: form ?? character, character, companion: null, form };
   }
   if ( !campaign.characters.has(command.of) ) return null;
   const character = game.actors.get(command.of);
   if ( !character ) return null;
   const found = findCompanion(campaign, command.actorId, command.of);
-  return found ? { actor: found.actor, character, companion: found.entry } : null;
+  return found ? { actor: found.actor, character, companion: found.entry, form: null } : null;
 }
 
 /* -------------------------------------------- */
-
-/**
- * Is a live actor transformed, as Wild Shape or Polymorph make one? Never a companion: dnd5e copies
- * its original's type, ownership and flags onto it.
- * @param {Actor} actor
- * @returns {boolean}
- */
-function transformed(actor) {
-  return foundry.utils.getProperty(actor, "flags.dnd5e.isPolymorphed") === true;
-}
 
 /**
  * May a live actor be an owned companion: neither a summon nor a summon's template?
@@ -283,7 +284,8 @@ function entryOf({ key, kind, actor, token, of, name, summoner }) {
  */
 function summonOf(actor, summoner) {
   const flag = foundry.utils.getProperty(actor, "flags.dnd5e.summon") ?? {};
-  const itemId = String(flag.origin).slice(`Actor.${summoner.id}.Item.`.length).split(".")[0];
+  // Since 0.40.0 the origin may name her form, whose copy of the item has the item's own id.
+  const itemId = String(flag.origin).split(".")[3] ?? "";
   return {
     itemId,
     item: summoner.items?.get?.(itemId)?.name ?? "",

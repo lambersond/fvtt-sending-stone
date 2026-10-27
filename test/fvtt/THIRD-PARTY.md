@@ -5,9 +5,10 @@ The harness in this folder is test code. None of it is in module.zip (the releas
 
 ## dnd5e
 
-actor5e.mjs, activity5e.mjs, enchant5e.mjs, dnd5e-cards.mjs and favorites-core.mjs are stand-ins
-ported from the dnd5e system 5.3.3 (https://github.com/foundryvtt/dnd5e), as far as the module's
-commands use it. dnd5e's software is distributed under the MIT license, whose notice follows. The
+actor5e.mjs, activity5e.mjs, enchant5e.mjs, dnd5e-cards.mjs, favorites-core.mjs and transform5e.mjs
+are stand-ins ported from the dnd5e system 5.3.3 (https://github.com/foundryvtt/dnd5e), as far as the
+module's commands use it; transform5e.mjs ports its Actor5e#transformInto and #revertOriginalForm,
+its transformation presets and TransformationSetting, and the Transform activity's data. dnd5e's software is distributed under the MIT license, whose notice follows. The
 harness also loads dnd5e's own dice classes, its lang/en.json and one of its templates at run time,
 from the releases pinned in `test/pins.env`; those are fetched by `test/dnd5e.sh` and never
 committed here.
@@ -21,6 +22,13 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
+
+transform5e.mjs also holds, as its fixtures, a few creatures' numbers (names, scores, armor class,
+hit points, speeds, size, Challenge Rating and their first attack), the 2024 Wild Shape feature's
+data and the druid's scale values, read from dnd5e 5.3.3's packs/_source, whose files mark them
+CC-BY-4.0: the System Reference Document 5.2 by Wizards of the Coast LLC, licensed under the
+Creative Commons Attribution 4.0 International License (https://creativecommons.org/licenses/by/4.0/legalcode). Its Moon Hare, Ogre and characters
+are synthetic.
 
 ## Midi-QOL
 

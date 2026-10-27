@@ -231,7 +231,8 @@ async function dishNow(command, passed) {
  * @returns {boolean}
  */
 function cookReads(card, command, campaign) {
-  const cook = commandActor(command, campaign)?.actor;
+  // The character, never her form while she's shaped (since 0.40.0).
+  const cook = commandActor(command, campaign)?.character;
   if ( !cook ) return false;
   const readers = new Set(card.whisper ?? []);
   return playerOwners(cook).some(user => readers.has(user.id));

@@ -191,6 +191,12 @@
         "EffectsPlayers": "Allow Players to disable & remove their own active effects",
         "EffectsHint": "From the app, a player turns off and deletes the effects their party put on their own character, such as an ally's Bless or a dish, and turns off an item's temporary effect, such as Rage. They turn back on only what they turned off there. Never an effect from a monster, one made on the sheet, a condition, or a concentration, which they end with End as before. Nothing is posted in chat.",
         "EffectsApp": "The app this campaign sends to doesn't let players change effects yet.",
+        "WildShape": "Wild Shape",
+        "WildShapePlayers": "Allow Players to use Wild Shape from the app",
+        "WildShapeHint": "From the app, a 2024 druid's player chooses the Beasts their druid knows, within the rules, and changes into one and back, a use each time. Wild Shape then ends when its hours of world time run out, at 0 hit points or Incapacitated. Known forms are kept on the druid's own Wild Shape feature, as dnd5e's linked forms, so dnd5e's sheet offers the same ones in place of its Challenge Rating browser.",
+        "WildShapeApp": "The app this campaign sends to doesn't take Wild Shape yet.",
+        "WildShapePacks": "Beasts come from",
+        "WildShapePacksHint": "The compendiums a druid's player learns Beasts from. Players see these Beasts' names and statistics in the app. A form put on a Wild Shape feature in Foundry from anywhere else, or outside the rules, is used only in Foundry.",
         "Companions": "Companions",
         "CompanionInitiative": "Companions' initiative",
         "CompanionInitiativeOwn": "Its own roll",
@@ -447,6 +453,18 @@
         "Label": "Open",
         "Hint": "Forms on GitHub for Sending Stone's module, for Gamemasters and players alike."
       }
+    },
+    "WildShape": {
+      "Chat": {
+        "Became": "{name} uses Wild Shape and becomes {aForm}.",
+        "BecameAgain": "{name} uses Wild Shape again and becomes {aForm}.",
+        "Left": "{name} is no longer {aForm}: Wild Shape ends.",
+        "EndedTime": "{name}'s Wild Shape ends: its {hours} hours ran out.",
+        "EndedHour": "{name}'s Wild Shape ends: its hour ran out.",
+        "EndedHp": "{name}'s Wild Shape ends at 0 hit points.",
+        "EndedIncapacitated": "{name}'s Wild Shape ends: {name} is Incapacitated."
+      },
+      "FromFoundry": "Foundry form"
     }
   }
 }

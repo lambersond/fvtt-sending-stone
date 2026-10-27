@@ -1,5 +1,5 @@
 import { TURN_MIDI_WAIT, TURN_UNDO_WITHIN } from "./constants.mjs";
-import { campaignCharacterId } from "./characters.mjs";
+import { combatantCharacterId } from "./characters.mjs";
 import { combatEnabled } from "./config.mjs";
 import { reportTurnChange } from "./combat.mjs";
 import { involvesCampaign } from "./combat-data.mjs";
@@ -239,14 +239,15 @@ function turnState(combat) {
 /**
  * Is a combatant's turn one a campaign character's player may end: the character's own, or one of
  * its companions' by round 0.36.0 §2.1's rule now, never as last told, so a creature hidden or gone
- * a moment ago is no one's?
+ * a moment ago is no one's? Since 0.40.0 a form's combatant is its character's, and stays so where
+ * it names the form once deleted (`combatantCharacterId`).
  * @param {Combatant} combatant
  * @param {Actor} character
  * @param {Campaign} campaign
  * @returns {boolean}
  */
 function endsTurnOf(combatant, character, campaign) {
-  if ( campaignCharacterId(combatant.actor, campaign) === character.id ) return true;
+  if ( combatantCharacterId(combatant, campaign) === character.id ) return true;
   return companionsOf(campaign).some(({ entry }) => entry.of.includes(character.id)
     && (companionKeyOf([entry], combatant) !== null));
 }

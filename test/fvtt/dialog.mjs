@@ -29,9 +29,11 @@ await save(win)
 // Changed on purpose (round 0.36.0 §6.12): and with its companions' initiative, each its own roll.
 // Changed on purpose (round 0.38.0 §D8.3): and whether it takes dishes from the Magical Recipe Book, off.
 // Changed on purpose (round 0.39.0 §1.9): and whether its players change their own effects, off.
+// Changed on purpose (round 0.40.0 §10.2): and whether its players use Wild Shape, off, and the 2024
+// Actors its druids learn Beasts from.
 assert.deepEqual(settings.get('campaigns'), [
-  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, companionInitiative: 'own' },
-  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, companionInitiative: 'own' },
+  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], companionInitiative: 'own' },
+  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], companionInitiative: 'own' },
 ])
 assert.equal(win.element.isConnected, false, 'saved, it closes')
 console.log('ok - saves campaigns in order, trims titles, drops unticked and missing characters')
@@ -325,6 +327,11 @@ assert.ok((campaignFields.transfers instanceof foundry.data.fields.BooleanField)
 assert.ok((campaignFields.dishes instanceof foundry.data.fields.BooleanField) && (campaignFields.dishes.initial === false), 'dishes is in the schema')
 // Changed on purpose (round 0.39.0 §1.9): so is effects, off until it's turned on.
 assert.ok((campaignFields.effects instanceof foundry.data.fields.BooleanField) && (campaignFields.effects.initial === false), 'effects is in the schema')
+// Changed on purpose (round 0.40.0 §10.2): so are wildShape, off until it's turned on, and the
+// compendiums its druids learn Beasts from, a list of their ids, dnd5e's 2024 Actors to begin with.
+assert.ok((campaignFields.wildShape instanceof foundry.data.fields.BooleanField) && (campaignFields.wildShape.initial === false), 'wildShape is in the schema')
+assert.ok((campaignFields.wildShapePacks instanceof foundry.data.fields.ArrayField) && (campaignFields.wildShapePacks.element instanceof foundry.data.fields.StringField), 'wildShapePacks is in the schema')
+assert.deepEqual(campaignFields.wildShapePacks.initial(), ['dnd5e.actors24'])
 assert.equal(campaignFields.manualDice.initial, false)
 assert.deepEqual(Object.keys(campaignFields).sort(), Object.keys(settings.get('campaigns')[0]).sort())
 const hellosNow = () => Object.fromEntries(posts.splice(0).filter(post => post.envelope.type === 'bridge.hello')
@@ -544,8 +551,9 @@ assert.equal(dishes.querySelector('label').textContent.trim(), 'SENDINGSTONE.Con
 assert.equal(dishes.querySelector('.hint').textContent.trim(), 'SENDINGSTONE.Config.Actions.DishesHint')
 const order = [...win.element.querySelectorAll('fieldset')].map(each => each.className)
 // Changed on purpose (round 0.39.0 §1.9): Active effects between it and Companions.
-assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 4),
-  ['sending-stone-transfers', 'sending-stone-dishes', 'sending-stone-effects', 'sending-stone-companions'], 'between Items and coins and Active effects')
+// Changed on purpose (round 0.40.0 §10.2): and Wild Shape after Active effects.
+assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 5),
+  ['sending-stone-transfers', 'sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-companions'], 'between Items and coins and Active effects')
 assert.equal(find(win, '[name="campaign.dishes"]').checked, false)
 assert.equal(find(win, '[name="campaign.dishes"]').disabled, false, 'whatever the rolls')
 tick(win, 'campaign.dishes')

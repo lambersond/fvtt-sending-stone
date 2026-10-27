@@ -1,6 +1,7 @@
 import { EVENTS, MODULE_ID, SETTINGS } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { originalOf } from "./characters.mjs";
 import { resultsAlways } from "./config.mjs";
 import { wrap } from "./dice-plan.mjs";
 import {
@@ -281,6 +282,17 @@ function isOpen(campaignId, actorId) {
 }
 
 /**
+ * The id a save Midi asks of an actor is asked as, since 0.40.0: a transformed actor's original's,
+ * so that a save asked of her form is asked of the character, answered from her seat, and rolled on
+ * the form Midi waits on.
+ * @param {Actor} actor
+ * @returns {string}
+ */
+function askedId(actor) {
+  return originalOf(actor)?.id ?? actor.id;
+}
+
+/**
  * The campaigns a character's Midi save would be asked in: each that has it, asks its players for
  * their saves, and whose app reads Midi prompts.
  * @param {string} actorId
@@ -370,8 +382,8 @@ function describeAsk(workflow, options) {
   if ( displayOptions.simulate ) return null;
   if ( (typeof Midi?.DummyWorkflow === "function") && (workflow instanceof Midi.DummyWorkflow) ) return null;
   if ( !ID.test(String(actor.id)) ) return null;
-  const campaigns = askers(actor.id);
-  if ( !campaigns.some(campaign => isOpen(campaign.id, actor.id)) ) return null;
+  const campaigns = askers(askedId(actor));
+  if ( !campaigns.some(campaign => isOpen(campaign.id, askedId(actor))) ) return null;
 
   // Monk's TokenBar, Flash Rolls and Epic Rolls get their requests once Midi has asked for every
   // target: theirs can't be held.
@@ -641,8 +653,9 @@ function createEntry(fields) {
   const entry = {
     ...fields,
     key,
-    id: `${key}-${fields.actor.id}`,
-    actorId: fields.actor.id,
+    // The character it's asked of, a form's own: `actor` is still the actor Midi's roll is made on.
+    id: `${key}-${askedId(fields.actor)}`,
+    actorId: askedId(fields.actor),
     messageId: fields.messageId ?? key,
     abilities: (fields.rollType === "skill") ? [] : (fields.abilities ?? fields.offered),
     skills: (fields.rollType === "skill") ? fields.offered : [],
@@ -1215,7 +1228,7 @@ function holdConcentrationCard(message, data, options, userId) {
     if ( !midiPromptStatus.chat || !canSend() || (userId !== game.user?.id) ) return;
     if ( globalThis.MidiQOL.configSettings()?.doConcentrationCheck !== "chat" ) return;
     const asked = concentrationCard(message);
-    if ( !asked || !askers(asked.actor.id).some(campaign => isOpen(campaign.id, asked.actor.id)) ) return;
+    if ( !asked || !askers(askedId(asked.actor)).some(campaign => isOpen(campaign.id, askedId(asked.actor))) ) return;
     message.updateSource({ "flags.midi-qol.concentrationRolled": true, [`flags.${MODULE_ID}.midiHeld`]: true });
   } catch (err) {
     warnOnce("card", "Could not hold Midi-QOL's concentration card for the app: Midi rolls it as it would.", err);
@@ -1236,8 +1249,8 @@ function askConcentrationCard(message, options, userId) {
   const asked = concentrationCard(message);
   if ( !asked ) return markDone(message);
   try {
-    const campaigns = askers(asked.actor.id);
-    if ( !canSend() || !campaigns.some(campaign => isOpen(campaign.id, asked.actor.id)) ) {
+    const campaigns = askers(askedId(asked.actor));
+    if ( !canSend() || !campaigns.some(campaign => isOpen(campaign.id, askedId(asked.actor))) ) {
       rollAsMidi(message, asked.actor, asked.dc);
       return;
     }

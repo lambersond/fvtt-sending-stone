@@ -1,11 +1,12 @@
 import {
-  CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, MODULE_ID, RESULTS_MODES, SETTINGS, STATUS_HOOK
+  CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, MODULE_ID, RESULTS_MODES, SETTINGS, STATUS_HOOK, WILD_SHAPE_PACKS
 } from "../constants.mjs";
 import { getCampaigns, manualDiceOn } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
 import { transferReader } from "../command-transfers.mjs";
 import { dishReader, dishSystem } from "../command-dishes.mjs";
 import { effectReader } from "../command-effects.mjs";
+import { wildShapeReader } from "../command-wildshape.mjs";
 import { attacksUnavailable } from "../command-uses.mjs";
 import { commandsOffered } from "../commands.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
@@ -156,9 +157,12 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * The campaigns as being edited, each with the secret this browser holds for it.
    * @type {{id: string, title: string, secret: string, characters: Set<string>, groups: Set<string>,
    *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean,
-   *   dishes: boolean, effects: boolean, companionInitiative: string}[]}
+   *   dishes: boolean, effects: boolean, wildShape: boolean, wildShapePacks: string[],
+   *   companionInitiative: string}[]}
    */
-  #campaigns = getCampaigns().map(campaign => ({ ...campaign, secret: getSecret(campaign.id) }));
+  #campaigns = getCampaigns().map(campaign => ({
+    ...campaign, wildShapePacks: [...campaign.wildShapePacks], secret: getSecret(campaign.id)
+  }));
 
   /**
    * Everything as saved, to tell whether anything has changed since.
@@ -269,6 +273,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         transfers: campaign.transfers,
         dishes: campaign.dishes,
         effects: campaign.effects,
+        wildShape: campaign.wildShape,
+        wildShapePacks: campaign.wildShapePacks,
         companionInitiative: campaign.companionInitiative
       }))
     });
@@ -302,8 +308,20 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     if ( campaign ) {
       if ( has("campaign.title") ) campaign.title = String(data["campaign.title"] ?? "");
       if ( has("campaign.secret") ) campaign.secret = String(data["campaign.secret"] ?? "");
-      for ( const name of ["rolls", "attacks", "prompts", "manualDice", "transfers", "dishes", "effects"] ) {
+      for ( const name of ["rolls", "attacks", "prompts", "manualDice", "transfers", "dishes", "effects", "wildShape"] ) {
         if ( has(`campaign.${name}`) ) campaign[name] = data[`campaign.${name}`] === true;
+      }
+      // Since 0.40.0 the Beasts' compendiums, a box each, named for its collection, whose own id has a
+      // dot in it: read by the name's prefix, never split on dots. A pack the world has no longer
+      // keeps its place, as getCampaigns drops it once read.
+      const prefix = "campaign.wildShapePacks.";
+      const boxes = Object.entries(data).filter(([name]) => name.startsWith(prefix));
+      if ( boxes.length ) {
+        const shown = new Set(boxes.map(([name]) => name.slice(prefix.length)));
+        campaign.wildShapePacks = [
+          ...campaign.wildShapePacks.filter(pack => !shown.has(pack)),
+          ...boxes.filter(([, checked]) => checked === true).map(([name]) => name.slice(prefix.length))
+        ];
       }
       // A choice, as the General section's are, never a switch.
       if ( has("campaign.companionInitiative") ) {
@@ -721,7 +739,9 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * 0.38.0, whether it takes dishes from the Magical Recipe Book, which need dnd5e 5 and an app that
    * takes them, an older one answering with commands but not with `dishes`; and since 0.39.0, whether
    * its players may turn off, turn on and delete their own characters' effects, which needs D&D Fifth
-   * Edition and an app that takes them, an older one answering with commands but not with `effects`.
+   * Edition and an app that takes them, an older one answering with commands but not with `effects`;
+   * and since 0.40.0, whether they may use Wild Shape, which needs D&D Fifth Edition and an app that
+   * takes it, and which of the world's Actor compendiums its druids learn Beasts from.
    * @param {SettingsWindow["#campaigns"][number]} campaign
    * @returns {object}
    */
@@ -765,6 +785,13 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
           reason: game.i18n.localize("SENDINGSTONE.Config.Actions.RollsReason.system")
         }) : null,
       effectsApp: campaign.effects && commandsOffered(campaign.id) && !effectReader(campaign.id),
+      wildShape: campaign.wildShape,
+      wildShapeUnavailable: (game.system?.id !== "dnd5e")
+        ? game.i18n.format("SENDINGSTONE.Config.Actions.Unavailable", {
+          reason: game.i18n.localize("SENDINGSTONE.Config.Actions.RollsReason.system")
+        }) : null,
+      wildShapeApp: campaign.wildShape && commandsOffered(campaign.id) && !wildShapeReader(campaign.id),
+      wildShapePackChoices: wildShapePackChoices(campaign),
       // Since 0.36.0, how its companions enter initiative, which needs no app: it's kept here.
       initiativeChoices: [
         { value: COMPANION_INITIATIVE.OWN, key: "CompanionInitiativeOwn" },
@@ -1084,7 +1111,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     const campaign = {
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
       attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false,
-      companionInitiative: COMPANION_INITIATIVE.OWN
+      wildShape: false, wildShapePacks: [...WILD_SHAPE_PACKS], companionInitiative: COMPANION_INITIATIVE.OWN
     };
     this.#campaigns.push(campaign);
     await this.#show({ section: "campaign", campaignId: campaign.id, tab: "connection" }, "[name='campaign.title']");
@@ -1387,6 +1414,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       transfers: campaign.transfers,
       dishes: campaign.dishes,
       effects: campaign.effects,
+      wildShape: campaign.wildShape,
+      wildShapePacks: [...campaign.wildShapePacks],
       companionInitiative: campaign.companionInitiative
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {
@@ -1398,6 +1427,29 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       ui.notifications.warn("SENDINGSTONE.Test.HintMixedContent", { localize: true });
     }
   }
+}
+
+/**
+ * The world's Actor compendiums a campaign's druids may learn Beasts from, since 0.40.0, each labelled
+ * by its title and its package's, the system's first, and ticked where the campaign takes Beasts from
+ * it.
+ * @param {{wildShapePacks: string[]}} campaign
+ * @returns {{id: string, label: string, checked: boolean}[]}
+ */
+function wildShapePackChoices(campaign) {
+  const packs = Array.from(game.packs ?? []).filter(pack => pack?.documentName === "Actor");
+  const owner = pack => {
+    const { packageType, packageName } = pack.metadata ?? {};
+    if ( packageType === "system" ) return game.system?.title ?? packageName;
+    if ( packageType === "world" ) return game.world?.title ?? packageName;
+    return game.modules.get(packageName)?.title ?? packageName;
+  };
+  const system = pack => pack.metadata?.packageType === "system";
+  return [...packs.filter(system), ...packs.filter(pack => !system(pack))].map(pack => ({
+    id: pack.collection,
+    label: `${pack.title ?? pack.metadata?.label ?? pack.collection} (${owner(pack) ?? ""})`,
+    checked: campaign.wildShapePacks.includes(pack.collection)
+  }));
 }
 
 /**

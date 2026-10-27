@@ -84,7 +84,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -286,7 +286,8 @@ an attack hit only where the game shows players.
   casts it, and its card is the spell's. Repeats of the same free casting, as dnd5e gives a spell
   granted more than once, are listed once; forwards that each spend uses of their own are each
   listed. A forward to a summoning, a transformation, an enchantment or a Cast activity, or one
-  whose level may be chosen, is left to Foundry, and so is a free casting of a check that isn't the
+  whose level may be chosen, is left to Foundry (or Wild Shape from the app, where the campaign
+  allows it), and so is a free casting of a check that isn't the
   spell cast, as the 2014 Silent Image's.
 - **Enchantments.** An enchant activity, such as Magic Weapon, Shillelagh, True Strike, Sacred
   Weapon or Pact of the Blade, is used from the app on one of the character's own items: the player
@@ -307,7 +308,8 @@ an attack hit only where the game shows players.
   game won't apply it once it's used, as when the item can no longer take it, it's left on the card
   for you; one whose concentration has ended by then isn't applied at all, as dnd5e's card no longer
   offers it. Choices made once, such as Eldritch Spear or Spell Mastery, and a magic item's
-  templates, such as a Shield's +1, are left to Foundry; summoning and transforming are yours to do.
+  templates, such as a Shield's +1, are left to Foundry; summoning and transforming are yours to do,
+  or Wild Shape from the app where the campaign allows it.
 - **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
   Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
@@ -324,7 +326,8 @@ an attack hit only where the game shows players.
   is applied until you apply it.
 - **Nothing asks you, where it can be helped.** An enchantment's profile and item are chosen in the
   app, so dnd5e's usage dialog never opens. Area attacks Midi targets itself around their user,
-  summoning, transforming and other activities dnd5e asks about, Midi's Active Defence, a used
+  summoning, transforming (but Wild Shape from the app where the campaign allows it) and other
+  activities dnd5e asks about, Midi's Active Defence, a used
   reaction or bonus action Midi enforces, and an activity set to always show Midi's dialogs or to
   ask which effects to apply are refused in the app with a reason. Midi may still ask you what it
   would in Foundry, such as a target's reaction, an optional bonus or confirming ammunition or
@@ -467,6 +470,31 @@ concentration, which they end with End as before, nor what their own concentrati
 It's off by default, apart from players' rolls, under D&D Fifth Edition 5 and 6. Nothing is posted
 in chat; the change shows on the character's sheet, in Foundry and in the app.
 
+### Wild Shape
+
+Turn **Allow Players to use Wild Shape from the app** on for a campaign, under **Wild Shape** on its
+Player actions tab, and a 2024 druid's player can, from the app, choose the Beasts their druid knows
+and change into one and back, a use of Wild Shape each time, by the 2024 rules: 4, 6 or 8 known forms
+by level, the Challenge Rating the druid's level (or the Circle of the Moon) allows, no Fly Speed
+before level 8, one known form replaced after each Long Rest. **Beasts come from** lists the world's
+Actor compendiums; the players see the names and statistics of the Beasts in those you tick, dnd5e's
+2024 Actors by default. Known forms are kept on the druid's own Wild Shape feature, as dnd5e's
+linked forms ("By Direct Link"), so dnd5e's sheet and Tidy 5e offer the same ones in Foundry in place
+of their Challenge Rating browser. A form put there in Foundry from anywhere else, or outside the
+rules, is shown by name and used only in Foundry.
+
+A change is dnd5e's own, with its Wild Shape preset, on your Foundry, with no dialog on your screen:
+the druid's linked tokens become the form on every scene, not only the one you're viewing, and a
+line goes to chat. Wild Shape ends as the rules end it: when its hours of world time run out, or the
+form drops to 0 hit points or is Incapacitated, while your Foundry is connected; and on a return,
+from the app or in Foundry, what the druid spent or gained in form, uses, hit dice, spell slots,
+conditions and the like, is kept, on top of anything done to the druid meanwhile, such as a party's
+Long Rest. Only a form dnd5e made of the druid is followed, ended or returned: a player's own actor
+flagged by hand to look like one never is. It's
+off by default, apart from players' rolls, under D&D Fifth Edition 5 and 6. A 2014 druid's Wild Shape
+stays in Foundry, and so does any other transformation, such as Polymorph: the app shows the form,
+and you return it in Foundry.
+
 ### Hit, miss and save results
 
 The app shows whether an attack hit each target, and whether a creature saved or passed a check,
@@ -571,6 +599,10 @@ the card shows whether they saved.
     of Midi's own workflow never asks as a card too.
 - **Ten minutes.** A request waits ten minutes, or until its card is deleted or the save is rolled
   from it in Foundry.
+- **A character in Wild Shape**, or transformed otherwise, is asked for the saves the game asks of
+  the form, since 0.40.0: a card at the form's token, the form's concentration check, or Midi-QOL's
+  save of it shows on the character's own page in the app, the player rolls it there, and the game
+  rolls it on the form, whose save it is, closing the character's request.
 
 ### Descriptions that roll
 
@@ -692,7 +724,7 @@ With **GM-only details** off, the listener receives what players could see:
 | A message made private after it was sent | The listener is told to delete it. |
 | Hidden combatants | No. Their turns are reported with no combatant. Revealing one reports it joining; hiding one reports it leaving. |
 | Hit points | The campaign's own characters only and, to an app that reads companions, their companions'. |
-| Character sheets | The campaign's own characters only: what their players can already see in Foundry, and their companions' sheets, to an app that reads them: without secrets where their players don't own the creature in Foundry. |
+| Character sheets | The campaign's own characters only: what their players can already see in Foundry, and their companions' sheets, to an app that reads them: without secrets where their players don't own the creature in Foundry. A character in Wild Shape, or otherwise transformed, to an app that takes Wild Shape, is sent its form's sheet, under the character's own name. |
 | Party sheets | Only to characters whose players have Observer or Owner on the group in Foundry: names and portraits of its members, its inventory and its description, without secrets. |
 | Journal notes | A character's journal for a campaign to that campaign, a party's to it while one of its characters can see the party; a page only Gamemasters, or only some of the journal's players, can see is never sent, and nor is a secret its readers couldn't read in Foundry: a party page's, or one on a character's page its players don't all own; and who last deleted or reordered a page the app is sent, by name, and when. |
 | Foundry settings | Versions, this campaign's switches, the visibility settings that decide chat results, and what players see, for the campaign's Gamemaster only; never a secret, address or token. |
@@ -707,6 +739,46 @@ characters, can read it. That lets the listener route each message to the right 
 Gamemaster-only information switched on.
 
 ## Behavior notes
+
+- **Wild Shape from the app is the 2024 Wild Shape only:** a 2014 druid's Wild Shape is used in
+  Foundry, and the app follows the form, shown as Wild Shape, but never times, ends or returns it:
+  the 2014 rules end it differently (0 hit points or Unconscious), and you return it in Foundry.
+- **Effects gained or ended while shaped**, but conditions and concentration, aren't carried back:
+  dnd5e's return keeps the druid's own effects as they were at the change, so a Bless cast on the
+  wolf ends with the form. Conditions gained in form are put on the druid, and conditions and
+  concentration that ended in form are taken off.
+- **Worn gear isn't modelled:** dnd5e gives a form none of the druid's gear, so a ring that should
+  work on the form doesn't; you decide.
+- **Bonus Actions aren't counted:** Change and Return say they take one.
+- **Beast Spells (level 18) and Archdruid (level 20)** are the table's: dnd5e drops every spell but
+  the Moon's from the form, and a use regained on Initiative is yours to give.
+- **A dish served while shaped** goes on the druid's own actor: its effect waits for the return; its
+  healing, and any other change to the druid's own hit points meanwhile, is kept on the return,
+  added to what the form took.
+- **An unlinked token** of the druid isn't switched, and a transformation of an unlinked token makes
+  no world actor, so the app doesn't follow it. A form made before module 0.40.0 was installed has
+  no record: shown as transformed, with no time and no Return from the app.
+- **Wild Shape's time left is world time:** a table that never advances time keeps the form until
+  Return, 0 hit points or Incapacitated.
+- **Uses spent by a module's consumption hooks** (Midi-QOL's, a module watching uses) aren't run for a
+  change from the app, which writes the use itself.
+- **Under Midi-QOL, its "auto undo transformations"** may return the druid when a concentration ends:
+  that's a return made in Foundry.
+- **A companion summoned while shaped** counts as the druid's only while the form exists; after the
+  return its summon names a deleted actor.
+- **Enchantments on the druid's weapons** can't be ended from the app while shaped: the form's sheet
+  lists none of them.
+- **A known form put on a druid's Wild Shape in Foundry** from outside the campaign's compendiums, or
+  outside the rules, is listed by name and used only in Foundry, where dnd5e's own Allow Polymorphing
+  and the source's permissions apply.
+- **Dead on a form** (the wolf's combatant marked defeated) ends Wild Shape as at 0 hit points and
+  isn't carried to the druid, who is at 0 hit points: mark the druid as you see fit.
+- **A druid's known forms are dnd5e's linked forms:** once a player has learned one from the app, the
+  druid's Wild Shape in Foundry offers those forms, not dnd5e's Challenge Rating browser.
+- **With an app from before module 0.40.0**, a character transformed in Foundry, as by Wild Shape or
+  Polymorph, is shown there in the character's own form, but the character's favorites, effects,
+  moves and removals are refused while transformed, and that app can't say why: wait for the return,
+  or update the app.
 
 - **Turn changes only.** `combatTurnChange` also fires when combatants are added, removed or
   reordered; those are ignored unless whose turn it is, or the round, actually changed.
@@ -898,6 +970,9 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch; nothing posted |
 | `scripts/command-effects.mjs` | A player's own effects turned off, on and deleted from the app, from 0.39.0, by the campaign's switch under dnd5e: fetching them from an app that takes them; each checked against what `sheet-effects.mjs` says its player may do, written with the mark of the app's own Turn off, and read again; the hook that clears the mark on any other change; nothing posted |
+| `scripts/wild-shape.mjs` | Wild Shape, from 0.40.0, by the 2024 rules: a druid's Wild Shape and what the rules allow the druid now; the campaign's compendiums, the Beasts the druid may learn and the known forms' summaries; the record written on every form as dnd5e makes it; the character's tokens switched and put back on every scene; what comes back on every return, as sums, and the character's hit points; the endings, on the bridge; a form deleted by hand, and a player's leftover form |
+| `scripts/sheet-wild-shape.mjs` | A 2024 druid's `wildShape` block and a transformed character's `form` on the sheet, from 0.40.0 |
+| `scripts/command-wildshape.mjs` | Wild Shape from the app, from 0.40.0, by the campaign's switch under dnd5e: fetching it from an app that takes it; `transform`, `revert`, `learn` and `forms`, every check before any write; the use spent on the character's own feature and refunded where the change doesn't happen; dnd5e's own change with the module's numbers; the chat lines |
 | `scripts/command-dishes.mjs` | Dishes from the Magical Recipe Book, from 0.38.0: whether a campaign takes them, by its own switch under dnd5e 5; fetching them from an app that takes them; each dish command checked and posted once as its card, answered again from its card or its tombstone |
 | `scripts/dish-card.mjs` | A dish's card, whispered to the Gamemasters and the campaign's players: its words, its buttons for Gamemasters, what became of it for anyone, the dialog of who ate it, serving it and setting it aside; telling the app what was decided, again after a drop and after every hello; deleted cards' tombstones; one dish effect per character |
 | `scripts/dish-effects.mjs` | A dish's Active Effect: its changes on dnd5e 5.3.3's paths, its one-offs, its duration and flags; cookbook strings made inert for enrichers; dish effects ended once their time has passed; the long rest's top-up |

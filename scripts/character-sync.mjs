@@ -1,22 +1,25 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend, resendHello } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { campaignActors, rosterEntry } from "./characters.mjs";
+import { activeForm, campaignActors, noteFormDeleted, originalOf, rosterEntry, transformed } from "./characters.mjs";
 import {
   companionsDelivered, companionTermsChanged, creatureChanged, forgetListed, listingDropped, listsChanged,
   resendCompanion, toldCompanions
 } from "./creature-sync.mjs";
 import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
 import { dishReader } from "./command-dishes.mjs";
+import { wildShapeReader } from "./command-wildshape.mjs";
 import { resendDishDecisions, resendLostDish } from "./dish-card.mjs";
 import { campaignGroups, groupEntry, groupReader, groupsListing } from "./groups.mjs";
 import { forgetBooks, journalOwnershipChanged, sendBooks } from "./journals.mjs";
 import { groupSheet } from "./sheet-group.mjs";
 import { characterSheet } from "./sheet.mjs";
+import { formBlock, wildShapeBlock } from "./sheet-wild-shape.mjs";
 import { slimSheet } from "./sheet-slim.mjs";
 import { forgetSent, sendTexts, SheetTexts, takeUnsent } from "./sheet-texts.mjs";
 import { buildEnvelope, helloPending, inMegabytes, post, send, termsOf } from "./transport.mjs";
 import { typesDice } from "./typed-dice.mjs";
+import { recheckCharacter } from "./wild-shape.mjs";
 
 /**
  * Keeping each campaign's copy of its characters current. Since 0.22.0 a bridge.hello lists a
@@ -51,6 +54,11 @@ import { typesDice } from "./typed-dice.mjs";
  * Since 0.36.0 a campaign's characters' companions are kept current the same way, to an app that
  * reads them (creature-sync.mjs): their sheets in the same maps, each keyed `c:<key>`, so that two
  * tokens of one actor never share one.
+ *
+ * Since 0.40.0 a transformed character's sheet, to an app that takes Wild Shape, is its form's, under
+ * the character's own id, with what it is now (`form`), and a 2024 druid's has her `wildShape`: so a
+ * form's changes, and its creation and deletion, send its character again, and the time left of a
+ * Wild Shape the module times, in whole minutes, counts as an effect running down.
  */
 
 /**
@@ -144,6 +152,14 @@ const USER_KEYS = ["role", "character", "permissions"];
 export function registerCharacterHooks() {
   Hooks.on("updateActor", (actor, changes) => characterChanged(actor, changes));
   Hooks.on("deleteActor", actor => actorDeleted(actor));
+  // Since 0.40.0 a form made or deleted sends its character, and the combats it's in, again: a
+  // deleted one noted first as hers (wild-shape.mjs notes it too, later), so a combatant still
+  // naming it is hers as the combats are checked.
+  Hooks.on("createActor", actor => formChanged(actor));
+  Hooks.on("deleteActor", actor => {
+    noteFormDeleted(actor);
+    formChanged(actor);
+  });
   for ( const hook of [
     "createItem", "updateItem", "deleteItem",
     "createActiveEffect", "updateActiveEffect", "deleteActiveEffect"
@@ -359,7 +375,9 @@ export function sheetTermsChanged(campaignId) {
 /**
  * Send a campaign a character as it now stands, unless that is what the campaign was last told:
  * in `character.updated`, as `sendActor` sends it. Since 0.32.0 with whether its player may enter
- * its dice results in the app, `manualDice`, as the hello's roster says it, read as it's built.
+ * its dice results in the app, `manualDice`, as the hello's roster says it, read as it's built. Since
+ * 0.40.0, to an app that takes Wild Shape, a transformed character's sheet is its form's, its effects
+ * offering nothing, with `form`, and a 2024 druid's has `wildShape`; the roster entry is always hers.
  * @param {Campaign} campaign
  * @param {Actor} actor
  * @returns {void}
@@ -371,10 +389,47 @@ function sendSheet(campaign, actor) {
       const texts = new SheetTexts();
       const manualDice = typesDice(actor, campaign);
       return { texts, data: { character: sheet
-        ? { ...rosterEntry(actor), manualDice, sheet: characterSheet(actor, texts) }
+        ? { ...rosterEntry(actor), manualDice, sheet: seatSheet(campaign, actor, texts) }
         : { ...rosterEntry(actor), manualDice, sheet: null } } };
     }
   });
+}
+
+/**
+ * A character's sheet as a campaign's app is sent it: to one that takes Wild Shape, its active form's
+ * while it has one, with `form`, and her `wildShape` where she's a 2024 druid; else her own, as before.
+ * @param {Campaign} campaign
+ * @param {Actor} actor
+ * @param {SheetTexts} texts
+ * @returns {object|null}
+ */
+function seatSheet(campaign, actor, texts) {
+  if ( !wildShapeReader(campaign.id) ) return characterSheet(actor, texts);
+  const form = activeForm(actor);
+  const sheet = form ? characterSheet(form, texts, { ops: false }) : characterSheet(actor, texts);
+  if ( !sheet ) return sheet;
+  const shape = form ? formBlock(form, actor, campaign) : undefined;
+  const block = wildShapeBlock(actor, form ?? actor, campaign);
+  if ( shape ) sheet.form = shape;
+  if ( block ) sheet.wildShape = block;
+  return sheet;
+}
+
+/**
+ * Send a campaign whose app has started or stopped taking Wild Shape, in answer to a heartbeat,
+ * every character again, as it's now sent them: with or without their forms.
+ * @param {string} campaignId
+ * @returns {void}
+ */
+export function wildShapeTermsChanged(campaignId) {
+  const campaign = getCampaigns().find(c => c.id === campaignId);
+  if ( !campaign || !canSend() || helloPending(campaign.id) ) return;
+  for ( const actor of campaignActors(campaign) ) {
+    const key = `${campaign.id}.${actor.id}`;
+    told.delete(key);
+    built.delete(key);
+    sendSheet(campaign, actor);
+  }
 }
 
 /**
@@ -583,15 +638,15 @@ export function resendLost() {
  * sends; every other client ignores the change. Since 0.30.0 it's noted whether any of the changes
  * settling was to its ownership, which changes who may see its campaigns' groups. Since 0.36.0 any
  * actor heard of may be a companion, as a token's synthetic actor is, which is sent as one
- * (creature-sync.mjs).
+ * (creature-sync.mjs). Since 0.40.0 a form's change is its character's, whose sheet it is.
  * @param {Actor|null} actor
  * @param {object} [changes]   What an update of the actor changed.
  * @returns {void}
  */
-function characterChanged(actor, changes) {
+export function characterChanged(actor, changes) {
   if ( !actor?.id || !canSend() ) return;
   creatureChanged(actor);
-  const id = actor.id;
+  const id = (originalOf(actor) ?? actor).id;
   if ( changes && (typeof changes === "object") && ("ownership" in changes) ) ownershipChanged.add(id);
   clearTimeout(settling.get(id));
   settling.set(id, setTimeout(() => {
@@ -633,6 +688,21 @@ function actorDeleted(actor) {
 }
 
 /**
+ * A form made or deleted, on the bridge: its character's sheet again, and its campaigns' combats
+ * checked again, a form's combatant being hers. A deleted one is known by the original it names,
+ * dnd5e's own flag, which a player's return in Foundry leaves on it.
+ * @param {Actor} actor
+ * @returns {void}
+ */
+function formChanged(actor) {
+  if ( !canSend() ) return;
+  const original = transformed(actor) ? originalOf(actor) : game.actors.get(actor?.getFlag?.("dnd5e", "originalActor"));
+  if ( !original || (original.id === actor.id) ) return;
+  characterChanged(original);
+  recheckCharacter(original);
+}
+
+/**
  * Send every campaign's groups again when the world's primary party changes, which each says it is
  * or isn't. Nothing of the party's experience or level is read.
  * @param {Setting} setting   The setting stored or changed.
@@ -648,7 +718,9 @@ function primaryPartyChanged(setting) {
 /**
  * Note that every campaign character with a temporary effect, or an item of theirs with a temporary
  * enchantment, may have changed, since the time it has left is on its sheet; since 0.36.0 every
- * companion listed with one too.
+ * companion listed with one too; and since 0.40.0 every character shaped, whose form's effects are on
+ * its sheet, and whose Wild Shape's time left is too, which goes in whole minutes, so that its sheet
+ * changes at most once a world minute.
  * @returns {void}
  */
 function effectsRunningDown() {
@@ -660,7 +732,9 @@ function effectsRunningDown() {
     return enchanted || effects.some(effect => effect.isTemporary);
   };
   for ( const actor of campaignCharacters() ) {
-    if ( running(actor) ) characterChanged(actor);
+    const form = activeForm(actor);
+    const timed = Number.isFinite(form?.getFlag(MODULE_ID, "form")?.hours);
+    if ( running(actor) || (form && (timed || running(form))) ) characterChanged(actor);
   }
   for ( const actor of toldCompanions() ) {
     if ( running(actor) ) creatureChanged(actor);

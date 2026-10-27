@@ -91,8 +91,8 @@ export const SETTINGS = Object.freeze({
   HELP_MENU: "helpMenu",
 
   /** World-scope list of campaigns: {id, title, characters, groups, rolls, attacks, prompts,
-   *  manualDice, transfers, dishes, effects, companionInitiative}, characters and groups being actor
-   *  ids. */
+   *  manualDice, transfers, dishes, effects, wildShape, wildShapePacks, companionInitiative},
+   *  characters and groups being actor ids, and since 0.40.0 the Beasts' packs by collection. */
   CAMPAIGNS: "campaigns",
 
   /** World-scope list of the dish cards deleted undecided, since 0.38.0, so that their app hears of
@@ -330,6 +330,57 @@ export const EFFECT_OPS = Object.freeze(["disable", "enable", "delete"]);
  */
 export const EFFECT_ID = /^[A-Za-z0-9]{1,64}(\.[A-Za-z0-9]{1,64})?$/;
 
+/**
+ * What a player can have done here from the app with their druid's Wild Shape, since module 0.40.0:
+ * a change into one of the Beasts she knows, a return, a Beast learned in an empty place or in place
+ * of one, and the Beasts she may learn listed. Offered under D&D Fifth Edition where the campaign's
+ * Gamemaster lets its players, apart from the rolls: it throws no dice.
+ * @type {readonly string[]}
+ */
+export const WILD_SHAPE_KINDS = Object.freeze(["wildShape"]);
+
+/** What a Wild Shape command does, since 0.40.0, by its `op`. */
+export const WILD_SHAPE_OPS = Object.freeze(["transform", "revert", "learn", "forms"]);
+
+/**
+ * A known form, as the druid's Wild Shape names it: its profile's id, as dnd5e makes one, since 0.40.0.
+ * @type {RegExp}
+ */
+export const PROFILE_ID = /^[A-Za-z0-9]{16}$/;
+
+/**
+ * A Beast to learn, by its uuid in an Actor compendium, since 0.40.0: never a world actor's.
+ * @type {RegExp}
+ */
+export const FORM_UUID = /^Compendium\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.Actor\.[A-Za-z0-9]{16}$/;
+
+/** The most Beasts a list of those to learn holds, since 0.40.0; past it, it says there are more. */
+export const MOST_FORMS = 200;
+
+/** The compendiums a campaign's druids learn Beasts from until its Gamemaster chooses, since 0.40.0: dnd5e's 2024 Actors. */
+export const WILD_SHAPE_PACKS = Object.freeze(["dnd5e.actors24"]);
+
+/**
+ * The statuses that end a Wild Shape as Incapacitated does, since 0.40.0: Incapacitated, and each
+ * condition dnd5e gives it with (Unconscious, Paralyzed, Petrified, Stunned, Sleeping).
+ * @type {readonly string[]}
+ */
+export const ENDING_STATUSES = Object.freeze(["incapacitated", "unconscious", "paralyzed", "petrified", "stunned", "sleeping"]);
+
+/**
+ * The pack folders whose creatures are no Wild Shape form, since 0.40.0, wherever they are within a
+ * pack: a spell's or an item's creatures, as the Phantom Steed and the Goat of Traveling, and summons.
+ * @type {readonly string[]}
+ */
+export const NOT_FORM_FOLDERS = Object.freeze(["Conjurations", "Magic Items", "Summons"]);
+
+/**
+ * How long after a form is deleted it's taken to have been deleted by hand, unless a return said
+ * otherwise, in milliseconds, since 0.40.0: the return's own mark reaches the bridge first.
+ * @type {number}
+ */
+export const FORM_GONE_SETTLE = 2000;
+
 /** A dish's outcomes, as the cookbook sends them, since 0.38.0. */
 export const DISH_OUTCOMES = Object.freeze(["boon", "bane", "standard"]);
 
@@ -372,13 +423,13 @@ export const MOST_COMPANIONS_EACH = 20;
  * The kinds a companion's command is never, since 0.36.0: what an NPC has none of, what isn't asked,
  * and what edits it rather than acting, as charges spent by hand, or its favorites, which an NPC has
  * none of, or a dish, which no companion eats (round 0.36.0 §2.5), or a change to its effects, which
- * only a character's player makes (round 0.39.0 §1.1), and what's its character's to do, as ending a
- * turn or taking one back, which the character's command does for the companion's turn too (round
- * 0.36.0 §2.8).
+ * only a character's player makes (round 0.39.0 §1.1), or Wild Shape, which only a character uses, and
+ * what's its character's to do, as ending a turn or taking one back, which the character's command does
+ * for the companion's turn too (round 0.36.0 §2.8).
  */
 export const COMPANION_UNTAKEN = Object.freeze([
-  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "favorite", "dish", "effect", "note", "endTurn",
-  "undoEndTurn"
+  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "favorite", "dish", "effect", "wildShape", "note",
+  "endTurn", "undoEndTurn"
 ]);
 
 /**

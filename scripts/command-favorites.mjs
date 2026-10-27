@@ -1,5 +1,6 @@
 import { EFFECT_ID, FAVORITE_KINDS, FAVORITE_OPS, FAVORITE_TYPES } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { activeForm } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { checkCommand, failedResult, isKey, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
 import { campaignGroups } from "./groups.mjs";
@@ -125,6 +126,8 @@ export async function runFavoriteCommand(command, passed) {
   // Only a character's data has dnd5e's favorites, never an NPC's or a group's.
   const api = ["addFavorite", "removeFavorite", "hasFavorite"].every(name => typeof actor?.system?.[name] === "function");
   if ( !api ) return failed("unknown");
+  // Since 0.40.0 none while she's transformed: her form's favorites are a copy her return loses.
+  if ( activeForm(actor) ) return failed("shaped");
   const { op, type } = command.favorite;
   const stored = storedId(command.favorite);
 
