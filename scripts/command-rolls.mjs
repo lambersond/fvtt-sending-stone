@@ -2,12 +2,13 @@ import {
   ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, ENCHANT_KINDS, MODULE_ID,
   MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG, TURN_KINDS
 } from "./constants.mjs";
-import { playerOwners } from "./characters.mjs";
+import { originalOf, playerOwners, seatActor, standingFor } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mjs";
 import { checkFavoriteCommand } from "./command-favorites.mjs";
 import { checkDishCommand } from "./command-dishes.mjs";
 import { checkEffectCommand } from "./command-effects.mjs";
+import { checkWildShapeCommand } from "./command-wildshape.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
 import { commandActor, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
@@ -191,7 +192,9 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   }
   let prompt = null;
   if ( command.prompt ) {
-    const asked = findPrompt(command.prompt, actor, campaign, command);
+    // Since 0.40.0 a prompt asked of her form is the character's, answered from her seat whichever
+    // app answers it; a companion's, as ever, its own live actor's.
+    const asked = findPrompt(command.prompt, companion ? actor : character, campaign, command);
     if ( asked.refusal ) return failed("prompt", asked.refusal);
     // Midi waits on it: made at once, and told of with no message where Midi makes none.
     if ( asked.midi ) return answerMidiPrompt(command, asked.midi);
@@ -201,6 +204,9 @@ export async function runRollCommand(command, campaign, { signal }={}) {
     }
     prompt = asked.prompt;
   }
+  // Since 0.40.0 a card's save is rolled on the actor she is now, her form while she's shaped, which
+  // dnd5e asked and whose save it reads, for any app.
+  const answering = (prompt && !companion) ? seatActor(character) : actor;
 
   const hp = actor.system.attributes?.hp?.value ?? 0;
   let made;
@@ -208,7 +214,7 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   try {
     made = await withPlan(command, planned => {
       plan = planned;
-      if ( prompt ) return answerPrompt(command, actor, prompt, character);
+      if ( prompt ) return answerPrompt(command, answering, prompt, character);
       if ( check ) return rollLinkedCheck(command, actor, link, check, character);
       return link ? rollLinkedSave(command, actor, link, character) : makeRoll(command, actor, character);
     });
@@ -239,7 +245,7 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * was shown it, and nothing else, as does taking one back, with the end of the turn it takes back.
  * And since 0.37.0 a favorite added or removed, what it is. And since 0.38.0 a dish from the Magical
  * Recipe Book, its body. And since 0.39.0 a change to one of the character's own effects, which and
- * how.
+ * how. And since 0.40.0 Wild Shape, which and how.
  * @param {object} command
  * @returns {string|null}
  */
@@ -260,6 +266,7 @@ export function checkCommand(command) {
   if ( command.kind === "note" ) return checkNoteCommand(command);
   if ( command.kind === "dish" ) return checkDishCommand(command);
   if ( command.kind === "effect" ) return checkEffectCommand(command);
+  if ( command.kind === "wildShape" ) return checkWildShapeCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);
@@ -879,9 +886,14 @@ function initiativeTurn(command, actor) {
   const combat = game.combats?.get(command.combatId);
   if ( !combat || (game.combat?.id !== combat.id) ) return { refusal: "not-in-combat" };
   const token = actor.isToken ? actor.token : null;
+  // Since 0.40.0 a character's, shaped or not: the combatant of her form's token, or of her own.
+  const self = originalOf(actor)?.id ?? actor.id;
   const own = token
     ? combat.combatants.filter(combatant => (combatant.tokenId === token.id) && (combatant.sceneId === token.parent?.id))
-    : combat.combatants.filter(combatant => (combatant.actor?.id ?? combatant.actorId) === actor.id);
+    : combat.combatants.filter(combatant => {
+      const id = combatant.actor?.id ?? combatant.actorId;
+      return (id === actor.id) || ((originalOf(combatant.actor)?.id ?? id) === self);
+    });
   if ( !own.length ) return { refusal: "not-in-combat" };
   const waiting = own.find(combatant => combatant.initiative === null);
   if ( !waiting ) return { refusal: "already-rolled" };
@@ -894,7 +906,8 @@ function initiativeTurn(command, actor) {
 /**
  * Is a companion's own initiative its campaign takes from its character's, since 0.36.0: under
  * "Right after its character", while one of its characters is a combatant of the combat it's for
- * (creature-initiative.mjs)? With none of them in it, it rolls its own.
+ * (creature-initiative.mjs)? With none of them in it, it rolls its own. Since 0.40.0 a combatant
+ * made from a character's form's token is hers.
  * @param {object} command
  * @param {Campaign} campaign
  * @param {CompanionEntry|null} companion
@@ -903,7 +916,7 @@ function initiativeTurn(command, actor) {
 function followsCharacter(command, campaign, companion) {
   if ( !companion || (campaign.companionInitiative !== COMPANION_INITIATIVE.AFTER) ) return false;
   const combat = game.combats?.get(command.combatId);
-  return Boolean(combat?.combatants?.some?.(combatant => companion.of.includes(combatant.actorId)));
+  return Boolean(combat?.combatants?.some?.(combatant => companion.of.includes(standingFor(combatant.actorId))));
 }
 
 /* -------------------------------------------- */

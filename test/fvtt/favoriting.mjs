@@ -410,7 +410,8 @@ assert.deepEqual(helloOf().data.features.favorites, ON)
 // Changed on purpose (round 0.38.0 §D8.3): dishes from the Magical Recipe Book after favorites, `"off"` with
 // the switch off, under dnd5e 6 too.
 // Changed on purpose (round 0.39.0 §1.9): a player's own effects after dishes, `"off"` with the switch off.
-assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects'], 'after companions')
+// Changed on purpose (round 0.40.0 §10.2): and whether its players use Wild Shape, after effects.
+assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape'], 'after companions')
 assert.deepEqual([helloOf().data.features.rolls.enabled, helloOf().data.features.transfers.enabled], [false, false], "the campaign's rolls and moves off")
 // Apart from the rolls, the moves and the dice: whatever they are.
 diceStatus.ready = false

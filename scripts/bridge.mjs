@@ -6,6 +6,7 @@ import { getCampaigns } from "./campaigns.mjs";
 import { favoriteFeatures } from "./command-favorites.mjs";
 import { dishFeatures } from "./command-dishes.mjs";
 import { effectFeatures } from "./command-effects.mjs";
+import { wildShapeFeatures } from "./command-wildshape.mjs";
 import { removalFeatures, transferFeatures } from "./command-transfers.mjs";
 import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { roster } from "./characters.mjs";
@@ -21,6 +22,7 @@ import { releaseHeldCards } from "./midi-prompts.mjs";
 import { openPrompts } from "./prompts.mjs";
 import { forgetSent } from "./sheet-texts.mjs";
 import { send } from "./transport.mjs";
+import { deleteLeftovers, endDueForms } from "./wild-shape.mjs";
 
 /**
  * The bridge: the single client that talks to the listener.
@@ -91,7 +93,9 @@ const resent = new Map();
  * and removed from the app, `features.favorites`, under dnd5e, with no switch. Since 0.38.0, whether
  * the campaign takes dishes from the Magical Recipe Book, `features.dishes`, by its own switch under
  * dnd5e 5. Since 0.39.0, whether its players may turn off, turn on and delete their own characters'
- * effects from the app, `features.effects`, by its own switch under D&D Fifth Edition.
+ * effects from the app, `features.effects`, by its own switch under D&D Fifth Edition. Since 0.40.0,
+ * whether its players may use Wild Shape from the app, `features.wildShape`, by its own switch under
+ * D&D Fifth Edition.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -130,7 +134,7 @@ export function announce({ campaignId }={}) {
       features: {
         rolls: rollFeatures(campaign), transfers: transferFeatures(campaign), removals: removalFeatures(),
         notes: noteFeatures(campaign), companions: companionFeatures(campaign), favorites: favoriteFeatures(),
-        dishes: dishFeatures(campaign), effects: effectFeatures(campaign)
+        dishes: dishFeatures(campaign), effects: effectFeatures(campaign), wildShape: wildShapeFeatures(campaign)
       },
       sheetsApart: true,
       characters: roster(campaign),
@@ -153,8 +157,10 @@ export function announce({ campaignId }={}) {
  * of each campaign set to "Right after its character" after their characters, in case a
  * character's initiative was set while no Gamemaster was connected: those it placed last, or with
  * none, so that the Gamemaster's own change to a companion stands (creature-initiative.mjs). Since
- * 0.38.0 it ends the dish effects whose time passed while no client looked (dish-effects.mjs). A
- * client that is no longer the bridge stops fetching players' rolls.
+ * 0.38.0 it ends the dish effects whose time passed while no client looked (dish-effects.mjs). Since
+ * 0.40.0 it ends each Wild Shape due to end, as one whose hours ran out while no Gamemaster was
+ * connected, and deletes the forms a player's own return left meanwhile, as the bridge does when it
+ * hears one (wild-shape.mjs). A client that is no longer the bridge stops fetching players' rolls.
  * @returns {void}
  */
 export function checkBridge() {
@@ -164,6 +170,8 @@ export function checkBridge() {
     releaseHeldCards();
     void followAll();
     void expireDishEffects();
+    endDueForms();
+    deleteLeftovers();
   }
   if ( !bridge && wasBridge ) stopPollers();
   wasBridge = bridge;

@@ -1,7 +1,7 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { campaignCharacterId, playerOwners } from "./characters.mjs";
+import { campaignCharacterId, endedForms, originalOf, playerOwners } from "./characters.mjs";
 import { askedSave, chatAudience } from "./chat-data.mjs";
 import { resultsAlways } from "./config.mjs";
 import { midiActivities } from "./command-uses.mjs";
@@ -296,16 +296,20 @@ function promptId(messageId, actorId) {
 }
 
 /**
- * The character a save was rolled for, as its message's speaker.
+ * The character a save was rolled for, as its message's speaker. Since 0.40.0 a form's save is its
+ * character's, as dnd5e records her, or as a form deleted since was, so that the prompt asked of her
+ * closes for the save her form rolled.
  * @param {ChatMessage} message
  * @returns {string|null}
  */
 function speakerId(message) {
-  return message.speakerActor?.id ?? message.speaker?.actor ?? null;
+  const id = message.speakerActor?.id ?? message.speaker?.actor ?? null;
+  return originalOf(message.speakerActor)?.id ?? endedForms.get(id) ?? id;
 }
 
 /**
- * Has a character rolled a save from a card, here or in the app?
+ * Has a character rolled a save from a card, here or in the app? Since 0.40.0 her form's save counts
+ * as hers. A prompt asked of a form is its character's, answered from her seat and rolled on the form.
  * @param {string} messageId
  * @param {string} actorId
  * @returns {boolean}
@@ -346,23 +350,25 @@ function summarizePrompt(prompt) {
  * asks no save of the character, as a concentration card of one who no longer concentrates on what
  * it asked about (`gone`), it waited too long (`expired`), or the character has rolled it
  * (`answered`); for Midi's, also as findMidiPrompt says.
+ * Since 0.40.0 a prompt asked of a form is its character's, answered from her seat and rolled on the
+ * form: it's found by the character, never the actor the save is rolled on.
  * @param {string} id         The prompt's id, as the app has it.
- * @param {Actor} actor       The character whose save it is.
+ * @param {Actor} character   The character whose save it is: a companion's own actor for a companion.
  * @param {Campaign} campaign
  * @param {object} command    The answer.
  * @returns {{prompt?: RollPrompt, midi?: object, refusal?: string}}
  */
-export function findPrompt(id, actor, campaign, command) {
+export function findPrompt(id, character, campaign, command) {
   if ( !prompting(campaign) ) return { refusal: "off" };
   const [messageId, actorId] = id.split("-");
-  if ( actorId !== actor.id ) return { refusal: "character" };
+  if ( actorId !== character.id ) return { refusal: "character" };
   const midi = findMidiPrompt(id, campaign, command);
   if ( midi ) return midi;
   const message = game.messages.get(messageId);
-  const prompt = message ? promptsOf(message, campaign).find(each => each.actorId === actor.id) : null;
+  const prompt = message ? promptsOf(message, campaign).find(each => each.actorId === character.id) : null;
   if ( !prompt ) return { refusal: "gone" };
   if ( Date.now() >= prompt.expiresAt ) return { refusal: "expired" };
-  if ( answered(messageId, actor.id) ) return { refusal: "answered" };
+  if ( answered(messageId, character.id) ) return { refusal: "answered" };
   return { prompt };
 }
 
@@ -422,10 +428,12 @@ function onDeleteMessage(message) {
 }
 
 /**
- * Close the concentration checks dnd5e's cards ask of a character who no longer concentrates on what
- * they asked about, once a concentration effect of theirs is deleted: ended from the app, or in
- * Foundry by anyone, or gone with what it was on. Midi-QOL's own are left to it, released by
- * nothing here: midi-prompts.mjs would have Midi roll one released.
+ * Close the concentration checks dnd5e's cards ask of a character who no longer concentrates on
+ * what they asked about, once a concentration effect of theirs is deleted: ended from the app, or
+ * in Foundry by anyone, or gone with what it was on. Midi-QOL's own are left to it, released by
+ * nothing here: midi-prompts.mjs would have Midi roll one released. Since 0.40.0 a form's is its
+ * character's, whose prompt it is, and a card asks as long as whoever spoke it, she or her form,
+ * still concentrates, as `askedOf` reads it.
  * @param {ActiveEffect} effect
  */
 function onDeleteEffect(effect) {
@@ -433,10 +441,11 @@ function onDeleteEffect(effect) {
   const actor = effect?.parent;
   if ( actor?.documentName !== "Actor" ) return;
   if ( !effect.statuses?.has?.(CONFIG.specialStatusEffects?.CONCENTRATING) ) return;
+  const whose = originalOf(actor)?.id ?? actor.id;
   for ( const [id, { prompt }] of open ) {
-    if ( (prompt.type !== "concentration") || (prompt.actorId !== actor.id) ) continue;
+    if ( (prompt.type !== "concentration") || (prompt.actorId !== whose) ) continue;
     const card = game.messages.get(prompt.messageId);
-    const asks = card && ((askedSave(card)?.source !== "concentration") || concentratesSince(actor, card));
+    const asks = card && ((askedSave(card)?.source !== "concentration") || concentratesSince(card.speakerActor ?? actor, card));
     if ( !asks ) closePrompt(id, "gone");
   }
 }

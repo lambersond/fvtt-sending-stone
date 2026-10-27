@@ -1,6 +1,7 @@
 import { COMPANION_INITIATIVE, FOLLOW_GAP, MODULE_ID } from "./constants.mjs";
 import { isBridge } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { standingFor } from "./characters.mjs";
 import { companionKeyOf, companionsOf } from "./creatures.mjs";
 
 /**
@@ -19,6 +20,8 @@ import { companionKeyOf, companionsOf } from "./creatures.mjs";
  * companion in another, would otherwise move each other down for ever. The value it last wrote is
  * kept on each companion's combatant, so that a Gamemaster's page load, which places what was
  * missed while none was connected, never undoes what the Gamemaster set on a companion since.
+ * Since 0.40.0 a character's form is the character here: a combatant made from her form's token,
+ * which keeps the form's id, leads her companions as her own does.
  */
 
 /**
@@ -72,16 +75,18 @@ export function registerFollowHooks() {
   });
   Hooks.on("updateCombatant", (combatant, changes, options) => {
     if ( !isBridge() || !changes || (typeof changes !== "object") || !("initiative" in changes) ) return;
-    if ( ownWrite(combatant, changes, options) || !leads(combatant.actorId) ) return;
-    void followCharacter(combatant.parent, combatant.actorId, { cleared: changes.initiative === null });
+    const character = standingFor(combatant.actorId);
+    if ( ownWrite(combatant, changes, options) || !leads(character) ) return;
+    void followCharacter(combatant.parent, character, { cleared: changes.initiative === null });
   });
   Hooks.on("createCombatant", (combatant, options) => {
     if ( !isBridge() || (options?.[MODULE_ID]?.follows === true) ) return;
     const combat = combatant.parent;
     if ( !combat ) return;
-    if ( leads(combatant.actorId) ) {
+    const character = standingFor(combatant.actorId);
+    if ( leads(character) ) {
       if ( (combatant.initiative !== null) && (combatant.initiative !== undefined) ) {
-        void followCharacter(combat, combatant.actorId);
+        void followCharacter(combat, character);
       }
       return;
     }
@@ -186,7 +191,7 @@ function leaderOf(combat, combatant) {
     for ( const { entry } of companionsOf(campaign) ) {
       if ( companionKeyOf([entry], combatant) === null ) continue;
       const leader = leaderIn(combat, entry);
-      if ( leader ) return leader.actorId;
+      if ( leader ) return standingFor(leader.actorId);
     }
   }
   return null;
@@ -194,14 +199,14 @@ function leaderOf(combat, combatant) {
 
 /**
  * A companion's leader in a combat: the combatant of the first of its characters, in the campaign's
- * order, that has an initiative there.
+ * order, that has an initiative there; since 0.40.0 her form's as hers.
  * @param {Combat} combat
  * @param {CompanionEntry} entry
  * @returns {Combatant|null}
  */
 function leaderIn(combat, entry) {
   for ( const id of entry.of ) {
-    const leader = combat.combatants.find(combatant => (combatant.actorId === id)
+    const leader = combat.combatants.find(combatant => (standingFor(combatant.actorId) === id)
       && (combatant.initiative !== null) && (combatant.initiative !== undefined));
     if ( leader ) return leader;
   }

@@ -1,6 +1,6 @@
 import { MODULE_ID } from "./constants.mjs";
 import { includeGmContent } from "./config.mjs";
-import { campaignActors, campaignCharacterId, charactersSeenBy } from "./characters.mjs";
+import { campaignActors, charactersSeenBy, speakerCharacterId } from "./characters.mjs";
 import { outcomeOf as attackOutcome } from "./command-uses.mjs";
 import { messageCompanion } from "./creature-sync.mjs";
 import {
@@ -143,7 +143,7 @@ export function serializeMessage(message, campaign, audience=chatAudience(messag
       tokenId: speaker.token ?? null,
       sceneId: speaker.scene ?? null
     },
-    character: campaignCharacterId(message.speakerActor, campaign),
+    character: speakerCharacterId(message, campaign),
     ...((companion !== undefined) && { companion }),
     ...((message.flags?.[MODULE_ID]?.alone === true) && { alone: true }),
     title: message.title || null,

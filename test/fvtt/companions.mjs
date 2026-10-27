@@ -373,7 +373,13 @@ const EXPECTED = [
 const hello = helloOf()
 assert.deepEqual(hello.data.companions, EXPECTED)
 assert.deepEqual(Object.keys(hello.data.companions[0]), ['key', 'of', 'kind', 'actorId', 'tokenId', 'sceneId', 'uuid', 'name', 'img', 'summon'])
-ok("the hello lists Thorin's companions exactly: Brakka, owned and linked; the Hound's token, owned through its delta; the two Wolf tokens, keyed <scene>-<token>; the Bat's token, summoned by Find Familiar; and the Draconic Spirit, summoned though no player owns it: owned then summoned, each by name; never the Bat's template, nor a token of it placed by hand, the Bat on another scene, the hidden wolf, an NPC owned through its default, a character-type actor, a polymorphed Brakka or a campaign character")
+// Changed on purpose (round 0.40.0 §10.2): a polymorphed campaign character's form is no companion
+// either: the dragon, Dave's character, transformed into a linked NPC Dave owns, as dnd5e copies its
+// type and ownership onto the form, which names the dragon its original.
+companionActor('dragonForm000000', 'Adult Red Dragon (Giant Ape)', { owners: ['dave'], linked: true, flags: { dnd5e: { isPolymorphed: true, originalActor: 'dragon' } } })
+assert.ok(!companionsOf(ashlands()).some(({ entry: listedEntry }) => listedEntry.actorId === 'dragonForm000000'), "the dragon's form, no one's companion")
+actors.delete('dragonForm000000')
+ok("the hello lists Thorin's companions exactly: Brakka, owned and linked; the Hound's token, owned through its delta; the two Wolf tokens, keyed <scene>-<token>; the Bat's token, summoned by Find Familiar; and the Draconic Spirit, summoned though no player owns it: owned then summoned, each by name; never the Bat's template, nor a token of it placed by hand, the Bat on another scene, the hidden wolf, an NPC owned through its default, a character-type actor, a polymorphed Brakka or a campaign character, nor a campaign character's own form")
 assert.ok(hello.data.companions.every(each => each.of.length === 1 && each.of[0] === 'thorin'), "none is Vex's")
 assert.deepEqual(companionsOf(ashlands()).map(({ entry: listedEntry }) => listedEntry.of), EXPECTED.map(() => ['thorin']))
 ok("Vex's list is none: Bob owns none of them")
@@ -1325,6 +1331,32 @@ await resetFight()
   const rolled = await send(initiative())
   assert.equal(rolled.status, 'done', `own: ${JSON.stringify(rolled)}`)
   ok("the Bat's own initiative under right after its character: refused follows while Thorin is in the combat, nothing rolled; rolled where he isn't; rolled under its own roll")
+}
+
+// Since module 0.40.0 (its contract §4.2): Thorin shaped, his combatant made from his form's token,
+// which keeps the form's id, leads his companions under right after its character as his own does.
+{
+  await saveInitiative('after')
+  const form = companionActor('thorinForm000000', 'Thorin (Wolf)', {
+    owners: ['alice'], type: 'character', flags: { dnd5e: { isPolymorphed: true, originalActor: 'thorin', previousActorIds: ['thorin'] } },
+  })
+  const shaped = combatOf('shaped', [{ id: 'cb-s-form', actor: form }, { id: 'cb-s-brakka', actor: brakka }])
+  await shaped.setInitiative(shaped.combatants.get('cb-s-form'), 17)
+  await settle()
+  assert.equal(shaped.combatants.get('cb-s-brakka').initiative, 16.999, "Brakka right after the form's combatant")
+  const joined = combatOf('joined', [{ id: 'cb-j-form', actor: form, fields: { initiative: 17 } }])
+  await joined.createEmbeddedDocuments('Combatant', [{ id: 'cb-j-brakka', actor: brakka }])
+  await settle()
+  assert.equal(joined.combatants.get('cb-j-brakka').initiative, 16.999, "Brakka joining a combat where the form's combatant has 17")
+  const batShaped = combatOf('batshaped', [{ id: 'cb-bs-form', actor: form }, { id: 'cb-bs-bat', token: bat1 }])
+  game.combat = batShaped
+  const refused = await send(initiative({ combatId: 'batshaped' }))
+  assert.deepEqual([refused.status, refused.reason], ['failed', 'follows'], "the Bat's own initiative refused while the form's combatant is in the combat")
+  game.combat = fight
+  await saveInitiative('own')
+  for (const id of ['shaped', 'joined', 'batshaped']) game.combats.delete(id)
+  actors.delete(form.id)
+  ok("right after its character, Thorin shaped (round 0.40.0): his form's combatant, which keeps the form's id, leads Brakka, set and joining, and the Bat's own initiative is refused follows while it's in the combat")
 }
 
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

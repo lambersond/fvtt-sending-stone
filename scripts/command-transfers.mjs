@@ -1,5 +1,6 @@
 import { MOST_AMONG, MOST_MOVED, MOST_MOVED_ITEMS, REMOVE_KINDS, TRANSFER_KINDS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { activeForm } from "./characters.mjs";
 import { postLine } from "./command-charges.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import {
@@ -338,7 +339,8 @@ async function transferNow(command, passed) {
  * from their own character, and with a party only one their character's users own in Foundry: one
  * they only observe is `not-owner`, and one they can't see `unknown`, as one not there. The
  * Gamemaster moves anything between them, party to party too. A distribution is shared among
- * exactly the party's characters, as Foundry now has them (`members`).
+ * exactly the party's characters, as Foundry now has them (`members`). Since 0.40.0 nothing moves
+ * to, from or by a character transformed, as by Wild Shape (`shaped`).
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {{refusal: string}|{from: MoveEnd, to: MoveEnd|null, among: Actor[], mover: Actor}}
@@ -367,6 +369,10 @@ function whoMoves(command, campaign) {
   // A character's things are moved only as one of the move's ends, the Gamemaster's too.
   const mover = campaign.characters.has(command.actorId) && !groups.has(command.actorId)
     ? (game.actors.get(command.actorId) ?? null) : null;
+  // Since 0.40.0 nothing moves to, from or by a character while she's transformed: her things aren't
+  // on her form, which dnd5e gives none of them.
+  const characters = [from, to].filter(end => end && !end.group).map(end => end.actor).concat(among, mover ?? []);
+  if ( characters.some(actor => activeForm(actor)) ) return { refusal: "shaped" };
   if ( !mover ) return { refusal: "not-yours" };
   if ( !from.group && ![from, to].some(end => end?.actor.id === mover.id) ) return { refusal: "not-yours" };
   if ( sharing && !from.group ) return { refusal: "not-yours" };
@@ -576,6 +582,8 @@ async function removeNow(command, passed) {
   const actor = (campaign.characters.has(command.actorId) && !groups.has(command.actorId))
     ? (game.actors.get(command.actorId) ?? null) : null;
   if ( !actor ) return failed("unknown");
+  // Since 0.40.0 none while she's transformed: her things aren't on her form.
+  if ( activeForm(actor) ) return failed("shaped");
   const { item: id, quantity: n, held } = command.remove;
   const item = actor.items?.get(id) ?? null;
   if ( !item || !inventoryTypes().has(item.type) || !listedInSheet(actor, item) ) return failed("gone");

@@ -351,6 +351,23 @@ assert.deepEqual(companionList(ashlands()).map(entry => [entry.key, entry.of]), 
   ok("Brakka's turn, by Thorin's endTurn, ends, the Bat current; the Bat's, a token's creature found by its token and scene, the Gamemaster's in Foundry, ends too")
 }
 {
+  // Changed on purpose (round 0.40.0 §10.2): a shaped character's turn ends. Thorin transformed, as
+  // dnd5e's Wild Shape makes him, a world actor of his own that names him its original, and the
+  // combatant of its token the form's: his to end, as its character's.
+  const form = add(new Actor5e({ id: 'thorinWolf000000', name: 'Thorin (Wolf)', owners: ['alice'], mods: { dex: 2 }, flags: { isPolymorphed: true, originalActor: 'thorin' } }))
+  const shaped = combatOf('shaped', [
+    { id: 'cb-s-form', actor: form, fields: { initiative: 15 } },
+    { id: 'cb-s-gob', actor: goblin.actor, token: goblin.token, fields: { initiative: 9 } },
+  ])
+  Object.assign(shaped, { round: 1, turn: 0 })
+  const made = await send(endTurn(shown(shaped)))
+  assert.deepEqual(made, DONE(made.id))
+  assert.deepEqual([shaped.advances, shaped.combatant.id], [1, 'cb-s-gob'], "the form's turn ended, the goblin current")
+  game.combats.delete('shaped')
+  actors.delete(form.id)
+  ok("Thorin transformed, his form's combatant current: his End Turn ends its turn, a form's turn its character's")
+}
+{
   await turnTo('cb-thorin')
   fight.settings = { skipDefeated: true }
   for (const cb of fight.combatants.values()) if (cb.id !== 'cb-thorin') cb.isDefeated = true

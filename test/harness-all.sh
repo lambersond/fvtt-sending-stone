@@ -79,4 +79,7 @@ for v in X=1 "X=1 DND5E6=1"; do run dishes $v SLIM_CHECK=1; done
 # Module 0.39.0: a player's own effects turned off, on and deleted from the app, by the campaign's
 # switch (dnd5e 5.3.3 and 6.0.5 stand-ins), fetched with every other switch off.
 for v in X=1 "X=1 DND5E6=1"; do run effects $v SLIM_CHECK=1; done
+# Module 0.40.0: Wild Shape from the app, a 2024 druid's known forms, the shaped seat followed, its
+# endings (dnd5e 5.3.3 and 6.0.5 stand-ins), and Midi-QOL's saves asked of and answered for a form.
+for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run wildshape $v; done
 exit $fail

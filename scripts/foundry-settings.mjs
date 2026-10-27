@@ -167,8 +167,8 @@ function toggle(id, label, value, note=null) {
 /**
  * The campaign's own switches, since 0.31.0 whether its players move items and coins among them,
  * since 0.38.0 whether it takes their dishes from the Magical Recipe Book, since 0.39.0 whether they
- * may turn off and delete their own effects, since 0.36.0 how its characters' companions enter
- * initiative, and its groups.
+ * may turn off and delete their own effects, since 0.40.0 whether they may use Wild Shape, since 0.36.0
+ * how its characters' companions enter initiative, and its groups.
  * @param {Campaign} campaign
  * @returns {object[]}
  */
@@ -186,6 +186,8 @@ function campaignRows(campaign) {
   const dishesWhy = (campaign.dishes && !dishSystem()) ? localize("SENDINGSTONE.Config.Actions.DishesSystem") : null;
   const effectsWhy = (campaign.effects && (game.system?.id !== "dnd5e"))
     ? localize("SENDINGSTONE.Config.Actions.RollsReason.system") : null;
+  const wildShapeWhy = (campaign.wildShape && (game.system?.id !== "dnd5e"))
+    ? localize("SENDINGSTONE.Config.Actions.RollsReason.system") : null;
   return [
     toggle("rolls", localize("SENDINGSTONE.Config.Actions.Rolls"), campaign.rolls, rollsWhy),
     toggle("attacks", localize("SENDINGSTONE.Config.Actions.Attacks"), campaign.attacks, attacksWhy),
@@ -194,6 +196,7 @@ function campaignRows(campaign) {
     toggle("transfers", localize("SENDINGSTONE.Config.Actions.TransfersPlayers"), campaign.transfers, transfersWhy),
     toggle("dishes", localize("SENDINGSTONE.Config.Actions.DishesPlayers"), campaign.dishes, dishesWhy),
     toggle("effects", localize("SENDINGSTONE.Config.Actions.EffectsPlayers"), campaign.effects, effectsWhy),
+    toggle("wildShape", localize("SENDINGSTONE.Config.Actions.WildShapePlayers"), campaign.wildShape, wildShapeWhy),
     row("companionInitiative", localize("SENDINGSTONE.Config.Actions.CompanionInitiative"), campaign.companionInitiative,
       localize(`SENDINGSTONE.Config.Actions.CompanionInitiative${(campaign.companionInitiative === COMPANION_INITIATIVE.AFTER) ? "After" : "Own"}`)),
     row("groups", localize("SENDINGSTONE.Settings.Groups"), groups.length,

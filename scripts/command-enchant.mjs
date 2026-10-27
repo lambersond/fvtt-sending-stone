@@ -1,5 +1,6 @@
 import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import { sendCharacter } from "./character-sync.mjs";
+import { originalOf } from "./characters.mjs";
 import { appFlags, authorFor, describeResult, failedResult, PUBLIC, visibleTo } from "./command-rolls.mjs";
 import { castFromItem, commandRefusal, currentTargets, setTargets, workflowSettled } from "./command-uses.mjs";
 import { commandActor } from "./creatures.mjs";
@@ -305,7 +306,7 @@ function enchantResult(command, card, actor, campaign, enchantment, use) {
  * enchantment as it now is, not as it was. Since 0.29.0 so it goes ahead of the result of a
  * concentration ended, charges spent and Heroic Inspiration used or gained, which say nothing of
  * the counts they changed: the sheet does. Since 0.36.0 a companion's, as it's listed, where it was
- * one's.
+ * one's. Since 0.40.0 a form's is its character's, under the character's own id.
  * @param {Actor} actor
  * @param {CompanionEntry|null} [companion]
  * @returns {void}
@@ -313,7 +314,7 @@ function enchantResult(command, card, actor, campaign, enchantment, use) {
 export function sheetFirst(actor, companion=null) {
   try {
     if ( companion ) companionFirst(actor, companion);
-    else sendCharacter(actor.id);
+    else sendCharacter(originalOf(actor)?.id ?? actor.id);
   } catch (err) {
     console.error(`${MODULE_ID} | Could not send ${actor.name} to Sending Stone`, err);
   }

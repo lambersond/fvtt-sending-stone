@@ -236,7 +236,8 @@ const OFF = { enabled: false, kinds: [], reason: 'off' }
 const ON = { enabled: true, kinds: ['effect'], reason: null }
 const SYSTEM = { enabled: false, kinds: [], reason: 'system' }
 assert.deepEqual(helloOf().features.effects, OFF, 'off by default, a campaign saved without the field')
-assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects'])
+// Changed on purpose (round 0.40.0 §10.2): and whether its players use Wild Shape, after effects.
+assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape'])
 await campaignAs({ effects: true })
 assert.deepEqual(helloOf().features.effects, ON, 'a saved switch sends the hello again, on')
 assert.ok(!helloOf().features.rolls.kinds.includes('effect') && !helloOf().features.companions.kinds.includes('effect'), "never among the rolls' kinds, nor a companion's")
@@ -557,8 +558,9 @@ assert.equal(fieldset().querySelector('legend').textContent.trim(), 'Active effe
 assert.equal(fieldset().querySelector('label[for="sending-stone-effects"]').textContent.trim(), label, "the user's words")
 assert.equal(fieldset().querySelector('.hint').textContent.trim(), words['SENDINGSTONE.Config.Actions.EffectsHint'])
 const order = [...win.element.querySelectorAll('fieldset')].map(each => each.className)
-assert.deepEqual(order.slice(order.indexOf('sending-stone-dishes'), order.indexOf('sending-stone-dishes') + 3),
-  ['sending-stone-dishes', 'sending-stone-effects', 'sending-stone-companions'], 'between Magical Recipe Book and Companions')
+// Changed on purpose (round 0.40.0 §10.2): Wild Shape between it and Companions.
+assert.deepEqual(order.slice(order.indexOf('sending-stone-dishes'), order.indexOf('sending-stone-dishes') + 4),
+  ['sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-companions'], 'between Magical Recipe Book and Wild Shape')
 assert.equal(find(win, '[name="campaign.effects"]').checked, true, 'ticked, as saved')
 assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'no warning: the app takes effects')
 tick(win, 'campaign.effects', false)
@@ -593,7 +595,8 @@ game.system.id = 'dnd5e'
 // The campaign's rows in the hello's settings: after dishes, its note under another system where it's on.
 const rowsOf = () => helloOf().settings.sections.find(section => section.id === 'campaign').rows
 await hello()
-assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'companionInitiative', 'groups'])
+// Changed on purpose (round 0.40.0 §10.2): whether its players use Wild Shape after their effects.
+assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'companionInitiative', 'groups'])
 assert.deepEqual(rowsOf().find(each => each.id === 'effects'), { id: 'effects', label, value: true, text: 'On' })
 game.system.id = 'pf2e'
 await hello()

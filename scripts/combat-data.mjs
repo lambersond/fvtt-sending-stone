@@ -1,5 +1,5 @@
 import { includeGmContent } from "./config.mjs";
-import { campaignCharacterId, hitPoints } from "./characters.mjs";
+import { campaignCharacterId, combatantCharacterId, endedForms, hitPoints } from "./characters.mjs";
 import { combatantCompanion } from "./creature-sync.mjs";
 
 /**
@@ -20,7 +20,10 @@ export function isCombatantShared(combatant) {
 /**
  * Does a combat include any of a campaign's characters that the listener may be told about? Since
  * 0.36.0, for an app that reads companions, any of their companions it was listed counts too, so a
- * fight with only the familiar in it reaches the campaign.
+ * fight with only the familiar in it reaches the campaign. Since 0.40.0 a character's form counts as
+ * the character, before and after the return: a combatant made from her form's token keeps the
+ * form's id once the form is deleted, so its live actor is read through its token first, which names
+ * her again after the return, then the id it keeps, then the form that id was, if it's gone.
  * @param {Combat} combat
  * @param {Campaign} campaign
  * @param {string} [leaving]   The id of a combatant to leave out, as it is being removed.
@@ -28,7 +31,20 @@ export function isCombatantShared(combatant) {
  */
 export function involvesCampaign(combat, campaign, leaving) {
   return combat.combatants.some(combatant => (combatant.id !== leaving) && isCombatantShared(combatant)
-    && (campaign.characters.has(combatant.actorId) || Boolean(combatantCompanion(combatant, campaign))));
+    && (isCharacter(combatant, campaign) || Boolean(combatantCompanion(combatant, campaign))));
+}
+
+/**
+ * Is a combatant one of a campaign's characters: by its live actor, the actor it keeps the id of, or
+ * the deleted form that id was?
+ * @param {Combatant} combatant
+ * @param {Campaign} campaign
+ * @returns {boolean}
+ */
+function isCharacter(combatant, campaign) {
+  if ( campaignCharacterId(combatant.actor, campaign) ) return true;
+  if ( campaignCharacterId(game.actors.get(combatant.actorId), campaign) ) return true;
+  return campaign.characters.has(endedForms.get(combatant.actorId) ?? combatant.actorId);
 }
 
 /**
@@ -39,13 +55,15 @@ export function involvesCampaign(combat, campaign, leaving) {
  * disposition is included, as `dispositionOf` has it. Since 0.36.0, for an app that reads
  * companions, which of their companions it is, `companion`, by its key in the list the campaign was
  * last told, and a companion's hit points as a character's; for any other app, exactly as before.
+ * Since 0.40.0 a form's combatant is its character's, and stays so where it names the form once
+ * deleted with no token to read another actor through: the character's own actor then stands in.
  * @param {Combatant} combatant
  * @param {Campaign} campaign
  * @returns {object}
  */
 export function summarizeCombatant(combatant, campaign) {
-  const actor = combatant.actor;
-  const character = campaignCharacterId(actor, campaign);
+  const character = combatantCharacterId(combatant, campaign);
+  const actor = combatant.actor ?? (character ? game.actors.get(character) : null) ?? null;
   const companion = combatantCompanion(combatant, campaign);
   const gmContent = includeGmContent();
   const summary = {

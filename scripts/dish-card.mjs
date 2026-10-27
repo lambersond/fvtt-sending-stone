@@ -119,7 +119,8 @@ export function registerDishHooks() {
  */
 export async function postDishCard(command, campaign) {
   const body = command.dish.body;
-  const cook = commandActor(command, campaign)?.actor ?? null;
+  // The character, never her form while she's shaped, which her return deletes (since 0.40.0).
+  const cook = commandActor(command, campaign)?.character ?? null;
   const card = await ChatMessage.implementation.create({
     author: game.user.id,
     speaker: cook ? ChatMessage.implementation.getSpeaker({ actor: cook }) : { alias: inert(body.cook.name) },
