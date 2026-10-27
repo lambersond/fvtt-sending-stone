@@ -57,6 +57,17 @@ export function creatureKey(tokenOrActor) {
 }
 
 /**
+ * The id a companion's prompts name it by, since 0.41.0: its token's for a token's creature, else its
+ * world actor's, a plain id, where its key may hold a "-" that a prompt's id can't (round 0.41.0 §3.2).
+ * Two wolves of one Wolf share their actor's id, never their tokens'.
+ * @param {CompanionEntry} entry
+ * @returns {string}
+ */
+export function companionPart(entry) {
+  return entry.tokenId ?? entry.actorId;
+}
+
+/**
  * A campaign's characters' companions now, by round 0.36.0 §2.1: each listed entry and its live
  * actor, in the list's order, at most MOST_COMPANIONS.
  *

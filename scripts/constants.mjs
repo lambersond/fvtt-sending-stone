@@ -441,6 +441,13 @@ export const COMPANION_UNTAKEN = Object.freeze([
 export const ALONE_KINDS = Object.freeze(["itemDamage", "recharge"]);
 
 /**
+ * The most plans of damage on its own a row is sent beside its own, since 0.41.0: past it, none, and
+ * the row's damage on its own is rolled as before, with nothing to choose.
+ * @type {number}
+ */
+export const MOST_ALONE_CHOICES = 64;
+
+/**
  * How a campaign's characters' companions enter initiative, as its Gamemaster chooses in Manage
  * Campaigns, since 0.36.0: each its own roll, or right after its character (round 0.36.0 §2.7).
  * @type {Readonly<{OWN: "own", AFTER: "after"}>}

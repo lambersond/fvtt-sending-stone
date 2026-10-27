@@ -10,7 +10,7 @@ import { checkDishCommand } from "./command-dishes.mjs";
 import { checkEffectCommand } from "./command-effects.mjs";
 import { checkWildShapeCommand } from "./command-wildshape.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
-import { commandActor, ownedByPlayers } from "./creatures.mjs";
+import { commandActor, companionPart, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
 import { checkEndTurnCommand, checkUndoTurnCommand } from "./command-turn.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
@@ -151,7 +151,8 @@ export function appFlags(command, key="request") {
  * Make a player's roll for their character, if the campaign takes their rolls and the character
  * can make it now. Since 0.36.0 one for a companion of theirs, named by `of`, on its live actor, as
  * their character's player; a companion's initiative is refused while the campaign keeps it right
- * after a character of its in that combat (`follows`).
+ * after a character of its in that combat (`follows`). Since 0.41.0 a companion's answer to what the
+ * game asks of it.
  * @param {object} command      The player's roll, as fetched from the app.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @param {object} [options]
@@ -193,8 +194,11 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   let prompt = null;
   if ( command.prompt ) {
     // Since 0.40.0 a prompt asked of her form is the character's, answered from her seat whichever
-    // app answers it; a companion's, as ever, its own live actor's.
-    const asked = findPrompt(command.prompt, companion ? actor : character, campaign, command);
+    // app answers it; since 0.41.0 a companion's is found by its own token's or actor's id and its
+    // key, and rolled, as ever, on its own live actor.
+    const whose = companion ? { part: companionPart(companion), actorId: companion.key }
+      : { part: character.id, actorId: character.id };
+    const asked = findPrompt(command.prompt, whose, campaign, command);
     if ( asked.refusal ) return failed("prompt", asked.refusal);
     // Midi waits on it: made at once, and told of with no message where Midi makes none.
     if ( asked.midi ) return answerMidiPrompt(command, asked.midi);
@@ -1190,7 +1194,8 @@ async function answerMidiPrompt(command, entry) {
  * check, with Midi's options, its message as Midi's own roll for the target would have it; or for
  * Midi's concentration card, the check Midi would roll on the Gamemaster's client, against the
  * card's DC, its message whispered to the Gamemaster, as Midi's is. Midi's hook for a
- * concentration check then ends the concentration of one failed, as Midi has it.
+ * concentration check then ends the concentration of one failed, as Midi has it. Since 0.41.0 a
+ * companion's is made as its character's player, the command's `of`, as every companion roll is.
  * @param {object} command
  * @param {object} entry
  * @returns {Promise<Roll[]|null>}
@@ -1200,7 +1205,7 @@ function rollMidiAnswer(command, entry) {
   // Where Midi has the player's roll dialog open in Foundry too, the message is theirs, as Midi's
   // own roll would be, and says which save it answers, for their client to close the dialog.
   const data = {
-    author: (midiAnswerAuthor(entry) ?? authorFor(actor)).id,
+    author: (midiAnswerAuthor(entry) ?? authorFor(actor, command.of ? game.actors.get(command.of) : undefined)).id,
     flags: { [MODULE_ID]: { ...appFlags(command), ...midiAnswerFlags(entry) } }
   };
   const rolls = [{ options: { [ROLL_TAG]: command.id } }];

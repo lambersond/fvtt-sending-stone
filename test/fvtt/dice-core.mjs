@@ -463,6 +463,9 @@ class Roll {
     const number = '\\s*(-?\\d+(?:\\.\\d+)?)\\s*'
     const text = this.replaceFormulaData(String(formula), data, { missing: '0' })
       .replace(new RegExp(`\\b(min|max)\\(${number},${number}\\)`, 'gi'), (match, fn, a, b) => String(Math[fn.toLowerCase()](Number(a), Number(b))))
+      // Module 0.41.0: a number of dice in parentheses, as dnd5e's `(@item.level)d8` makes once its
+      // data is in, a die of that many, as Foundry simplifies a deterministic one [core, unverified].
+      .replace(/\((\d+)\)(?=d\d)/g, '$1')
       .replace(/\+\s*-/g, '-').replace(/-\s*-/g, '+')
     const terms = []
     for (const piece of text.split(/([+-])/).map(p => p.trim()).filter(Boolean)) {

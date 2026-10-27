@@ -3,7 +3,9 @@
 // rollConcentration and a targeted endConcentration, ported from dnd5e 5.3.3's actor.mjs, with its
 // concentration effects as active-effect.mjs makes them, since module 0.29.0); a save activity's
 // card and a Gamemaster's request, as dnd5e's templates render them; and Midi-QOL's own
-// concentration card. Import after dice-core.mjs, whose Sets have Foundry's find and reduce.
+// concentration card. Since module 0.41.0, a companion's concentration check and card too
+// (`withConcentrationChecks`, `concentrationCardOf`). Import after dice-core.mjs, whose Sets have
+// Foundry's find and reduce.
 import { Actor5e } from './actor5e.mjs'
 
 /** How many concentration effects have been made, for their ids. */
@@ -183,6 +185,47 @@ export class Character extends Actor5e {
     Hooks.callAll('dnd5e.rollConcentrationV2', rolls, { subject: this })
     return rolls
   }
+}
+
+/**
+ * dnd5e's concentration card for any actor concentrating, as Character#challengeConcentration posts
+ * one (actor.mjs:1119-1148), since module 0.41.0 for a companion's: a token's creature's or a linked
+ * NPC's, made by token-core.mjs, whose concentration effects are activity5e.mjs's equip()'s. Not
+ * wrapped by midi-saves.mjs, so dnd5e's card whatever Midi's Concentration Check says. Null where it
+ * concentrates on nothing.
+ */
+export async function concentrationCardOf(actor, { dc = 10, ability = null } = {}) {
+  if (!actor.concentration?.effects?.size) return null
+  const dataset = { action: 'concentration', dc }
+  if (ability in CONFIG.DND5E.abilities) dataset.ability = ability
+  return ChatMessage.implementation.create({
+    content: requestCardHtml([{
+      dataset: { ...dataset, type: 'concentration', visbility: 'all' },
+      buttonLabel: `DC ${dc} Concentration`, hiddenLabel: 'Concentration',
+    }]),
+    whisper: game.users.filter(user => user.isGM || actor.testUserPermission(user, 'OWNER')).map(user => user.id),
+    speaker: ChatMessage.implementation.getSpeaker({ actor }),
+  })
+}
+
+/**
+ * Give an actor dnd5e's concentration check, as Character has it, since module 0.41.0: its
+ * concentration's ability, limit and roll, and rollConcentration; for a companion's world actor made
+ * by token-core.mjs, its tokens' creatures too, as core makes each from it.
+ */
+export function withConcentrationChecks(actor, { ability = 'con' } = {}) {
+  const give = each => {
+    each.system.attributes.concentration = { ability, limit: 1, roll: { mode: 0, max: null, min: null }, bonuses: { save: '' } }
+    Object.defineProperty(each, 'isOwner', { configurable: true, value: true })
+    each.rollConcentration = Character.prototype.rollConcentration
+    return each
+  }
+  give(actor)
+  if (typeof actor.make === 'function') {
+    const make = actor.make
+    actor.make = () => give(make())
+  }
+  return actor
 }
 
 // dnd5e's dataset helper: each key in kebab case, as a data attribute.

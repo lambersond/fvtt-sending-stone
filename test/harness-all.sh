@@ -65,9 +65,12 @@ for v in X=1 "X=1 DND5E6=1"; do run removals $v SLIM_CHECK=1; done
 for v in X=1 "X=1 DND5E6=1"; do run notes $v; done
 # Module 0.36.0: companions (the creatures a character summons, and the NPCs its player owns),
 # found, sent and commanded on their own tokens (dnd5e 5.3.3 and 6.0.5 stand-ins, and Midi-QOL's);
-# and damage on its own and recharges.
+# and damage on its own and recharges. Module 0.41.0: damage on its own at the level, in the mode and
+# with the ammunition chosen, spending what its use would, Midi's Bonus Action or reaction counted.
 for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run companions $v; done
 for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run alone $v; done
+# Module 0.41.0: the saves the game asks of companions, by dnd5e's cards and Midi-QOL's (dnd5e 5.3.3 and 6.0.5).
+for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run companion-saves $v; done
 # Module 0.36.0: ending a turn from the app, the character's or a companion's, by Foundry's Next Turn.
 for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run turns $v; done
 # Module 0.37.0: favorites added and removed from the app by dnd5e's own methods (dnd5e 5.3.3 and
@@ -81,5 +84,6 @@ for v in X=1 "X=1 DND5E6=1"; do run dishes $v SLIM_CHECK=1; done
 for v in X=1 "X=1 DND5E6=1"; do run effects $v SLIM_CHECK=1; done
 # Module 0.40.0: Wild Shape from the app, a 2024 druid's known forms, the shaped seat followed, its
 # endings (dnd5e 5.3.3 and 6.0.5 stand-ins), and Midi-QOL's saves asked of and answered for a form.
+# Module 0.41.0: under MIDI=1, a change and a return refused and marked by Midi-QOL's Bonus Actions.
 for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run wildshape $v; done
 exit $fail

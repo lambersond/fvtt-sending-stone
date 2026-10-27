@@ -454,6 +454,17 @@
         "Hint": "Forms on GitHub for Sending Stone's module, for Gamemasters and players alike."
       }
     },
+    "Alone": {
+      "NothingSpent": "nothing spent",
+      "Spent": "{parts} spent",
+      "Spends": {
+        "slot": "spell slot",
+        "uses": "use",
+        "ammunition": "ammunition",
+        "thrown": "thrown weapon"
+      },
+      "Concentrating": "concentrating"
+    },
     "WildShape": {
       "Chat": {
         "Became": "{name} uses Wild Shape and becomes {aForm}.",

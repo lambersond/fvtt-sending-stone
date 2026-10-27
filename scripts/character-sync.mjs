@@ -8,6 +8,7 @@ import {
 } from "./creature-sync.mjs";
 import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
 import { dishReader } from "./command-dishes.mjs";
+import { aloneReader } from "./command-alone.mjs";
 import { wildShapeReader } from "./command-wildshape.mjs";
 import { resendDishDecisions, resendLostDish } from "./dish-card.mjs";
 import { campaignGroups, groupEntry, groupReader, groupsListing } from "./groups.mjs";
@@ -398,15 +399,17 @@ function sendSheet(campaign, actor) {
 /**
  * A character's sheet as a campaign's app is sent it: to one that takes Wild Shape, its active form's
  * while it has one, with `form`, and her `wildShape` where she's a 2024 druid; else her own, as before.
+ * Since 0.41.0, to one that reads damage on its own's choices, with them.
  * @param {Campaign} campaign
  * @param {Actor} actor
  * @param {SheetTexts} texts
  * @returns {object|null}
  */
 function seatSheet(campaign, actor, texts) {
-  if ( !wildShapeReader(campaign.id) ) return characterSheet(actor, texts);
+  const aloneChoices = aloneReader(campaign.id);
+  if ( !wildShapeReader(campaign.id) ) return characterSheet(actor, texts, { aloneChoices });
   const form = activeForm(actor);
-  const sheet = form ? characterSheet(form, texts, { ops: false }) : characterSheet(actor, texts);
+  const sheet = form ? characterSheet(form, texts, { ops: false, aloneChoices }) : characterSheet(actor, texts, { aloneChoices });
   if ( !sheet ) return sheet;
   const shape = form ? formBlock(form, actor, campaign) : undefined;
   const block = wildShapeBlock(actor, form ?? actor, campaign);
@@ -430,6 +433,20 @@ export function wildShapeTermsChanged(campaignId) {
     built.delete(key);
     sendSheet(campaign, actor);
   }
+}
+
+/**
+ * Send a campaign whose app has started or stopped reading damage on its own's choices, in answer to
+ * a heartbeat, every character and companion again, as it's now sent them: with or without them,
+ * since 0.41.0.
+ * @param {string} campaignId
+ * @returns {void}
+ */
+export function aloneTermsChanged(campaignId) {
+  const campaign = getCampaigns().find(c => c.id === campaignId);
+  if ( !campaign || !canSend() || helloPending(campaign.id) ) return;
+  for ( const actor of campaignActors(campaign) ) sendSheet(campaign, actor);
+  companionTermsChanged(campaign);
 }
 
 /**

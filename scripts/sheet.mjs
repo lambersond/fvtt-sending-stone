@@ -31,16 +31,19 @@ import { combinedMode, finite, localize, rollMode } from "./sheet-values.mjs";
  * 0.36.0 a companion's too, an NPC's sheet carrying its `creature` block; one none of whose players
  * owns it in Foundry goes without its secrets (`secrets: false`), its biography the public one, its
  * texts collected without them. Since 0.39.0 each effect says what its player may do to it from the
- * app, but on a companion's sheet (`ops: false`), whose effects take no commands.
+ * app, but on a companion's sheet (`ops: false`), whose effects take no commands. Since 0.41.0, for
+ * an app that reads them (`aloneChoices`), each row's damage on its own carries its plans at its
+ * other levels, modes and ammunition, and what it would spend.
  * @param {Actor} actor
  * @param {SheetTexts} [texts]  Collects the descriptions the sheet refers to.
  * @param {object} [options]
- * @param {boolean} [options.secrets]   Is it described with its secrets, as for its owner?
- * @param {boolean} [options.ops]       Does each effect say what its player may do to it?
+ * @param {boolean} [options.secrets]       Is it described with its secrets, as for its owner?
+ * @param {boolean} [options.ops]           Does each effect say what its player may do to it?
+ * @param {boolean} [options.aloneChoices]  Does each row's `tableDamage` carry `choices` and `spends`?
  * @returns {object|null}
  */
-export function characterSheet(actor, texts=new SheetTexts(), { secrets=true, ops=true }={}) {
-  return enchantingSheet(() => tablingSheet(() => sheetOf(actor, texts, { secrets, ops })));
+export function characterSheet(actor, texts=new SheetTexts(), { secrets=true, ops=true, aloneChoices=false }={}) {
+  return enchantingSheet(() => tablingSheet(() => sheetOf(actor, texts, { secrets, ops }), { choices: aloneChoices }));
 }
 
 /**

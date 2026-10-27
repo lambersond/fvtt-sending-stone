@@ -6,7 +6,7 @@ import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
-import { runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
+import { noteAloneReader, runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
@@ -165,18 +165,21 @@ const made = new Map();
  * or healing on its own and a spent recharge rolled, where players may attack and damage takes
  * their dice, as a description's damage is offered, under dnd5e 5.x and 6, Midi-QOL or not; and
  * that players may change damage there too; and ending the current turn, their character's or one
- * of its companions', wherever their rolls are made, as ending a concentration is.
+ * of its companions', wherever their rolls are made, as ending a concentration is. And from 0.41.0,
+ * that damage on its own may name its level, attack mode and ammunition and spend what it uses
+ * (`aloneChoices`), wherever it's offered; and that companions' saves are asked of an app that reads
+ * them (`companionPrompts`), wherever its players are asked for theirs.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
  *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean, manualDice: boolean,
- *   midiPrompts: boolean}}
+ *   midiPrompts: boolean, aloneChoices: boolean, companionPrompts: boolean}}
  */
 export function rollFeatures(campaign) {
   const off = {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
     signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false,
-    midiPrompts: false
+    midiPrompts: false, aloneChoices: false, companionPrompts: false
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -204,7 +207,9 @@ export function rollFeatures(campaign) {
     gmRolls: true,
     gmRollMessages: true,
     manualDice: manualDiceOn(campaign),
-    midiPrompts: midiPromptsOffered(campaign)
+    midiPrompts: midiPromptsOffered(campaign),
+    aloneChoices: alone === true,
+    companionPrompts: prompting(campaign)
   };
 }
 
@@ -239,7 +244,11 @@ export function registerCommandHooks() {
  * from where the campaign's Gamemaster lets its players, under dnd5e, with everything else off; and
  * since 0.40.0, whether it takes Wild Shape, for which it's fetched from where the campaign's
  * Gamemaster lets its players, under dnd5e, with everything else off, and to which the campaign's
- * sheets are sent again where it starts or stops in a heartbeat's answer. A hello's answer wakes the
+ * sheets are sent again where it starts or stops in a heartbeat's answer; and since 0.41.0, whether it
+ * reads damage on its own's choices, `aloneChoices`, to which the campaign's sheets, its companions'
+ * too, are sent again where it starts or stops in a heartbeat's answer, and whether it reads what the
+ * game asks of companions, `companions` 2, to which their open prompts are sent again where it first
+ * says so (creature-sync.mjs). A hello's answer wakes the
  * campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
@@ -258,6 +267,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteDishReader(campaignId, features, type);
   noteEffectReader(campaignId, features);
   noteWildShapeReader(campaignId, features, type);
+  noteAloneReader(campaignId, features, type);
   noteNotesReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);
   syncPollers();

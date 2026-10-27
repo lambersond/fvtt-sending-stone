@@ -1692,12 +1692,16 @@ export function originOf(actor, { relativeTo }) {
  * @param {string} [config.attackMode]
  * @param {Item|null} [config.ammunition]
  * @param {boolean} [config.isCritical]
+ * @param {number} [config.scaling]   Since 0.41.0, at a level above the spell's own, as dnd5e scales a
+ *                                    part by the configuration's `scaling`; none at 0.
  * @returns {{critical: boolean, plannable: boolean, healing: boolean, rolls: object[]}|null}   Null
  *   for no damage or healing.
  */
-export function previewDamage(activity, { attackMode, ammunition, isCritical=false }={}) {
+export function previewDamage(activity, { attackMode, ammunition, isCritical=false, scaling }={}) {
   if ( !DND5E_ACTIVITIES[activity?.type] ) return null;
-  const process = ownDamageConfig(activity, { attackMode, ammunition: ammunition ?? undefined });
+  const process = ownDamageConfig(activity, {
+    attackMode, ammunition: ammunition ?? undefined, ...((Number.isInteger(scaling) && (scaling > 0)) && { scaling })
+  });
   if ( !process?.rolls?.length ) return null;
   const rolls = damageRollsFor({ ...process, isCritical });
   const planned = rolls.map(roll => plannedDice(roll));
@@ -1714,6 +1718,83 @@ export function previewDamage(activity, { attackMode, ammunition, isCritical=fal
       perDie: diceForEach({ ...process, isCritical }, index)
     }))
   };
+}
+
+/**
+ * What damage on its own is previewed and rolled on, at a spell slot `scaling` levels above the
+ * spell's own, since 0.41.0 (round 0.41.0 §2.7): at its own level, the activity itself; where its
+ * damage reads the spell's level as it's cast, `@item.level` or `@scaling`, which only the item's
+ * roll data changes, the activity of a copy of the item scaled by dnd5e's own flag, as dnd5e's own
+ * card would roll it; otherwise the activity itself, with `scaling` in the damage configuration, as
+ * dnd5e scales each part by it. The sheet's plans and the command both come through here, so that a
+ * plan and its roll can't differ. The real activity is never changed.
+ * @param {Activity} activity
+ * @param {number} [scaling]   How many levels above the spell's own.
+ * @returns {{subject: Activity, config: {scaling?: number}}}
+ */
+export function aloneSubject(activity, scaling=0) {
+  if ( !(Number.isInteger(scaling) && (scaling > 0)) ) return { subject: activity, config: {} };
+  if ( readsLevel(activity) ) {
+    const item = activity.item.clone({ "flags.dnd5e.scaling": scaling }, { keepId: true });
+    const subject = item?.system?.activities?.get?.(activity.id);
+    if ( subject ) return { subject, config: {} };
+  }
+  return { subject: activity, config: { scaling } };
+}
+
+/**
+ * Does an activity's damage read the spell's level as it's cast, in a part's own formula, where it
+ * has one, or its bonus: `@item.level` or `@scaling`, which dnd5e takes from the item's roll data?
+ * @param {Activity} activity
+ * @returns {boolean}
+ */
+export function readsLevel(activity) {
+  const level = /@(?:item\.level|scaling)\b/;
+  return Array.from(activity?.damage?.parts ?? []).some(part => {
+    const custom = part?.custom?.enabled ? String(part.custom.formula ?? "") : "";
+    return level.test(custom) || level.test(String(part?.bonus ?? ""));
+  });
+}
+
+/**
+ * The spell slots a spell can be cast with, as dnd5e's usage dialog offers them: each pool from the
+ * spell's level up to the highest the character has, that its kind of spellcasting may use, and
+ * whether it has one left to spend. Null for anything cast without choosing a slot: a cantrip, a
+ * spell cast at will or innately, one cast from an item, or one at a fixed level, as on a scroll.
+ * Here since 0.41.0, from command-uses.mjs, as the sheet's damage on its own offers the levels too.
+ * @param {Activity} activity
+ * @returns {{key: string, level: number, available: boolean}[]|null}
+ */
+export function eligibleSlots(activity) {
+  return slotChoice(activity)?.slots ?? null;
+}
+
+/**
+ * How a spell's slot is chosen, as dnd5e's usage dialog has it: the slot it would be cast with
+ * unless another is chosen, whether casting spends one, and the slots it offers, if any. Here since
+ * 0.41.0, from command-uses.mjs, as the sheet's damage on its own offers the levels too.
+ * @param {Activity} activity
+ * @returns {{configured: string|null, consumes: boolean, slots: object[]|null}|null}   Null for
+ *   anything cast without a slot.
+ */
+export function slotChoice(activity) {
+  if ( !activity.requiresSpellSlot ) return null;
+  const prepared = activity._prepareUsageConfig({});
+  const configured = prepared.spell?.slot ?? null;
+  const consumes = (prepared.consume === true) || Boolean(prepared.consume?.spellSlot);
+  if ( (prepared.scaling === false) || prepared.cause?.activity ) return { configured, consumes, slots: null };
+  const { actor, item } = activity;
+  const spells = actor.system.spells ?? {};
+  const lowest = item.system.level ?? 1;
+  const highest = Object.values(spells).reduce((max, pool) => pool.max ? Math.max(max, pool.level) : max, 0);
+  const method = CONFIG.DND5E.spellcasting?.[item.system.method];
+  const slots = Object.entries(spells).flatMap(([key, pool]) => {
+    if ( !pool.max || (pool.level < lowest) || (pool.level > highest) || !pool.type ) return [];
+    if ( method?.exclusive?.spells && (item.system.method !== pool.type) ) return [];
+    if ( CONFIG.DND5E.spellcasting?.[pool.type]?.exclusive?.slots && (item.system.method !== pool.type) ) return [];
+    return [{ key, level: pool.level, available: !consumes || (pool.value > 0) }];
+  });
+  return { configured, consumes, slots };
 }
 
 /**

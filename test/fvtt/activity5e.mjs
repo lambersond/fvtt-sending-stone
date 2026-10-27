@@ -150,17 +150,20 @@ const SPELLCASTING = {
  */
 class DamageData {
   constructor({ number = 1, denomination = 8, bonus = '', types = ['slashing'], scaling = 0, custom = null }) {
-    Object.assign(this, { number, denomination, bonus, custom, scalingNumber: scaling })
+    // damage-field.mjs:35-38: a custom formula as dnd5e keeps it, `{ enabled, formula }`; a fixture's
+    // string is one enabled.
+    const own = (typeof custom === 'string') ? { enabled: true, formula: custom } : { enabled: custom?.enabled === true, formula: custom?.formula ?? '' }
+    Object.assign(this, { number, denomination, bonus, custom: own, scalingNumber: scaling })
     this.types = new Set(types)
   }
   get formula() {
-    if (this.custom) return this.custom
+    if (this.custom.enabled) return this.custom.formula
     const dice = this.number ? `${this.number}d${this.denomination}` : ''
     return [dice, this.bonus].filter(Boolean).join(' + ')
   }
   /** module/data/shared/damage-field.mjs:84-112, for whole scaling: more dice per level. */
   scaledFormula(increase) {
-    if (this.custom || !increase || !this.scalingNumber) return this.formula
+    if (this.custom.enabled || !increase || !this.scalingNumber) return this.formula
     const dice = `${this.number + (this.scalingNumber * increase)}d${this.denomination}`
     return [dice, this.bonus].filter(Boolean).join(' + ')
   }
@@ -620,7 +623,7 @@ export class Activity {
     return (deltas.actor.length || !isEmpty(deltas.item)) ? deltas : {}
   }
 
-  /** mixin.mjs:415-488, without spell scrolls. */
+  /** mixin.mjs:415-488; since module 0.41.0 a scroll's fixed level and a target spent only in a fight too. */
   _prepareUsageConfig(config) {
     config = deepClone(config)
     const linked = this.getLinkedActivity(config.cause?.activity)
@@ -637,23 +640,34 @@ export class Activity {
       // mixin.mjs:426-437: an activation that spends a pool of the creature's, as a legendary action.
       const activationConfig = CONFIG.DND5E.activityActivationTypes?.[this.activation.type] ?? {}
       config.consume.action ??= !!activationConfig.consume && (activationConfig.consume.canConsume?.(this) !== false)
-      config.consume.resources ??= Array.from(this.consumption.targets.entries()).map(([index]) => index)
+      // mixin.mjs:435-437: a target spent only in a fight left out of one (module 0.41.0).
+      config.consume.resources ??= Array.from(this.consumption.targets.entries())
+        .filter(([, target]) => !target.combatOnly || this.actor.inCombat)
+        .map(([index]) => index)
       config.consume.spellSlot ??= !linked && hasSpellSlotConsumption
       config.hasConsumption = hasResourceConsumption || hasLinkedConsumption || (!linked && hasSpellSlotConsumption)
     }
-    const canScale = linked ? linked.consumption.scaling.allowed : this.canScale
-    const linkedDelta = (linked?.spell?.level ?? Infinity) - this.item.system.level
-    if (!canScale) config.scaling = false
-    else if (Number.isFinite(linkedDelta)) config.scaling ??= linkedDelta
-    if (this.requiresSpellSlot) {
-      const { level, method } = this.item.system
+    // mixin.mjs:443-448: a scroll's spell at the level it's written at, fixed (module 0.41.0).
+    const levelingFlag = this.item.getFlag('dnd5e', 'spellLevel')
+    if (levelingFlag) {
+      config.scaling = false
       config.spell ??= {}
-      config.spell.slot ??= linked?.spell?.level ? `spell${linked.spell.level}`
-        : (SPELLCASTING[method]?.getSpellSlotKey(level) ?? `spell${level}`)
-      const scaling = (this.actor.system.spells?.[config.spell.slot]?.level ?? 0) - this.item.system.level
-      if (scaling > 0) config.scaling ??= scaling
+      config.spell.slot = levelingFlag.value
+    } else {
+      const canScale = linked ? linked.consumption.scaling.allowed : this.canScale
+      const linkedDelta = (linked?.spell?.level ?? Infinity) - this.item.system.level
+      if (!canScale) config.scaling = false
+      else if (Number.isFinite(linkedDelta)) config.scaling ??= linkedDelta
+      if (this.requiresSpellSlot) {
+        const { level, method } = this.item.system
+        config.spell ??= {}
+        config.spell.slot ??= linked?.spell?.level ? `spell${linked.spell.level}`
+          : (SPELLCASTING[method]?.getSpellSlotKey(level) ?? `spell${level}`)
+        const scaling = (this.actor.system.spells?.[config.spell.slot]?.level ?? 0) - this.item.system.level
+        if (scaling > 0) config.scaling ??= scaling
+      }
+      config.scaling ??= 0
     }
-    config.scaling ??= 0
     // mixin.mjs:470-479
     if (this.requiresConcentration && !game.settings.get('dnd5e', 'disableConcentration')) {
       config.concentration ??= {}
@@ -1097,6 +1111,11 @@ export class AttackActivity extends Activity {
     }
     const roll = super._processDamagePart(part, rollConfig, rollData, index)
     roll.base = true
+    // attack-data.mjs:385-392: an off-hand attack's damage without its wielder's modifier, unless it's
+    // less than nothing. The fixtures write the @mod dnd5e adds into the part itself (module 0.41.0).
+    if ((this.item.type === 'weapon') && rollConfig.attackMode?.endsWith('offhand') && !(roll.data.mod < 0)) {
+      roll.parts = roll.parts.map(each => each.replace(/\s*\+\s*@mod\b/g, '').replace(/^@mod\s*\+\s*/, '')).filter(each => each && (each !== '@mod'))
+    }
     const criticalBonusDice = this.actor?.getFlag('dnd5e', 'meleeCriticalDamageDice') ?? 0
     if ((this.getActionType(rollConfig.attackMode) === 'mwak') && (parseInt(criticalBonusDice) !== 0)) {
       setProperty(roll, 'options.critical.bonusDice', criticalBonusDice)
@@ -1426,8 +1445,9 @@ export class ConsumptionError extends Error {}
  * value of the uses per use, more for each level of scaling where it scales by amount.
  */
 class ConsumptionTarget {
-  constructor(activity, { type = 'itemUses', target = '', value = 1, scaling = {} } = {}) {
-    Object.assign(this, { activity, type, target, value })
+  constructor(activity, { type = 'itemUses', target = '', value = 1, scaling = {}, combatOnly = false } = {}) {
+    // consumption-targets-field.mjs: `combatOnly`, spent only in a fight (module 0.41.0).
+    Object.assign(this, { activity, type, target, value, combatOnly: combatOnly === true })
     this.scaling = { mode: scaling.mode ?? '', formula: scaling.formula ?? '' }
   }
 

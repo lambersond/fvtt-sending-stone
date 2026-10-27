@@ -50,6 +50,17 @@ export const midi = {
   activeDefence: false,
   usedReaction: new Set(),
   usedBonus: new Set(),
+  /**
+   * Module 0.41.0: the actors Midi was told used a Bonus Action or a reaction, by their ids, in order,
+   * through `setBonusActionUsed` and `setReactionUsed`; and `noMarker`, a world whose enforcement was
+   * turned on without a reload, which has no marker effect, so that neither writes anything
+   * (utils.ts:7072-7073).
+   */
+  bonusMarks: [],
+  reactionMarks: [],
+  noMarker: false,
+  /** How many times Midi's damage roll modifiers were added to a damage configuration. */
+  modifiersMade: 0,
   /** Abort the next attack without a change of state, as Midi does for a weapon with no ammunition. */
   abortNext: false,
   /** Hold the next attack this long, in milliseconds, as a prompt to the Gamemaster would; or for ever. */
@@ -621,10 +632,18 @@ export const MidiActivity = Base => class extends Base {
 
   /**
    * MidiActivityMixin.ts:1288-1294, 1323-1335: Midi's own getDamageConfig, whoever calls it, adds the
-   * actor's damage roll modifiers to each roll (here only where it has some).
+   * actor's damage roll modifiers to each roll (here only where it has some), by its own
+   * createDamageRollModifiers, which module 0.41.0 calls after dnd5e's configuration to keep a mode.
    */
   getDamageConfig(config = {}) {
     const rollConfig = super.getDamageConfig(config)
+    this.createDamageRollModifiers(rollConfig)
+    return rollConfig
+  }
+
+  /** MidiActivityMixin.ts:1323-1335: the actor's damage roll modifiers added to each roll. */
+  createDamageRollModifiers(rollConfig) {
+    midi.modifiersMade++
     for (const roll of rollConfig.rolls ?? []) {
       const modifiers = damageRollModifiers(this, roll)
       if (!modifiers.length) continue
@@ -632,7 +651,6 @@ export const MidiActivity = Base => class extends Base {
       roll.options['midi-qol'] ??= {}
       roll.options['midi-qol'].modifiers = [...(roll.options['midi-qol'].modifiers ?? []), ...modifiers]
     }
-    return rollConfig
   }
 
   /** MidiActivityMixin.ts:979-1110 */
@@ -782,6 +800,18 @@ export function installMidi() {
     isTargetable: token => !token.document.hidden,
     hasUsedReaction: actor => midi.usedReaction.has(actor.id),
     hasUsedBonusAction: actor => midi.usedBonus.has(actor.id),
+    // utils.ts:7029-7061, 7063-7098 (module 0.41.0): marked only under "all", "displayOnly" or the
+    // actor's type, and only where Midi registered its marker effect.
+    setReactionUsed: async actor => {
+      if (midi.noMarker || !['all', 'displayOnly', actor.type].includes(midi.settings.enforceReactions)) return
+      midi.usedReaction.add(actor.id)
+      midi.reactionMarks.push(actor.id)
+    },
+    setBonusActionUsed: async actor => {
+      if (midi.noMarker || !['all', 'displayOnly', actor.type].includes(midi.settings.enforceBonusActions)) return
+      midi.usedBonus.add(actor.id)
+      midi.bonusMarks.push(actor.id)
+    },
   }
   globalThis.canvas = {
     scene: { tokens: { size: placeables.size } },
