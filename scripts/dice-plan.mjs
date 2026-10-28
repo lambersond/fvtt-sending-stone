@@ -21,6 +21,10 @@ import { CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from 
  * Gamemaster, whose client this is: each die doubled, never Midi's `mx2` or its maximized dice.
  * Since 0.33.0 only its dice are doubled, never a number in it, whatever dnd5e's Critical Damage
  * Modifiers, Midi-QOL or the roll's own options say. The Gamemaster's own rolls keep those rules.
+ *
+ * Since 0.42.0, for a roll its player typed in, the dice its effects add are theirs where they typed
+ * them, by faces and sign; and where they say they rerolled at the table, `rerolls: "kept"`, each die
+ * term they typed every die of keeps no reroll: the die typed is the die kept.
  */
 
 /**
@@ -42,6 +46,22 @@ class DicePlan {
       const queue = this.queues.get(faces) ?? [];
       queue.push(...results);
       this.queues.set(faces, queue);
+    }
+
+    /**
+     * Since 0.42.0, the values the player typed for the dice their character's effects add, by the
+     * die's faces and sign, such as "4|-1" for Bane's d4, in the order typed: only for a roll they
+     * typed in, never the Gamemaster's, and only once the self-test has checked that they reach
+     * those dice. Never for a d20.
+     * @type {Map<string, number[]>}
+     */
+    this.effects = new Map();
+    if ( takesEffectDice(command) ) {
+      for ( const { faces, sign, results } of command.effectDice ) {
+        if ( (faces === 20) || !DIE_FACES.has(faces) || ![1, -1].includes(sign) || !Array.isArray(results) ) continue;
+        const key = `${faces}|${sign}`;
+        this.effects.set(key, [...(this.effects.get(key) ?? []), ...results]);
+      }
     }
 
     /**
@@ -72,13 +92,17 @@ class DicePlan {
   }
 
   /**
-   * The next value the player rolled on a die with this many faces, if one is left.
+   * The next value the player rolled on a die with this many faces, if one is left: their own dice
+   * first, and since 0.42.0, once those are used, a value they typed for an effect's die of these
+   * faces and this sign, for a die whose sign is given.
    * @param {number} faces
+   * @param {1|-1} [sign]   Whether the die adds or takes away, where it's one of its roll's own.
    * @returns {number|undefined}
    */
-  take(faces) {
+  take(faces, sign) {
     if ( this.ended ) return undefined;
-    const queue = this.queues.get(faces);
+    const own = this.queues.get(faces);
+    const queue = (own?.length || (sign === undefined)) ? own : this.effects.get(`${faces}|${sign}`);
     const value = queue?.[0];
     if ( !Number.isInteger(value) || (value < 1) || (value > faces) ) return undefined;
     queue.shift();
@@ -132,6 +156,21 @@ const DAMAGE_COMMANDS = new Set(["damage", "textDamage", "itemDamage"]);
 const termPlans = new WeakMap();
 
 /**
+ * Since 0.42.0, the sign of each of a tagged roll's own dice as it's evaluated: 1 for a die it adds,
+ * -1 for one it takes away, as dnd5e reads the signs of damage. A die within parentheses or a
+ * function has none, and so takes no value typed for an effect's die: Foundry rolls it.
+ * @type {WeakMap<DiceTerm, 1|-1>}
+ */
+const termSigns = new WeakMap();
+
+/**
+ * The self-tests' own rolls, which take a player's typed dice before the self-test has said they may.
+ * A command from the app is JSON, and can't carry it.
+ * @type {symbol}
+ */
+const TESTING = Symbol("testing");
+
+/**
  * How many dice have been given a player's value, ever. The self-test watches it.
  * @type {number}
  */
@@ -142,14 +181,19 @@ let served = 0;
  * has shown that this Foundry and its modules roll dice as expected. Their hit dice also need
  * dnd5e's hit die roll to take their die, their attacks their damage rolled as expected, and the
  * damage they change in the app, more dice, another die or every die at its highest, changed as
- * expected, which the self-test checks apart.
+ * expected, which the self-test checks apart. Since 0.42.0, for rolls their players type in: whether
+ * a die typed keeps no reroll where they say they rerolled at the table (`keptRerolls`), whether the
+ * values they typed for the dice their effects add reach those dice (`effectDice`), and whether a
+ * die an effect takes away on its own, as Bane's alone, is one of the roll's own (`negativeDice`);
+ * `typedError` is what went wrong first.
  * @type {{ready: boolean, reason: string|null, error: string|null, hitDice: boolean,
  *   hitDiceError: string|null, attacks: boolean, attacksError: string|null, modifiers: boolean,
- *   modifiersError: string|null}}
+ *   modifiersError: string|null, keptRerolls: boolean, effectDice: boolean, negativeDice: boolean,
+ *   typedError: string|null}}
  */
 export const diceStatus = {
   ready: false, reason: "pending", error: null, hitDice: false, hitDiceError: null, attacks: false, attacksError: null,
-  modifiers: false, modifiersError: null
+  modifiers: false, modifiersError: null, keptRerolls: false, effectDice: false, negativeDice: false, typedError: null
 };
 
 /* -------------------------------------------- */
@@ -190,7 +234,8 @@ function planFor(tag) {
  * Give a die of a tagged roll the next value the player rolled for it. Only a die's first roll is
  * the player's: a reroll or an explosion is Foundry's, so a player can't stock values for them.
  * Foundry rolls one with `reroll` or `explode`, as its `r`, `rr`, `x` and `xo` modifiers do, which
- * the self-test checks.
+ * the self-test checks. Since 0.42.0 one of the roll's own dice, once the player's own of its faces
+ * are used, takes a value they typed for an effect's die of its faces and sign, such as Bless's.
  * @this {DiceTerm}
  * @param {Function} wrapped   Foundry's own roll of the die.
  * @param {...any} args
@@ -201,7 +246,7 @@ function plannedRoll(wrapped, ...args) {
   const first = !options?.reroll && !options?.explode && !options?.minimize && !options?.maximize;
   if ( first ) {
     const plan = termPlans.get(this) ?? planFor(this._root?.options?.[ROLL_TAG]);
-    const value = plan?.take(this.faces);
+    const value = plan?.take(this.faces, termSigns.get(this));
     if ( value !== undefined ) return value;
   }
   return wrapped(...args);
@@ -209,7 +254,10 @@ function plannedRoll(wrapped, ...args) {
 
 /**
  * Evaluate a tagged roll without asking anyone for its dice, as a Gamemaster's manual dice would:
- * they are the player's. Its dice are noted with its plan, in case they don't know their roll.
+ * they are the player's. Its dice are noted with its plan, in case they don't know their roll, and
+ * since 0.42.0 with whether each adds or takes away, for the dice its effects add. And a roll its
+ * player typed in, saying they rerolled at the table, keeps none of the rerolls of the dice they
+ * typed (`keepTypedRerolls`): by now dnd5e has expanded its advantage and configured it.
  * @this {Roll}
  * @param {Function} wrapped   Foundry's own evaluation.
  * @param {object} [options]
@@ -220,12 +268,87 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
   const plan = planFor(this.options?.[ROLL_TAG]);
   if ( !plan ) return wrapped(options, ...rest);
   const { DiceTerm } = foundry.dice.terms;
+  const taken = subtractedTerms(this.terms);
   for ( const term of this.terms ) {
-    if ( term instanceof DiceTerm ) termPlans.set(term, plan);
+    if ( !(term instanceof DiceTerm) ) continue;
+    termPlans.set(term, plan);
+    termSigns.set(term, taken.has(term) ? -1 : 1);
   }
+  if ( keepsRerolls(plan.command) ) keepTypedRerolls(this, plan);
   // Damage the player chose at its highest has every die at its highest, Foundry's own too.
   const maximize = DAMAGE_COMMANDS.has(plan.command.kind) && (plan.command.modifiers?.maximize === true);
   return wrapped({ ...options, allowInteractive: false, ...(maximize && { maximize: true }) }, ...rest);
+}
+
+/**
+ * Does a player's roll take the values they typed for the dice their character's effects add, since
+ * 0.42.0: one they typed in, never the Gamemaster's, once the self-test has checked that those reach
+ * their dice? The self-test's own rolls do before.
+ * @param {object} command
+ * @returns {boolean}
+ */
+function takesEffectDice(command) {
+  return (command.typed === true) && (command.by !== "gm") && Array.isArray(command.effectDice)
+    && ((diceStatus.effectDice === true) || (command[TESTING] === true));
+}
+
+/* -------------------------------------------- */
+/*  Rerolls made at the table                   */
+/* -------------------------------------------- */
+
+/**
+ * The commands of a die's modifiers that roll it again for a lower face, which a player who typed the
+ * die rerolled at the table instead.
+ * @type {string[]}
+ */
+const REROLLS = ["reroll", "rerollRecursive"];
+
+/**
+ * Does a player's roll keep their typed dice as they typed them, since 0.42.0: one they typed in and
+ * say they rerolled at the table, `rerolls: "kept"`, never the Gamemaster's, once the self-test has
+ * checked that a die keeps no reroll it's had dropped? The self-test's own rolls do before.
+ * @param {object} command
+ * @returns {boolean}
+ */
+function keepsRerolls(command) {
+  return (command.typed === true) && (command.rerolls === "kept") && (command.by !== "gm")
+    && ((diceStatus.keptRerolls === true) || (command[TESTING] === true));
+}
+
+/**
+ * Drop the rerolls, `r` and `rr`, a Halfling's `r1=1` among them, of each of a roll's own die terms
+ * the player typed every die of, in order, before any is thrown: the die they typed is the one they
+ * kept at the table. A term with a die they didn't type, as a d20 Midi-QOL's advantage adds as the
+ * roll is made or one of a size whose values have run out, keeps its rerolls, and the terms after it
+ * of its size too, so that Foundry rerolls its own die. What a term keeps, drops, raises, lowers or
+ * counts, and its explosions, are left as they are. The roll's formula is then written again, for its
+ * card to show the roll as made.
+ * @param {Roll} roll   Built, configured and about to be evaluated.
+ * @param {DicePlan} plan
+ */
+function keepTypedRerolls(roll, plan) {
+  const { DiceTerm } = foundry.dice.terms;
+  // The player's values left for the terms not yet read, by faces.
+  const left = new Map();
+  let dropped = false;
+  for ( const term of roll.terms ) {
+    if ( !(term instanceof DiceTerm) || !Number.isInteger(term.number) ) continue;
+    const { faces } = term;
+    const values = left.get(faces) ?? plan.remaining(faces);
+    if ( values < term.number ) {
+      left.set(faces, 0);
+      continue;
+    }
+    left.set(faces, values - term.number);
+    const commands = term.constructor.MODIFIERS ?? {};
+    const known = Object.keys(commands).sort((a, b) => b.length - a.length);
+    const kept = (term.modifiers ?? []).filter(modifier => !modifierCommands(String(modifier), known)
+      .some(([command]) => REROLLS.includes(commands[command])));
+    if ( kept.length === (term.modifiers ?? []).length ) continue;
+    term.modifiers = kept;
+    dropped = true;
+  }
+  if ( dropped ) roll.resetFormula();
 }
 
 /**
@@ -1392,10 +1515,16 @@ export async function selfTest() {
     Object.assign(diceStatus, { ready: true, reason: null, error: null });
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    Object.assign(diceStatus, { ready: false, reason: "self-test", error, hitDice: false, attacks: false });
+    Object.assign(diceStatus, {
+      ready: false, reason: "self-test", error, hitDice: false, attacks: false, keptRerolls: false, effectDice: false,
+      negativeDice: false
+    });
     console.warn(`${MODULE_ID} | Players' rolls from Sending Stone can't be made in this game: ${error}`, err);
     return;
   }
+
+  // Since 0.42.0, typed dice: right after the core's, so that no other part's failure skips them.
+  await typedSelfTests();
 
   try {
     await hitDieSelfTest();
@@ -1424,6 +1553,141 @@ export async function selfTest() {
     Object.assign(diceStatus, { modifiers: false, modifiersError: error });
     console.warn(`${MODULE_ID} | Players can't change their damage from Sending Stone in this game: ${error}`, err);
   }
+}
+
+/**
+ * Check, since 0.42.0, what a player typing in their dice relies on, each part apart, none printing
+ * anything, its outcome in `diceStatus` alone: that a die typed keeps no reroll where they say they
+ * rerolled at the table (`keptRerolls`); that the values they type for the dice their effects add
+ * reach those dice (`effectDice`); and, once those do, that a die an effect takes away on its own, as
+ * Bane's alone, is one of the roll's own, taken away (`negativeDice`). `typedError` says what went
+ * wrong first, or what wasn't checked.
+ * @returns {Promise<void>}
+ */
+async function typedSelfTests() {
+  Object.assign(diceStatus, { keptRerolls: false, effectDice: false, negativeDice: false, typedError: null });
+  const failed = err => {
+    diceStatus.typedError ??= (err instanceof Error) ? err.message : String(err);
+  };
+  try {
+    const unchecked = await keptRerollsSelfTest();
+    diceStatus.keptRerolls = true;
+    if ( unchecked ) failed(unchecked);
+  } catch (err) {
+    failed(err);
+  }
+
+  try {
+    await effectDiceSelfTest();
+    diceStatus.effectDice = true;
+  } catch (err) {
+    failed(err);
+    return;
+  }
+  try {
+    await negativeDiceSelfTest();
+    diceStatus.negativeDice = true;
+  } catch (err) {
+    failed(err);
+  }
+}
+
+/**
+ * Check that a die a player typed keeps no reroll where they say they rerolled at the table: a
+ * Halfling's d20 typed 1 is the one die thrown, standing, the roll 1 + 2 = 3, its formula without
+ * `r1=1`; and damage of `2d6r<=2` typed 1 and 5 comes to 6, neither rerolled. A Foundry that rolled
+ * the modifiers a die was made with, whatever was dropped from it since, would reroll them. And the
+ * same d20 typed without saying so is rerolled, as before. Where dnd5e has no damage rolls, the d20's
+ * alone are checked, and that is said.
+ * @returns {Promise<string|null>}   What wasn't checked, if anything.
+ */
+async function keptRerollsSelfTest() {
+  const D20Roll = CONFIG.Dice.D20Roll;
+  const typed = (id, dice, kept=true) => ({ id, typed: true, ...(kept && { rerolls: "kept" }), dice, [TESTING]: true });
+  const thrown = die => JSON.stringify((die?.results ?? []).map(({ result, active, rerolled }) => {
+    return [result, active, rerolled === true];
+  }));
+
+  const id = `self-test-${foundry.utils.randomID()}`;
+  const roll = new D20Roll("1d20 + 2", {}, { [ROLL_TAG]: id, halflingLucky: true });
+  await withPlan(typed(id, [{ faces: 20, results: [1] }]), () => roll.evaluate());
+  check(thrown(roll.dice[0]) === "[[1,true,false]]",
+    `a Halfling's d20 typed 1 and kept threw ${thrown(roll.dice[0])}, not the 1 alone`);
+  check(roll.total === 3, `a Halfling's d20 typed 1 and kept came to ${roll.total}, not 3`);
+  check(!roll.formula.includes("r1=1"), `a Halfling's d20 typed 1 and kept was made as ${roll.formula}`);
+
+  // Typed without saying so: Foundry's reroll, as before 0.42.0.
+  const before = `self-test-${foundry.utils.randomID()}`;
+  const rerolled = new D20Roll("1d20 + 2", {}, { [ROLL_TAG]: before, halflingLucky: true });
+  await withPlan(typed(before, [{ faces: 20, results: [1] }], false), () => rerolled.evaluate());
+  check(rerolled.dice[0]?.results[0]?.rerolled === true,
+    `a Halfling's d20 typed 1, not kept, threw ${thrown(rerolled.dice[0])}, its 1 not rerolled`);
+
+  if ( !CONFIG.Dice.DamageRoll ) return "dnd5e has no damage rolls: only a d20's kept rerolls were checked";
+  const damageId = `self-test-${foundry.utils.randomID()}`;
+  const [damage] = damageRollsFor({
+    rolls: [{ parts: ["2d6r<=2"], data: {}, options: { type: "slashing", [ROLL_TAG]: damageId } }], isCritical: false
+  });
+  await withPlan({ ...typed(damageId, [{ faces: 6, results: [1, 5] }]), kind: "damage" }, () => damage.evaluate());
+  check((thrown(damage.dice[0]) === "[[1,true,false],[5,true,false]]") && (damage.total === 6),
+    `damage of 2d6r<=2 typed 1 and 5 and kept threw ${thrown(damage.dice[0])}, coming to ${damage.total}, not 6`);
+  return null;
+}
+
+/**
+ * Check that the values a player typed for the dice their effects add reach those dice, by faces and
+ * sign: a d20 roll of `1d20 + 1d4 - 1d4`, as Bless and Bane add theirs, typed 10, with Bless's 3 and
+ * Bane's 1, throws them so, the second d4 taken away, coming to 12, both values used; and a roll for
+ * no one, made meanwhile, takes none of them. Foundry's own d4 can land on 3 or 1 by chance, so the
+ * values thrown alone can't show a die took the player's: the values left unused can.
+ * @returns {Promise<void>}
+ */
+async function effectDiceSelfTest() {
+  const D20Roll = CONFIG.Dice.D20Roll;
+  const id = `self-test-${foundry.utils.randomID()}`;
+  const roll = new D20Roll("1d20 + 1d4 - 1d4", {}, { [ROLL_TAG]: id });
+  const command = {
+    id, typed: true, dice: [{ faces: 20, results: [10] }],
+    effectDice: [{ faces: 4, sign: 1, results: [3] }, { faces: 4, sign: -1, results: [1] }], [TESTING]: true
+  };
+  let unused = [];
+  await withPlan(command, async plan => {
+    await new foundry.dice.Roll("1d4 - 1d4").evaluate({ allowInteractive: false });
+    check(Array.from(plan.effects.values()).every(values => values.length === 1),
+      "a roll for no one was given the dice a player typed for their effects");
+    await roll.evaluate();
+    unused = Array.from(plan.effects).filter(([, values]) => values.length).map(([key, values]) => {
+      const [faces, sign] = key.split("|");
+      return `${(sign === "-1") ? "-" : "+"}d${faces} ${values.join(", ")}`;
+    });
+  });
+  const values = JSON.stringify(roll.dice.map(die => die.results.map(({ result }) => result)));
+  check(values === "[[10],[3],[1]]", `a typed roll of ${roll.formula} threw ${values}, not 10, Bless's 3 and Bane's 1`);
+  check(roll.total === 12, `a typed roll of ${roll.formula}, 10 with Bless's 3 and Bane's 1, came to ${roll.total}, not 12`);
+  check(!unused.length, `a typed roll of ${roll.formula} threw ${values} but left unused the values typed for `
+    + `its effects' dice (${unused.join("; ")}): Foundry rolled those dice`);
+}
+
+/**
+ * Check that a die an effect takes away on its own, as Bane's alone, which dnd5e writes into the
+ * roll as `-1d4`, is one of the roll's own, taken away, and takes the value typed for it: where this
+ * world's parser puts it within parentheses instead, as `(1d4 * -1)`, it can take none, and a sheet
+ * lists no such die.
+ * @returns {Promise<void>}
+ */
+async function negativeDiceSelfTest() {
+  const D20Roll = CONFIG.Dice.D20Roll;
+  const { DiceTerm } = foundry.dice.terms;
+  const id = `self-test-${foundry.utils.randomID()}`;
+  const roll = new D20Roll("1d20 + @b", { b: "-1d4" }, { [ROLL_TAG]: id });
+  await withPlan({
+    id, typed: true, dice: [{ faces: 20, results: [10] }], effectDice: [{ faces: 4, sign: -1, results: [1] }],
+    [TESTING]: true
+  }, () => roll.evaluate());
+  const taken = Array.from(subtractedTerms(roll.terms)).filter(term => (term instanceof DiceTerm) && (term.faces === 4));
+  check(taken.length === 1, `a lone -1d4 was made as ${roll.formula}, with no d4 of its own taken away`);
+  check(taken[0].results[0]?.result === 1, `a lone -1d4 typed 1 threw ${taken[0].results[0]?.result}`);
+  check(roll.total === 9, `a lone -1d4 typed 1, with a d20 of 10, came to ${roll.total}, not 9`);
 }
 
 /**

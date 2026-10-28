@@ -139,10 +139,9 @@ function mapChange(change, units) {
         return { changes: ATTACKS.map(kind => add(`system.bonuses.${kind}.${change.roll}`, change.value)) };
       }
       if ( change.roll === "check" ) return { changes: [add("system.bonuses.abilities.check", change.value)] };
-      // A death save adds its own bonus alone, never the saving throws' (D5 documents/actor/actor.mjs:1589-1590).
-      if ( change.roll === "save" ) {
-        return { changes: [add("system.bonuses.abilities.save", change.value), add("system.attributes.death.bonuses.save", change.value)] };
-      }
+      // A death save adds the saving throws' bonus as well as its own (D5 documents/actor/actor.mjs:1490,
+      // :1613), so one key adds it once to each.
+      if ( change.roll === "save" ) return { changes: [add("system.bonuses.abilities.save", change.value)] };
       return invalid;
     }
     case "maxHitPoints": {

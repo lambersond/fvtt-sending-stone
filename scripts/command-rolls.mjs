@@ -1,6 +1,6 @@
 import {
-  ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, ENCHANT_KINDS, MODULE_ID,
-  MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG, TURN_KINDS
+  ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, EFFECT_DICE_KINDS, ENCHANT_KINDS,
+  MODULE_ID, MOST_EFFECT_DICE, MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG, TURN_KINDS
 } from "./constants.mjs";
 import { originalOf, playerOwners, seatActor, standingFor } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
@@ -249,7 +249,8 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * was shown it, and nothing else, as does taking one back, with the end of the turn it takes back.
  * And since 0.37.0 a favorite added or removed, what it is. And since 0.38.0 a dish from the Magical
  * Recipe Book, its body. And since 0.39.0 a change to one of the character's own effects, which and
- * how. And since 0.40.0 Wild Shape, which and how.
+ * how. And since 0.40.0 Wild Shape, which and how. And since 0.42.0 a typed d20 roll's effects' dice,
+ * `effectDice`.
  * @param {object} command
  * @returns {string|null}
  */
@@ -257,6 +258,7 @@ export function checkCommand(command) {
   if ( (command.by !== undefined) && (command.by !== null) && (command.by !== "gm") ) return "by";
   if ( !isOptional(command.of, isId) ) return "of";
   if ( isId(command.of) && COMPANION_UNTAKEN.includes(command.kind) ) return "of";
+  if ( !isOptional(command.effectDice, () => isEffectDice(command)) ) return "effectDice";
   if ( TURN_KINDS.includes(command.kind) ) return (command.kind === "undoEndTurn") ? checkUndoTurnCommand(command) : checkEndTurnCommand(command);
   const named = checkItemCommand(command);
   if ( named ) return named;
@@ -662,6 +664,23 @@ export function isRolled(rolled) {
   const { faces, results } = rolled ?? {};
   return DIE_FACES.has(faces) && Array.isArray(results) && (results.length >= 1) && (results.length <= 40)
     && results.every(value => Number.isInteger(value) && (value >= 1) && (value <= faces));
+}
+
+/**
+ * Are these the dice a player typed for the dice their character's effects add to a d20 roll, since
+ * 0.42.0: on a check, saving throw, death save, initiative or attack, at most ten, each
+ * `{ faces, sign, results }`, of a die a player rolls but never a d20, added (1) or taken away (-1),
+ * with 1 to 20 values it can show? Whether the roll has such a die is never asked: a value no die
+ * takes is dropped.
+ * @param {object} command
+ * @returns {boolean}
+ */
+function isEffectDice(command) {
+  const { effectDice } = command;
+  if ( !EFFECT_DICE_KINDS.includes(command.kind) || !Array.isArray(effectDice) ) return false;
+  if ( effectDice.length > MOST_EFFECT_DICE ) return false;
+  return effectDice.every(die => (die?.faces !== 20) && [1, -1].includes(die?.sign) && isRolled(die)
+    && (die.results.length <= 20));
 }
 
 /**

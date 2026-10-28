@@ -315,7 +315,8 @@ const WOLF2 = 'arena-wolf2'
   const keys = Object.keys(rolls)
   assert.deepEqual([rolls.prompts, rolls.companionPrompts], [true, true])
   assert.equal(keys[keys.indexOf('aloneChoices') + 1], 'companionPrompts', 'after aloneChoices')
-  assert.equal(keys.at(-1), 'companionPrompts')
+  // Changed on purpose (round 0.42.0 §8.2): `effectDice` and `keptRerolls` follow it, last.
+  assert.deepEqual(keys.slice(keys.indexOf('companionPrompts')), ['companionPrompts', 'effectDice', 'keptRerolls'])
   assert.deepEqual([helloOf('camp-b').data.features.rolls.prompts, helloOf('camp-b').data.features.rolls.companionPrompts], [false, false], 'off where its players are asked nothing')
   // An app answering companions: 1 is asked nothing of them.
   app.answers.set('camp-a', { ...FEATURES, companions: 1 })

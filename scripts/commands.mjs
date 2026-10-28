@@ -31,6 +31,7 @@ import { noteGroupReader } from "./groups.mjs";
 import { noteNotesReader, notesOn, notesReader } from "./journals.mjs";
 import { answersMidiPrompt, midiPromptsOffered, noteMidiReader, noteOpen } from "./midi-prompts.mjs";
 import { prompting } from "./prompts.mjs";
+import { effectDiceSystem } from "./sheet-effect-dice.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
 import { currentSession, DeliveryError, refusalError, send } from "./transport.mjs";
 
@@ -168,18 +169,21 @@ const made = new Map();
  * of its companions', wherever their rolls are made, as ending a concentration is. And from 0.41.0,
  * that damage on its own may name its level, attack mode and ammunition and spend what it uses
  * (`aloneChoices`), wherever it's offered; and that companions' saves are asked of an app that reads
- * them (`companionPrompts`), wherever its players are asked for theirs.
+ * them (`companionPrompts`), wherever its players are asked for theirs. And from 0.42.0, whether a
+ * typed roll's effects' dice are its player's (`effectDice`), under dnd5e 5, and whether its rerolls
+ * may be (`keptRerolls`): each wherever its players may type in their dice and its self-test passed.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
  *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean, manualDice: boolean,
- *   midiPrompts: boolean, aloneChoices: boolean, companionPrompts: boolean}}
+ *   midiPrompts: boolean, aloneChoices: boolean, companionPrompts: boolean, effectDice: boolean,
+ *   keptRerolls: boolean}}
  */
 export function rollFeatures(campaign) {
   const off = {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
     signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false,
-    midiPrompts: false, aloneChoices: false, companionPrompts: false
+    midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -209,7 +213,9 @@ export function rollFeatures(campaign) {
     manualDice: manualDiceOn(campaign),
     midiPrompts: midiPromptsOffered(campaign),
     aloneChoices: alone === true,
-    companionPrompts: prompting(campaign)
+    companionPrompts: prompting(campaign),
+    effectDice: manualDiceOn(campaign) && diceStatus.effectDice && effectDiceSystem(),
+    keptRerolls: manualDiceOn(campaign) && diceStatus.keptRerolls
   };
 }
 

@@ -51,7 +51,8 @@ run chat6 X=1 DND5E6=1
 # results in the app, Always.
 for v in X=1 "X=1 DND5E6=1"; do run transfers $v SLIM_CHECK=1; done
 # Module 0.32.0: players type in what their own dice show (dnd5e 5.3.3 and 6.0.5 stand-ins, and Midi-QOL's),
-# and an app roll's critical damage as dnd5e makes it, whatever Midi-QOL's rules for critical hits say.
+# and an app roll's critical damage as dnd5e makes it, whatever Midi-QOL's rules for critical hits say;
+# and since 0.42.0, the dice effects add, typed or skipped, and rerolls kept.
 for v in X=1 "X=1 DND5E6=1" MIDI=1; do run typed $v SLIM_CHECK=1; done
 for v in X=1 "X=1 DND5E6=1" MIDI=1 "MIDI=1 DND5E6=1"; do run crit-rules $v; done
 # Module 0.32.0: a party's things sent elsewhere by its Owner, party to party, and a party's coin

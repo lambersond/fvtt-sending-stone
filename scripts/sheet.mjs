@@ -4,6 +4,7 @@ import { criticalRule } from "./dice-plan.mjs";
 import { actionSections } from "./sheet-actions.mjs";
 import { creatureOf, deathSavesOf, describeTool, detailsOf, traitsOf } from "./sheet-details.mjs";
 import { concentrationOf, conditionsOf, effectSections } from "./sheet-effects.mjs";
+import { effectDiceField } from "./sheet-effect-dice.mjs";
 import { favoritesOf } from "./sheet-favorites.mjs";
 import { classesOf, featureSections } from "./sheet-features.mjs";
 import { inventoryOf } from "./sheet-inventory.mjs";
@@ -18,7 +19,8 @@ import { combinedMode, finite, localize, rollMode } from "./sheet-values.mjs";
  *
  * Every number is the one dnd5e itself shows on its sheet, already including proficiency and
  * fixed bonuses. Bonuses that are dice, such as Bless or Guidance, are not in the totals: dnd5e
- * adds them only when it rolls.
+ * adds them only when it rolls. Since 0.42.0 the dice effects add are listed apart, `effectDice`,
+ * for a player typing in their dice.
  *
  * Descriptions are not in the sheet itself: it refers to each by hash, and they are sent apart.
  * See sheet-texts.mjs.
@@ -93,7 +95,8 @@ function sheetOf(actor, texts, { secrets=true, ops=true }={}) {
     details: detailsOf(actor, texts, { secrets }),
     creature: creatureOf(actor),
     actions: actionSections(actor, texts),
-    favorites: favoritesOf(actor, texts)
+    favorites: favoritesOf(actor, texts),
+    ...effectDiceField(actor)
   };
 }
 
