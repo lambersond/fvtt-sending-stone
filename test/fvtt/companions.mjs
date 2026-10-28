@@ -11,6 +11,7 @@
 // --import ./dnd5e-register.mjs, and SLIM_CHECK=1 (every full sheet posted, a companion's among
 // them, slims and expands back).
 import assert from 'node:assert/strict'
+import { isDeepStrictEqual } from 'node:util'
 import { settings, user, users, actors } from './stub.mjs'
 import { DND5E5, DND5E6 as DND5E6_ROOT } from './paths.mjs'
 
@@ -82,7 +83,7 @@ settings.set('initiativeDexTiebreaker', true)
 globalThis._loc ??= (key, data) => (data ? game.i18n.format(key, data) : game.i18n.localize(key))
 
 const { Actor5e } = await import('./actor5e.mjs')
-const { AttackActivity, SaveActivity, DamageActivity, HealActivity, equip, port } = await import('./activity5e.mjs')
+const { AttackActivity, SaveActivity, DamageActivity, HealActivity, Item5e, equip, port } = await import('./activity5e.mjs')
 const { midi, placeables, installMidi } = await import('./midi-fake.mjs')
 globalThis.dnd5e = {
   settings: { rulesVersion: 'modern' },
@@ -1357,6 +1358,94 @@ await resetFight()
   for (const id of ['shaped', 'joined', 'batshaped']) game.combats.delete(id)
   actors.delete(form.id)
   ok("right after its character, Thorin shaped (round 0.40.0): his form's combatant, which keeps the form's id, leads Brakka, set and joining, and the Bat's own initiative is refused follows while it's in the combat")
+}
+
+// Since module 0.41.0 (its contract §8.2.2): an app that reads damage on its own's choices is sent a
+// companion's with them, and a companion's damage on its own spends on its live actor. Only here does
+// the stand-in app answer aloneChoices; every case above is as before.
+{
+  brakka.items.set('brakka-potion', new Item5e(brakka, {
+    id: 'brakka-potion', name: 'Potion of Healing', type: 'consumable', system: { properties: [], quantity: 2, type: { value: 'potion' }, uses: { max: 1, spent: 0, autoDestroy: true } },
+    activities: [{ id: 'bp-heal', type: 'heal', activation: { type: 'bonus', value: 1 }, healing: { number: 2, denomination: 4, bonus: '2', types: ['healing'] }, consumption: [{ type: 'itemUses', value: '1' }] }],
+  }))
+  let from = app.events.length
+  app.features = { commands: true, companions: 1, aloneChoices: 1 }
+  clock += 31_000
+  heartbeat()
+  await until(() => sheetsSent(from).some(e => e.data.companion.key === 'brakka'), "Brakka's sheet again")
+  await settle()
+  const rowsIn = whole => {
+    const found = []
+    JSON.stringify(whole, (key, value) => {
+      if (value && (typeof value === 'object') && Object.hasOwn(value, 'tableDamage')) found.push(value)
+      return value
+    })
+    return found
+  }
+  const potionRow = rowsIn(sheetOf('brakka')).find(row => (row.activity?.id === 'bp-heal') || (row.id === 'bp-heal'))
+  assert.deepEqual([potionRow?.tableDamage?.choices, potionRow?.tableDamage?.spends], [[], ['uses']], "Brakka's potion: choices and spends")
+  const made = await send({ id: `alone-${++ids}`, actorId: 'brakka', of: 'thorin', kind: 'itemDamage', item: 'brakka-potion', activity: 'bp-heal', consume: true, ...plain, dice: [{ faces: 4, results: [2, 3] }] })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual([made.alone, brakka.items.get('brakka-potion').system.quantity], [{ spent: ['uses'] }, 1], "spent on Brakka's own actor")
+  assert.equal(messageOf(made.id).flags['sending-stone'].companion, 'brakka')
+  from = app.events.length
+  app.features = { commands: true, companions: 1 }
+  clock += 31_000
+  heartbeat()
+  await until(() => sheetsSent(from).some(e => e.data.companion.key === 'brakka'), "Brakka's sheet again, without them")
+  await settle()
+  assert.ok(rowsIn(sheetOf('brakka')).every(row => (row.tableDamage === null) || isDeepStrictEqual(Object.keys(row.tableDamage), ['normal', 'critical'])), 'without them once the answer drops it')
+  brakka.items.delete('brakka-potion')
+  ok("an app answering aloneChoices 1 is sent a companion's sheet again with choices and spends, Brakka's potion [uses]; its damage on its own with consume, of: thorin, spends on Brakka's actor; dropped, sent again without them")
+}
+
+// Round 0.41.0 §2.5.3.2 and §2.6.6: under Midi-QOL's Enforce settings, in a fight, a companion's damage
+// on its own that spends is checked and marked on the companion, as Midi keeps a Bonus Action and a
+// reaction on each actor: its own used refuses it, its character's never does, and the mark is its own.
+if (MIDI) {
+  brakka.items.set('brakka-potion', new Item5e(brakka, {
+    id: 'brakka-potion', name: 'Potion of Healing', type: 'consumable', system: { properties: [], quantity: 2, type: { value: 'potion' }, uses: { max: 1, spent: 0, autoDestroy: true } },
+    activities: [{ id: 'bp-heal', type: 'heal', activation: { type: 'bonus', value: 1 }, healing: { number: 2, denomination: 4, bonus: '2', types: ['healing'] }, consumption: [{ type: 'itemUses', value: '1' }] }],
+  }))
+  brakka.items.set('brakka-snap', new Item5e(brakka, {
+    id: 'brakka-snap', name: 'Snap', type: 'feat', system: { properties: [], uses: { max: 2, spent: 0, recovery: [] } },
+    activities: [{ id: 'bs-hit', type: 'damage', activation: { type: 'reaction', value: 1 }, damage: [{ number: 1, denomination: 6, types: ['piercing'] }], consumption: [{ type: 'itemUses', value: '1' }] }],
+  }))
+  const alone = (item, activity, dice) => send({ id: `alone-${++ids}`, actorId: 'brakka', of: 'thorin', kind: 'itemDamage', item, activity, consume: true, ...plain, dice })
+  const drink = () => alone('brakka-potion', 'bp-heal', [{ faces: 4, results: [2, 3] }])
+  const snap = () => alone('brakka-snap', 'bs-hit', [{ faces: 6, results: [4] }])
+  const refused = (made, reason) => assert.deepEqual([made.status, made.reason], ['failed', reason], JSON.stringify(made))
+  const done = made => assert.equal(made.status, 'done', JSON.stringify(made))
+  game.combat = fight
+  assert.deepEqual([brakka.inCombat, thorin.inCombat], [true, true], 'both in the fight')
+  midi.settings.enforceBonusActions = 'all'
+  midi.settings.enforceReactions = 'all'
+  // Brakka's own Bonus Action used: refused, nothing rolled or spent.
+  midi.usedBonus.add('brakka')
+  const before = messages.size
+  refused(await drink(), 'bonus-action')
+  assert.deepEqual([messages.size, brakka.items.get('brakka-potion').system.quantity], [before, 2], 'nothing rolled, nothing spent')
+  // Thorin's used, Brakka's not: drunk, and marked on Brakka alone.
+  midi.usedBonus.clear()
+  midi.usedBonus.add('thorin')
+  let marks = midi.bonusMarks.length
+  done(await drink())
+  assert.deepEqual([midi.bonusMarks.slice(marks), brakka.items.get('brakka-potion').system.quantity], [['brakka'], 1], 'marked on Brakka, never Thorin')
+  // A reaction the same: Brakka's own used refuses it; Thorin's doesn't, and the mark is Brakka's.
+  midi.usedReaction.add('brakka')
+  refused(await snap(), 'reaction')
+  midi.usedReaction.clear()
+  midi.usedReaction.add('thorin')
+  marks = midi.reactionMarks.length
+  done(await snap())
+  assert.deepEqual([midi.reactionMarks.slice(marks), brakka.items.get('brakka-snap').system.uses.spent], [['brakka'], 1], 'its reaction marked on Brakka, never Thorin')
+  midi.usedBonus.clear()
+  midi.usedReaction.clear()
+  midi.settings.enforceBonusActions = 'none'
+  midi.settings.enforceReactions = 'none'
+  brakka.items.delete('brakka-potion')
+  brakka.items.delete('brakka-snap')
+  ok("Midi-QOL's Enforce bonus actions and reactions \"all\", in a fight: Brakka's potion with consume refused \"bonus-action\" while Brakka's own Bonus Action is used, nothing rolled; with only Thorin's used, drunk and marked on Brakka, never Thorin; a reaction of Brakka's refused \"reaction\" while Brakka's own is used, with only Thorin's used done and marked on Brakka")
 }
 
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

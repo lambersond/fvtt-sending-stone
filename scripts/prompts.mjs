@@ -5,8 +5,10 @@ import { campaignCharacterId, endedForms, originalOf, playerOwners } from "./cha
 import { askedSave, chatAudience } from "./chat-data.mjs";
 import { resultsAlways } from "./config.mjs";
 import { midiActivities } from "./command-uses.mjs";
+import { companionOfActor, companionPart, creatureKey } from "./creatures.mjs";
+import { companionPromptReader, onCompanionPromptReader, onCompanionsLeft, toldList } from "./creature-sync.mjs";
 import { diceStatus } from "./dice-plan.mjs";
-import { findMidiPrompt, midiOpenPrompts } from "./midi-prompts.mjs";
+import { findMidiPrompt, midiCompanionPrompts, midiOpenPrompts, releaseCompanionPrompts } from "./midi-prompts.mjs";
 import { send } from "./transport.mjs";
 
 /**
@@ -21,6 +23,9 @@ import { send } from "./transport.mjs";
  * Whether a prompt is open is read from the chat log: its card is there, less than ten minutes
  * old, and its character hasn't rolled the save from it. So a prompt can still be answered, and a
  * campaign told which are open, after the Gamemaster reloads.
+ *
+ * Since 0.41.0 a listed companion's too, to an app that reads them, filed under its key, its own
+ * token's or actor's id in the prompt's (round 0.41.0 §3).
  */
 
 /**
@@ -30,10 +35,12 @@ import { send } from "./transport.mjs";
 export const PROMPT_LIFETIME = 10 * 60_000;
 
 /**
- * A saving throw the game asks of one of a campaign's characters.
+ * A saving throw the game asks of one of a campaign's characters, or since 0.41.0 of a companion.
  * @typedef {object} RollPrompt
- * @property {string} id                       The card's id and the character's, joined by "-".
- * @property {string} actorId
+ * @property {string} id                       The card's id and the character's, joined by "-": for
+ *                                             a companion, its token's id, or its actor's.
+ * @property {string} actorId                  The character's id, or the companion's key.
+ * @property {string} part                     Whose the id names, its second part; never sent.
  * @property {string} messageId                The card that asks.
  * @property {"save"|"concentration"} type
  * @property {string[]} abilities              The abilities it may be rolled with, one for
@@ -68,6 +75,10 @@ export function registerPromptHooks() {
   // On every client, whoever deleted it, unlike dnd5e's endConcentration hook, which is the
   // caller's alone.
   Hooks.on("deleteActiveEffect", onDeleteEffect);
+  // Since 0.41.0: a companion's prompts close as it leaves the list, and are sent again where an app
+  // first says it reads them.
+  onCompanionsLeft(closeCompanionPrompts);
+  onCompanionPromptReader(resendCompanionPrompts);
 }
 
 /**
@@ -78,6 +89,16 @@ export function registerPromptHooks() {
  */
 export function prompting(campaign) {
   return campaign.rolls && campaign.prompts && diceStatus.ready;
+}
+
+/**
+ * Does a campaign ask the saves the game asks of its characters' companions, since 0.41.0: it asks
+ * its players for their saves, and its app reads companions' prompts, `companions` 2?
+ * @param {Campaign} campaign
+ * @returns {boolean}
+ */
+export function companionPrompting(campaign) {
+  return prompting(campaign) && companionPromptReader(campaign.id);
 }
 
 /* -------------------------------------------- */
@@ -115,32 +136,52 @@ function overTimeAction(message) {
 }
 
 /**
- * The campaign's characters a card asks a save of, of those whose players can read it: the one
+ * Whom a card asks a save of: the campaign's characters, of those whose players can read it: the one
  * concentrating, for dnd5e's concentration card, while they still concentrate on what it asked
  * about, as `concentratesSince` has it; the targets of a save's card; and, for a request a
- * Gamemaster posts in chat, every one.
+ * Gamemaster posts in chat, every one. Since 0.41.0, where the campaign asks companions' saves, the
+ * companions it was last told of too, each matched by its live actor: the one concentrating, whoever
+ * its card is whispered to, as a concentration check gives nothing away; and a save card's targets,
+ * where every character it's a companion of has a player who can read the card; never by a request.
+ * Each once, with the actor its save is described by, the id part its prompt names, and the id it's
+ * filed under, its key for a companion.
  * @param {ChatMessage} message
  * @param {AskedSave} save
  * @param {Campaign} campaign
- * @returns {string[]}   Their actor ids.
+ * @returns {{actor: Actor, part: string, actorId: string}[]}
  */
 function askedOf(message, save, campaign) {
   const readers = new Set(chatAudience(message, campaign).characters);
-  let ids = [];
+  const listed = companionPrompting(campaign) ? toldList(campaign.id) : [];
+  const asked = new Map();
+  const character = id => {
+    if ( id && readers.has(id) && !asked.has(id) ) asked.set(id, { actor: game.actors.get(id), part: id, actorId: id });
+  };
+  const companion = (actor, read) => {
+    const entry = companionOfActor(listed, actor);
+    if ( entry && read(entry) && !asked.has(entry.key) ) {
+      asked.set(entry.key, { actor, part: companionPart(entry), actorId: entry.key });
+    }
+  };
   switch ( save.source ) {
     case "concentration":
       if ( concentratesSince(message.speakerActor, message) ) {
-        ids = [campaignCharacterId(message.speakerActor, campaign)];
+        character(campaignCharacterId(message.speakerActor, campaign));
+        companion(message.speakerActor, () => true);
       }
       break;
     case "save":
-      ids = (message.flags?.dnd5e?.targets ?? []).map(target => campaignCharacterId(actorOf(target?.uuid), campaign));
+      for ( const target of message.flags?.dnd5e?.targets ?? [] ) {
+        const actor = actorOf(target?.uuid);
+        character(campaignCharacterId(actor, campaign));
+        companion(actor, entry => entry.of.every(id => readers.has(id)));
+      }
       break;
     case "request":
-      if ( message.author?.isGM ) ids = Array.from(readers);
+      if ( message.author?.isGM ) for ( const id of readers ) character(id);
       break;
   }
-  return Array.from(new Set(ids.filter(id => id && readers.has(id))));
+  return Array.from(asked.values()).filter(each => each.actor);
 }
 
 /**
@@ -178,9 +219,10 @@ function actorOf(uuid) {
 
 /**
  * The prompts a chat card opens in a campaign: one for each of its characters it asks a save of,
- * while the campaign asks its players for their saves. A roll request a player posts from the app
- * asks no one, whoever it's posted as: it's for the Gamemaster, to roll for the creatures it names,
- * and anyone in Foundry may click it.
+ * while the campaign asks its players for their saves, and since 0.41.0 for each companion it asks,
+ * where the campaign asks theirs. A roll request a player posts from the app asks no one, whoever
+ * it's posted as: it's for the Gamemaster, to roll for the creatures it names, and anyone in Foundry
+ * may click it.
  * @param {ChatMessage} message
  * @param {Campaign} campaign
  * @returns {RollPrompt[]}
@@ -189,28 +231,28 @@ export function promptsOf(message, campaign) {
   if ( !prompting(campaign) || message.flags?.[MODULE_ID]?.ask || overTimeAction(message) ) return [];
   const save = askedSave(message);
   if ( !save || leftToMidi(save, message) ) return [];
-  return askedOf(message, save, campaign).flatMap(actorId => {
-    const actor = game.actors.get(actorId);
-    const prompt = actor ? describePrompt(message, save, actor) : null;
+  return askedOf(message, save, campaign).flatMap(asked => {
+    const prompt = describePrompt(message, save, asked);
     return prompt ? [prompt] : [];
   });
 }
 
 /**
- * A save a card asks of a character.
+ * A save a card asks of a character, or since 0.41.0 of a companion, described from its own actor.
  * @param {ChatMessage} message
  * @param {AskedSave} save
- * @param {Actor} actor
+ * @param {{actor: Actor, part: string, actorId: string}} asked
  * @returns {RollPrompt|null}   Null for a save with no ability to roll.
  */
-function describePrompt(message, save, actor) {
+function describePrompt(message, save, { actor, part, actorId }) {
   const abilities = (save.type === "concentration") ? [save.abilities[0] ?? ownConcentrationAbility(actor)]
     : save.abilities;
   if ( !abilities.length ) return null;
   const openedAt = Number.isFinite(message.timestamp) ? message.timestamp : Date.now();
   return {
-    id: promptId(message.id, actor.id),
-    actorId: actor.id,
+    id: promptId(message.id, part),
+    actorId,
+    part,
     messageId: message.id,
     type: save.type,
     abilities,
@@ -286,13 +328,14 @@ export function concentratingOn(actor) {
 }
 
 /**
- * A prompt's id: its card's and its character's, which Foundry's ids never contain a "-" to blur.
+ * A prompt's id: its card's and its character's, which Foundry's ids never contain a "-" to blur;
+ * since 0.41.0 a companion's token's or actor's in its character's place.
  * @param {string} messageId
- * @param {string} actorId
+ * @param {string} part
  * @returns {string}
  */
-function promptId(messageId, actorId) {
-  return `${messageId}-${actorId}`;
+function promptId(messageId, part) {
+  return `${messageId}-${part}`;
 }
 
 /**
@@ -308,15 +351,31 @@ function speakerId(message) {
 }
 
 /**
+ * The id parts a save message was rolled for, since 0.41.0: its speaker's character, as
+ * `speakerId` has it; its speaker's token, as a save clicked on a card in Foundry with a companion's
+ * token selected names it; and the companion the app rolled it for, as its own mark names it, by its
+ * key's token id, or its key, whatever speaker core gave it.
+ * @param {ChatMessage} message
+ * @returns {Set<string>}
+ */
+function partsOf(message) {
+  const parts = new Set([speakerId(message), message.speaker?.token]);
+  const key = message.flags?.[MODULE_ID]?.companion;
+  if ( typeof key === "string" ) parts.add(key.includes("-") ? key.split("-")[1] : key);
+  return new Set(Array.from(parts).filter(part => (typeof part === "string") && part));
+}
+
+/**
  * Has a character rolled a save from a card, here or in the app? Since 0.40.0 her form's save counts
  * as hers. A prompt asked of a form is its character's, answered from her seat and rolled on the form.
+ * Since 0.41.0 by the prompt's id part, so a companion's, each of two wolves of one Wolf its own.
  * @param {string} messageId
- * @param {string} actorId
+ * @param {string} part
  * @returns {boolean}
  */
-function answered(messageId, actorId) {
+function answered(messageId, part) {
   return game.messages.contents.some(message => (message.flags?.dnd5e?.originatingMessage === messageId)
-    && (message.flags?.dnd5e?.roll?.type === "save") && (speakerId(message) === actorId));
+    && (message.flags?.dnd5e?.roll?.type === "save") && partsOf(message).has(part));
 }
 
 /**
@@ -351,24 +410,26 @@ function summarizePrompt(prompt) {
  * it asked about (`gone`), it waited too long (`expired`), or the character has rolled it
  * (`answered`); for Midi's, also as findMidiPrompt says.
  * Since 0.40.0 a prompt asked of a form is its character's, answered from her seat and rolled on the
- * form: it's found by the character, never the actor the save is rolled on.
+ * form: it's found by the character, never the actor the save is rolled on. Since 0.41.0 a
+ * companion's is found by its own id part and its key, `character` where the id names another.
  * @param {string} id         The prompt's id, as the app has it.
- * @param {Actor} character   The character whose save it is: a companion's own actor for a companion.
+ * @param {{part: string, actorId: string}} asked   Whose save it is: the character's id, both; or a
+ *                                                  companion's token's or actor's id, and its key.
  * @param {Campaign} campaign
  * @param {object} command    The answer.
  * @returns {{prompt?: RollPrompt, midi?: object, refusal?: string}}
  */
-export function findPrompt(id, character, campaign, command) {
+export function findPrompt(id, asked, campaign, command) {
   if ( !prompting(campaign) ) return { refusal: "off" };
-  const [messageId, actorId] = id.split("-");
-  if ( actorId !== character.id ) return { refusal: "character" };
+  const [messageId, part] = id.split("-");
+  if ( part !== asked.part ) return { refusal: "character" };
   const midi = findMidiPrompt(id, campaign, command);
   if ( midi ) return midi;
   const message = game.messages.get(messageId);
-  const prompt = message ? promptsOf(message, campaign).find(each => each.actorId === character.id) : null;
+  const prompt = message ? promptsOf(message, campaign).find(each => each.actorId === asked.actorId) : null;
   if ( !prompt ) return { refusal: "gone" };
   if ( Date.now() >= prompt.expiresAt ) return { refusal: "expired" };
-  if ( answered(messageId, character.id) ) return { refusal: "answered" };
+  if ( answered(messageId, asked.part) ) return { refusal: "answered" };
   return { prompt };
 }
 
@@ -406,14 +467,15 @@ function onCreateMessage(message) {
 }
 
 /**
- * Close the prompt a save rolled from its card answers: from the app, or clicked in Foundry.
+ * Close the prompt a save rolled from its card answers: from the app, or clicked in Foundry. Since
+ * 0.41.0 by each id part the message was rolled for (`partsOf`): an id that isn't open is passed by.
  * @param {ChatMessage} message
  */
 function closeAnswered(message) {
   const origin = message.flags?.dnd5e?.originatingMessage;
-  const actorId = speakerId(message);
-  if ( !origin || !actorId || (message.flags?.dnd5e?.roll?.type !== "save") ) return;
-  closePrompt(promptId(origin, actorId), message.flags?.[MODULE_ID]?.request ? "answered" : "rolled");
+  if ( !origin || (message.flags?.dnd5e?.roll?.type !== "save") ) return;
+  const reason = message.flags?.[MODULE_ID]?.request ? "answered" : "rolled";
+  for ( const part of partsOf(message) ) closePrompt(promptId(origin, part), reason);
 }
 
 /**
@@ -433,7 +495,7 @@ function onDeleteMessage(message) {
  * in Foundry by anyone, or gone with what it was on. Midi-QOL's own are left to it, released by
  * nothing here: midi-prompts.mjs would have Midi roll one released. Since 0.40.0 a form's is its
  * character's, whose prompt it is, and a card asks as long as whoever spoke it, she or her form,
- * still concentrates, as `askedOf` reads it.
+ * still concentrates, as `askedOf` reads it. Since 0.41.0 a companion's, filed under its key.
  * @param {ActiveEffect} effect
  */
 function onDeleteEffect(effect) {
@@ -441,9 +503,9 @@ function onDeleteEffect(effect) {
   const actor = effect?.parent;
   if ( actor?.documentName !== "Actor" ) return;
   if ( !effect.statuses?.has?.(CONFIG.specialStatusEffects?.CONCENTRATING) ) return;
-  const whose = originalOf(actor)?.id ?? actor.id;
+  const whose = new Set([originalOf(actor)?.id ?? actor.id, creatureKey(actor)]);
   for ( const [id, { prompt }] of open ) {
-    if ( (prompt.type !== "concentration") || (prompt.actorId !== whose) ) continue;
+    if ( (prompt.type !== "concentration") || !whose.has(prompt.actorId) ) continue;
     const card = game.messages.get(prompt.messageId);
     const asks = card && ((askedSave(card)?.source !== "concentration") || concentratesSince(card.speakerActor ?? actor, card));
     if ( !asks ) closePrompt(id, "gone");
@@ -489,16 +551,62 @@ function closePrompt(id, reason) {
 }
 
 /**
+ * Close the prompts of companions that left a campaign's list, since 0.41.0, at once, `gone`: the
+ * card prompts that campaign was told of, filed under their keys, and Midi-QOL's, which go Midi's own
+ * way (midi-prompts.mjs). An answer that comes later finds no companion, `unknown`.
+ * @param {string} campaignId
+ * @param {string[]} keys
+ * @returns {void}
+ */
+export function closeCompanionPrompts(campaignId, keys) {
+  const left = new Set(keys);
+  for ( const [id, { prompt, campaignIds }] of Array.from(open) ) {
+    if ( left.has(prompt.actorId) && campaignIds.has(campaignId) ) closePrompt(id, "gone");
+  }
+  releaseCompanionPrompts(campaignId, keys);
+}
+
+/**
+ * Send a campaign the companions' prompts open now, since 0.41.0, once its app first says it reads
+ * them: a hello built before it said so, as after a reload, left them out, and the app closed them.
+ * The card prompts read from the chat log, as for a hello, and Midi-QOL's waiting. Posted in turn, so
+ * after any hello on its way that was built before the answer and left them out too.
+ * @param {string} campaignId
+ * @returns {void}
+ */
+function resendCompanionPrompts(campaignId) {
+  const campaign = getCampaigns().find(c => c.id === campaignId);
+  if ( !campaign || !canSend() || !companionPrompting(campaign) ) return;
+  for ( const prompt of openFrom(campaign) ) {
+    if ( campaign.characters.has(prompt.actorId) ) continue;
+    remember(prompt, campaign);
+    send(EVENTS.PROMPT_OPENED, { prompt: summarizePrompt(prompt) }, campaign);
+  }
+  for ( const prompt of midiCompanionPrompts(campaign) ) send(EVENTS.PROMPT_OPENED, { prompt }, campaign);
+}
+
+/**
+ * The card prompts open in a campaign, read from the chat log: its last ten minutes' cards, those
+ * asked not yet answered.
+ * @param {Campaign} campaign
+ * @returns {RollPrompt[]}
+ */
+function openFrom(campaign) {
+  const since = Date.now() - PROMPT_LIFETIME;
+  const recent = prompting(campaign) ? game.messages.contents.filter(message => !(message.timestamp < since)) : [];
+  return recent.flatMap(message => promptsOf(message, campaign))
+    .filter(prompt => (Date.now() < prompt.expiresAt) && !answered(prompt.messageId, prompt.part));
+}
+
+/**
  * The prompts open in a campaign, read from the chat log, for its hello; from then on, it's told as
- * each closes, and of no other it was told of before.
+ * each closes, and of no other it was told of before. Since 0.41.0 a companion's only where its app
+ * reads them, as `promptsOf` asks.
  * @param {Campaign} campaign
  * @returns {object[]}
  */
 export function openPrompts(campaign) {
-  const since = Date.now() - PROMPT_LIFETIME;
-  const recent = prompting(campaign) ? game.messages.contents.filter(message => !(message.timestamp < since)) : [];
-  const found = recent.flatMap(message => promptsOf(message, campaign))
-    .filter(prompt => (Date.now() < prompt.expiresAt) && !answered(prompt.messageId, prompt.actorId));
+  const found = openFrom(campaign);
   const ids = new Set(found.map(prompt => prompt.id));
   for ( const [id, entry] of open ) {
     if ( ids.has(id) ) continue;

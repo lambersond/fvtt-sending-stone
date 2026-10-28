@@ -1835,4 +1835,216 @@ assert.equal(campaignCharacterId(formOf(), campaign()), 'elowen', "a form stands
 assert.equal((await made(revert())).result.status, 'done')
 ok("Manage Campaigns: the Wild Shape fieldset, the user's words, between Active effects and Companions, ticked and saved either way; the packs' boxes for every Actor compendium, the 2024 Actors ticked by default, saved by prefix so a pack id's dots survive; WildShapeApp with an app that has commands but no wildShape, none once it says wildShape: 1; Not available under another system; the settings row after effects, with its note; a form is no candidate character")
 
+/* -------------------------------------------- */
+/*  19. Midi-QOL's Bonus Actions (0.41.0)       */
+/* -------------------------------------------- */
+
+// Round 0.41.0 §8.2.1: where Midi-QOL makes uses and enforces Bonus Actions, a change and a return
+// are refused once one is used in a fight, and mark one used: on the form, or on her once back.
+{
+  const leaf = readFileSync(`${MODULE}/scripts/midi-economy.mjs`, 'utf8')
+  assert.ok(!/^\s*import\b/m.test(leaf) && !/\bimport\s*\(/.test(leaf), 'midi-economy.mjs imports nothing')
+  const uses = await import(`${MODULE}/scripts/command-uses.mjs`)
+  assert.equal(typeof uses.midiActivities, 'function', 'command-uses.mjs still exports midiActivities')
+  ok('the economy is a leaf: midi-economy.mjs imports nothing, and command-uses.mjs still exports midiActivities')
+}
+if (MIDI) {
+  const { midi } = await import('./midi-fake.mjs')
+  const viewed = game.combat
+  game.combat = fight
+  await reset()
+  assert.equal(formOf(), undefined, 'herself to begin with')
+  const blackBearId = profileId('Black Bear')
+  const used = (...ids) => { midi.usedBonus.clear(); for (const id of ids) midi.usedBonus.add(id) }
+  const marks = () => [...midi.bonusMarks]
+  const back = async () => {
+    used()
+    if (formOf()) assert.equal((await made(revert())).result.status, 'done', 'back to herself')
+    used()
+    await reset()
+  }
+  // 1. Enforced for all, her Bonus Action used: refused, nothing written.
+  midi.settings.enforceBonusActions = 'all'
+  used('elowen')
+  let writes = 0
+  const counting = Hooks.on('updateItem', item => { if (item.actor?.id === 'elowen') writes++ })
+  let shape = await made(transform(wolfId))
+  Hooks.off('updateItem', counting)
+  assert.deepEqual(refusal(shape), ['failed', 'bonus-action', null], 'her Bonus Action used: refused')
+  assert.deepEqual([formOf(), shapeItem().system.uses.spent, elowenHall.actorId, elowenForest.actorId, writes], [undefined, 0, 'elowen', 'elowen', 0],
+    'no form, no use spent, her tokens hers, no item written')
+  // 2. Unused: changed, the Bonus Action marked on the form, never on her.
+  used()
+  let from = marks().length
+  shape = await made(transform(wolfId))
+  const wolf = formOf()
+  assert.equal(shape.result.status, 'done', JSON.stringify(shape.result))
+  assert.deepEqual(marks().slice(from), [wolf.id], "marked once, on the form, never 'elowen'")
+  // 3. Returning in the same turn, the form's Bonus Action used: refused, still a Wolf.
+  shape = await made(revert())
+  assert.deepEqual([refusal(shape), formOf()?.id], [['failed', 'bonus-action', null], wolf.id], 'Return refused, still a Wolf')
+  // 4. At her next turn: returned, marked on her once back.
+  used()
+  from = marks().length
+  shape = await made(revert())
+  assert.deepEqual([shape.result.status, formOf(), marks().slice(from)], ['done', undefined, ['elowen']], 'returned, marked on her')
+  ok("Midi-QOL's Enforce bonus actions \"all\" in a fight: her Bonus Action used, a change refused \"bonus-action\" with nothing written (no form, no use spent, her tokens hers, no item update); unused, the change made and marked once, on the form; a Return in the same turn refused, the Wolf kept; at her next turn returned and marked on her")
+
+  // 5. "displayOnly": never refused, the form marked once.
+  await reset()
+  midi.settings.enforceBonusActions = 'displayOnly'
+  used('elowen')
+  from = marks().length
+  shape = await made(transform(wolfId))
+  assert.deepEqual([shape.result.status, marks().slice(from)], ['done', [formOf().id]], 'displayOnly: changed, the form marked once')
+  await back()
+  // 6. "character": enforced for her; "npc": neither refused nor marked.
+  midi.settings.enforceBonusActions = 'character'
+  used('elowen')
+  assert.deepEqual(refusal(await made(transform(wolfId))), ['failed', 'bonus-action', null], '"character": enforced for her')
+  midi.settings.enforceBonusActions = 'npc'
+  from = marks().length
+  shape = await made(transform(wolfId))
+  assert.deepEqual([shape.result.status, marks().slice(from)], ['done', []], '"npc": neither refused nor marked')
+  await back()
+  // 7. Out of a fight: neither checked nor marked.
+  midi.settings.enforceBonusActions = 'all'
+  game.combat = null
+  used('elowen')
+  from = marks().length
+  shape = await made(transform(wolfId))
+  assert.deepEqual([shape.result.status, marks().slice(from)], ['done', []], 'out of a fight: neither')
+  shape = await made(revert())
+  assert.deepEqual([shape.result.status, marks().slice(from)], ['done', []], 'nor its return')
+  game.combat = fight
+  await reset()
+  ok('"displayOnly": never refused, the form marked once; "character" enforced for her; "npc" neither refused nor marked; out of a fight, neither checked nor marked, a change or a return')
+
+  // 8. A change while shaped: the Wolf's Bonus Action used, refused, the Wolf kept and no use spent;
+  // at its next turn the Black Bear, one Bonus Action and one mark, on the new form.
+  used()
+  shape = await made(transform(wolfId))
+  const wolf2 = formOf()
+  assert.equal(shape.result.status, 'done')
+  const spentThen = shapeItem().system.uses.spent
+  shape = await made(transform(blackBearId))
+  assert.deepEqual([refusal(shape), formOf()?.id, shapeItem().system.uses.spent], [['failed', 'bonus-action', null], wolf2.id, spentThen], 'the Wolf marked: refused, kept, no use spent')
+  used()
+  from = marks().length
+  shape = await made(transform(blackBearId))
+  const bear = formOf()
+  assert.deepEqual([shape.result.status, bear?.name, marks().slice(from)], ['done', 'Elowen (Black Bear)', [bear.id]], 'one mark, on the new form')
+  await back()
+  // 9. "none": no refusal, no mark.
+  midi.settings.enforceBonusActions = 'none'
+  used('elowen')
+  from = marks().length
+  shape = await made(transform(wolfId))
+  assert.deepEqual([shape.result.status, marks().slice(from)], ['done', []], '"none": neither')
+  await back()
+  // 10. No uses left and her Bonus Action used: "consume", the use's check first.
+  midi.settings.enforceBonusActions = 'all'
+  await shapeItem().update({ 'system.uses.spent': shapeItem().system.uses.max })
+  used('elowen')
+  assert.deepEqual(refusal(await made(transform(wolfId))), ['failed', 'consume', null], 'no uses left: consume, not bonus-action')
+  await reset()
+  ok('a change while shaped: the Wolf\'s Bonus Action used, refused, the Wolf kept and no use spent; next turn the Black Bear, one mark, on the new form; "none" neither; no uses left "consume" before "bonus-action"')
+
+  // 11. Core matching a combatant by the actor it stored (her own), not its token's (the form's):
+  // a change while shaped still checked, her own actor in the fight.
+  port.faults.storedActorId = true
+  used()
+  shape = await made(transform(wolfId))
+  assert.equal(shape.result.status, 'done')
+  assert.deepEqual([formOf().inCombat, elowen.inCombat], [false, true], "the form not in the fight by core's reading, she is")
+  shape = await made(transform(blackBearId))
+  assert.deepEqual([refusal(shape), formOf()?.name], [['failed', 'bonus-action', null], 'Elowen (Wolf)'], 'still checked, by her own actor in the fight')
+  port.faults.storedActorId = false
+  await back()
+  // 12. Midi not making uses (ReplaceDefaultActivities off): neither checked nor marked.
+  settings.set('ReplaceDefaultActivities', false)
+  used('elowen')
+  from = marks().length
+  shape = await made(transform(wolfId))
+  assert.deepEqual([shape.result.status, marks().slice(from)], ['done', []], "Midi's activities off: neither")
+  settings.delete('ReplaceDefaultActivities')
+  await back()
+  ok("core matching a combatant by its stored actor: a change while shaped still checked, by her own actor in the fight; Midi-QOL not making uses: neither checked nor marked")
+
+  // 13. Midi with no marker effect (enforcement turned on without a reload): done, nothing marked.
+  midi.noMarker = true
+  used()
+  from = marks().length
+  shape = await made(transform(wolfId))
+  assert.deepEqual([shape.result.status, marks().slice(from), midi.usedBonus.size], ['done', [], 0], 'no marker: done, nothing marked')
+  midi.noMarker = false
+  await back()
+  // 14. Midi throwing as it marks: done, the form made, the failure logged.
+  const errors = []
+  const logged = console.error
+  console.error = (...args) => errors.push(args.map(String).join(' '))
+  const setter = MidiQOL.setBonusActionUsed
+  MidiQOL.setBonusActionUsed = async () => { throw new Error('Midi broke') }
+  shape = await made(transform(wolfId))
+  MidiQOL.setBonusActionUsed = setter
+  console.error = logged
+  assert.deepEqual([shape.result.status, formOf()?.name], ['done', 'Elowen (Wolf)'], 'done, the form made')
+  assert.ok(errors.some(line => line.includes("Could not mark Elowen's Bonus Action for Midi-QOL")), 'the failure logged')
+  await back()
+  // A change that fails once checked (transformInto throwing): refunded, nothing marked.
+  used()
+  from = marks().length
+  port.faults.throwOnTransform = true
+  shape = await made(transform(wolfId))
+  assert.deepEqual([refusal(shape)[1], formOf(), shapeItem().system.uses.spent, marks().slice(from)], ['error', undefined, 0, []], 'refunded, nothing marked')
+  midi.settings.enforceBonusActions = 'none'
+  used()
+  game.combat = viewed
+  ok('Midi-QOL with no marker effect: done, nothing marked; Midi throwing as it marks: done, the form made, the failure logged; a change that fails once checked: refunded, nothing marked')
+
+  // Damage on its own from the form, with consume (round 0.41.0 §2.5.3.2, §2.6.6): a Bonus Action of
+  // the form's is checked and marked on the form, where Midi keeps it, never on Elowen, even where core
+  // finds only Elowen's own actor in the fight, by the id the form's combatant stores.
+  const activity5e = await import('./activity5e.mjs')
+  const documents = globalThis.dnd5e.documents
+  globalThis.dnd5e.documents = { activity: { AttackActivity: activity5e.AttackActivity, SaveActivity: activity5e.SaveActivity, DamageActivity: activity5e.DamageActivity, HealActivity: activity5e.HealActivity } }
+  await campaignAs({ rolls: true, attacks: true })
+  game.combat = fight
+  midi.settings.enforceBonusActions = 'all'
+  port.faults.storedActorId = true
+  used()
+  shape = await made(transform(wolfId))
+  assert.equal(shape.result.status, 'done', JSON.stringify(shape.result))
+  const shaped = formOf()
+  assert.deepEqual([shaped.inCombat, elowen.inCombat], [false, true], "the form not in the fight by core's reading, Elowen is")
+  const bite = [...shaped.items].find(item => item.name === 'Bite')
+  const biting = [...bite.system.activities].find(activity => activity.type === 'attack')
+  biting.activation = { type: 'bonus', value: 1 }
+  const alone = () => ({ id: `alone-${++ids}`, actorId: 'elowen', kind: 'itemDamage', item: bite.id, activity: biting.id, consume: true, mode: 0, explicit: false, extras: [], dice: [{ faces: 6, results: [3] }] })
+  used(shaped.id)
+  assert.deepEqual(refusal(await made(alone())), ['failed', 'bonus-action', null], "the form's Bonus Action used: refused")
+  used('elowen')
+  from = marks().length
+  shape = await made(alone())
+  assert.deepEqual([shape.result.status, marks().slice(from)], ['done', [shaped.id]], "only Elowen's own used: rolled, marked once, on the form")
+  port.faults.storedActorId = false
+  await back()
+  midi.settings.enforceBonusActions = 'none'
+  if (documents === undefined) delete globalThis.dnd5e.documents
+  else globalThis.dnd5e.documents = documents
+  await campaignAs({ rolls: false, attacks: false })
+  game.combat = viewed
+  ok("damage on its own from the form, a Bonus Action with consume, under Enforce bonus actions \"all\" and core matching the form's combatant by Elowen's stored id: refused \"bonus-action\" while the form's is used; with only Elowen's own used, rolled and marked once, on the form")
+} else {
+  // 15. Without Midi-QOL: changed and returned in a fight as before, nothing asked of it.
+  const viewed = game.combat
+  game.combat = fight
+  await reset()
+  assert.equal(globalThis.MidiQOL, undefined, 'no Midi-QOL')
+  assert.equal((await made(transform(wolfId))).result.status, 'done')
+  assert.equal((await made(revert())).result.status, 'done')
+  game.combat = viewed
+  ok('without Midi-QOL: a change and a return in a fight as before')
+}
+
 process.exit(0)

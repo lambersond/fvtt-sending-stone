@@ -21,9 +21,54 @@ export const ACTION_KEYS = ['name', 'img', 'type', 'activityName', 'activation',
   ...ROLLS, 'damage', 'tableDamage', 'attackArea', 'rollFormula', 'check', 'consumesSlot', 'cast', 'spellId', 'forward',
   'activities', 'uses', 'level', 'castFrom', 'concentration', 'identified', 'consumable', 'enchantments', 'text']
 
+// Since module 0.41.0: the keys of a plan of damage on its own and of each of its rolls, which a
+// choice's plan leaves out where they hold its row's own, in the order the module builds them.
+const PLAN_KEYS = ['critical', 'plannable', 'healing', 'rolls']
+const ROLL_KEYS = ['formula', 'type', 'types', 'dice', 'perDie']
+
 const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v)
 const list = v => Array.isArray(v) ? v : []
 const copy = v => structuredClone(v)
+
+// An object with each of these keys it lacks put back from its own, in this order, then its others.
+function withOwn(o, own, keys) {
+  const out = {}
+  for (const k of keys) {
+    if (k in o) out[k] = o[k]
+    else if (k in own) out[k] = copy(own[k])
+  }
+  for (const [k, v] of Object.entries(o)) if (!(k in out)) out[k] = v
+  return out
+}
+
+// Damage on its own's choices, wherever a tableDamage holds them, each made whole from its row's
+// own: a plan it lacks, its row's; a plan both have, each plan key it lacks, and each roll key a roll
+// lacks of the row's own roll at the same place. Its picks first, then normal and critical.
+function choicesBack(v) {
+  if (Array.isArray(v)) return v.forEach(choicesBack)
+  if (!isObject(v)) return
+  for (const [k, child] of Object.entries(v)) {
+    if (k === 'tableDamage' && isObject(child) && Array.isArray(child.choices)) child.choices = child.choices.map(c => choiceBack(c, child))
+    else choicesBack(child)
+  }
+}
+
+function choiceBack(c, own) {
+  if (!isObject(c)) return c
+  const out = {}
+  for (const [k, v] of Object.entries(c)) if (k !== 'normal' && k !== 'critical') out[k] = v
+  for (const k of ['normal', 'critical']) {
+    if (!(k in c)) { if (k in own) out[k] = copy(own[k]); continue }
+    const plan = c[k]
+    if (!isObject(plan) || !isObject(own[k])) { out[k] = plan; continue }
+    const back = withOwn(plan, own[k], PLAN_KEYS)
+    if (Array.isArray(plan.rolls) && Array.isArray(own[k].rolls)) {
+      back.rolls = plan.rolls.map((r, i) => (isObject(r) && isObject(own[k].rolls[i])) ? withOwn(r, own[k].rolls[i], ROLL_KEYS) : r)
+    }
+    out[k] = back
+  }
+  return out
+}
 
 function add(o, kind, group) {
   for (const [k, d] of Object.entries(DEFAULTS[kind])) if (!(k in o)) o[k] = copy(d)
@@ -57,6 +102,7 @@ export function expandSheet(raw) {
   if (raw.slim !== 1) return null
   const sheet = copy(raw)
   delete sheet.slim
+  choicesBack(sheet)
   const fn = (o, kind) => add(o, kind)
   for (const [r, kind] of rows(sheet)) {
     add(r, kind, kind === 'container' ? null : kind)

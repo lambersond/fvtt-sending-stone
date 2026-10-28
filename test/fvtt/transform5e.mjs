@@ -35,11 +35,13 @@ const sixth = () => String(game.system?.version ?? '').startsWith('6')
  * each TransformationSetting made; each fromUuid asked; each pack index read; each token batch
  * written; and faults: `throwOnTransform` makes the next transformInto throw before it creates
  * anything, `throwOnTokens` the next scenes' token batch, `refuseRevert` the next revert do nothing
- * (as a module's hook might stop it), `moonSpellList` registers Circle of the Moon's spell list.
+ * (as a module's hook might stop it), `moonSpellList` registers Circle of the Moon's spell list;
+ * since module 0.41.0 `storedActorId` makes an actor's `inCombat` core's other reading, by the actor
+ * id a combatant stored when it was made rather than its token's actor now.
  */
 export const port = {
   transforms: [], reverts: [], settings: [], fromUuid: [], indexes: [], tokenWrites: [], created: [], deleted: [],
-  faults: { throwOnTransform: false, throwOnTokens: false, refuseRevert: false, moonSpellList: true },
+  faults: { throwOnTransform: false, throwOnTokens: false, refuseRevert: false, moonSpellList: true, storedActorId: false },
 }
 
 /** A turn of the event loop, as a server's round trip takes at least. */
@@ -393,6 +395,18 @@ export class TActor extends Character {
     for (const data of this._source.effects ?? []) this.effects.push(new PlainEffect(this, data))
     delete this._source.effects
     this.prepare()
+  }
+
+  /**
+   * Core's Actor#inCombat (module 0.41.0): a combatant of the combat viewed represents it, its actor
+   * the token's actor as it is now, so that a druid's combatant follows her token to her form; or,
+   * under `port.faults.storedActorId`, the actor id the combatant stored when it was made. Which of
+   * the two core does is [core, unverified]: round 0.41.0's live check L1 records it.
+   * @type {boolean}
+   */
+  get inCombat() {
+    const combatants = Array.from(game.combat?.combatants?.values?.() ?? [])
+    return combatants.some(cb => (port.faults.storedActorId ? cb.actorId : cb.actor?.id) === this.id)
   }
 
   // Actor5e's constructor writes these, which are read here: the writes are let go.

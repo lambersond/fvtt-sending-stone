@@ -3,6 +3,8 @@ import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { originalOf } from "./characters.mjs";
 import { resultsAlways } from "./config.mjs";
+import { companionOfActor, companionPart } from "./creatures.mjs";
+import { companionPromptReader, toldList } from "./creature-sync.mjs";
 import { wrap } from "./dice-plan.mjs";
 import {
   concentratingOn, ownConcentrationAbility, prompting, PROMPT_LIFETIME, showsChallenge
@@ -28,6 +30,10 @@ import { send } from "./transport.mjs";
  * Midi decides how the save is rolled: the app is told its advantage, and isn't asked at all for a
  * save Midi fails or passes by itself. What Midi makes of the save, as the damage or the end of an
  * OverTime effect, is its workflow's, as ever.
+ *
+ * Since 0.41.0 a listed companion's too, to an app that reads them, filed under its key, its own
+ * token's or actor's id in the prompt's, while one of the characters it's a companion of is open in
+ * the app (round 0.41.0 §3.4).
  */
 
 /**
@@ -149,10 +155,15 @@ let checking = null;
 /**
  * A save asked of a character for Midi-QOL, from the moment the app is told of it.
  * @typedef {object} MidiPrompt
- * @property {string} id                       Its key and the character's, joined by "-".
+ * @property {string} id                       Its key and the character's, joined by "-": for a
+ *                                             companion, its token's id, or its actor's.
  * @property {string} key                      Random: never a card's id, so nothing for a card
  *                                             closes it.
- * @property {string} actorId
+ * @property {string} actorId                  The character's id, or the companion's key.
+ * @property {boolean} companion               Is it a companion's, since 0.41.0?
+ * @property {(campaign: Campaign) => string[]} presence   Whose being open in a campaign's app keeps
+ *                                             it waiting there: the character's, or the companion's
+ *                                             characters'.
  * @property {Set<string>} campaignIds         The campaigns told of it.
  * @property {Actor} actor                     Whose save it is: the target token's, or the
  *                                             concentration card's speaker.
@@ -304,6 +315,50 @@ function askers(actorId) {
 }
 
 /**
+ * Whom a save Midi asks of an actor is asked as, since 0.41.0: a campaign's character, or the
+ * character a form is (`askedId`), in the campaigns `askers` finds; else a companion the campaigns
+ * that ask its players for their saves, read Midi prompts and companions' prompts were last told of,
+ * matched by its live actor. With the id part its prompt is named by, the id it's filed under, the
+ * campaigns that ask, and whose being open in each keeps it waiting: the character's own, or the
+ * characters' it's a companion of, whose pages it lives on. Null where none asks.
+ * @param {Actor} actor
+ * @returns {{part: string, actorId: string, campaigns: Campaign[], companion: boolean,
+ *   presence: (campaign: Campaign) => string[]}|null}
+ */
+function askedAs(actor) {
+  const id = askedId(actor);
+  const campaigns = askers(id);
+  if ( campaigns.length ) {
+    const presence = campaign => (campaign.characters.has(id) ? [id] : []);
+    return { part: id, actorId: id, campaigns, companion: false, presence };
+  }
+  const of = new Map();
+  let found = null;
+  for ( const campaign of getCampaigns() ) {
+    if ( !prompting(campaign) || !readers.has(campaign.id) || !companionPromptReader(campaign.id) ) continue;
+    const entry = companionOfActor(toldList(campaign.id), actor);
+    if ( !entry ) continue;
+    found ??= entry;
+    of.set(campaign.id, entry.of);
+  }
+  if ( !found ) return null;
+  return {
+    part: companionPart(found), actorId: found.key, companion: true,
+    campaigns: getCampaigns().filter(campaign => of.has(campaign.id)),
+    presence: campaign => of.get(campaign.id) ?? []
+  };
+}
+
+/**
+ * Is whom a save is asked as open in one of the campaigns that ask it?
+ * @param {{campaigns: Campaign[], presence: (campaign: Campaign) => string[]}} asked
+ * @returns {boolean}
+ */
+function openIn(asked) {
+  return asked.campaigns.some(campaign => asked.presence(campaign).some(id => isOpen(campaign.id, id)));
+}
+
+/**
  * How long a save waits on the app: a minute, or less where a test set it so.
  * @returns {number}
  */
@@ -364,8 +419,9 @@ function queueTargetSaveRoll(wrapped, options, ...rest) {
 
 /**
  * What to ask the app of a save Midi requests, or null to leave it to Midi at once: a save, ability
- * check or skill check of a campaign's character, open in the app, that Midi doesn't fail or pass
- * by itself, and that no other module rolls for it.
+ * check or skill check of a campaign's character, open in the app, or since 0.41.0 of a companion
+ * one of whose characters is, that Midi doesn't fail or pass by itself, and that no other module
+ * rolls for it.
  * @param {object} workflow
  * @param {object} options
  * @returns {object|null}
@@ -382,8 +438,8 @@ function describeAsk(workflow, options) {
   if ( displayOptions.simulate ) return null;
   if ( (typeof Midi?.DummyWorkflow === "function") && (workflow instanceof Midi.DummyWorkflow) ) return null;
   if ( !ID.test(String(actor.id)) ) return null;
-  const campaigns = askers(askedId(actor));
-  if ( !campaigns.some(campaign => isOpen(campaign.id, askedId(actor))) ) return null;
+  const whom = askedAs(actor);
+  if ( !whom || !openIn(whom) ) return null;
 
   // Monk's TokenBar, Flash Rolls and Epic Rolls get their requests once Midi has asked for every
   // target: theirs can't be held.
@@ -449,7 +505,8 @@ function describeAsk(workflow, options) {
   const rollMode = workflow.activity?.midiProperties?.rollMode;
 
   return {
-    actor, campaigns, rollType, offered, advantage, branch, wait, midiWait, saveDisplay, dcShown,
+    actor, campaigns: whom.campaigns, part: whom.part, actorId: whom.actorId, companion: whom.companion,
+    presence: whom.presence, rollType, offered, advantage, branch, wait, midiWait, saveDisplay, dcShown,
     // Whose client Midi's roll dialog is open on, whose the answer's roll is, as Midi's own would be.
     asked: (branch === "dialog") ? player : null,
     type: concentration ? "concentration" : rollType,
@@ -653,9 +710,10 @@ function createEntry(fields) {
   const entry = {
     ...fields,
     key,
-    // The character it's asked of, a form's own: `actor` is still the actor Midi's roll is made on.
-    id: `${key}-${askedId(fields.actor)}`,
-    actorId: askedId(fields.actor),
+    // The character it's asked of, a form's own, or since 0.41.0 a companion: `actor` is still the
+    // actor Midi's roll is made on.
+    id: `${key}-${fields.part}`,
+    actorId: fields.actorId,
     messageId: fields.messageId ?? key,
     abilities: (fields.rollType === "skill") ? [] : (fields.abilities ?? fields.offered),
     skills: (fields.rollType === "skill") ? fields.offered : [],
@@ -896,15 +954,17 @@ function checkWaiting() {
 }
 
 /**
- * Leave a waiting save to Midi, if it's no longer to wait.
+ * Leave a waiting save to Midi, if it's no longer to wait: since 0.41.0 where no campaign told of it
+ * that still asks has whom it waits for open, the character, or a companion's characters.
  * @param {MidiPrompt} entry
  * @returns {void}
  */
 function checkEntry(entry) {
   if ( entry.workflow?.aborted === true ) return release(entry, "gone");
   if ( !canSend() || (Date.now() >= entry.expiresAt) ) return release(entry, "expired");
-  const asking = askers(entry.actorId).filter(campaign => entry.campaignIds.has(campaign.id));
-  if ( !asking.some(campaign => isOpen(campaign.id, entry.actorId)) ) release(entry, "expired");
+  const asking = getCampaigns().filter(campaign => entry.campaignIds.has(campaign.id) && prompting(campaign)
+    && readers.has(campaign.id));
+  if ( !openIn({ campaigns: asking, presence: entry.presence }) ) release(entry, "expired");
 }
 
 /**
@@ -1228,7 +1288,8 @@ function holdConcentrationCard(message, data, options, userId) {
     if ( !midiPromptStatus.chat || !canSend() || (userId !== game.user?.id) ) return;
     if ( globalThis.MidiQOL.configSettings()?.doConcentrationCheck !== "chat" ) return;
     const asked = concentrationCard(message);
-    if ( !asked || !askers(askedId(asked.actor)).some(campaign => isOpen(campaign.id, askedId(asked.actor))) ) return;
+    const whom = asked ? askedAs(asked.actor) : null;
+    if ( !whom || !openIn(whom) ) return;
     message.updateSource({ "flags.midi-qol.concentrationRolled": true, [`flags.${MODULE_ID}.midiHeld`]: true });
   } catch (err) {
     warnOnce("card", "Could not hold Midi-QOL's concentration card for the app: Midi rolls it as it would.", err);
@@ -1249,14 +1310,16 @@ function askConcentrationCard(message, options, userId) {
   const asked = concentrationCard(message);
   if ( !asked ) return markDone(message);
   try {
-    const campaigns = askers(askedId(asked.actor));
-    if ( !canSend() || !campaigns.some(campaign => isOpen(campaign.id, askedId(asked.actor))) ) {
+    const whom = askedAs(asked.actor);
+    if ( !canSend() || !whom || !openIn(whom) ) {
       rollAsMidi(message, asked.actor, asked.dc);
       return;
     }
     const { actor, dc } = asked;
     const entry = createEntry({
-      card: message, actor, campaigns, mode: "held", branch: null, rollType: "save", type: "concentration",
+      card: message, actor, campaigns: whom.campaigns, part: whom.part, actorId: whom.actorId,
+      companion: whom.companion, presence: whom.presence, mode: "held", branch: null, rollType: "save",
+      type: "concentration",
       source: "concentration", offered: [ownConcentrationAbility(actor)], choices: 1,
       advantage: advantageOf([ownConcentrationAbility(actor)], () => undefined, { actor, card: true }),
       dc: (showsChallenge(message, actor) && Number.isInteger(dc) && (dc >= 0) && (dc <= 100)) ? dc : null,
@@ -1333,12 +1396,41 @@ export function releaseHeldCards() {
 /* -------------------------------------------- */
 
 /**
- * The Midi prompts waiting in a campaign, for its hello: as told of them.
+ * The Midi prompts waiting in a campaign, for its hello: as told of them. Since 0.41.0 a companion's
+ * only while its app reads them, as a card's.
  * @param {Campaign} campaign
  * @returns {object[]}
  */
 export function midiOpenPrompts(campaign) {
   return Array.from(registry.values())
-    .filter(entry => (entry.state === "waiting") && entry.campaignIds.has(campaign.id))
+    .filter(entry => (entry.state === "waiting") && entry.campaignIds.has(campaign.id)
+      && (!entry.companion || companionPromptReader(campaign.id)))
     .map(summarize);
+}
+
+/**
+ * The companions' Midi prompts waiting in a campaign, since 0.41.0, to send it again as its app first
+ * says it reads them.
+ * @param {Campaign} campaign
+ * @returns {object[]}
+ */
+export function midiCompanionPrompts(campaign) {
+  return Array.from(registry.values())
+    .filter(entry => entry.companion && (entry.state === "waiting") && entry.campaignIds.has(campaign.id))
+    .map(summarize);
+}
+
+/**
+ * Leave to Midi's own way, at once, the saves waiting for companions that left a campaign's list,
+ * since 0.41.0: closed `gone`, as they're no one's now.
+ * @param {string} campaignId
+ * @param {string[]} keys
+ * @returns {void}
+ */
+export function releaseCompanionPrompts(campaignId, keys) {
+  const left = new Set(keys);
+  for ( const entry of Array.from(registry.values()) ) {
+    const leaving = entry.companion && left.has(entry.actorId) && entry.campaignIds.has(campaignId);
+    if ( leaving && (entry.state === "waiting") ) release(entry, "gone");
+  }
 }

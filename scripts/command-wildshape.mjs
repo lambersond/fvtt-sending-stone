@@ -7,6 +7,7 @@ import {
   appFlags, authorFor, checkCommand, failedResult, isObject, namesRollFields, throwsNoDice, visibleTo
 } from "./command-rolls.mjs";
 import { campaignGroups } from "./groups.mjs";
+import { markMidiBonusAction, midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
 import { finite } from "./sheet-values.mjs";
 import {
   beastsFor, eligible, endWildShape, entryOf, forgetTokenData, formName, inPool, knownProfiles, recheckCharacter,
@@ -28,6 +29,9 @@ import {
  * the player's name would pass dnd5e's own Allow Polymorphing, which the Gamemaster's client never
  * meets. Offered under D&D Fifth Edition where the campaign's Gamemaster lets its players, by its own
  * switch, apart from its rolls: it throws no dice.
+ *
+ * Since 0.41.0, where Midi-QOL makes uses and enforces Bonus Actions, a change or return is refused
+ * once the character has used theirs in a fight, and marks it used, on the form, or on her once back.
  */
 
 /**
@@ -176,6 +180,19 @@ function done(command, wildShape, { message=null, character, campaign }={}) {
 }
 
 /**
+ * Are Midi-QOL's Bonus Actions counted for a Wild Shape: Midi makes uses here, it can say whether one
+ * is used, and the seat, or the character's own actor, is in a fight, as a combatant made from her
+ * token may still name her after dnd5e switched it to the form.
+ * @param {Actor} seat        The actor she acts as now.
+ * @param {Actor} character
+ * @returns {boolean}
+ */
+function midiEconomy(seat, character) {
+  return midiActivities() && (typeof globalThis.MidiQOL?.hasUsedBonusAction === "function")
+    && Boolean(seat?.inCombat || character?.inCombat);
+}
+
+/**
  * Is the actor a character acts as now Incapacitated, as the rules have it, at 0 hit points, or dead?
  * @param {Actor} actor
  * @returns {boolean}
@@ -188,9 +205,11 @@ function incapacitated(actor) {
 
 /**
  * Change into a known form: one usable from the app, its Beast in the campaign's compendiums and
- * fitting her now; not while she's another kind of form, Incapacitated, or out of uses. Shaped
- * already, the form she is is returned first, as one command. The use is spent on her own feature
- * before dnd5e changes her, refunded where the change doesn't happen; once the form exists it never is.
+ * fitting her now; not while she's another kind of form, Incapacitated, or out of uses, nor since
+ * 0.41.0 with Midi-QOL's Bonus Action used in a fight, where it enforces them. Shaped already, the
+ * form she is is returned first, as one command. The use is spent on her own feature before dnd5e
+ * changes her, refunded where the change doesn't happen; once the form exists it never is, and the
+ * Bonus Action is marked on it.
  * @param {object} command
  * @param {Campaign} campaign
  * @param {Actor} character
@@ -214,6 +233,10 @@ async function transform(command, campaign, character, rules) {
   // Her Wild Shape's uses as the form's copy has them while shaped, the same as hers.
   const row = seat.items?.get?.(rules.item.id) ?? rules.item;
   if ( !((row.system?.uses?.value ?? 0) > 0) ) return failed("consume");
+  // Midi-QOL's Bonus Actions, where it makes uses and the seat is in a fight (round 0.41.0 §1).
+  const economy = midiEconomy(seat, character);
+  const bonus = economy && (rules.activity?.activation?.type === "bonus");
+  if ( bonus && midiBonusActionUsed(seat) ) return failed("bonus-action");
   let source = null;
   try {
     source = await fromUuid(profile.uuid);
@@ -281,6 +304,14 @@ async function transform(command, campaign, character, rules) {
   } catch (err) {
     console.error(`${MODULE_ID} | Could not finish ${character.name}'s Wild Shape into ${source.name}`, err);
   }
+  // The Bonus Action it took, on the form, the seat for the rest of the turn, as Midi's own use marks it.
+  if ( bonus ) {
+    try {
+      await markMidiBonusAction(form);
+    } catch (err) {
+      console.error(`${MODULE_ID} | Could not mark ${character.name}'s Bonus Action for Midi-QOL`, err);
+    }
+  }
   const message = await postLine(character, active ? "BecameAgain" : "Became", { name: character.name, aForm: articled(source.name) },
     { op: "transform", form: source.name, why: active ? "change" : null }, command);
   sheetFirst(character);
@@ -294,7 +325,9 @@ async function transform(command, campaign, character, rules) {
 
 /**
  * Return to her own form: a Wild Shape the module times alone, any other ending in Foundry. Already
- * herself, done with nothing written, as the app may have been showing an older sheet.
+ * herself, done with nothing written, as the app may have been showing an older sheet. Since 0.41.0
+ * refused where Midi-QOL enforces Bonus Actions and the form has used its own in a fight, and once
+ * she's back, marked on her.
  * @param {object} command
  * @param {Campaign} campaign
  * @param {Actor} character
@@ -306,8 +339,18 @@ async function revert(command, campaign, character) {
   if ( !active ) return done(command, { op: "revert", form: null });
   const record = active.getFlag(MODULE_ID, "form");
   if ( !Number.isFinite(record?.hours) ) return failed("transformed");
+  // Leaving the form early is a Bonus Action too, as the 2024 rules have it (round 0.41.0 §1.5).
+  const economy = midiEconomy(active, character);
+  if ( economy && midiBonusActionUsed(active) ) return failed("bonus-action");
   await endWildShape(active, "app");
   if ( activeForm(character) ) return failed("cancelled");
+  if ( economy ) {
+    try {
+      await markMidiBonusAction(character);
+    } catch (err) {
+      console.error(`${MODULE_ID} | Could not mark ${character.name}'s Bonus Action for Midi-QOL`, err);
+    }
+  }
   const message = await postLine(character, "Left", { name: character.name, aForm: articled(record.name) },
     { op: "revert", form: record.name, why: "app" }, command);
   sheetFirst(character);

@@ -3,6 +3,7 @@ import { canSend } from "./bridge.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { forgetActorKey, forgetSheetTold, sendActor } from "./character-sync.mjs";
+import { aloneReader } from "./command-alone.mjs";
 import { rollFeatures } from "./commands.mjs";
 import { combatEnabled } from "./config.mjs";
 import { companionKeyOf, companionOfActor, companionsOf, ownedByPlayers } from "./creatures.mjs";
@@ -52,10 +53,25 @@ const DELTA_KEYS = ["ownership", "flags", "name", "img"];
 const NPC_KEYS = ["ownership", "name", "img", "type", "prototypeToken", "flags"];
 
 /**
- * The campaigns whose app's latest answer said it reads companions, `features.companions` 1 or more.
- * @type {Set<string>}
+ * The campaigns whose app's latest answer said it reads companions, `features.companions` 1 or more,
+ * and the format it said, 2 or more since 0.41.0 for one that reads what the game asks of them.
+ * @type {Map<string, number>}
  */
-const readers = new Set();
+const readers = new Map();
+
+/**
+ * What's told when companions leave a campaign's list, with their keys: since 0.41.0, prompts.mjs's
+ * closing of what the game asked of them, which this file needn't import.
+ * @type {((campaignId: string, keys: string[]) => void)[]}
+ */
+const leftListeners = [];
+
+/**
+ * What's told when a campaign's app first says it reads what the game asks of companions, since
+ * 0.41.0: prompts.mjs's sending of those open again, which a hello built before it said so left out.
+ * @type {((campaignId: string) => void)[]}
+ */
+const promptReaderListeners = [];
 
 /**
  * What each campaign was last told of its companions, by campaign id: the list's JSON, null where
@@ -94,7 +110,10 @@ let listing = null;
  * Note whether a campaign's app reads companions, from what it said in answer to its hello or
  * heartbeat: `features.companions`, the format it reads, 1 or later. One that starts to in a
  * heartbeat's answer, as an app deployed mid-session does, is sent the list and every companion's
- * sheet at once; after a hello's, they follow its character and group sheets.
+ * sheet at once; after a hello's, they follow its character and group sheets. Since 0.41.0 the format
+ * is kept: 2 or more says it reads what the game asks of companions, and where it first says so, from
+ * less or from nothing, as after a reload, whose hello left those out, or in the hello's own answer,
+ * their prompts open now are sent again (round 0.41.0 §3.6.6).
  * @param {string} campaignId
  * @param {object|null} features
  * @param {string} [type]   The event answered.
@@ -106,9 +125,12 @@ export function noteCompanionReader(campaignId, features, type) {
     readers.delete(campaignId);
     return;
   }
-  const was = readers.has(campaignId);
-  readers.add(campaignId);
+  const was = readers.get(campaignId) ?? 0;
+  readers.set(campaignId, format);
   if ( !was && (type === EVENTS.HEARTBEAT) ) companionsWanted(campaignId);
+  if ( (format >= 2) && (was < 2) ) {
+    for ( const fn of promptReaderListeners ) fn(campaignId);
+  }
 }
 
 /**
@@ -118,6 +140,34 @@ export function noteCompanionReader(campaignId, features, type) {
  */
 export function companionReader(campaignId) {
   return readers.has(campaignId);
+}
+
+/**
+ * Does a campaign's app read what the game asks of companions, since 0.41.0: its latest answer said
+ * `companions` 2 or more? One that drops to 1 is asked no more; what was asked closes in its time.
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function companionPromptReader(campaignId) {
+  return (readers.get(campaignId) ?? 0) >= 2;
+}
+
+/**
+ * Be told of the companions that leave a campaign's list, by their keys, as the list is compared.
+ * @param {(campaignId: string, keys: string[]) => void} fn
+ * @returns {void}
+ */
+export function onCompanionsLeft(fn) {
+  leftListeners.push(fn);
+}
+
+/**
+ * Be told of each campaign whose app first says it reads what the game asks of companions.
+ * @param {(campaignId: string) => void} fn
+ * @returns {void}
+ */
+export function onCompanionPromptReader(fn) {
+  promptReaderListeners.push(fn);
 }
 
 /**
@@ -235,10 +285,12 @@ export function sendCompanion(campaign, entry, actor) {
     apart: true,
     build: ({ sheet=true }={}) => {
       const texts = new SheetTexts({ secrets });
-      // A companion's effects take no commands, so its sheet offers none.
+      // A companion's effects take no commands, so its sheet offers none. Since 0.41.0 its damage on
+      // its own carries its choices, to an app that reads them.
+      const aloneChoices = aloneReader(campaign.id);
       return {
         texts,
-        data: { companion: { ...entry }, sheet: sheet ? characterSheet(actor, texts, { secrets, ops: false }) : null }
+        data: { companion: { ...entry }, sheet: sheet ? characterSheet(actor, texts, { secrets, ops: false, aloneChoices }) : null }
       };
     }
   });
@@ -391,10 +443,13 @@ function compareList(campaign, { found, before }={}) {
   if ( changed ) {
     send(EVENTS.COMPANIONS_LISTED, { companions: list }, campaign);
     const keys = new Set(list.map(entry => entry.key));
-    for ( const { key } of told?.entries ?? [] ) {
-      if ( !keys.has(key) ) forgetCompanion(campaign.id, key);
-    }
+    const left = (told?.entries ?? []).map(entry => entry.key).filter(key => !keys.has(key));
+    for ( const key of left ) forgetCompanion(campaign.id, key);
     noteListed(campaign.id, list);
+    // Since 0.41.0 what the game asked of those that left closes at once, as they're no one's now.
+    if ( left.length ) {
+      for ( const fn of leftListeners ) fn(campaign.id, left);
+    }
   }
   unseen.delete(campaign.id);
   // Each new to the list has its sheet sent after it, and each sent after a list that was lost again.

@@ -1,7 +1,9 @@
+import { MOST_ALONE_CHOICES } from "./constants.mjs";
 import { describeEnchant, enchantInPlay } from "./sheet-enchant.mjs";
 import { formulaRoll } from "./dice-plan.mjs";
 import {
-  challenge, checkOptions, criticalAdditions, DND5E_ACTIVITIES, ownDamageConfig, previewDamage
+  aloneSubject, challenge, checkOptions, criticalAdditions, DND5E_ACTIVITIES, eligibleSlots, ownDamageConfig,
+  previewDamage, slotChoice
 } from "./sheet-links.mjs";
 import { countedUses, finite, limitedUses, localize, RESOURCES } from "./sheet-values.mjs";
 
@@ -140,18 +142,31 @@ const NO_ROLLS = Object.freeze({
 let tabled = null;
 
 /**
- * Build a sheet, working out each activity's damage on its own once.
+ * Does the sheet being built carry, since 0.41.0, each row's damage on its own's plans at its other
+ * levels, modes and ammunition, and what it would spend, for an app that reads them?
+ * @type {boolean}
+ */
+let tablingChoices = false;
+
+/**
+ * Build a sheet, working out each activity's damage on its own once; since 0.41.0 with its choices
+ * where asked. A sheet built within another on other terms works out its own.
  * @template T
  * @param {() => T} build
+ * @param {object} [options]
+ * @param {boolean} [options.choices]   With `choices` and `spends`?
  * @returns {T}
  */
-export function tablingSheet(build) {
+export function tablingSheet(build, { choices=false }={}) {
   const outer = tabled;
-  tabled = outer ?? new Map();
+  const outerChoices = tablingChoices;
+  tabled = (outer && (outerChoices === choices)) ? outer : new Map();
+  tablingChoices = choices;
   try {
     return build();
   } finally {
     tabled = outer;
+    tablingChoices = outerChoices;
   }
 }
 
@@ -300,16 +315,23 @@ function activityRolls(item, activity, texts) {
 
 /**
  * The dice an activity's damage or healing throws on its own, since 0.36.0, for the app to roll and
- * send with no attack or use made, as `itemDamage`: as the module will make it up, with the
- * activity's first attack mode and no ammunition, at the spell's own level, as dnd5e's own damage
- * configuration for its kind of activity has it; and a critical hit's, where the activity allows
- * one, as dnd5e makes one, never a heal's. None for an item's own activity of another item, as a
- * spell's copy cast from an item, an item not identified yet, an activity that isn't an attack,
- * save, damage or heal, one with no damage, or one whose dice can't be planned; nor for one dnd5e or
- * a module can't work out.
+ * send with no attack or use made, as `itemDamage`: as the module will make it up, with no attack
+ * mode and no ammunition, at the spell's own level, as dnd5e's own damage configuration for its kind
+ * of activity has it; and a critical hit's, where the activity allows one, as dnd5e makes one, never
+ * a heal's. None for an item's own activity of another item, as a spell's copy cast from an item, an
+ * item not identified yet, an activity that isn't an attack, save, damage or heal, one with no
+ * damage, or one whose dice can't be planned; nor for one dnd5e or a module can't work out.
+ *
+ * Since 0.41.0, in a sheet built for an app that reads them (round 0.41.0 §2.2, §2.11), also
+ * `choices`, the plans that differ from these at a spell slot's level above the spell's own, in one
+ * of a weapon's attack modes, with one of its ammunition, or in a mode with an ammunition, each named
+ * by what it picks, `{level?, attackMode?, ammunition?, normal, critical}`, left out where there would
+ * be more than `MOST_ALONE_CHOICES`; and `spends`, what spending its use would spend: `"slot"`,
+ * `"uses"`, `"ammunition"`, `"thrown"`. Each is left out where dnd5e or a module can't work it out,
+ * so that the row rolls as it would without them, its own plan kept, and the sheet is still sent.
  * @param {Item} item
  * @param {Activity} activity
- * @returns {{normal: object, critical: object|null}|null}
+ * @returns {{normal: object, critical: object|null, choices?: object[], spends?: string[]}|null}
  */
 function tableDamageOf(item, activity) {
   if ( !activity || (activity.item?.id !== item.id) || (item.system?.identified === false) ) return null;
@@ -318,17 +340,130 @@ function tableDamageOf(item, activity) {
   if ( tabled?.has(key) ) return tabled.get(key);
   let rolls = null;
   try {
-    const normal = previewDamage(activity);
-    if ( normal?.plannable ) {
-      const process = ownDamageConfig(activity);
-      const allowed = (activity.type !== "heal") && criticalAdditions(process, process?.rolls?.length ?? 0).allowed;
-      rolls = { normal, critical: allowed ? previewDamage(activity, { isCritical: true }) : null };
-    }
+    rolls = alonePlanOf(activity);
   } catch {
     rolls = null;
   }
+  if ( rolls && tablingChoices ) {
+    // Each asks dnd5e how the activity would be used, which a module's wrapper or odd data can make
+    // throw: that one is left out, never the row's own plan or the whole sheet.
+    let choices = null;
+    try {
+      choices = aloneChoicesOf(item, activity, rolls);
+    } catch {
+      choices = null;
+    }
+    let spends = null;
+    try {
+      spends = aloneSpendsOf(item, activity);
+    } catch {
+      spends = null;
+    }
+    rolls = { ...rolls, ...(choices && { choices }), ...(spends && { spends }) };
+  }
   if ( key ) tabled?.set(key, rolls);
   return rolls;
+}
+
+/**
+ * Damage on its own's plan, its dice and a critical hit's where the activity allows one, never a
+ * heal's, as `previewDamage` makes them: at its own level, or a spell slot's `scaling` levels above
+ * it, in an attack mode, with ammunition, as dnd5e would roll it there. Null for dice that can't be
+ * planned.
+ * @param {Activity} activity
+ * @param {object} [pick]
+ * @param {number} [pick.scaling]
+ * @param {string} [pick.attackMode]
+ * @param {Item} [pick.ammunition]
+ * @returns {{normal: object, critical: object|null}|null}
+ */
+function alonePlanOf(activity, { scaling=0, attackMode, ammunition }={}) {
+  const { subject, config } = aloneSubject(activity, scaling);
+  const options = { ...config, ...(attackMode && { attackMode }), ...(ammunition && { ammunition }) };
+  const normal = previewDamage(subject, options);
+  if ( !normal?.plannable ) return null;
+  const process = ownDamageConfig(subject, options);
+  const allowed = (activity.type !== "heal") && criticalAdditions(process, process?.rolls?.length ?? 0).allowed;
+  return { normal, critical: allowed ? previewDamage(subject, { ...options, isCritical: true }) : null };
+}
+
+/**
+ * Damage on its own's plans that differ from its own, since 0.41.0: at each level of the spell slots
+ * dnd5e offers above the spell's own; and of a weapon's attack, in each of its modes, where it has
+ * more than one, as the app picks one only then, with each of its ammunition, and in each mode with
+ * each. One that's the same as its own is left out, as is one that fails to be worked out; and all of
+ * them where there would be more than `MOST_ALONE_CHOICES`, as null.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @param {{normal: object, critical: object|null}} base
+ * @returns {object[]|null}
+ */
+function aloneChoicesOf(item, activity, base) {
+  const own = JSON.stringify([base.normal, base.critical]);
+  const choices = [];
+  for ( const { keys, pick } of alonePicksOf(item, activity) ) {
+    let plan = null;
+    try {
+      plan = alonePlanOf(activity, pick);
+    } catch {
+      plan = null;
+    }
+    if ( !plan || (JSON.stringify([plan.normal, plan.critical]) === own) ) continue;
+    choices.push({ ...keys, ...plan });
+    if ( choices.length > MOST_ALONE_CHOICES ) return null;
+  }
+  return choices;
+}
+
+/**
+ * What damage on its own may be picked by, each as the app names it and as it's previewed: each
+ * spell slot level above the spell's own; and of an attack, each mode, each ammunition, and each mode
+ * with each ammunition.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {{keys: object, pick: object}[]}
+ */
+function alonePicksOf(item, activity) {
+  const spellLevel = finite(item.system?.level) ?? 0;
+  const levels = [...new Set((eligibleSlots(activity) ?? []).map(slot => slot.level))]
+    .filter(level => Number.isInteger(level) && (level > spellLevel))
+    .sort((a, b) => a - b);
+  const picks = levels.map(level => ({ keys: { level }, pick: { scaling: level - spellLevel } }));
+  if ( activity.type !== "attack" ) return picks;
+  const modes = Array.from(item.system?.attackModes ?? []).filter(mode => mode?.value).map(mode => mode.value);
+  const ammunition = Array.from(item.system?.ammunitionOptions ?? [])
+    .map(option => item.actor?.items?.get(option.value) ?? option.item)
+    .filter(Boolean);
+  const shown = (modes.length > 1) ? modes : [];
+  for ( const attackMode of shown ) picks.push({ keys: { attackMode }, pick: { attackMode } });
+  for ( const ammo of ammunition ) picks.push({ keys: { ammunition: ammo.id }, pick: { ammunition: ammo } });
+  for ( const attackMode of shown ) {
+    for ( const ammo of ammunition ) {
+      picks.push({ keys: { attackMode, ammunition: ammo.id }, pick: { attackMode, ammunition: ammo } });
+    }
+  }
+  return picks;
+}
+
+/**
+ * What spending damage on its own's use would spend, since 0.41.0, in this order, each where it
+ * applies: a spell slot that casting it spends; its consumption targets, its own or its item's uses,
+ * a consumable's quantity, a resource; the ammunition an attack's weapon fires; and the weapon itself,
+ * where it has a thrown mode and doesn't return.
+ * @param {Item} item
+ * @param {Activity} activity
+ * @returns {string[]}
+ */
+function aloneSpendsOf(item, activity) {
+  const spends = [];
+  if ( (slotChoice(activity)?.consumes === true) && !spendsNoSlot(item, activity) ) spends.push("slot");
+  if ( Array.from(activity.consumption?.targets ?? []).length ) spends.push("uses");
+  if ( activity.type === "attack" ) {
+    if ( Array.from(item.system?.ammunitionOptions ?? []).length ) spends.push("ammunition");
+    const thrown = Array.from(item.system?.attackModes ?? []).some(mode => String(mode?.value ?? "").startsWith("thrown"));
+    if ( thrown && !item.system?.properties?.has?.("ret") ) spends.push("thrown");
+  }
+  return spends;
 }
 
 /**

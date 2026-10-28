@@ -9,8 +9,9 @@ import {
 import { dnd5eEnchant, enchantChoice, midiEnchantNow } from "./command-enchant.mjs";
 import { resultsAlways } from "./config.mjs";
 import { commandActor } from "./creatures.mjs";
+import { midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
 import { midiPromptWaits } from "./midi-prompts.mjs";
-import { DND5E_ACTIVITIES, ownDamageConfig, previewDamage } from "./sheet-links.mjs";
+import { DND5E_ACTIVITIES, eligibleSlots, ownDamageConfig, previewDamage, slotChoice } from "./sheet-links.mjs";
 import { enchantInPlay } from "./sheet-enchant.mjs";
 import {
   castCopy, castSpellOf, checkUsable, followUpCheck, forwardTarget, FORWARDED, freeCheck, offeredLevels, USES
@@ -103,19 +104,9 @@ export function attacksUnavailable() {
   return null;
 }
 
-/**
- * Does Midi-QOL make the uses of items' activities here: its activities in place of dnd5e's, each
- * use of one a workflow?
- * @returns {boolean}
- */
-export function midiActivities() {
-  if ( game.modules.get("midi-qol")?.active !== true ) return false;
-  try {
-    return game.settings.get("midi-qol", "ReplaceDefaultActivities") !== false;
-  } catch {
-    return true;
-  }
-}
+// Since 0.41.0 in midi-economy.mjs, which the uses, Wild Shape and damage on its own share; still
+// exported from here, where prompts.mjs and the harness import it.
+export { midiActivities };
 
 /**
  * Has the Gamemaster left players' attacks to go through Midi-QOL's workflow?
@@ -407,11 +398,11 @@ function castLevel(command, cast, spell, activity) {
  * Scale how a use is worked out as dnd5e scales it once it's made, before it spends anything: by
  * the level of the spell slot it's cast with, above the spell's own, or a scroll's spell's fixed
  * level, so that what it spends is what dnd5e will spend, such as a wand's charges for a spell it
- * casts above its own level.
+ * casts above its own level. Exported since 0.41.0 for damage on its own.
  * @param {object} config        As `_prepareUsageConfig` gave it, changed in place.
  * @param {Activity} activity
  */
-function scaleAsUsed(config, activity) {
+export function scaleAsUsed(config, activity) {
   const fixed = activity.item.getFlag?.("dnd5e", "spellLevel");
   if ( fixed ) config.scaling = Math.max(0, fixed.value - fixed.base);
   else if ( activity.isSpell ) {
@@ -455,18 +446,6 @@ function followUpSlot(command, activity) {
 }
 
 /**
- * The spell slots a spell can be cast with, as dnd5e's usage dialog offers them: each pool from the
- * spell's level up to the highest the character has, that its kind of spellcasting may use, and
- * whether it has one left to spend. Null for anything cast without choosing a slot: a cantrip, a
- * spell cast at will or innately, one cast from an item, or one at a fixed level, as on a scroll.
- * @param {Activity} activity
- * @returns {{key: string, level: number, available: boolean}[]|null}
- */
-export function eligibleSlots(activity) {
-  return slotChoice(activity)?.slots ?? null;
-}
-
-/**
  * The spell slot a spell is cast with, as dnd5e's usage dialog picks it: its own level's, if any
  * are left; otherwise the first pool with any left, at or above its level, that its kind of
  * spellcasting may use. Nothing for a cantrip or a spell cast without slots.
@@ -480,33 +459,6 @@ export function defaultSlot(activity) {
   if ( !slots || !consumes || activity.actor.system.spells?.[configured]?.value ) return configured;
   // None is left; the consumption check then says so.
   return slots.find(slot => slot.available)?.key ?? configured;
-}
-
-/**
- * How a spell's slot is chosen, as dnd5e's usage dialog has it: the slot it would be cast with
- * unless another is chosen, whether casting spends one, and the slots it offers, if any.
- * @param {Activity} activity
- * @returns {{configured: string|null, consumes: boolean, slots: object[]|null}|null}   Null for
- *   anything cast without a slot.
- */
-function slotChoice(activity) {
-  if ( !activity.requiresSpellSlot ) return null;
-  const prepared = activity._prepareUsageConfig({});
-  const configured = prepared.spell?.slot ?? null;
-  const consumes = (prepared.consume === true) || Boolean(prepared.consume?.spellSlot);
-  if ( (prepared.scaling === false) || prepared.cause?.activity ) return { configured, consumes, slots: null };
-  const { actor, item } = activity;
-  const spells = actor.system.spells ?? {};
-  const lowest = item.system.level ?? 1;
-  const highest = Object.values(spells).reduce((max, pool) => pool.max ? Math.max(max, pool.level) : max, 0);
-  const method = CONFIG.DND5E.spellcasting?.[item.system.method];
-  const slots = Object.entries(spells).flatMap(([key, pool]) => {
-    if ( !pool.max || (pool.level < lowest) || (pool.level > highest) || !pool.type ) return [];
-    if ( method?.exclusive?.spells && (item.system.method !== pool.type) ) return [];
-    if ( CONFIG.DND5E.spellcasting?.[pool.type]?.exclusive?.slots && (item.system.method !== pool.type) ) return [];
-    return [{ key, level: pool.level, available: !consumes || (pool.value > 0) }];
-  });
-  return { configured, consumes, slots };
 }
 
 /**
@@ -959,9 +911,7 @@ function midiRefusal({ activity, targets, attack, area }, actor) {
     const opportunity = attack && !ownTurn && enforced("recordAOO") && (type !== "special");
     const reaction = (REACTIONS.has(type) && ((activity.activation?.cost ?? 1) > 0)) || opportunity;
     if ( reaction && enforced("enforceReactions") && MidiQOL.hasUsedReaction?.(actor) ) return "reaction";
-    if ( (type === "bonus") && enforced("enforceBonusActions") && MidiQOL.hasUsedBonusAction?.(actor) ) {
-      return "bonus-action";
-    }
+    if ( (type === "bonus") && midiBonusActionUsed(actor) ) return "bonus-action";
   }
   return null;
 }

@@ -10,6 +10,8 @@
 // token (token-core.mjs); a stand-in Foundry core and app. Run with --import ./unref-timers.mjs
 // --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { isDeepStrictEqual } from 'node:util'
 import { settings, user, users, actors } from './stub.mjs'
 import { DND5E5, DND5E6 as DND5E6_ROOT } from './paths.mjs'
 
@@ -59,6 +61,17 @@ CONFIG.DND5E = {
   damageTypes: Object.fromEntries(TYPES.map(type => [type, { label: type.charAt(0).toUpperCase() + type.slice(1) }])),
   healingTypes: { healing: { label: 'Healing' } },
   characterFlags: { elvenAccuracy: { abilities: ['dex', 'int', 'wis', 'cha'] } },
+  // Module 0.41.0: the names the damage card gives a level and a mode, as dnd5e's config has them, localized.
+  spellLevels: { 0: 'Cantrip', 1: '1st Level', 2: '2nd Level', 3: '3rd Level', 4: '4th Level', 5: '5th Level', 6: '6th Level', 7: '7th Level', 8: '8th Level', 9: '9th Level' },
+  attackModes: { oneHanded: { label: 'One-Handed' }, twoHanded: { label: 'Two-Handed' }, offhand: { label: 'Off-Hand' }, thrown: { label: 'Thrown' }, 'thrown-offhand': { label: 'Offhand Throw' } },
+}
+// Since module 0.41.0 the damage card says what was chosen and spent in the module's own words, from
+// its language file, as Foundry's i18n gives them.
+{
+  const flat = (object, prefix = '') => Object.entries(object).flatMap(([key, value]) => (typeof value === 'object')
+    ? flat(value, `${prefix}${key}.`) : [[`${prefix}${key}`, value]])
+  game.i18n.translations = Object.fromEntries(flat(JSON.parse(readFileSync(`${process.env.MODULE_DIR}/lang/en.json`, 'utf8'))))
+  game.i18n.format = function (key, data = {}) { return this.localize(key).replace(/\{(\w+)\}/g, (_, name) => String(data[name] ?? '')) }
 }
 settings.set('messageMode', 'gm')
 settings.set('criticalDamageModifiers', false)
@@ -67,7 +80,7 @@ settings.set('attackRollVisibility', 'hideAC')
 globalThis._loc ??= (key, data) => (data ? game.i18n.format(key, data) : game.i18n.localize(key))
 
 const { Actor5e } = await import('./actor5e.mjs')
-const { Activity, AttackActivity, SaveActivity, DamageActivity, HealActivity, equip, port } = await import('./activity5e.mjs')
+const { Activity, AttackActivity, SaveActivity, DamageActivity, HealActivity, Item5e, equip, port, screen } = await import('./activity5e.mjs')
 const { midi, placeables, installMidi, installMidiDamageModifiers } = await import('./midi-fake.mjs')
 globalThis.dnd5e = {
   settings: { rulesVersion: 'modern' },
@@ -166,7 +179,40 @@ equip(thorin, {
     feat('twin', 'Twin Breath', [{ id: 'twin-use', type: 'utility' }], { uses: recharge(1, '5', 2) }),
     feat('fresh', 'Fresh Breath', [{ id: 'fresh-use', type: 'utility' }], { uses: recharge(0) }),
     feat('plainUses', 'Second Wind', [{ id: 'plain-use', type: 'utility' }], { uses: { max: 1, spent: 1, recovery: [{ period: 'sr', type: 'recoverAll' }] } }),
+    // Module 0.41.0 (its contract §8.2.2): damage on its own at a level, in a mode, with ammunition,
+    // spending what it uses. Burning Hands, 3d6 and a die a level; a Potion of Healing, a Bonus Action,
+    // its one use destroying it, two of them; Grip, a 2nd-level concentration spell that doesn't scale;
+    // Ember Lance, whose damage reads the spell's level; a scroll of Burning Hands written at 3rd; Battle
+    // Cry, its use spent only in a fight; a versatile Battleaxe; a light, thrown Dagger, three of them,
+    // and one that returns; and plain Arrows, and arrows that return, beside the Arrows of Fire.
+    { id: 'hands', name: 'Burning Hands', type: 'spell', system: { level: 1, method: 'spell', properties: [] },
+      activities: [{ id: 'hands-save', type: 'save', save: ['dex'], dc: 13, damage: [{ number: 3, denomination: 6, types: ['fire'], scaling: 1 }] }] },
+    { id: 'potion', name: 'Potion of Healing', type: 'consumable', system: { properties: [], quantity: 2, type: { value: 'potion' }, uses: { max: 1, spent: 0, autoDestroy: true } },
+      activities: [{ id: 'potion-heal', type: 'heal', activation: { type: 'bonus', value: 1 }, healing: { number: 2, denomination: 4, bonus: '2', types: ['healing'] }, consumption: [{ type: 'itemUses', value: '1' }] }] },
+    { id: 'grip', name: 'Grip', type: 'spell', system: { level: 2, method: 'spell', properties: ['concentration'] },
+      activities: [{ id: 'grip-hit', type: 'damage', concentration: true, damage: [{ number: 1, denomination: 6, types: ['force'] }] }] },
+    { id: 'lance', name: 'Ember Lance', type: 'spell', system: { level: 1, method: 'spell', properties: [] },
+      activities: [{ id: 'lance-hit', type: 'damage', damage: [{ custom: { enabled: true, formula: '(@item.level)d8' }, types: ['fire'] }] }] },
+    { id: 'scroll', name: 'Spell Scroll of Burning Hands', type: 'consumable', flags: { dnd5e: { scaling: 2, spellLevel: { value: 3, base: 1 } } },
+      system: { properties: [], quantity: 1, level: 3, type: { value: 'scroll' }, uses: { max: 1, spent: 0, autoDestroy: true } },
+      activities: [{ id: 'scroll-save', type: 'save', save: ['dex'], dc: 13, damage: [{ number: 3, denomination: 6, types: ['fire'], scaling: 1 }], consumption: [{ type: 'itemUses', value: '1' }] }] },
+    feat('cry', 'Battle Cry', [{ id: 'cry-hit', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['force'] }], consumption: [{ type: 'itemUses', value: '1', combatOnly: true }] }],
+      { uses: { max: 2, spent: 0, recovery: [] } }),
+    weapon('axe', 'Battleaxe', { id: 'axe-swing', versatile: 10, damage: [{ number: 1, denomination: 8, bonus: '@mod', types: ['slashing'] }] }, { properties: ['ver'] }),
+    weapon('dagger', 'Dagger', { id: 'dagger-stab', damage: [{ number: 1, denomination: 4, bonus: '@mod', types: ['piercing'] }] }, { properties: ['lgt', 'thr'], quantity: 3 }),
+    weapon('boomerang', 'Returning Dagger', { id: 'boomerang-stab', damage: [{ number: 1, denomination: 4, bonus: '@mod', types: ['piercing'] }] }, { properties: ['lgt', 'thr', 'ret'], quantity: 1 }),
+    { id: 'arrows2', name: 'Arrows', type: 'consumable', system: { type: { value: 'ammo' }, quantity: 10, properties: [] }, activities: [] },
+    { id: 'arrows3', name: 'Returning Arrows', type: 'consumable', system: { type: { value: 'ammo' }, quantity: 5, properties: ['ret'] }, activities: [] },
   ],
+  spells: { spell1: { value: 2, max: 2, level: 1 }, spell2: { value: 1, max: 1, level: 2 } },
+})
+// Module 0.41.0: Wren, Alice's too, a pact-only warlock, one pact slot at 3rd level, with Hellish
+// Rebuke, a 1st-level reaction cast with it.
+const wren = add(new Actor5e({ id: 'wren', name: 'Wren', owners: ['alice'], mods: { cha: 3 } }))
+equip(wren, {
+  items: [{ id: 'rebuke', name: 'Hellish Rebuke', type: 'spell', system: { level: 1, method: 'pact', properties: [] },
+    activities: [{ id: 'rebuke-save', type: 'save', activation: { type: 'reaction', value: 1 }, save: ['dex'], dc: 13, damage: [{ number: 2, denomination: 10, types: ['fire'], scaling: 1 }] }] }],
+  spells: { pact: { value: 1, max: 1, level: 3 } },
 })
 // Midi's damage roll modifiers on Thorin, once an effect gives him some.
 thorin.effectsMade = []
@@ -192,7 +238,8 @@ fight.getCombatantsByActor = actor => fight.combatants.filter(cb => cb.actor?.id
 game.combat = fight
 
 // ---- The app ----
-const app = { events: [], polls: [], waiting: new Map(), wake: null, features: { commands: true, companions: 1 } }
+// Since module 0.41.0 it reads damage on its own's choices too, unless a case says not.
+const app = { events: [], polls: [], waiting: new Map(), wake: null, features: { commands: true, companions: 1, aloneChoices: 1 } }
 const json = body => ({ ok: true, status: 200, statusText: 'OK', headers: new Headers({ 'content-type': 'application/json' }), json: async () => body })
 globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body)
@@ -247,7 +294,7 @@ await Hooks.callAll('init')
 settings.set('listenerUrl', 'https://stone.example')
 settings.set('campaignSecrets', { 'camp-a': 'a', 'camp-b': 'b', 'camp-c': 'c' })
 settings.set('campaigns', [
-  { id: 'camp-a', title: 'Ashlands', characters: ['thorin'], rolls: true, attacks: true },
+  { id: 'camp-a', title: 'Ashlands', characters: ['thorin', 'wren'], rolls: true, attacks: true },
   { id: 'camp-b', title: 'Mirkwood', characters: ['thorin'], rolls: true, attacks: false },
   { id: 'camp-c', title: 'Coldwater', characters: ['thorin'], rolls: false, attacks: true },
 ])
@@ -292,7 +339,8 @@ const ALONE = ['itemDamage', 'recharge']
 /*  The sheet                                   */
 /* -------------------------------------------- */
 
-const sheet = app.events.filter(e => (e.type === 'character.updated') && (e.campaign.id === 'camp-a')).at(-1).data.character.sheet
+// Changed on purpose (round 0.41.0 §8.2.4): Thorin's, as Wren is the campaign's too.
+const sheet = app.events.filter(e => (e.type === 'character.updated') && (e.campaign.id === 'camp-a') && (e.data.character.id === 'thorin')).at(-1).data.character.sheet
 /** Every row the sheet sends that has a tableDamage, by its activity's id or its own. */
 const rows = []
 JSON.stringify(sheet, (key, value) => {
@@ -491,6 +539,530 @@ settings.set('chatEvents', true)
   assert.equal(serializeMessage(messageOf(sword.id), unread).companion, undefined, 'a listener reading no companions')
   assert.equal(serializeMessage(messageOf(sword.id), unread).alone, true, 'is told it too')
   ok(`the card damage on its own makes is flagged alone, a heal's too, and the app is told it in its chat message, as a listener that reads no companions is; ${MIDI ? "Midi's card of an attack and its damage" : "an attack's damage, made on its use,"} and a recharge's card are neither, nor a message flagged "true"`)
+}
+
+/* -------------------------------------------- */
+/*  Choices (module 0.41.0)                     */
+/* -------------------------------------------- */
+
+// Round 0.41.0 §8.2.2, with round.v1.md's weapon cases 6-8: damage on its own at a level, in a mode,
+// with ammunition, and spending what it uses, for an app that answered `aloneChoices: 1`.
+const { characterSheet } = await import(`${MODULE}/scripts/sheet.mjs`)
+const { slimSheet } = await import(`${MODULE}/scripts/sheet-slim.mjs`)
+const { expandSheet } = await import('./slim-expand.mjs')
+const { send: post } = await import(`${MODULE}/scripts/transport.mjs`)
+const { aloneTermsChanged } = await import(`${MODULE}/scripts/character-sync.mjs`)
+const { readsLevel } = await import(`${MODULE}/scripts/sheet-links.mjs`)
+/** Every row of a sheet that has a tableDamage. */
+const rowsIn = whole => {
+  const found = []
+  JSON.stringify(whole, (key, value) => {
+    if (value && (typeof value === 'object') && Object.hasOwn(value, 'tableDamage')) found.push(value)
+    return value
+  })
+  return found
+}
+const rowIn = (whole, id) => rowsIn(whole).find(row => (row.activity?.id === id) || (row.attackId === id) || (row.id === id))
+const formulasOf = plan => plan?.rolls.map(roll => roll.formula) ?? null
+const sheetOf = (actor = thorin) => characterSheet(actor, undefined, { aloneChoices: true })
+const sentSheet = (id = 'thorin') => app.events.filter(e => (e.type === 'character.updated') && (e.campaign.id === 'camp-a') && (e.data.character.id === id)).at(-1)?.data.character.sheet
+const slotOf = (actor, key) => actor.system.spells[key].value
+const setSlot = (actor, key, value) => { actor.system.spells[key].value = value }
+const aloneOf = fields => send({ id: `alone-${++ids}`, actorId: 'thorin', kind: 'itemDamage', ...plain, ...fields })
+const hands = fields => aloneOf({ item: 'hands', activity: 'hands-save', ...fields })
+const rebuke = fields => send({ id: `alone-${++ids}`, actorId: 'wren', kind: 'itemDamage', item: 'rebuke', activity: 'rebuke-save', ...plain, ...fields })
+const d = (faces, ...results) => ({ faces, results })
+const FOUR = [d(6, 3, 5, 2, 6)]
+const THREE = [d(6, 3, 5, 2)]
+const usageCards = since => [...messages.values()].slice(since).filter(m => (m.type === 'usage') || (m.flags?.dnd5e?.messageType === 'usage'))
+const failedAs = (made, reason, error = null) => assert.deepEqual([made.status, made.reason, made.error], ['failed', reason, error], JSON.stringify(made))
+const doneOf = made => { assert.equal(made.status, 'done', JSON.stringify(made)); return messageOf(made.id) }
+const chosenOf = card => card.flags['sending-stone'].chosen
+/** The potions as they were made: two, their use unspent. */
+const POTION = thorin.items.get('potion').toObject()
+const restorePotion = () => thorin.items.set('potion', new Item5e(thorin, foundry.utils.deepClone(POTION)))
+
+{
+  // 1. The hello.
+  const rolls = helloOf('camp-a').data.features.rolls
+  assert.equal(rolls.aloneChoices, true, 'aloneChoices where itemDamage is offered')
+  const keys = Object.keys(rolls)
+  assert.equal(keys[keys.indexOf('midiPrompts') + 1], 'aloneChoices', 'right after midiPrompts')
+  assert.equal(keys[keys.indexOf('aloneChoices') + 1], 'companionPrompts', 'companionPrompts after it')
+  assert.equal(helloOf('camp-b').data.features.rolls.aloneChoices, false, 'not with attacks off')
+  assert.equal(helloOf('camp-c').data.features.rolls.aloneChoices, false, 'nor with rolls off, in the off object')
+  const [ashlands] = getCampaigns()
+  const was = diceStatus.attacks
+  diceStatus.attacks = false
+  assert.equal(rollFeatures(ashlands).aloneChoices, false, 'nor before the damage self-test passes')
+  diceStatus.attacks = was
+  ok('the hello: features.rolls.aloneChoices true where itemDamage is offered, right after midiPrompts, companionPrompts after it; false with attacks off, rolls off and before the self-test')
+}
+
+// A ranged weapon's damage bonus, which a thrown weapon gets, as dnd5e's thrown mode makes it a ranged attack.
+thorin.system.bonuses.rwak.damage = '1'
+{
+  // 2. The sheet.
+  const full = sheetOf()
+  const plan = id => rowIn(full, id).tableDamage
+  const hands41 = plan('hands-save')
+  assert.deepEqual(hands41.choices.map(each => [Object.keys(each), each.level, formulasOf(each.normal), each.critical]),
+    [[['level', 'normal', 'critical'], 2, ['4d6'], null]], 'Burning Hands at 2nd: 4d6')
+  assert.deepEqual(hands41.spends, ['slot'])
+  assert.deepEqual([plan('potion-heal').choices, plan('potion-heal').spends], [[], ['uses']], 'the potion: its uses')
+  assert.deepEqual([plan('ls-swing').choices, plan('ls-swing').spends], [[], []], 'the longsword: nothing')
+  assert.deepEqual([plan('grip-hit').choices, plan('grip-hit').spends], [[], ['slot']], 'Grip: no level that changes it')
+  assert.deepEqual([plan('scroll-save').choices, plan('scroll-save').spends, formulasOf(plan('scroll-save').normal)], [[], ['uses'], ['5d6']], 'the scroll: a fixed level, 5d6')
+  const lance = plan('lance-hit')
+  assert.deepEqual(lance.choices.map(each => [each.level, each.normal.rolls.map(roll => roll.dice)]), [[2, [[{ faces: 8, number: 2 }]]]], "Ember Lance at 2nd, its level read: two d8")
+  assert.deepEqual([plan('cry-hit').choices, plan('cry-hit').spends], [[], ['uses']], 'Battle Cry: its uses')
+  const axe = plan('axe-swing')
+  assert.deepEqual(axe.choices.map(each => [Object.keys(each), each.attackMode, formulasOf(each.normal), formulasOf(each.critical)]),
+    [[['attackMode', 'normal', 'critical'], 'twoHanded', ['1d10 + 3'], ['2d10 + 3']]], 'the Battleaxe two-handed; one-handed, the same as its own, left out')
+  assert.deepEqual(axe.spends, [])
+  const dagger = plan('dagger-stab')
+  assert.deepEqual(dagger.choices.map(each => [each.attackMode, formulasOf(each.normal)]),
+    [['offhand', ['1d4']], ['thrown', ['1d4 + 3 + 1']], ['thrown-offhand', ['1d4 + 1']]], 'the Dagger off-hand, thrown (a ranged attack\'s bonus), thrown off-hand')
+  assert.deepEqual(dagger.spends, ['thrown'])
+  assert.deepEqual(plan('boomerang-stab').spends, [], 'a returning dagger spends nothing thrown')
+  const bow = plan('bow-shot')
+  assert.deepEqual(bow.choices.map(each => [Object.keys(each), each.ammunition, formulasOf(each.normal)]),
+    [[['ammunition', 'normal', 'critical'], 'arrows', ['1d8 + 2 + 1', '1d4']]], 'the Longbow (and a ranged attack\'s bonus) with Arrows of Fire; plain and returning arrows, the same as its own, left out')
+  assert.deepEqual(bow.spends, ['ammunition'])
+  const wren41 = rowIn(sheetOf(wren), 'rebuke-save').tableDamage
+  assert.deepEqual([wren41.choices.map(each => [each.level, formulasOf(each.normal)]), wren41.spends], [[[3, ['4d10']]], ['slot']], "Wren's Hellish Rebuke at her pact slot's 3rd: 4d10")
+  // Slim sheets keep both keys, and come back whole.
+  const slim = slimSheet(full)
+  assert.ok(rowsIn(slim).some(row => row.tableDamage?.choices?.length && row.tableDamage?.spends), 'the slim sheet keeps choices and spends')
+  // Each choice in it with only what it doesn't hold alike with its row's own plan (PROTOCOL, "Slim
+  // sheets"): Burning Hands at 2nd its formula and dice; the Longbow with Arrows of Fire its second
+  // roll, the fire, whole, its first the row's own.
+  assert.deepEqual(rowIn(slim, 'hands-save').tableDamage.choices, [{ level: 2, normal: { rolls: [{ formula: '4d6', dice: [{ faces: 6, number: 4 }] }] } }], 'Burning Hands at 2nd: its formula and dice')
+  assert.deepEqual(rowIn(slim, 'bow-shot').tableDamage.choices.map(each => [each.normal.rolls, each.critical.rolls.length]),
+    [[[{}, rowIn(full, 'bow-shot').tableDamage.choices[0].normal.rolls[1]], 2]], 'the Longbow with Arrows of Fire: the fire alone')
+  assert.deepEqual(expandSheet(JSON.parse(JSON.stringify(slim))), JSON.parse(JSON.stringify(full)), 'and expands back to the full sheet, as posted')
+  // The gate: an app that answers no aloneChoices is sent 0.40.0's tableDamage, byte for byte; one
+  // whose answer rises to 1 is sent the sheets again, with the keys.
+  assert.ok(rowIn(sentSheet(), 'hands-save').tableDamage.choices, 'the sheet the app was sent carries them')
+  const campaign = getCampaigns().find(({ id }) => id === 'camp-a')
+  let from = app.events.length
+  app.features = { commands: true, companions: 1 }
+  post('bridge.heartbeat', {}, campaign, { sequenced: false })
+  await until(() => app.events.slice(from).some(e => (e.type === 'character.updated') && (e.data.character.id === 'thorin')), 'the sheet sent again without them')
+  await settle()
+  assert.ok(rowsIn(sentSheet()).every(row => (row.tableDamage === null) || isDeepStrictEqual(Object.keys(row.tableDamage), ['normal', 'critical'])),
+    'every tableDamage {normal, critical} alone')
+  assert.ok(rowsIn(sentSheet('wren')).every(row => (row.tableDamage === null) || isDeepStrictEqual(Object.keys(row.tableDamage), ['normal', 'critical'])), "Wren's too")
+  from = app.events.length
+  app.features = { commands: true, companions: 1, aloneChoices: 1 }
+  post('bridge.heartbeat', {}, campaign, { sequenced: false })
+  await until(() => app.events.slice(from).some(e => (e.type === 'character.updated') && (e.data.character.id === 'thorin')), 'the sheet sent again with them')
+  await settle()
+  assert.deepEqual(rowIn(sentSheet(), 'hands-save').tableDamage.spends, ['slot'], 'the answer risen to 1: sent again with the keys')
+  ok("the sheet, to an app that answered aloneChoices 1: Burning Hands' choices [{level 2, 4d6}] and spends [slot]; the potion's uses; the longsword nothing; Grip [slot] with no level entry; the scroll at its fixed 5d6, [uses]; Ember Lance's two d8 at 2nd; Battle Cry's uses; the Battleaxe two-handed alone, 1d10 + 3; the Dagger off-hand (1d4), thrown (1d4 + 3 + 1) and thrown off-hand, [thrown]; a returning dagger nothing; the Longbow with Arrows of Fire, [ammunition]; Wren's pact Hellish Rebuke at 3rd, 4d10; the slim sheet keeps both, each choice with only what isn't its row's own (Burning Hands' formula and dice, the Longbow's fire), and expands back; an app that answers none is sent {normal, critical} alone, the sheets sent again as the answer changes")
+}
+{
+  // 2, the size: a level-20 wizard's full sheet, with the keys and without.
+  const mage = new Actor5e({ id: 'mage', name: 'Mage', owners: [], mods: { int: 5 } })
+  const levels = [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 1, 2]
+  equip(mage, {
+    spells: Object.fromEntries([4, 3, 3, 3, 3, 2, 2, 1, 1].map((max, index) => [`spell${index + 1}`, { value: max, max, level: index + 1 }])),
+    items: levels.map((level, n) => ({ id: `spell-${n}`, name: `Spell ${n}`, type: 'spell', system: { level, method: 'spell', properties: [] },
+      activities: [{ id: `spell-${n}-save`, type: 'save', save: ['dex'], dc: 19, damage: [{ number: 2 + (n % 4), denomination: [6, 8, 10][n % 3], types: [TYPES[n % TYPES.length]], scaling: 1 }] }] })),
+  })
+  const plainSheet = JSON.stringify(characterSheet(mage))
+  const keyed = JSON.stringify(characterSheet(mage, undefined, { aloneChoices: true }))
+  const added = keyed.length - plainSheet.length
+  // Printed for the record: a stand-in's sheet is far smaller than dnd5e's own, so only what's added
+  // is held to a bound here.
+  console.log(`the level-20 wizard's sheet: ${plainSheet.length} bytes without the keys, ${keyed.length} with (${added} added, ${(100 * added / plainSheet.length).toFixed(1)}% of the stand-in's)`)
+  assert.ok(added <= 64 * 1024, 'at most 64 KB added')
+  ok("the size of a level-20 wizard's full sheet with twenty damaging spells, with and without the keys, printed: at most 64 KB added")
+
+  // And what's posted, slim: a wizard with a spellbook of 150 spells, as each of the nine of the app's
+  // sync suite (e2e/sync-e2e.mjs) has, a third spell attacks and a third saves, cantrips to 5th level,
+  // each a die more a level, with slots from 1st to 5th: 175 choices, 50 of them with a critical hit's
+  // plan. Each choice's plan goes with only what it doesn't hold alike with the row's own, so that the
+  // keys add at most 26,000 bytes to what's posted, which keeps each of the nine's posts, of 73,055
+  // bytes without them, under the 100,000 bytes that suite holds them to.
+  const scholar = new Actor5e({ id: 'scholar', name: 'Scholar', owners: [], mods: { int: 4 } })
+  equip(scholar, {
+    spells: Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => [`spell${level}`, { value: (level <= 5) ? 2 : 0, max: (level <= 5) ? 3 : 0, level }])),
+    items: Array.from({ length: 150 }, (_, n) => {
+      const damage = [{ number: 1 + (n % 4), denomination: [4, 6, 8, 10][n % 4], types: [TYPES[n % TYPES.length]], scaling: 1 }]
+      const activity = [
+        { id: `book-${n}-hit`, type: 'attack', ability: 'int', damage },
+        { id: `book-${n}-save`, type: 'save', affects: 'creature', count: 1, save: ['dex'], dc: 15, damage },
+        { id: `book-${n}-use`, type: 'utility', affects: 'ally', count: 1 + (n % 3), range: '60' },
+      ][n % 3]
+      return {
+        id: `book-${n}`, name: `Book Spell ${n}`, type: 'spell',
+        system: {
+          level: n % 6, school: 'evo', method: 'spell', prepared: 1, canPrepare: true, properties: ['vocal', 'somatic'], duration: { units: 'inst' },
+          description: { value: `<p>Book Spell ${n}, the ${n + 1}th of the Scholar's book.</p>` },
+        },
+        activities: [activity],
+      }
+    }),
+  })
+  const plainSlim = JSON.stringify(slimSheet(characterSheet(scholar)))
+  const keyedFull = characterSheet(scholar, undefined, { aloneChoices: true })
+  const posted = JSON.stringify(slimSheet(keyedFull))
+  const more = posted.length - plainSlim.length
+  console.log(`the spellbook wizard's slim sheet: ${plainSlim.length} bytes without the keys, ${posted.length} with (${more} added, ${(100 * more / plainSlim.length).toFixed(1)}%)`)
+  const choices = rowsIn(keyedFull).flatMap(row => row.tableDamage?.choices ?? [])
+  assert.deepEqual([choices.length, choices.filter(each => each.critical).length], [25 * 4 + 25 * 2 + 25, 50], 'each level above each spell\'s own')
+  assert.ok(more <= 26_000, 'at most 26,000 bytes more posted')
+  assert.deepEqual(expandSheet(JSON.parse(posted)), JSON.parse(JSON.stringify(keyedFull)), 'and it comes back whole')
+  ok("what's posted: the slim sheet of a wizard with 150 spells, 100 of them damaging, slots 1st to 5th, with and without the keys, printed: its 175 choices add at most 26,000 bytes, and it comes back whole")
+}
+{
+  // 2, past MOST_ALONE_CHOICES: a crossbow with seventy kinds of bolt, each its own damage.
+  const quartermaster = new Actor5e({ id: 'quartermaster', name: 'Quartermaster', owners: [], mods: { dex: 2 } })
+  equip(quartermaster, {
+    items: [
+      weapon('crossbow', 'Heavy Crossbow', { id: 'crossbow-shot', ability: 'dex', actionType: 'rwak', damage: [{ number: 1, denomination: 10, bonus: '@mod', types: ['piercing'] }] }, { properties: ['amm'], attackType: 'ranged' }),
+      ...Array.from({ length: 70 }, (_, n) => ({ id: `bolt-${n}`, name: `Bolt ${String(n).padStart(2, '0')}`, type: 'consumable',
+        system: { type: { value: 'ammo' }, quantity: 5, properties: [], damage: { base: { number: 1, denomination: 4, types: [TYPES[n % TYPES.length]] } } }, activities: [] })),
+    ],
+  })
+  const crossbow = rowIn(characterSheet(quartermaster, undefined, { aloneChoices: true }), 'crossbow-shot').tableDamage
+  assert.deepEqual([crossbow.choices, crossbow.spends, formulasOf(crossbow.normal)], [undefined, ['ammunition'], ['1d10 + 2']], 'no choices past 64, its own plan and what it spends kept')
+  ok('a row past MOST_ALONE_CHOICES, a crossbow with seventy bolts each its own damage: no choices, its own plan and spends kept')
+}
+{
+  // 2, what dnd5e can't work out (round 0.41.0 §2.2.3): its usage configuration throwing for Burning
+  // Hands, as a module's wrapper or odd item data can make it, leaves that row's choices and spends
+  // out, its own plan kept, every other row whole, and the sheet sent to the app all the same.
+  const activity = thorin.items.get('hands').system.activities.get('hands-save')
+  assert.ok(!Object.hasOwn(activity, '_prepareUsageConfig'), "dnd5e's own, on its class")
+  activity._prepareUsageConfig = () => { throw new Error('a wrapper broke') }
+  const errors = []
+  const logged = console.error
+  console.error = (...args) => errors.push(args.map(String).join(' '))
+  try {
+    const built = sheetOf()
+    const hands41 = rowIn(built, 'hands-save').tableDamage
+    assert.deepEqual([Object.keys(hands41), formulasOf(hands41.normal)], [['normal', 'critical'], ['3d6']], 'Burning Hands: its own plan alone')
+    assert.deepEqual(rowIn(built, 'cry-hit').tableDamage.spends, ['uses'], "Battle Cry's kept")
+    const from = app.events.length
+    aloneTermsChanged('camp-a')
+    await until(() => app.events.slice(from).some(e => (e.type === 'character.updated') && (e.data.character.id === 'thorin')), "Thorin's sheet sent again")
+    await settle()
+    assert.ok(sentSheet(), 'a sheet, not null')
+    assert.deepEqual(Object.keys(rowIn(sentSheet(), 'hands-save').tableDamage), ['normal', 'critical'], 'sent with its own plan alone')
+  } finally {
+    console.error = logged
+    delete activity._prepareUsageConfig
+  }
+  assert.deepEqual(errors, [], 'nothing logged')
+  const from = app.events.length
+  aloneTermsChanged('camp-a')
+  await until(() => app.events.slice(from).some(e => (e.type === 'character.updated') && (e.data.character.id === 'thorin')), "Thorin's sheet whole again")
+  await settle()
+  assert.deepEqual(rowIn(sentSheet(), 'hands-save').tableDamage.spends, ['slot'], 'once it works again, sent with its keys')
+  ok("dnd5e's usage configuration throwing for Burning Hands: its row keeps {normal, critical} alone, choices and spends left out, the rest of the sheet whole, Thorin's sheet sent all the same, nothing logged; whole again once it works")
+}
+
+{
+  // 3. A level.
+  let made = await hands({ slot: 'spell2', dice: FOUR })
+  let card = doneOf(made)
+  assert.deepEqual([card.rolls[0].formula, cardTargets(card), card.flags['sending-stone'].alone], ['4d6', [], true], "dnd5e's card, 4d6, no targets, on its own")
+  assert.equal(card.flavor, 'Burning Hands - Damage Roll · 2nd Level · nothing spent')
+  assert.deepEqual(chosenOf(card), { level: 2, consume: false })
+  assert.deepEqual([slotOf(thorin, 'spell2'), made.alone], [1, undefined], 'nothing spent, no alone in the result')
+  failedAs(await hands({ slot: 'spell2', dice: THREE }), 'invalid', 'dice')
+  made = await hands({ slot: 'spell1', dice: THREE })
+  card = doneOf(made)
+  assert.deepEqual([card.rolls[0].formula, card.flavor], ['3d6', 'Burning Hands - Damage Roll · 1st Level · nothing spent'], "the spell's own level, its base")
+  ok("a level: Burning Hands at 2nd with 4d6, dnd5e's card 4d6 with no targets, its flavor \"· 2nd Level · nothing spent\", chosen {level 2, consume false}, nothing spent; the base dice at 2nd invalid dice; at 1st, the base")
+
+  // 4. Spending a slot.
+  const since = messages.size
+  made = await hands({ slot: 'spell2', consume: true, dice: FOUR })
+  card = doneOf(made)
+  assert.deepEqual([slotOf(thorin, 'spell2'), made.alone, usageCards(since).length], [0, { spent: ['slot'] }, 0], 'its slot spent, no usage card')
+  assert.equal(card.flavor, 'Burning Hands - Damage Roll · 2nd Level · spell slot spent')
+  assert.deepEqual(chosenOf(card), { level: 2, consume: true, spent: ['slot'] })
+  const before = messages.size
+  made = await hands({ slot: 'spell2', consume: true, dice: FOUR })
+  assert.deepEqual([made.status, made.reason], ['failed', 'consume'])
+  assert.ok(String(made.error).includes('SpellCastNoSlots'), "dnd5e's own message")
+  assert.equal(messages.size, before, 'nothing rolled')
+  card = doneOf(await hands({ slot: 'spell2', dice: FOUR }))
+  assert.equal(slotOf(thorin, 'spell2'), 0)
+  ok('spending a slot: Burning Hands at 2nd with consume, 2nd-level slots 1 → 0, alone {spent: [slot]}, no usage card, the flavor ending "· spell slot spent"; again "consume" with dnd5e\'s message, nothing rolled; without consume, rolled, nothing spent')
+
+  // 5. Pact magic.
+  const TEN4 = [d(10, 1, 2, 3, 4)]
+  const TEN2 = [d(10, 5, 6)]
+  made = await rebuke({ slot: 'pact', consume: true, dice: TEN4 })
+  card = doneOf(made)
+  assert.deepEqual([slotOf(wren, 'pact'), made.alone, card.rolls[0].formula, chosenOf(card).level], [0, { spent: ['slot'] }, '4d10', 3], 'its pact slot, 4d10 at 3rd')
+  setSlot(wren, 'pact', 1)
+  made = await rebuke({ consume: true, dice: TEN4 })
+  card = doneOf(made)
+  assert.deepEqual([slotOf(wren, 'pact'), card.rolls[0].formula, chosenOf(card).level], [0, '4d10', 3], 'no slot named: the default slot, scaled and spent')
+  setSlot(wren, 'pact', 1)
+  failedAs(await rebuke({ consume: true, dice: TEN2 }), 'invalid', 'dice')
+  made = await rebuke({ dice: TEN2 })
+  card = doneOf(made)
+  assert.deepEqual([slotOf(wren, 'pact'), card.rolls[0].formula, card.flavor, made.alone], [1, '2d10', 'Hellish Rebuke - Damage Roll · nothing spent', undefined], "an older app's request: its own level, nothing spent")
+  ok("pact magic: Wren's Hellish Rebuke at her pact slot with consume, 4d10, the slot spent; no slot named with consume, the default slot's level and spend; then the base 2d10 invalid dice; neither field, 2d10 at its own level, nothing spent")
+}
+{
+  // 6. Concentration.
+  const grip = fields => aloneOf({ item: 'grip', activity: 'grip-hit', dice: [d(6, 4)], ...fields })
+  const effects = () => [...thorin.concentration.effects.values()]
+  setSlot(thorin, 'spell2', 1)
+  let made = await grip({ consume: true })
+  let card = doneOf(made)
+  assert.deepEqual([effects().map(effect => effect.flags.dnd5e.item.data), made.alone], [['grip-hit'], { spent: ['slot'], concentrating: true }], "Grip's concentration begun")
+  assert.equal(card.flavor, 'Grip - Damage Roll · 2nd Level · spell slot spent · concentrating')
+  assert.deepEqual(chosenOf(card), { level: 2, consume: true, spent: ['slot'], concentrating: true })
+  for (const effect of effects()) await thorin.endConcentration(effect.id)
+  const other = await thorin.beginConcentrating(thorin.items.get('hands').system.activities.get('hands-save'))
+  setSlot(thorin, 'spell2', 1)
+  made = await grip({ consume: true })
+  doneOf(made)
+  assert.deepEqual(effects().map(effect => effect.flags.dnd5e.item.data), ['grip-hit'], 'at the limit: the other ended, Grip\'s begun')
+  assert.ok(!effects().includes(other))
+  for (const effect of effects()) await thorin.endConcentration(effect.id)
+  setSlot(thorin, 'spell2', 1)
+  made = await grip({})
+  doneOf(made)
+  assert.deepEqual([effects().length, slotOf(thorin, 'spell2')], [0, 1], 'without consume: none begun')
+  ok('concentration: Grip with consume begins it, alone {spent: [slot], concentrating: true}, the flavor ending "· concentrating"; at the limit the other one ended and Grip\'s begun, as dnd5e\'s use; without consume none')
+}
+if (MIDI) {
+  // 13. Midi-QOL's Bonus Actions and reactions, where it enforces them, in a fight.
+  const potion = fields => aloneOf({ item: 'potion', activity: 'potion-heal', dice: [d(4, 2, 3)], ...fields })
+  midi.settings.enforceBonusActions = 'all'
+  midi.usedBonus.add('thorin')
+  const before = messages.size
+  failedAs(await potion({ consume: true }), 'bonus-action')
+  assert.equal(messages.size, before, 'nothing rolled')
+  let marks = midi.bonusMarks.length
+  doneOf(await potion({}))
+  assert.equal(midi.bonusMarks.length, marks, 'without consume: neither checked nor marked')
+  midi.usedBonus.delete('thorin')
+  doneOf(await potion({ consume: true }))
+  assert.deepEqual(midi.bonusMarks.slice(marks), ['thorin'], 'with consume: marked')
+  midi.settings.enforceReactions = 'all'
+  combatant(fight, 'cb-wren', wren)
+  midi.usedReaction.add('wren')
+  failedAs(await rebuke({ slot: 'pact', consume: true, dice: [d(10, 1, 2, 3, 4)] }), 'reaction')
+  midi.usedReaction.delete('wren')
+  doneOf(await rebuke({ slot: 'pact', consume: true, dice: [d(10, 1, 2, 3, 4)] }))
+  assert.deepEqual(midi.reactionMarks, ['wren'], 'its reaction marked')
+  setSlot(wren, 'pact', 1)
+  fight.combatants.delete('cb-wren')
+  const inCombat = Object.getOwnPropertyDescriptor(thorin, 'inCombat')
+  Object.defineProperty(thorin, 'inCombat', { configurable: true, value: false })
+  midi.usedBonus.add('thorin')
+  marks = midi.bonusMarks.length
+  doneOf(await potion({ consume: true }))
+  assert.equal(midi.bonusMarks.length, marks, 'out of a fight: neither checked nor marked')
+  Object.defineProperty(thorin, 'inCombat', inCombat)
+  midi.usedBonus.clear()
+  midi.usedReaction.clear()
+  midi.settings.enforceBonusActions = 'none'
+  midi.settings.enforceReactions = 'none'
+  restorePotion()
+  ok("Midi-QOL's economy with consume: Enforce bonus actions \"all\", Thorin's used, the potion refused \"bonus-action\", nothing rolled; without consume rolled, nothing marked; unused, marked; Enforce reactions \"all\", Wren's used, Hellish Rebuke refused \"reaction\", unused marked; out of a fight neither")
+}
+{
+  // 7. Uses.
+  const potion = () => aloneOf({ item: 'potion', activity: 'potion-heal', consume: true, dice: [d(4, 2, 3)] })
+  let made = await potion()
+  const card = doneOf(made)
+  if (DND5E6) assert.equal(card.type, 'healing')
+  else assert.equal(card.flags.dnd5e.roll.type, 'healing')
+  assert.deepEqual([thorin.items.get('potion').system.quantity, made.alone], [1, { spent: ['uses'] }], 'a healing card, one potion fewer')
+  assert.equal(card.flavor, 'Potion of Healing - Healing Roll · use spent')
+  made = await potion()
+  doneOf(made)
+  assert.deepEqual([thorin.items.has('potion'), made.alone], [false, { spent: ['uses'] }], 'its last: deleted')
+  ok("uses: the potion's healing with consume, a healing card, quantity 2 → 1, [uses]; its last deleted, [uses]")
+
+  // 7, an attribute (round 0.41.0 §2.6.3): a point of Focus a feat spends, kept on the actor as a
+  // spell slot is, is a use, never a slot.
+  const resources = thorin.system.resources
+  thorin.system.resources = { primary: { value: 3, max: 3, label: 'Focus' } }
+  thorin.items.set('surge', new Item5e(thorin, { id: 'surge', name: 'Focus Surge', type: 'feat', system: { properties: [] },
+    activities: [{ id: 'surge-hit', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['force'] }], consumption: [{ type: 'attribute', target: 'resources.primary.value', value: '1' }] }] }))
+  made = await aloneOf({ item: 'surge', activity: 'surge-hit', consume: true, dice: [d(6, 4)] })
+  assert.deepEqual([thorin.system.resources.primary.value, made.alone, doneOf(made).flavor], [2, { spent: ['uses'] }, 'Focus Surge - Damage Roll · use spent'], 'one point of Focus, a use')
+  thorin.items.delete('surge')
+  thorin.system.resources = resources
+  ok('an attribute: a feat spending a point of Focus (resources.primary.value) with consume, 3 → 2, [uses], "· use spent", never a spell slot')
+
+  // 8. A use spent only in a fight.
+  const cry = () => aloneOf({ item: 'cry', activity: 'cry-hit', consume: true, dice: [d(6, 4)] })
+  const inCombat = Object.getOwnPropertyDescriptor(thorin, 'inCombat')
+  Object.defineProperty(thorin, 'inCombat', { configurable: true, value: false })
+  made = await cry()
+  doneOf(made)
+  assert.deepEqual([thorin.items.get('cry').system.uses.spent, made.alone], [0, { spent: [] }], 'out of a fight: unspent')
+  Object.defineProperty(thorin, 'inCombat', inCombat)
+  made = await cry()
+  doneOf(made)
+  assert.deepEqual([thorin.items.get('cry').system.uses.spent, made.alone], [1, { spent: ['uses'] }], 'in a fight: spent')
+  ok('a use spent only in a fight: Battle Cry with consume out of a fight unspent, spent []; in a fight [uses]')
+
+  // 9. A scroll.
+  failedAs(await aloneOf({ item: 'scroll', activity: 'scroll-save', slot: 'spell1', dice: [d(6, 1, 2, 3, 4, 5)] }), 'slot')
+  made = await aloneOf({ item: 'scroll', activity: 'scroll-save', consume: true, dice: [d(6, 1, 2, 3, 4, 5)] })
+  assert.deepEqual([doneOf(made).rolls[0].formula, thorin.items.has('scroll'), made.alone], ['5d6', false, { spent: ['uses'] }], 'at its 3rd level, the scroll gone')
+  ok('a scroll: a slot named "slot"; with consume 5d6 at its fixed 3rd level, the scroll deleted, [uses]')
+
+  // 10. Damage that reads the level.
+  made = await aloneOf({ item: 'lance', activity: 'lance-hit', slot: 'spell2', dice: [d(8, 3, 4)] })
+  assert.deepEqual(doneOf(made).rolls[0].dice.map(die => [die.faces, die.number]), [[8, 2]], 'two d8 at 2nd')
+  failedAs(await aloneOf({ item: 'lance', activity: 'lance-hit', slot: 'spell2', dice: [d(8, 3)] }), 'invalid', 'dice')
+  ok("damage that reads the level: Ember Lance at 2nd, two d8 on dnd5e's card; one d8 invalid dice")
+
+  // 10, healing that reads the level (round 0.41.0 §2.7): a heal's one part is its healing, which has
+  // no damage, read as dnd5e's own card reads it; and a part's scaling formula, as dnd5e's own Aid's.
+  thorin.items.set('mend', new Item5e(thorin, { id: 'mend', name: 'Mend Wounds', type: 'spell', system: { level: 1, method: 'spell', properties: [] },
+    activities: [{ id: 'mend-heal', type: 'heal', healing: { custom: { enabled: true, formula: '(@item.level)d4' }, types: ['healing'] } }] }))
+  const mend = rowIn(sheetOf(), 'mend-heal').tableDamage
+  assert.deepEqual([mend.normal.rolls.map(roll => roll.dice), mend.choices.map(each => [each.level, each.normal.rolls.map(roll => roll.dice)])],
+    [[[{ faces: 4, number: 1 }]], [[2, [[{ faces: 4, number: 2 }]]]]], 'Mend Wounds: one d4, two at 2nd')
+  made = await aloneOf({ item: 'mend', activity: 'mend-heal', slot: 'spell2', dice: [d(4, 3, 2)] })
+  assert.deepEqual(doneOf(made).rolls[0].dice.map(die => [die.faces, die.number]), [[4, 2]], "two d4 at 2nd on dnd5e's healing card")
+  failedAs(await aloneOf({ item: 'mend', activity: 'mend-heal', slot: 'spell2', dice: [d(4, 3)] }), 'invalid', 'dice')
+  thorin.items.delete('mend')
+  const healing = scaling => ({ healing: { custom: { enabled: false, formula: '' }, bonus: '', scaling } })
+  assert.equal(readsLevel(healing({ mode: 'whole', number: 0, formula: '(@item.level - 2) * 5' })), true, "Aid's scaling formula")
+  assert.equal(readsLevel({ damage: { parts: [{ custom: { enabled: false, formula: '' }, bonus: '', scaling: { mode: 'whole', number: 0, formula: '1d6 * @scaling' } }] } }), true, "a damage part's")
+  assert.equal(readsLevel(healing({ mode: 'whole', number: 1, formula: '' })), false, 'more dice alone, by scaling')
+  ok("healing that reads the level: Mend Wounds' (@item.level)d4, two d4 among its choices at 2nd and on dnd5e's healing card, one invalid dice; a part's scaling formula, as Aid's (@item.level - 2) * 5, read too")
+}
+{
+  // 11. Vetoes.
+  setSlot(thorin, 'spell2', 1)
+  const veto = Hooks.on('dnd5e.preActivityConsumption', () => false)
+  let made = await hands({ slot: 'spell2', consume: true, dice: FOUR })
+  Hooks.off('dnd5e.preActivityConsumption', veto)
+  let card = doneOf(made)
+  assert.deepEqual([slotOf(thorin, 'spell2'), made.alone, card.flavor], [1, { spent: [] }, 'Burning Hands - Damage Roll · 2nd Level · nothing spent'], 'vetoed before: nothing written')
+  // Grip at the limit, Thorin concentrating on Burning Hands, vetoed the same (round 0.41.0 §2.6.4):
+  // nothing spent, so no concentration on Grip begun, nor the one Thorin keeps up ended.
+  const concentrations = () => [...thorin.concentration.effects.values()].map(effect => effect.flags.dnd5e.item.data)
+  assert.deepEqual(concentrations(), [], 'concentrating on nothing to begin with')
+  const kept = await thorin.beginConcentrating(thorin.items.get('hands').system.activities.get('hands-save'))
+  const vetoAgain = Hooks.on('dnd5e.preActivityConsumption', () => false)
+  made = await aloneOf({ item: 'grip', activity: 'grip-hit', consume: true, dice: [d(6, 4)] })
+  Hooks.off('dnd5e.preActivityConsumption', vetoAgain)
+  card = doneOf(made)
+  assert.deepEqual([slotOf(thorin, 'spell2'), made.alone, card.flavor], [1, { spent: [] }, 'Grip - Damage Roll · 2nd Level · nothing spent'], 'Grip vetoed: nothing spent, not concentrating')
+  assert.deepEqual(concentrations(), ['hands-save'], "no concentration on Grip begun, Burning Hands' kept")
+  await thorin.endConcentration(kept.id)
+  const after = Hooks.on('dnd5e.postActivityConsumption', () => false)
+  made = await hands({ slot: 'spell2', consume: true, dice: FOUR })
+  Hooks.off('dnd5e.postActivityConsumption', after)
+  card = doneOf(made)
+  assert.deepEqual([slotOf(thorin, 'spell2'), made.alone, card.flavor], [0, { spent: ['slot'] }, 'Burning Hands - Damage Roll · 2nd Level · spell slot spent'], 'vetoed after writing: spent all the same')
+  ok("vetoes: dnd5e.preActivityConsumption false, rolled, nothing written, spent [], \"· nothing spent\"; Grip so vetoed at the concentration limit, no concentration begun and Burning Hands' kept; dnd5e.postActivityConsumption false after writing, the slot spent, [slot], \"· spell slot spent\"")
+
+  // 12. A race: the slot spent between the roll and the spend.
+  setSlot(thorin, 'spell2', 1)
+  const race = Hooks.on('dnd5e.rollDamage', () => setSlot(thorin, 'spell2', 0))
+  const notes = screen.notifications.length
+  made = await hands({ slot: 'spell2', consume: true, dice: FOUR })
+  Hooks.off('dnd5e.rollDamage', race)
+  doneOf(made)
+  assert.deepEqual([made.alone, screen.notifications.length], [{ spent: [] }, notes], 'nothing spent, no notification on the Gamemaster\'s screen')
+  ok('a race: the slot spent between the roll and the spend, done with spent [], no notification')
+
+  // 14. Shapes.
+  failedAs(await hands({ slot: 3, dice: THREE }), 'invalid', 'slot')
+  failedAs(await hands({ consume: 'yes', dice: THREE }), 'invalid', 'consume')
+  failedAs(await hands({ consume: false, dice: THREE }), 'invalid', 'consume')
+  failedAs(await aloneOf({ item: 'axe', activity: 'axe-swing', attackMode: '!', dice: [d(8, 3)] }), 'invalid', 'attack-mode')
+  failedAs(await aloneOf({ item: 'bow', activity: 'bow-shot', ammunition: '', dice: [d(8, 3)] }), 'invalid', 'ammo')
+  failedAs(await hands({ use: 'some-use', dice: THREE }), 'invalid', 'item')
+  ok('shapes: a slot not a key, invalid slot; consume not true, invalid consume; a mode not a key, invalid attack-mode; ammunition not an id, invalid ammo; a use named, invalid item')
+}
+{
+  // Weapons (round.v1.md §8.2.2 cases 6-8, built in 0.41.0). 6. A mode.
+  const axe = fields => aloneOf({ item: 'axe', activity: 'axe-swing', ...fields })
+  const before = MIDI ? midi.made.length : 0
+  let made = await axe({ attackMode: 'twoHanded', dice: [d(10, 7)] })
+  let card = doneOf(made)
+  assert.deepEqual([card.rolls[0].formula, card.flavor, chosenOf(card)], ['1d10 + 3', 'Battleaxe - Damage Roll · Two-Handed · nothing spent', { attackMode: 'twoHanded', consume: false }],
+    `two-handed, its versatile die${MIDI ? ", kept under Midi-QOL" : ''}`)
+  if (MIDI) {
+    thorin.effectsMade = [{ disabled: false, isSuppressed: false, system: { changes: [{ key: 'flags.midi-qol.rollModifiers.damage.all.all', value: 'min3', priority: 20 }] } }]
+    made = await axe({ attackMode: 'twoHanded', dice: [d(10, 1)] })
+    thorin.effectsMade = []
+    assert.deepEqual([doneOf(made).rolls[0].formula, doneOf(made).rolls[0].total], ['1d10min3 + 3', 6], "Midi's min3 on the versatile die")
+    assert.equal(midi.made.length, before, 'no workflow')
+  }
+  assert.equal(doneOf(await axe({ attackMode: 'oneHanded', dice: [d(8, 5)] })).rolls[0].formula, '1d8 + 3', 'one-handed, its own')
+  failedAs(await axe({ attackMode: 'thrown', dice: [d(8, 5)] }), 'mode')
+  failedAs(await hands({ attackMode: 'twoHanded', dice: THREE }), 'mode')
+  ok(`a mode: the Battleaxe two-handed, 1d10 + 3 on dnd5e's card, "· Two-Handed" in its flavor${MIDI ? ", under Midi-QOL too, with Midi's min3 as 1d10min3 + 3, no workflow" : ''}; one-handed its own 1d8 + 3; a mode the axe hasn't, or on Burning Hands, "mode"`)
+
+  // 7. Thrown.
+  const dagger = fields => aloneOf({ item: 'dagger', activity: 'dagger-stab', ...fields })
+  made = await dagger({ attackMode: 'thrown', consume: true, dice: [d(4, 2)] })
+  card = doneOf(made)
+  assert.deepEqual([card.rolls[0].formula, thorin.items.get('dagger').system.quantity, made.alone], ['1d4 + 3 + 1', 2, { spent: ['thrown'] }], 'thrown: a ranged attack\'s bonus, one dagger fewer')
+  assert.equal(card.flavor, 'Dagger - Damage Roll · Thrown · thrown weapon spent')
+  assert.equal(doneOf(await dagger({ attackMode: 'offhand', dice: [d(4, 2)] })).rolls[0].formula, '1d4', 'off-hand: no modifier')
+  made = await aloneOf({ item: 'boomerang', activity: 'boomerang-stab', attackMode: 'thrown', consume: true, dice: [d(4, 2)] })
+  doneOf(made)
+  assert.deepEqual([thorin.items.get('boomerang').system.quantity, made.alone], [1, { spent: [] }], 'a returning dagger kept')
+  thorin.items.get('dagger').updateSource({ 'system.quantity': 0 })
+  failedAs(await dagger({ attackMode: 'thrown', consume: true, dice: [d(4, 2)] }), 'consume')
+  thorin.items.get('dagger').updateSource({ 'system.quantity': 3 })
+  ok('thrown: the Dagger thrown with consume, 1d4 + 3 + 1, quantity 3 → 2, [thrown], "· Thrown · thrown weapon spent"; off-hand 1d4; a returning dagger kept, spent []; none left "consume"')
+
+  // 7, a weapon thrown in its only mode (round 0.41.0 §2.11.4): a Dart, a thrown ranged weapon, whose
+  // one mode dnd5e makes Thrown (weapon.mjs:174-205). The app names a mode only where there is more
+  // than one, so its request has consume and no mode, and the Dart is thrown all the same.
+  thorin.items.set('dart', new Item5e(thorin, weapon('dart', 'Dart', { id: 'dart-throw', damage: [{ number: 1, denomination: 4, bonus: '@mod', types: ['piercing'] }] },
+    { properties: ['fin', 'thr'], attackType: 'ranged', quantity: 3 })))
+  assert.deepEqual(thorin.items.get('dart').system.attackModes.map(mode => mode.value), ['thrown'], 'Thrown, its only mode')
+  const darts = rowIn(sheetOf(), 'dart-throw').tableDamage
+  assert.deepEqual([darts.choices, darts.spends, formulasOf(darts.normal)], [[], ['thrown'], ['1d4 + 3 + 1']], 'no mode to pick, a dart thrown to spend')
+  const dart = fields => aloneOf({ item: 'dart', activity: 'dart-throw', ...fields })
+  made = await dart({ consume: true, dice: [d(4, 2)] })
+  card = doneOf(made)
+  assert.deepEqual([card.rolls[0].formula, thorin.items.get('dart').system.quantity, made.alone], ['1d4 + 3 + 1', 2, { spent: ['thrown'] }], 'no mode named: one dart fewer')
+  assert.deepEqual([card.flavor, chosenOf(card)], ['Dart - Damage Roll · thrown weapon spent', { consume: true, spent: ['thrown'] }])
+  made = await dart({ dice: [d(4, 2)] })
+  assert.deepEqual([doneOf(made).flavor, thorin.items.get('dart').system.quantity], ['Dart - Damage Roll · nothing spent', 2], 'without consume: kept')
+  thorin.items.get('dart').updateSource({ 'system.quantity': 0 })
+  failedAs(await dart({ consume: true, dice: [d(4, 2)] }), 'consume')
+  thorin.items.delete('dart')
+  ok('thrown in its only mode: a Dart with consume and no mode, 1d4 + 3 + 1, quantity 3 → 2, [thrown], "· thrown weapon spent"; its sheet no choices, [thrown]; without consume kept, "· nothing spent"; none left "consume"')
+
+  // 8. Ammunition.
+  const bow = fields => aloneOf({ item: 'bow', activity: 'bow-shot', ...fields })
+  const FIRE = [d(8, 5), d(4, 3)]
+  // Under Midi-QOL, an attack earlier in the run fired one already.
+  const arrows = thorin.items.get('arrows').system.quantity
+  made = await bow({ ammunition: 'arrows', consume: true, dice: FIRE })
+  card = doneOf(made)
+  assert.deepEqual([card.rolls.map(roll => roll.formula), thorin.items.get('arrows').system.quantity, made.alone], [['1d8 + 2 + 1', '1d4'], arrows - 1, { spent: ['ammunition'] }], 'its fire too, one arrow fewer')
+  assert.deepEqual([card.flavor, chosenOf(card)], ['Longbow - Damage Roll · Arrows of Fire · ammunition spent', { ammunition: 'arrows', consume: true, spent: ['ammunition'] }])
+  thorin.items.get('arrows').updateSource({ 'system.quantity': 1, 'system.uses.autoDestroy': true })
+  made = await bow({ ammunition: 'arrows', consume: true, dice: FIRE })
+  doneOf(made)
+  assert.deepEqual([thorin.items.has('arrows'), made.alone], [false, { spent: ['ammunition'] }], 'its last, destroying itself: deleted')
+  thorin.items.get('arrows2').updateSource({ 'system.quantity': 0 })
+  failedAs(await bow({ ammunition: 'arrows2', consume: true, dice: [d(8, 5)] }), 'ammo')
+  doneOf(await bow({ ammunition: 'arrows2', dice: [d(8, 5)] }))
+  failedAs(await bow({ ammunition: 'potion-none', dice: [d(8, 5)] }), 'ammo')
+  failedAs(await hands({ ammunition: 'arrows2', dice: THREE }), 'ammo')
+  made = await bow({ ammunition: 'arrows3', consume: true, dice: [d(8, 5)] })
+  doneOf(made)
+  assert.deepEqual([thorin.items.get('arrows3').system.quantity, made.alone], [5, { spent: [] }], 'returning arrows kept')
+  ok('ammunition: the Longbow with Arrows of Fire and consume, 1d8 + 2 + 1 and 1d4 on the card, one arrow fewer, [ammunition], "· Arrows of Fire · ammunition spent"; its last destroying itself deleted; plain arrows at 0 with consume "ammo", without rolled; ammunition not the bow\'s, or on Burning Hands, "ammo"; returning arrows kept, spent []')
 }
 
 console.log(`alone${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
