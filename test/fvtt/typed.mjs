@@ -1175,7 +1175,7 @@ assert.deepEqual(companionSheet.effectDice, DND5E6 ? undefined : [{ name: 'Bless
 ok(`a companion's sheet, built as the module builds one (ops: false), ${DND5E6 ? 'lists no effectDice under dnd5e 6' : 'lists Bless on it'}`)
 
 /* -------------------------------------------- */
-/*  12. Module 0.42.1: Bardic Inspiration       */
+/*  12. 0.42.1: Bardic Inspiration offered      */
 /* -------------------------------------------- */
 
 // Round 0.42.1 §7.1: the 2024 Bardic Inspiration another character gave Thorin, listed among his
@@ -1213,8 +1213,9 @@ if (!DND5E6) {
   }
 
   // 1. Found: from the effect on Vex's feature, as dnd5e's Apply makes it; from the feature itself;
-  // by its name where it has no identifier of its own, as dnd5e's getter; the die the bard's scale's,
-  // as the sheet is sent; Bless beside it unchanged.
+  // by its name where it has no identifier of its own, as dnd5e's getter, and by its identifier
+  // whatever it's named; with its rules blank; the die the bard's scale's, as the sheet is sent; Bless
+  // beside it unchanged.
   const vexInspired = inspiredBy(vexBard)
   const offered = { name: 'Bardic Inspiration', effect: vexInspired.id, faces: 6, count: 1, sign: 1, on: OFFER_ON, offer: true }
   having([vexInspired], {})
@@ -1227,6 +1228,15 @@ if (!DND5E6) {
   having([vexInspired], {})
   assert.deepEqual(effectDiceOf(thorin), [offered], "no identifier of its own: dnd5e's, from its name")
   vexBard.feat.system.identifier = 'bardic-inspiration'
+  // Renamed or translated, its identifier kept, as dnd5e's getter keeps it: found by the identifier,
+  // never by the name, and named as the feature now is.
+  vexBard.feat.name = 'Inspiration bardique'
+  assert.deepEqual(effectDiceOf(thorin), [{ ...offered, name: 'Inspiration bardique' }], 'renamed, its identifier kept')
+  vexBard.feat.name = 'Bardic Inspiration'
+  // Its rules blank, as dnd5e's Source lets them be, so the world's: left out only where it says 2014.
+  vexBard.feat.system.source.rules = ''
+  assert.deepEqual(effectDiceOf(thorin), [offered], 'its rules blank')
+  vexBard.feat.system.source.rules = '2024'
   inspiration.faces = 8
   try {
     sheet = await thorinSheet()
@@ -1240,7 +1250,7 @@ if (!DND5E6) {
   sheet = await thorinSheet()
   assert.deepEqual(sheet.effectDice, [{ name: 'Bless', effect: blessing.id, faces: 4, count: 1, sign: 1, on: BLESS_ON }, offered])
   assert.deepEqual(Object.keys(sheet.effectDice[0]), ['name', 'effect', 'faces', 'count', 'sign', 'on'], "Bless's six keys alone")
-  ok('0.42.1, found: Thorin Inspired by Vex lists {name "Bardic Inspiration", effect, d6, count 1, sign 1, on every kind but initiative, offer true}, kept by a slim sheet; the same from the feature itself, and from a feature with no identifier of its own, named Bardic Inspiration; d8 once the bard\'s scale is, the sheet sent again; count 2 from the scale\'s number; Bless beside it its own six keys, first')
+  ok('0.42.1, found: Thorin Inspired by Vex lists {name "Bardic Inspiration", effect, d6, count 1, sign 1, on every kind but initiative, offer true}, kept by a slim sheet; the same from the feature itself, and from a feature with no identifier of its own, named Bardic Inspiration; renamed Inspiration bardique, its identifier kept, offered by that name; its rules blank, offered; d8 once the bard\'s scale is, the sheet sent again; count 2 from the scale\'s number; Bless beside it its own six keys, first')
 
   // 2. Not found.
   const none = (why, effects, fields = {}) => {

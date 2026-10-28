@@ -796,6 +796,10 @@ Gamemaster-only information switched on.
   page until it's removed, but is after the page is reloaded; and a bard's Inspire given again
   before it's removed isn't offered, dnd5e refreshing the same effect: the Gamemaster removes it
   first.
+- **A roll that took too long** (`timeout`, as when a module asks the Gamemaster something first)
+  may still be made once the Gamemaster answers, so the Bardic Inspiration die added to it stays
+  spent: once the roll is made, Inspired is removed as after any other roll; if it never is, the die
+  isn't offered again on that page, but is after the page is reloaded.
 - **Bardic Inspiration's die is the bard's now,** as the inspired character's sheet last read it,
   not as it was when given; it follows the bard's within a turn in combat.
 - **Two bards' Inspired:** each is offered; the 2024 rule allows one die at a time. Two bards who
