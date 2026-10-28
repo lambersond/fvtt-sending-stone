@@ -581,7 +581,9 @@ const EXPECTED = [
   [TWO, thorin, [add_('system.skills.ste.roll.mode', '1'), add_('system.skills.ath.roll.mode', '1')], 0],
   [SENSE, thorin, [add_('system.attributes.senses.ranges.darkvision', '60', 'upgrade'), add_('system.skills.prc.roll.mode', '1')], 0],
   [SENSE, vex, [add_('system.attributes.senses.ranges.darkvision', '18', 'upgrade'), add_('system.skills.prc.roll.mode', '1')], 0],
-  [BONUSES, thorin, [add_('system.bonuses.abilities.check', '-1'), add_('system.bonuses.abilities.save', '-1'), add_('system.attributes.death.bonuses.save', '-1')], 0],
+  // Changed on purpose (round 0.42.0 §8.2): a save bonus writes the saving throws' key alone, which a
+  // death save adds too, so it counts once there.
+  [BONUSES, thorin, [add_('system.bonuses.abilities.check', '-1'), add_('system.bonuses.abilities.save', '-1')], 0],
   [ATTACKS, thorin, [...['mwak', 'rwak', 'msak', 'rsak'].map(kind => add_(`system.bonuses.${kind}.attack`, '2')),
     ...['mwak', 'rwak', 'msak', 'rsak'].map(kind => add_(`system.bonuses.${kind}.damage`, '1'))], 0],
   [() => RISOTTO(1), thorin, [add_('system.abilities.int.value', '-4')], 0],

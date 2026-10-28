@@ -513,8 +513,26 @@ assert.ok(message, 'a roll message')
 assert.deepEqual([message.flags['sending-stone'], message.speaker.token, message.author.id], [{ request: made.command.id, typed: true }, 'tok-thorin', 'alice'])
 assert.equal(message.flags.dnd5e.originatingMessage, workflow.chatCard.id)
 assert.deepEqual(message.rolls[0].dice[0].results.map(r => r.result), [15], 'its die used as any')
+// Module 0.42.0 (its contract §8.2): Bless's d4 on Thorin's saves, typed in with the d20, taken by
+// the save Midi asked for, as dnd5e adds it.
+thorin.system.bonuses.abilities.save = '1d4'
+count = opened().length
+workflow = await spell()
+running = runSaves(workflow)
+prompt = await nextPrompt(count)
+// Foundry's own d4 would show a 1, as seeded.
+const { seedRandom } = await import('./dice-core.mjs')
+for (let seed = 1; ; seed++) {
+  seedRandom(seed)
+  if (Math.ceil(CONFIG.Dice.randomUniform() * 4) === 1) { seedRandom(seed); break }
+}
+made = await answer(prompt, { d20s: [12], command: { typed: true, effectDice: [{ faces: 4, sign: 1, results: [3] }] } })
+await running
+thorin.system.bonuses.abilities.save = ''
+message = messages.get(made.result.messageId)
+assert.deepEqual(message.rolls[0].dice.map(die => [die.faces, die.results.map(r => r.result)]), [[20, [12]], [4, [3]]], "Bless's d4 the player's 3")
 midi.settings.autoCheckSaves = 'all'
-ok("where Midi shows saves, the answer's roll message is made as Midi's own would be: the player's, on the item card, its speaker the token; one typed in from the player's own dice marked `typed` (0.32.0)")
+ok("where Midi shows saves, the answer's roll message is made as Midi's own would be: the player's, on the item card, its speaker the token; one typed in from the player's own dice marked `typed` (0.32.0); and since 0.42.0 one typed with the dice its effects add, Bless's d4, takes them")
 
 // The usual save, of one ability, that Midi gives advantage or disadvantage, as for Magic
 // Resistance: shown, and rolled with both of the player's d20s.
@@ -1163,6 +1181,48 @@ assert.deepEqual([made.result.outcome, workflow.failedSaves.has(tokens.thorin)],
 delete thorin.flags['midi-qol']
 midi.settings.doConcentrationCheck = 'chat'
 ok("in Midi's item mode, the concentration check is a workflow's save, asked as a concentration check, and rolled as one, with the disadvantage Midi's flags give concentration checks")
+
+// Module 0.42.0 (its contract §2.1, as amended in its review fixes): a die only concentration
+// checks take, on `attributes.concentration.bonuses.save`, typed in with the d20, is taken by the
+// checks Midi asks as by dnd5e's card, both of Midi's being dnd5e's rollConcentration: its card's,
+// answered here with it, and its item mode's workflow save, which Midi's wrapper makes one. Foundry's
+// own d4 would show a 1, as seeded, and a plain save takes no such die (the save prompt above).
+const foundryD4Shows1 = () => {
+  for (let seed = 1; ; seed++) {
+    seedRandom(seed)
+    if (Math.ceil(CONFIG.Dice.randomUniform() * 4) === 1) return seedRandom(seed)
+  }
+}
+const concentrationDie = { typed: true, effectDice: [{ faces: 4, sign: 1, results: [3] }] }
+const diceOf = roll => roll.dice.map(die => [die.faces, die.results.map(r => r.result)])
+thorin.system.attributes.concentration.bonuses.save = '1d4'
+thorin.effects = []
+thorin.concentrateOn('Bless')
+count = opened().length
+conc = await thorin.challengeConcentration({ dc: 12 })
+prompt = await nextPrompt(count)
+assert.deepEqual([prompt.type, prompt.source], ['concentration', 'concentration'])
+foundryD4Shows1()
+made = await answer(prompt, { d20s: [12], command: concentrationDie })
+await settle()
+assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+assert.deepEqual(diceOf(messages.get(made.result.messageId).rolls[0]), [[20, [12]], [4, [3]]], "Midi's card: the concentration d4 the player's 3")
+midi.settings.doConcentrationCheck = 'item'
+thorin.effects = []
+thorin.concentrateOn('Hex')
+count = opened().length
+running = itemConcentrationCheck(thorin, tokens.thorin, 10)
+prompt = await nextPrompt(count)
+assert.deepEqual([prompt.type, prompt.source], ['concentration', 'concentration'])
+foundryD4Shows1()
+made = await answer(prompt, { d20s: [12], command: concentrationDie })
+workflow = await running
+const typedCheck = midiSaves.processed.find(p => p.workflow === workflow).results[0][0]
+assert.deepEqual([made.result.status, typedCheck.options.sendingStone], ['done', made.command.id])
+assert.deepEqual(diceOf(typedCheck), [[20, [12]], [4, [3]]], "Midi's item mode: the concentration d4 the player's 3")
+midi.settings.doConcentrationCheck = 'chat'
+thorin.system.attributes.concentration.bonuses.save = ''
+ok("since 0.42.0 a die only concentration checks take, typed in with the d20, is the player's on the checks Midi asks: its concentration card's and its item mode's workflow save, as on dnd5e's card")
 
 // ---- OverTime turn saves ----
 const overTime = (id, value) => ({ id, uuid: `Actor.thorin.ActiveEffect.${id}`, name: id, changes: [{ key: 'flags.midi-qol.OverTime', value }] })

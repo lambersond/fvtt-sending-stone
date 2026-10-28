@@ -154,12 +154,20 @@ while the roll is being made.
 - **How it's rolled.** A tap in the app rolls as the character's sheet has it, so Foundry decides
   advantage. Choosing advantage, disadvantage or extra dice in the app is the player's say, as in
   dnd5e's roll dialog.
-- **Foundry's dice where the player rolled none.** A Halfling's reroll of a 1, Elven Accuracy's
-  third d20, or a bonus the game applies, such as Bless as an effect, is rolled by Foundry. So is
-  a die a formula rolls again, as a Great Weapon Fighter's `2d6r<=2` rerolls a 1 or a 2, or `1d6x`
-  explodes on a 6: the player's dice are each die's first throw, and what a formula keeps or counts
-  of them, as `4d6kh3` keeps the highest three, Foundry works out from those. Foundry's total
-  stands, and is what the player is shown.
+- **Foundry's dice where the player rolled none.** A bonus the game applies, such as Bless as an
+  effect, is rolled by Foundry where the player rolls the app's dice or skips it when typing, and
+  Elven Accuracy's third d20 where they send two. So is a die a formula rolls again, a Halfling's
+  reroll of a 1 or a Great Weapon Fighter's `2d6r<=2` rerolling a 1 or a 2, where the player rolls
+  the app's dice, or `1d6x` exploding on a 6: the player's dice are each die's first throw. What a
+  formula keeps or counts of them, as `4d6kh3` keeps the highest three, Foundry works out from
+  those. Foundry's total stands, and is what the player is shown.
+- **Typed dice, since 0.42.0.** A player typing in their dice is asked for each die their effects
+  add to the roll, Bless's or Bane's, by the spell's name, and may skip it for Foundry to roll. Only
+  effects applied to the character in Foundry are found: a Bless the table narrates is added with
+  Modify Roll. The die they type is the die kept: Foundry rerolls none of it, a Halfling's 1 or a
+  Great Weapon Fighter's 1 or 2, as they rerolled at the table; a die the game throws itself still
+  rerolls. An explosion is still Foundry's. Bardic Inspiration is added with Modify Roll. Midi-QOL's
+  optional bonuses are still offered on the Gamemaster's screen.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -758,6 +766,33 @@ Gamemaster-only information switched on.
 
 ## Behavior notes
 
+- **Damage's dice an effect adds**, such as Divine Favor's, are asked for among the damage's own
+  dice, unnamed, with no Skip.
+- **A die bonus no effect explains**, typed into the character in Foundry, or a bonus the table
+  narrates without applying it, is rolled by Foundry, or added with Modify Roll.
+- **An effect's die on only some kinds of attack** (melee or ranged, weapon or spell) is rolled by
+  Foundry; Bless's and Bane's are on every attack.
+- **An effect's die that isn't one plain die term**, such as `1d4 + 1` or one written with roll
+  data, or a d20, is rolled by Foundry.
+- **Under dnd5e 6**, no effect's die is asked for (dnd5e 6 is v2.0).
+- **Bardic Inspiration** is added with Modify Roll's extra dice until 0.42.1, which offers the 2024
+  one; the 2014 one, which leaves no effect, stays so.
+- **Advantage the game adds as the roll is made**, such as Midi-QOL's from a target, takes Foundry's
+  d20s, Elven Accuracy's among them, and a Halfling's reroll of those stays Foundry's.
+- **A die skipped for the game** isn't in the app's own total, which says so; the tray's table total
+  has it.
+- **An exploding die** typed in still has Foundry throw its extra die.
+- **Midi-QOL's optional bonuses**, its Bardic Inspiration among them, are offered on the
+  Gamemaster's screen after the roll, with Foundry's dice.
+- **Bane where the game nests a lone negative die** (checked by the self-test) is rolled by Foundry.
+- **A skill or tool check made with another ability** than its own, as Midi-QOL may ask, asks the
+  dice of its own ability's check bonus; the game uses the ability it rolls with, and drops a typed
+  die it doesn't add.
+- **An attack with a flat to-hit** (as a spell scroll's) asks Bless's die, which dnd5e doesn't add to
+  it; the game drops the typed value, and the tray shows the game's total.
+- **A dish's save bonus counts once on death saves** since 0.42.0: dnd5e adds the saving throws'
+  bonus to a death save too, and a dish no longer writes the death save's own. A dish eaten before
+  keeps both until it ends.
 - **Wild Shape from the app is the 2024 Wild Shape only:** a 2014 druid's Wild Shape is used in
   Foundry, and the app follows the form, shown as Wild Shape, but never times, ends or returns it:
   the 2014 rules end it differently (0 hit points or Unconscious), and you return it in Foundry.
@@ -962,6 +997,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
 | `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player, and what it concentrates on; from 0.39.0, what its player may do to each effect from the app |
+| `scripts/sheet-effect-dice.mjs` | From 0.42.0, the dice a character's effects add to its d20 rolls, as dnd5e will add them, named by the spell or item they come from, for a player typing in their dice |
 | `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
 | `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
@@ -1009,7 +1045,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-dishes.mjs` | Dishes from the Magical Recipe Book, from 0.38.0: whether a campaign takes them, by its own switch under dnd5e 5; fetching them from an app that takes them; each dish command checked and posted once as its card, answered again from its card or its tombstone |
 | `scripts/dish-card.mjs` | A dish's card, whispered to the Gamemasters and the campaign's players: its words, its buttons for Gamemasters, what became of it for anyone, the dialog of who ate it, serving it and setting it aside; telling the app what was decided, again after a drop and after every hello; deleted cards' tombstones; one dish effect per character |
 | `scripts/dish-effects.mjs` | A dish's Active Effect: its changes on dnd5e 5.3.3's paths, its one-offs, its duration and flags; cookbook strings made inert for enrichers; dish effects ended once their time has passed; the long rest's top-up |
-| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works |
+| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster; and from 0.39.0 the links to the module's issue forms at the end of its side |
 | `scripts/apps/help-window.mjs` | From 0.39.0, Configure Settings' Report a bug or request a feature, which any user may open: the links to the module's issue forms |
 | `scripts/issue-links.mjs` | From 0.39.0, the module's bug and feature forms on GitHub, the bug form's with the module's, Foundry's and the system's versions filled in |

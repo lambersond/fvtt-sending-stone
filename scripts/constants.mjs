@@ -553,6 +553,19 @@ export const DIE_FACES = Object.freeze(new Set([4, 6, 8, 10, 12, 20, 100]));
 export const DAMAGE_FACES = Object.freeze(new Set([4, 6, 8, 10, 12]));
 
 /**
+ * The kinds of a player's roll that may send the dice their character's effects add to it, since
+ * 0.42.0: the d20 rolls, a check, a saving throw, a death save, initiative and an attack.
+ * @type {readonly string[]}
+ */
+export const EFFECT_DICE_KINDS = Object.freeze(["skill", "tool", "ability", "save", "death", "initiative", "attack"]);
+
+/**
+ * The most dice effects add that a character's sheet lists, and that a roll may send, since 0.42.0.
+ * @type {number}
+ */
+export const MOST_EFFECT_DICE = 10;
+
+/**
  * The name of the hook this module calls whenever delivery status changes. Called with the status
  * object.
  * @type {string}

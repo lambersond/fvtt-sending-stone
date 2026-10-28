@@ -4,7 +4,9 @@
 // min and max, counting successes and failures) with its own loops, Foundry's extensions of
 // built-ins, and chat messages. Import after stub.mjs and before dnd5e's dice. Switches in `core`
 // let a test leave _root off top-level terms, configure interactive (manual) dice, make rolls blind,
-// have the min modifier do nothing, or roll rerolls and explosions as first throws.
+// have the min modifier do nothing, or roll rerolls and explosions as first throws; and since module
+// 0.42.0 have a die keep applying modifiers it was given and has had taken off, a parser make a
+// lone negative die after `+` a die within parentheses, or a roll throw copies of the dice it adds.
 
 export const core = {
   /** Leave `_root` off a roll's own dice, as Foundry might. */
@@ -17,6 +19,24 @@ export const core = {
   breakMinimum: false,
   /** A reroll or an explosion is rolled without saying so, as a first throw, as a Foundry that rolled them otherwise might. */
   breakReroll: false,
+  /**
+   * Since module 0.42.0: a die applies every modifier it was ever given, those since taken off its
+   * `modifiers` among them, as a core that ignored a later change to a term's modifiers would, so a
+   * reroll dropped from a typed die still rerolls it.
+   */
+  staleModifiers: false,
+  /**
+   * Since module 0.42.0: the parser makes a die after `+ -`, as `1d20 + -1d4`, the nested
+   * `(1d4 * -1)`, as a core that wraps a negative term would [core, unverified], rather than a die of
+   * the roll's own taken away.
+   */
+  nestNegative: false,
+  /**
+   * Since module 0.42.0: a roll throws a fresh copy of each die it adds after `+`, as `1d20 + 1d4`'s
+   * d4, made as it's evaluated, as a core that rebuilt such a term then would, so that what was noted
+   * of the die before isn't of the die thrown; a die it takes away, after `-`, is its own still.
+   */
+  freshTerms: false,
 }
 
 /** Rolls that asked the Gamemaster for their dice. */
@@ -152,6 +172,24 @@ class ParentheticalTerm extends RollTerm {
   get expression() { return `(${this.term})` }
 }
 
+/**
+ * Since module 0.42.0, with `core.nestNegative`: a lone negative die after `+`, as `(1d4 * -1)`, as a
+ * Foundry that wraps a negative term would make it: its die rolled within it, a die of no roll's own,
+ * which knows the roll it's in by `_root`, and its total taken away.
+ */
+class NegativeGroup extends ParentheticalTerm {
+  get isDeterministic() { return false }
+  get dice() { return this.roll?.dice ?? [] }
+  get total() { return -(this.roll?.total ?? 0) }
+  async evaluate(options = {}) {
+    this.roll = new Roll(/^\s*(\d*d\d+)/i.exec(this.term)[1])
+    this.roll._root = this._root
+    await this.roll.evaluate(options)
+    this._evaluated = true
+    return this
+  }
+}
+
 /** A function of terms, such as max(1d4, 2): none is made here, but dnd5e's damage rolls look for them. */
 class FunctionTerm extends RollTerm {
   constructor({ fn, terms = [], options } = {}) { super({ options }); this.fn = fn; this.terms = terms }
@@ -182,7 +220,20 @@ class DiceTerm extends RollTerm {
     super({ options })
     this._number = number
     this._faces = faces
-    this.modifiers = [...modifiers]
+    // Its modifiers, as Foundry's, its own, as dnd5e's D20Roll copies them; with
+    // `core.staleModifiers`, those it held whenever they're set anew are kept apart, and applied all
+    // the same.
+    let held = [...modifiers]
+    const given = []
+    Object.defineProperty(this, 'modifiers', {
+      configurable: true, enumerable: true,
+      get: () => held,
+      set: value => {
+        if (core.staleModifiers) for (const modifier of held) if (!given.includes(modifier)) given.push(modifier)
+        held = value
+      },
+    })
+    Object.defineProperty(this, '_given', { configurable: true, get: () => given })
     this.results = [...results]
     this.method = method
   }
@@ -240,7 +291,7 @@ class DiceTerm extends RollTerm {
   async _evaluateModifiers() {
     const cls = this.constructor
     const all = Object.keys(cls.MODIFIERS).sort((a, b) => b.length - a.length)
-    for (const modifier of [...this.modifiers]) {
+    for (const modifier of this._applied()) {
       let command = (modifier.match(/[A-z]+/)?.[0] ?? '').toLowerCase()
       if (command in cls.MODIFIERS) {
         await this._evaluateModifier(command, modifier)
@@ -253,6 +304,16 @@ class DiceTerm extends RollTerm {
         command = command.replace(known, '')
       }
     }
+  }
+  /**
+   * The modifiers it applies: its own; with `core.staleModifiers`, every one it was given too, those
+   * of advantage first, as dnd5e's BasicDie orders them.
+   */
+  _applied() {
+    if (!core.staleModifiers || !this._given.length) return [...this.modifiers]
+    const all = [...this._given, ...this.modifiers.filter(modifier => !this._given.includes(modifier))]
+    const [rest, advantage] = all.partition(modifier => /^(adv|dis)\d*/i.test(modifier))
+    return [...advantage, ...rest]
   }
   async _evaluateModifier(command, modifier) {
     let fn = this.constructor.MODIFIERS[command]
@@ -461,12 +522,16 @@ class Roll {
     // Foundry's Math functions, as far as min() and max() of two numbers, which dnd5e's wands use for
     // the most levels they cast at (`min(@item.uses.value, 3)`): any other function is invalid here.
     const number = '\\s*(-?\\d+(?:\\.\\d+)?)\\s*'
-    const text = this.replaceFormulaData(String(formula), data, { missing: '0' })
+    const read = this.replaceFormulaData(String(formula), data, { missing: '0' })
       .replace(new RegExp(`\\b(min|max)\\(${number},${number}\\)`, 'gi'), (match, fn, a, b) => String(Math[fn.toLowerCase()](Number(a), Number(b))))
       // Module 0.41.0: a number of dice in parentheses, as dnd5e's `(@item.level)d8` makes once its
       // data is in, a die of that many, as Foundry simplifies a deterministic one [core, unverified].
       .replace(/\((\d+)\)(?=d\d)/g, '$1')
-      .replace(/\+\s*-/g, '-').replace(/-\s*-/g, '+')
+    // Module 0.42.0, with `core.nestNegative`: a die after `+ -`, and one so nested as a roll made
+    // again from its formula has it, a NegativeGroup.
+    const nested = core.nestNegative
+      ? read.replace(/\(\s*(\d*d\d+)\s*\*\s*-1\s*\)/gi, '~$1').replace(/\+\s*-\s*(\d*d\d+)/gi, '+ ~$1') : read
+    const text = nested.replace(/\+\s*-/g, '-').replace(/-\s*-/g, '+')
     const terms = []
     for (const piece of text.split(/([+-])/).map(p => p.trim()).filter(Boolean)) {
       if ((piece === '+') || (piece === '-')) terms.push(new OperatorTerm({ operator: piece }))
@@ -476,6 +541,7 @@ class Roll {
   }
 
   static parseTerm(piece) {
+    if (piece.startsWith('~')) return new NegativeGroup({ term: `${piece.slice(1)} * -1` })
     // As Foundry's: a term's flavor, in brackets after it, kept in its options, as "1d6[fire]".
     const [, body, flavor] = /^(.*?)(?:\[([^\]]+)\])?$/s.exec(piece)
     const options = flavor ? { flavor } : {}
@@ -548,6 +614,14 @@ class Roll {
     if (!this._root && (allowInteractive !== false) && !minimize && !maximize && core.interactive) {
       prompts.push(this.formula)
       this._resolver = { addTerm: async () => {}, resolveResult: term => term.faces }
+    }
+    // Module 0.42.0, with `core.freshTerms`: each die after `+` a copy of itself, as it is now.
+    if (core.freshTerms) {
+      this.terms = this.terms.map((term, index) => {
+        const added = (term instanceof DiceTerm) && !term._evaluated && (this.terms[index - 1]?.operator === '+')
+        if (!added) return term
+        return new term.constructor({ number: term.number, faces: term.faces, modifiers: [...term.modifiers], options: { ...term.options } })
+      })
     }
     for (const term of this.terms) {
       if (!(core.omitRoot && (term instanceof DiceTerm))) term._root = this._root ?? this

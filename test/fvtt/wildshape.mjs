@@ -1466,6 +1466,27 @@ ok("queue: a transform waits behind the same character's held roll, by its actor
   assert.notEqual(wolf.system.abilities.str.save.value, elowen.system.abilities.str.save.value)
   it = await made(roll({ kind: 'save', key: 'str' }))
   assert.deepEqual([it.result.status, it.result.rolls[0].total, speakerOf(it.result)], ['done', 10 + wolf.system.abilities.str.save.value, wolf.id], 'a Strength save, rolled on the form')
+  // Module 0.42.0 (its contract §8.2.11): Bless on the form, adding its d4 to the form's saves, is
+  // listed on her seat's sheet, the form's; and a save she types in, made on the form, takes it.
+  if (!DND5E6) {
+    const formBless = new PlainEffect(wolf, {
+      _id: 'formBlessed00000', name: 'Blessed', origin: 'Actor.rowan.Item.rowanBless000000',
+      system: { changes: [{ key: 'system.bonuses.abilities.save', type: 'add', value: '1d4', phase: 'initial' }] },
+    })
+    wolf.effects.push(formBless)
+    wolf.system.bonuses.abilities.save = '1d4'
+    await Hooks.callAll('createActiveEffect', formBless, {}, 'gm')
+    await until(() => lastSheet()?.effectDice?.some(each => each.effect === formBless.id), "her seat's sheet with the form's Bless")
+    assert.deepEqual(lastSheet().effectDice, [{ name: 'Bless', effect: formBless.id, faces: 4, count: 1, sign: 1, on: ['save', 'death', 'concentration'] }])
+    it = await made(roll({ kind: 'save', key: 'str', typed: true, effectDice: [{ faces: 4, sign: 1, results: [3] }] }))
+    const blessedSave = messages.get(it.result.messageId)?.rolls[0]
+    assert.deepEqual([it.result.status, blessedSave?.dice.filter(die => die.faces === 4).map(die => die.results.map(r => r.result)), it.result.rolls[0].total],
+      ['done', [[3]], 10 + wolf.system.abilities.str.save.value + 3], "a typed save on the form takes Bless's d4")
+    wolf.effects.splice(wolf.effects.indexOf(formBless), 1)
+    wolf.system.bonuses.abilities.save = ''
+    await Hooks.callAll('deleteActiveEffect', formBless, {}, 'gm')
+    await settle(60)
+  }
   // A chat card the form speaks is hers, in scope under Connected.
   const card = chatOf(it.result.messageId)
   assert.deepEqual([card?.speaker.actorId, card?.character], [wolf.id, 'elowen'], "the form's card, hers, under Connected")
@@ -1760,7 +1781,7 @@ ok("queue: a transform waits behind the same character's held roll, by its actor
   for (const key of ['chatEvents', 'chatScope', 'combatEvents']) settings.delete(key)
   game.combat = null
 }
-ok(`the seat while shaped: a skill and a save rolled on the form, its card hers under Connected; the Bite on the form's item; initiative its combatant's; End Turn on its turn done; a familiar her form summoned hers; a dnd5e save card at the form asked of Elowen (<card>-elowen), answered from her seat, the save the form's, closed and gone from the open list; the form's concentration card answered the same${MIDI ? "; Midi-QOL's save asked of the form reaches the app as Elowen's, is answered, and rolled on the form" : ''}; a favorite, an effect, a move to and from her and a removal "shaped"; End concentration ends both copies and what they kept up; charges and an activity's use spent on the form's copies, her sheet first; a dish's card spoken by Elowen, her id the cook's; to an app that takes no Wild Shape, a skill on her own actor, End concentration on both copies, a spend on her own item, her initiative the form's combatant's and a card's save at the form rolled on it; Heroic Inspiration used on the form's copy${MIDI ? '' : "; the form's concentration ended in Foundry closes its card's prompt, her own copy alone leaves it open; a card through her token answered by the form stays answered after the return"}; a fight with only the Wolf's combatant stays the campaign's through the 0 hit points ending, the combatant hers, as do fights whose combatant's token names the deleted form or that has none, that combatant with no token hers with her hit points and its turn hers to end, and one whose form is deleted by hand; the form's card with no token stays hers after the return, updated and deleted`)
+ok(`the seat while shaped: a skill and a save rolled on the form, its card hers under Connected${DND5E6 ? '' : "; since 0.42.0 Bless on the form listed on her seat's sheet, the form's, its d4 taken by a save typed on the form"}; the Bite on the form's item; initiative its combatant's; End Turn on its turn done; a familiar her form summoned hers; a dnd5e save card at the form asked of Elowen (<card>-elowen), answered from her seat, the save the form's, closed and gone from the open list; the form's concentration card answered the same${MIDI ? "; Midi-QOL's save asked of the form reaches the app as Elowen's, is answered, and rolled on the form" : ''}; a favorite, an effect, a move to and from her and a removal "shaped"; End concentration ends both copies and what they kept up; charges and an activity's use spent on the form's copies, her sheet first; a dish's card spoken by Elowen, her id the cook's; to an app that takes no Wild Shape, a skill on her own actor, End concentration on both copies, a spend on her own item, her initiative the form's combatant's and a card's save at the form rolled on it; Heroic Inspiration used on the form's copy${MIDI ? '' : "; the form's concentration ended in Foundry closes its card's prompt, her own copy alone leaves it open; a card through her token answered by the form stays answered after the return"}; a fight with only the Wolf's combatant stays the campaign's through the 0 hit points ending, the combatant hers, as do fights whose combatant's token names the deleted form or that has none, that combatant with no token hers with her hit points and its turn hers to end, and one whose form is deleted by hand; the form's card with no token stays hers after the return, updated and deleted`)
 
 /* -------------------------------------------- */
 /*  17. Manage Campaigns and the settings row   */

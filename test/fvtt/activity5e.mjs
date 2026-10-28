@@ -376,10 +376,12 @@ export function equip(actor, { items = [], spells = {}, ac = 15, concentrationLi
   }]))
   actor.system.attributes.ac = { value: ac }
   actor.system.attributes.concentration = { limit: concentrationLimit }
-  actor.system.bonuses.mwak = { damage: '' }
-  actor.system.bonuses.rwak = { damage: '' }
-  actor.system.bonuses.msak = { damage: '' }
-  actor.system.bonuses.rsak = { damage: '' }
+  // Since module 0.42.0 each attack kind's bonus to hit too, which a case sets after this, as this
+  // replaces each kind's bonuses.
+  actor.system.bonuses.mwak = { attack: '', damage: '' }
+  actor.system.bonuses.rwak = { attack: '', damage: '' }
+  actor.system.bonuses.msak = { attack: '', damage: '' }
+  actor.system.bonuses.rsak = { attack: '', damage: '' }
   actor.system.bonuses.save = { damage: '' }
   actor.system.bonuses.heal = { damage: '' }
   actor.system.bonuses.other = { damage: '' }
@@ -957,12 +959,22 @@ export class AttackActivity extends Activity {
     return actionType
   }
 
-  /** attack-data.mjs:259-279, simplified: the ability modifier and proficiency, and a magic bonus. */
-  getAttackData() {
+  /**
+   * attack-data.mjs:259-279, simplified: the ability modifier and proficiency, and a magic bonus; and
+   * since module 0.42.0 the actor's own bonus to its kind of attack, `actorBonus` (:271), where it has
+   * one, as an effect such as Bless adds it, for the attack mode's kind (base-activity.mjs:729-733).
+   */
+  getAttackData({ attackMode } = {}) {
     const rollData = this.getRollData()
     const parts = ['@mod', '@prof']
     if (this._data.magic) parts.push(String(this._data.magic))
-    return { parts, data: { ...rollData, mod: this.actor.system.abilities[this.ability].mod } }
+    const data = { ...rollData, mod: this.actor.system.abilities[this.ability].mod }
+    const actorBonus = this.actor?.system.bonuses?.[this.getActionType(attackMode)]?.attack
+    if (actorBonus) {
+      parts.push('@actorBonus')
+      data.actorBonus = actorBonus
+    }
+    return { parts, data }
   }
 
   /** attack.mjs:70-72: opens the attack dialog on the Gamemaster's screen. */
