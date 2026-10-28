@@ -16,7 +16,10 @@
 // skipped, by faces and sign; rerolls kept at the table where the roll says so; their self-tests,
 // with dice-core.mjs's staleModifiers, nestNegative and freshTerms; a Midi-QOL save, and Midi's
 // concentration checks, answered with them are in midi-prompts.mjs, and a shaped druid's in
-// wildshape.mjs. Run with SLIM_CHECK=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
+// wildshape.mjs. And since module 0.42.1 (its contract §7.1): the 2024 Bardic Inspiration another
+// character gave one, offered on its sheet among effectDice, marked offer, the die its bard's scale's,
+// never one dnd5e adds; and that die added to a typed save, attack and death save as one of the
+// roll's extras. Run with SLIM_CHECK=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { JSDOM } from 'jsdom'
@@ -1170,6 +1173,190 @@ for (const kind of ATTACKS) wolf.system.bonuses[kind].attack = '1d4'
 const companionSheet = characterSheet(wolf, undefined, { ops: false })
 assert.deepEqual(companionSheet.effectDice, DND5E6 ? undefined : [{ name: 'Bless', effect: 'wolfBlessed', faces: 4, count: 1, sign: 1, on: BLESS_ON }])
 ok(`a companion's sheet, built as the module builds one (ops: false), ${DND5E6 ? 'lists no effectDice under dnd5e 6' : 'lists Bless on it'}`)
+
+/* -------------------------------------------- */
+/*  12. Module 0.42.1: Bardic Inspiration       */
+/* -------------------------------------------- */
+
+// Round 0.42.1 §7.1: the 2024 Bardic Inspiration another character gave Thorin, listed among his
+// effectDice marked `offer`, a die dnd5e never adds, for his player to add once a roll fails; and
+// that die, added as one of a typed roll's extras, on the card. Each bard as dnd5e 5.3.3's 2024 bard
+// has one (PK classes24/bard/class-features/bardic-inspiration.yml): the feature, by its identifier,
+// for the 2024 rules; its Inspire effect, Inspired, with no change and not transferred, which dnd5e's
+// Apply puts on the one inspired with that effect as its origin; and the class's scale die, `number`
+// null, a d6 at level 4 (PK classes24/bard/bard.yml:303-329).
+const OFFER_ON = ['attack', 'check', 'save', 'skill', 'tool', 'death', 'concentration']
+/** dnd5e's Item#identifier (D5 documents/item.mjs:251-254): its own, else its name's slug. */
+const slugOf = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+const bardOf = ({ actor }) => {
+  const feat = itemOn(actor, { _id: `${actor.id}Inspire`, name: 'Bardic Inspiration' })
+  Object.defineProperty(feat, 'identifier', { configurable: true, get() { return this.system.identifier || slugOf(this.name) } })
+  Object.assign(feat.system, { identifier: 'bardic-inspiration', source: { rules: '2024' } })
+  const inspire = effectOnItem(feat, { _id: `${actor.id}Inspired`, name: 'Inspired', transfer: false, system: { changes: [] } })
+  actor.system.scale = { bard: { inspiration: { number: null, faces: 6 } } }
+  return { actor, feat, inspire }
+}
+const vexBard = bardOf(vexBless)
+const miraBard = bardOf(miraBless)
+const snagBard = bardOf(snagBane)
+const inspiredBy = ({ actor, inspire }, data = {}, on = thorin) => new PlainEffect(on, {
+  _id: `inspiredBy${actor.id}`.slice(0, 16), name: 'Inspired', origin: inspire.uuid, duration: { seconds: 3600 },
+  system: { changes: [] }, ...data,
+})
+
+if (!DND5E6) {
+  const inspiration = vexBard.actor.system.scale.bard.inspiration
+  const scaled = (data, fn) => {
+    const before = { ...inspiration }
+    Object.assign(inspiration, data)
+    try { return fn() } finally { Object.assign(inspiration, before) }
+  }
+
+  // 1. Found: from the effect on Vex's feature, as dnd5e's Apply makes it; from the feature itself;
+  // by its name where it has no identifier of its own, as dnd5e's getter; the die the bard's scale's,
+  // as the sheet is sent; Bless beside it unchanged.
+  const vexInspired = inspiredBy(vexBard)
+  const offered = { name: 'Bardic Inspiration', effect: vexInspired.id, faces: 6, count: 1, sign: 1, on: OFFER_ON, offer: true }
+  having([vexInspired], {})
+  let sheet = await thorinSheet()
+  assert.deepEqual(sheet.effectDice, [offered])
+  assert.deepEqual(slimSheet(sheet).effectDice, sheet.effectDice, 'kept by a slim sheet')
+  having([inspiredBy(vexBard, { origin: vexBard.feat.uuid })], {})
+  assert.deepEqual(effectDiceOf(thorin), [offered], 'its origin the feature itself')
+  vexBard.feat.system.identifier = ''
+  having([vexInspired], {})
+  assert.deepEqual(effectDiceOf(thorin), [offered], "no identifier of its own: dnd5e's, from its name")
+  vexBard.feat.system.identifier = 'bardic-inspiration'
+  inspiration.faces = 8
+  try {
+    sheet = await thorinSheet()
+  } finally {
+    inspiration.faces = 6
+  }
+  assert.deepEqual(sheet.effectDice, [{ ...offered, faces: 8 }], "the bard's scale a d8, the sheet sent again")
+  assert.deepEqual(scaled({ number: 2 }, () => effectDiceOf(thorin)), [{ ...offered, count: 2 }], "the scale's number 2")
+  const blessing = blessedBy(vexBless)
+  having([blessing, vexInspired], { save: '1d4', attack: '1d4' })
+  sheet = await thorinSheet()
+  assert.deepEqual(sheet.effectDice, [{ name: 'Bless', effect: blessing.id, faces: 4, count: 1, sign: 1, on: BLESS_ON }, offered])
+  assert.deepEqual(Object.keys(sheet.effectDice[0]), ['name', 'effect', 'faces', 'count', 'sign', 'on'], "Bless's six keys alone")
+  ok('0.42.1, found: Thorin Inspired by Vex lists {name "Bardic Inspiration", effect, d6, count 1, sign 1, on every kind but initiative, offer true}, kept by a slim sheet; the same from the feature itself, and from a feature with no identifier of its own, named Bardic Inspiration; d8 once the bard\'s scale is, the sheet sent again; count 2 from the scale\'s number; Bless beside it its own six keys, first')
+
+  // 2. Not found.
+  const none = (why, effects, fields = {}) => {
+    having(effects, fields)
+    assert.deepEqual(effectDiceOf(thorin), [], why)
+  }
+  vexBard.feat.system.identifier = ''
+  vexBard.feat.name = 'Song of Rest'
+  none('a feature of another identifier and name', [vexInspired])
+  Object.assign(vexBard.feat, { name: 'Bardic Inspiration' })
+  vexBard.feat.system.identifier = 'bardic-inspiration'
+  vexBard.feat.system.source.rules = '2014'
+  none('for the 2014 rules', [vexInspired])
+  vexBard.feat.system.source.rules = '2024'
+  const scale = vexBard.actor.system.scale
+  vexBard.actor.system.scale = {}
+  none('no scale.bard', [vexInspired])
+  vexBard.actor.system.scale = scale
+  scaled({ faces: 20 }, () => none('faces 20', [vexInspired]))
+  scaled({ faces: 3 }, () => none('faces 3', [vexInspired]))
+  scaled({ number: 21 }, () => none('number 21', [vexInspired]))
+  none('an origin to a gone actor', [inspiredBy(vexBard, { origin: 'Actor.goneBard.Item.goneInspire.ActiveEffect.goneInspired' })])
+  none('a compendium uuid', [inspiredBy(vexBard, { origin: 'Compendium.dnd5e.classes24.Item.phbbrdBardicInsp' })])
+  none('no origin', [inspiredBy(vexBard, { origin: null })])
+  // Midi-QOL's own Bardic Inspiration, an optional bonus it offers itself: no offer, and the effect's
+  // plain die still listed as one the game adds.
+  const midiOptional = { key: 'flags.midi-qol.optional.bardicInspiration.attack.all', type: 'custom', value: '@scale.bard.inspiration', phase: 'initial' }
+  const midiInspired = inspiredBy(vexBard, { system: { changes: [midiOptional, change('bonuses.abilities.save', '1d4')] } })
+  having([midiInspired], { save: '1d4' })
+  assert.deepEqual(effectDiceOf(thorin), [{ name: 'Bardic Inspiration', effect: midiInspired.id, faces: 4, count: 1, sign: 1, on: ['save', 'death', 'concentration'] }],
+    "Midi-QOL's optional bonus: its plain die alone")
+  // An Inspired an item of Thorin's carries, transferred to him.
+  const charm = { id: 'charm', _id: 'charm', name: 'Charm of Heroes', documentName: 'Item', parent: thorin, get actor() { return thorin }, system: {}, effects: new Embedded() }
+  effectOnItem(charm, { _id: 'charmInspired', name: 'Inspired', origin: vexBard.inspire.uuid, system: { changes: [] } })
+  worn.push(charm)
+  none("an item's transferred effect", [])
+  worn.splice(worn.indexOf(charm), 1)
+  none('disabled', [inspiredBy(vexBard, { disabled: true })])
+  none('concealed', [inspiredBy(vexBard, { system: { isConcealed: true, changes: [] } })])
+  // Expired, though core keeps it on and not suppressed [core, unverified]: the reader's own check.
+  const expired = inspiredBy(vexBard, { duration: { seconds: 3600, expired: true } })
+  Object.defineProperties(expired, { isSuppressed: { get: () => false }, active: { get: () => true } })
+  none('expired', [expired])
+  // Vex Inspired by Vex, as dnd5e lets a bard's player apply it to their own character.
+  const selfInspired = inspiredBy(vexBard, {}, vexBard.actor)
+  vexBard.actor.allApplicableEffects = function* () { yield selfInspired }
+  assert.deepEqual(effectDiceOf(vexBard.actor), [], 'Vex Inspired by Vex')
+  delete vexBard.actor.allApplicableEffects
+  // A Wild Shape form of Vex's, Inspired by Vex: dnd5e copies an effect of another origin onto it.
+  const vexForm = new Character({ id: 'vexForm', name: 'Wolf', owners: ['bob'], flags: { originalActor: 'vexbard' } })
+  const formInspired = inspiredBy(vexBard, {}, vexForm)
+  vexForm.allApplicableEffects = function* () { yield formInspired }
+  assert.deepEqual(effectDiceOf(vexForm), [], "a form of Vex's own, Inspired by Vex")
+  ok("0.42.1, not found: a feature of another identifier and name; one for the 2014 rules; a bard with no scale.bard, its die a d20 or a d3, or its number 21; an origin to a gone actor, a compendium's or none; an effect with a Midi-QOL optional bonus's change, its plain 1d4 still listed as the game's, unoffered; an item's transferred Inspired; Inspired disabled, concealed or expired; Vex Inspired by Vex; a Wild Shape form of Vex's Inspired by Vex")
+
+  // 3. A throw reading the bard: the offer lost, Bless kept.
+  Object.defineProperty(vexBard.actor.system, 'scale', { configurable: true, get() { throw new Error('a broken scale') } })
+  having([blessing, vexInspired], { save: '1d4', attack: '1d4' })
+  const unthrown = effectDiceOf(thorin)
+  Object.defineProperty(vexBard.actor.system, 'scale', { configurable: true, enumerable: true, writable: true, value: scale })
+  assert.deepEqual(unthrown.map(({ name, offer }) => [name, offer === true]), [['Bless', false]])
+  ok("0.42.1, a throw: the bard's scale throwing as it's read, Thorin's Bless still listed, no offer")
+
+  // 4. Two bards of the party, each by name; an enemy's, never.
+  const [byVex, byMira, bySnag] = [inspiredBy(vexBard), inspiredBy(miraBard), inspiredBy(snagBard)]
+  having([byVex, byMira, bySnag], {})
+  sheet = await thorinSheet()
+  assert.deepEqual(sheet.effectDice.map(({ name, effect, offer }) => [name, effect, offer]),
+    [['Bardic Inspiration (Vex)', byVex.id, true], ['Bardic Inspiration (Mira)', byMira.id, true], ['Bardic Inspiration', bySnag.id, true]])
+  assert.ok(!/Snag/.test(JSON.stringify(sheet.effectDice)), "no enemy's name")
+  ok('0.42.1, two bards: Inspired by Vex and by Mira, "Bardic Inspiration (Vex)" and "Bardic Inspiration (Mira)"; by Snag, an NPC, "Bardic Inspiration", Snag named nowhere')
+
+  // 5. The cap: nine of Bless's kind and two offers, ten in effect order, Mira's the one left out.
+  const boons = Array.from({ length: 9 }, (_, i) => new PlainEffect(thorin, { _id: `capBoon${String(i).padStart(9, '0')}`, name: 'Boon', system: { changes: [change('bonuses.abilities.save', '1d4')] } }))
+  having([...boons.slice(0, 5), byVex, ...boons.slice(5), byMira], { save: Array(9).fill('1d4').join(' + ') })
+  assert.deepEqual(effectDiceOf(thorin).map(({ effect, offer }) => [effect, offer === true]),
+    [...boons.slice(0, 5).map(boon => [boon.id, false]), [byVex.id, true], ...boons.slice(5).map(boon => [boon.id, false])])
+  ok('0.42.1, the cap: nine dice of Bless\'s kind and two offers give ten entries, in effect order, the second offer left out')
+
+  // 6. The die added, as the app adds it: one of a typed roll's extras, its value after the d20s.
+  const DEX = 4
+  const six = [{ sign: 1, count: 1, sides: 6 }]
+  having([blessing, vexInspired], { save: '1d4', attack: '1d4' })
+  let made = await roll({ kind: 'save', key: 'str', typed: true, extras: six, dice: [{ faces: 20, results: [9] }, { faces: 6, results: [5] }], effectDice: [{ faces: 4, sign: 1, results: [3] }] })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual([rollOf(made).dice.map(die => die.faces), facesOf(rollOf(made), 6), facesOf(rollOf(made), 4), rollOf(made).total],
+    [[20, 6, 4], [[5]], [[3]], 9 + 0 + 5 + 3], 'a Strength save: the d6 5 first after the d20, then Bless\'s d4 3')
+  made = await attack({ typed: true, extras: six, dice: [{ faces: 20, results: [15] }, { faces: 6, results: [5] }], effectDice: [{ faces: 4, sign: 1, results: [3] }] })
+  thrown = attackRollOf(made)
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual([d20sOf(thrown), facesOf(thrown, 6), facesOf(thrown, 4), thrown.total], [[15], [[5]], [[3]], 15 + DEX + 3 + 5 + 3], `an attack${MIDI ? ", through Midi-QOL's workflow" : ''}`)
+  const hpBefore = thorin.system.attributes.hp
+  const deathBefore = thorin.system.attributes.death
+  thorin.system.attributes.hp = { ...hpBefore, value: 0 }
+  thorin.system.attributes.death = { ...deathBefore, success: 0, failure: 0 }
+  having([vexInspired], {})
+  made = await roll({ kind: 'death', key: undefined, typed: true, extras: six, dice: [{ faces: 20, results: [9] }, { faces: 6, results: [5] }] })
+  const successes = thorin.system.attributes.death.success
+  thorin.system.attributes.hp = hpBefore
+  thorin.system.attributes.death = deathBefore
+  assert.deepEqual([made.status, facesOf(rollOf(made), 6), rollOf(made).total, successes], ['done', [[5]], 14, 1], 'a death save: 9 a failure, 14 with the d6 a success')
+  ok(`0.42.1, the die added: a typed Strength save with +1d6 typed 5 and Bless's d4 3 is 9 + 5 + 3, the d6 the player's first, Bless's after; an attack the same${MIDI ? " through Midi-QOL's workflow" : ''}, 15 + 4 + 3 + 5 + 3; a typed death save of 9 with the d6's 5, 14, a success`)
+
+  // 7. PROTOCOL.md, changed on purpose (round 0.42.1 §7.1): the six-key sentence kept, for listeners
+  // before 0.42.1, and the offer's.
+  assert.match(sheetDiceRow, /reads an entry only where its keys are exactly these six, `name`, `effect`, `faces`, `count`, `sign` and `on`: an entry with any other key[^|]* is dropped and its die left to Foundry/)
+  assert.match(sheetDiceRow, /Since module 0\.42\.1, an entry may also have `offer`: `true`/)
+  having([], {})
+  ok("0.42.1, PROTOCOL.md: the sheet's effectDice row keeps its six-key sentence and says an entry may also have offer: true since 0.42.1")
+} else {
+  // 8. dnd5e 6: none.
+  having([inspiredBy(vexBard)], {})
+  assert.ok(!('effectDice' in (await thorinSheet())), 'dnd5e 6: no effectDice')
+  having([], {})
+  ok('0.42.1, dnd5e 6.0.5: Thorin Inspired by Vex, no effectDice')
+}
 
 console.log(`typed${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
 process.exit(0)

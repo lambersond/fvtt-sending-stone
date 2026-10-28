@@ -166,8 +166,13 @@ while the roll is being made.
   effects applied to the character in Foundry are found: a Bless the table narrates is added with
   Modify Roll. The die they type is the die kept: Foundry rerolls none of it, a Halfling's 1 or a
   Great Weapon Fighter's 1 or 2, as they rerolled at the table; a die the game throws itself still
-  rerolls. An explosion is still Foundry's. Bardic Inspiration is added with Modify Roll. Midi-QOL's
-  optional bonuses are still offered on the Gamemaster's screen.
+  rerolls. An explosion is still Foundry's. Since 0.42.1, the 2024 Bardic Inspiration a bard gave
+  the character is offered beside Done, left out until the player adds it once the Gamemaster says
+  the roll fails; once the roll is made, the app removes Inspired where the campaign lets players
+  remove their own effects, and otherwise says to ask the Gamemaster. Inspired is applied from the
+  bard's card by the Gamemaster (a player can't apply it to another player's character). The 2014
+  one is added with Modify Roll. Midi-QOL's optional bonuses are still offered on the Gamemaster's
+  screen.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -194,8 +199,8 @@ while the roll is being made.
   values as with dice rolled in the app, and its card is marked with a keyboard, "Entered by hand on
   Sending Stone", in place of the phone; the Gamemaster's own rolls in the app stay marked GM. A
   character with Elven Accuracy enters a third d20 for an attack with advantage made with an
-  ability it's for. A player's own Manual Dice toggle in Foundry lives in their browser alone, and
-  plays no part in the app.
+  ability it's for, or, since app 0.42.1, skips it for Foundry to roll. A player's own Manual Dice
+  toggle in Foundry lives in their browser alone, and plays no part in the app.
 - **Ending a turn.** Players can end their turn from the app, and their companions' turns: the turn
   panel's **End turn**, or the Combat tab held for a second. It's Foundry's own Next Turn, made by
   your Foundry, so dnd5e's and Midi-QOL's start- and end-of-turn work happens as if you had clicked
@@ -775,8 +780,30 @@ Gamemaster-only information switched on.
 - **An effect's die that isn't one plain die term**, such as `1d4 + 1` or one written with roll
   data, or a d20, is rolled by Foundry.
 - **Under dnd5e 6**, no effect's die is asked for (dnd5e 6 is v2.0).
-- **Bardic Inspiration** is added with Modify Roll's extra dice until 0.42.1, which offers the 2024
-  one; the 2014 one, which leaves no effect, stays so.
+- **Bardic Inspiration isn't offered** on what Midi-QOL asks, with typing off, on a roll not sent to
+  the table, or on initiative (which can't fail): Modify Roll's extra dice, or the Gamemaster in
+  Foundry. The 2014 Bardic Inspiration, which leaves no effect, and Midi-QOL's own Bardic
+  Inspiration (an optional bonus) stay as before.
+- **Once Done is pressed, Bardic Inspiration can't be added to that roll from the app:** the
+  Gamemaster adds it in Foundry.
+- **With Bless, Bane or Elven Accuracy's d20 skipped,** the dialog's total leaves out a die only the
+  game rolls, so whether the roll fails can't be told before Done: the player types that die in to
+  use Bardic Inspiration on it.
+- **Inspired is applied by the Gamemaster** from the bard's card (a player can't apply it to another
+  player's character); until it's on the character, nothing is offered.
+- **A spent die's Inspired, where the app may not remove it** (the campaign's switch off, a
+  companion, a shaped druid, a bard who isn't a player's character): it isn't offered again on that
+  page until it's removed, but is after the page is reloaded; and a bard's Inspire given again
+  before it's removed isn't offered, dnd5e refreshing the same effect: the Gamemaster removes it
+  first.
+- **Bardic Inspiration's die is the bard's now,** as the inspired character's sheet last read it,
+  not as it was when given; it follows the bard's within a turn in combat.
+- **Two bards' Inspired:** each is offered; the 2024 rule allows one die at a time. Two bards who
+  aren't the party's are offered under the same name.
+- **In Wild Shape**, Inspired is offered from the form; removed there, the druid's own Inspired
+  stays and is offered again once the druid changes back: the Gamemaster removes it from both.
+- **A world on the legacy (2014) rules:** a Bardic Inspiration item that doesn't say its rules
+  counts as 2014's and isn't offered; dnd5e's 2024 compendium feature is.
 - **Advantage the game adds as the roll is made**, such as Midi-QOL's from a target, takes Foundry's
   d20s, Elven Accuracy's among them, and a Halfling's reroll of those stays Foundry's.
 - **A die skipped for the game** isn't in the app's own total, which says so; the tray's table total
@@ -997,7 +1024,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
 | `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player, and what it concentrates on; from 0.39.0, what its player may do to each effect from the app |
-| `scripts/sheet-effect-dice.mjs` | From 0.42.0, the dice a character's effects add to its d20 rolls, as dnd5e will add them, named by the spell or item they come from, for a player typing in their dice |
+| `scripts/sheet-effect-dice.mjs` | From 0.42.0, the dice a character's effects add to its d20 rolls, as dnd5e will add them, named by the spell or item they come from, for a player typing in their dice; from 0.42.1, the Bardic Inspiration an effect offers |
 | `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
 | `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
