@@ -5,7 +5,9 @@
  * Two things are left out. An action is mostly the row of its item, spell or feature again, so it
  * goes by reference: its id, `ref`, and only what differs from that row. And a key whose value is
  * the default its kind of row always has, such as a spell's `ritual: false`, is left out, the app
- * adding it back. Nothing else changes, so a sheet expanded is the sheet built, key for key.
+ * adding it back. Since 0.41.0, too, what a choice of damage on its own holds alike with its row's
+ * own plan, which only an app that reads choices is sent. Nothing else changes, so a sheet expanded
+ * is the sheet built, key for key.
  */
 
 /**
@@ -71,6 +73,15 @@ export const ACTION_KEYS = [
   "uses", "level", "castFrom", "concentration", "identified", "consumable", "enchantments", "text"
 ];
 
+/**
+ * The keys of a plan of damage on its own, as `previewDamage` makes one, and of each of its rolls,
+ * that a choice's plan leaves out where it holds what its row's own does, since 0.41.0: each always
+ * there in the full shape, so one missing from a choice's is never a doubt.
+ * @type {string[]}
+ */
+const PLAN_KEYS = ["critical", "plannable", "healing", "rolls"];
+const ROLL_KEYS = ["formula", "type", "types", "dice", "perDie"];
+
 /* -------------------------------------------- */
 
 /**
@@ -104,6 +115,10 @@ export function slimSheet(sheet) {
   for ( const favorite of list(slim.favorites) ) {
     if ( favorite?.type === "activity" ) within(favorite, leaveOut);
   }
+
+  // And since 0.41.0, damage on its own's choices with only what they don't hold alike with their
+  // row's own plan, wherever a tableDamage holds them.
+  slimChoices(slim);
   slim.slim = FORMAT;
   return slim;
 }
@@ -155,6 +170,80 @@ function leaveOut(object, kind, row=false) {
  */
 function rollDefault(key) {
   return (key === "concentration") ? false : null;
+}
+
+/* -------------------------------------------- */
+
+/**
+ * Leave out of each choice of damage on its own, since 0.41.0, wherever in the sheet a
+ * `tableDamage` holds `choices`, what its plans hold alike with the row's own: a choice differs from
+ * its row's plan in a few dice, at a higher level, in another mode or with ammunition, and the rest
+ * of each of its plans would otherwise go again with every level the spell can be cast at.
+ * @param {unknown} value
+ * @returns {void}
+ */
+function slimChoices(value) {
+  if ( Array.isArray(value) ) {
+    for ( const entry of value ) slimChoices(entry);
+    return;
+  }
+  if ( !isObject(value) ) return;
+  for ( const [key, child] of Object.entries(value) ) {
+    if ( (key === "tableDamage") && isObject(child) && Array.isArray(child.choices) ) {
+      child.choices = child.choices.map(choice => choiceAgainst(choice, child));
+    }
+    else slimChoices(child);
+  }
+}
+
+/**
+ * A choice of damage on its own without what it holds alike with its row's own plans: its `normal`
+ * or `critical` where that is the row's own, as a `critical` of null beside the row's null, and of
+ * one that isn't, what `planAgainst` leaves out.
+ * @param {unknown} choice
+ * @param {object} own    The row's `tableDamage`.
+ * @returns {unknown}
+ */
+function choiceAgainst(choice, own) {
+  if ( !isObject(choice) ) return choice;
+  const slim = {};
+  for ( const [key, value] of Object.entries(choice) ) {
+    const plan = ["normal", "critical"].includes(key) && Object.hasOwn(own, key);
+    if ( plan && same(value, own[key]) ) continue;
+    slim[key] = (plan && isObject(value) && isObject(own[key])) ? planAgainst(value, own[key]) : value;
+  }
+  return slim;
+}
+
+/**
+ * A choice's plan without each of its keys that holds what the row's own plan does, and in rolls
+ * that aren't the row's own, each roll without each of its keys that holds what the row's own roll
+ * at the same place does: mostly the formula and the dice are left.
+ * @param {object} plan
+ * @param {object} own
+ * @returns {object}
+ */
+function planAgainst(plan, own) {
+  const slim = {};
+  for ( const [key, value] of Object.entries(plan) ) {
+    if ( PLAN_KEYS.includes(key) && Object.hasOwn(own, key) && same(value, own[key]) ) continue;
+    slim[key] = ((key === "rolls") && Array.isArray(value) && Array.isArray(own.rolls))
+      ? value.map((roll, index) => rollAgainst(roll, own.rolls[index]))
+      : value;
+  }
+  return slim;
+}
+
+/**
+ * A roll of a choice's plan without each of its keys that holds what the row's own roll does.
+ * @param {unknown} roll
+ * @param {unknown} own
+ * @returns {unknown}
+ */
+function rollAgainst(roll, own) {
+  if ( !isObject(roll) || !isObject(own) ) return roll;
+  return Object.fromEntries(Object.entries(roll)
+    .filter(([key, value]) => !(ROLL_KEYS.includes(key) && Object.hasOwn(own, key) && same(value, own[key]))));
 }
 
 /**

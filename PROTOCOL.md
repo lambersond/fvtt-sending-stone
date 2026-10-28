@@ -617,16 +617,19 @@ Since module 0.41.0, to a listener that answers `"aloneChoices": 1` (see
 dnd5e offers the spell above its own, `level`; and of an attack, in each of its weapon's attack
 modes, `attackMode`, where it has more than one; with each ammunition it fires, `ammunition`, that
 ammunition item's id, previewed with it; and in each of those modes with each ammunition. It's `[]`
-where none differs, and left out where there would be more than 64. `spends` lists what spending
-its use would spend, in this order, each where it applies: `"slot"`, a spell slot casting it spends;
+where none differs, and left out where there would be more than 64, or where dnd5e or a module
+can't work them out, the row then rolled as without them. `spends` lists what spending its use
+would spend, in this order, each where it applies: `"slot"`, a spell slot casting it spends;
 `"uses"`, its consumption, its own or its item's uses, a consumable's quantity or a resource;
 `"ammunition"`, the ammunition an attack's weapon fires; and `"thrown"`, a weapon with a thrown mode
-that doesn't return; `[]` where it spends nothing. A plan is looked up by the picks that change the
-dice: `level`, the named slot's level, where above the spell's own; `attackMode`, where the weapon
-has more than one mode; and `ammunition`, where it fires any; the entry whose keys are exactly
-those, else `normal` or `critical`. A listener reads them beside `features.rolls.aloneChoices`; to
-any other, `tableDamage` is `{ normal, critical }` as before. A slim sheet's action takes them from
-its row too.
+that doesn't return; `[]` where it spends nothing, and left out where dnd5e or a module can't work
+it out. A plan is looked up by the picks that change the dice: `level`, the named slot's level,
+where above the spell's own; `attackMode`, where the weapon has more than one mode; and
+`ammunition`, where it fires any; the entry whose keys are exactly those, else `normal` or
+`critical`. A listener reads them beside `features.rolls.aloneChoices`; to any other, `tableDamage`
+is `{ normal, critical }` as before. A slim sheet's action takes them from its row too, and in a
+[slim](#slim-sheets) sheet each choice goes with only what it doesn't hold alike with `normal` and
+`critical`.
 
 Any number dnd5e doesn't provide is `null`. Labels are in the Gamemaster's language. The sheet
 shows what the character's player would see in Foundry: effects dnd5e hides from players, such as
@@ -679,14 +682,31 @@ keys are left out where they hold their defaults, and put back on any such row w
 spell's `toHit`, `attackId`, `activity`, `attackModes`, `ammunition` and `save`, `null`; an item's
 `activation`, `range` and `target`, `null`, and `concentration`, `false`, then those six; a
 feature's `range` and `target`, `null`, and `concentration`, `false`, then those six. A row without
-`damage` rolls nothing, and nothing is put back. Nothing else is left out: not an action's own keys
-or a favorite's, labels or images.
+`damage` rolls nothing, and nothing is put back. Nothing else is left out but what the choices
+below hold alike with their row's own: not an action's own keys or a favorite's, labels or images.
+
+**Choices' plans.** Since module 0.41.0, wherever in the sheet a
+[`tableDamage`](#what-an-item-rolls) holds `choices`, which only a listener that answers
+`aloneChoices` is sent, each choice leaves out what its plans hold alike with that `tableDamage`'s
+own: its `normal` or `critical` where it is the same as the `tableDamage`'s, as a `critical` of
+`null` beside a `critical` of `null`; and of one that isn't, each of its `critical`, `plannable`,
+`healing` and `rolls` that is the same, and in `rolls` that aren't, each of a roll's `formula`,
+`type`, `types`, `dice` and `perDie` that is the same as the `tableDamage`'s own roll's at the same
+place in its `rolls`. Each of those keys is always there in the full shape. To put a choice back,
+give it each of `normal` and `critical` it lacks, a copy of the `tableDamage`'s; and to one it has
+that the `tableDamage`'s is an object for too, each of those plan keys it lacks, and to each of its
+rolls that the `tableDamage`'s own has a roll at the same place for, each of those roll keys it
+lacks, each copied from there; its picks first, then `normal` and `critical`, each plan's and roll's
+keys in the order above, as the module builds them. So Burning Hands at 2nd level goes as
+`{ "level": 2, "normal": { "rolls": [ { "formula": "4d6", "dice": [ { "faces": 6, "number": 4 } ] } ] } }`,
+put back with the rest of its plan and its roll from the row's own 3d6, and `critical: null`.
 
 Put the defaults back first, in rows and in what they list, and in actions and activity favorites,
-then the actions by reference. Bound what you put back: a post of rows of nothing, or of many
-references to one wide row, would grow many times over as it's expanded. The Sending Stone app
-gives up on a sheet, as unreadable, once what it adds comes to three times the largest post it
-takes, or `contents` nest deeper than 8; the module nests them 6 deep at most.
+then the actions by reference; choices' plans before or after either. Bound what you put back: a
+post of rows of nothing, of many references to one wide row, or of many empty choices beside a wide
+plan, would grow many times over as it's expanded. The Sending Stone app gives up on a sheet, as
+unreadable, once what it adds comes to three times the largest post it takes, or `contents` nest
+deeper than 8; the module nests them 6 deep at most.
 
 #### Descriptions
 
@@ -2177,7 +2197,8 @@ had closed `"gone"` when it's opened again.
   kinds, and `companionPrompts`, `true` wherever `prompts` is. To a listener that answers
   `"aloneChoices": 1`, a damaging row's
   [`tableDamage`](#what-an-item-rolls) carries `choices`, its plans at the spell's higher levels, in
-  its weapon's other attack modes and with each ammunition, and `spends`; and with `aloneChoices` an
+  its weapon's other attack modes and with each ammunition, each in a [slim](#slim-sheets) sheet with
+  only what it doesn't hold alike with the row's own, and `spends`; and with `aloneChoices` an
   [`itemDamage`](#damage-on-its-own-and-recharges) may name `slot`, `attackMode`, `ammunition` and
   `consume: true`, checked as a use's are, rolled at that level, in that mode, with that ammunition,
   the card's flavor naming them, then spending what its use would, as dnd5e spends it, the ammunition

@@ -2001,6 +2001,40 @@ if (MIDI) {
   used()
   game.combat = viewed
   ok('Midi-QOL with no marker effect: done, nothing marked; Midi throwing as it marks: done, the form made, the failure logged; a change that fails once checked: refunded, nothing marked')
+
+  // Damage on its own from the form, with consume (round 0.41.0 §2.5.3.2, §2.6.6): a Bonus Action of
+  // the form's is checked and marked on the form, where Midi keeps it, never on Elowen, even where core
+  // finds only Elowen's own actor in the fight, by the id the form's combatant stores.
+  const activity5e = await import('./activity5e.mjs')
+  const documents = globalThis.dnd5e.documents
+  globalThis.dnd5e.documents = { activity: { AttackActivity: activity5e.AttackActivity, SaveActivity: activity5e.SaveActivity, DamageActivity: activity5e.DamageActivity, HealActivity: activity5e.HealActivity } }
+  await campaignAs({ rolls: true, attacks: true })
+  game.combat = fight
+  midi.settings.enforceBonusActions = 'all'
+  port.faults.storedActorId = true
+  used()
+  shape = await made(transform(wolfId))
+  assert.equal(shape.result.status, 'done', JSON.stringify(shape.result))
+  const shaped = formOf()
+  assert.deepEqual([shaped.inCombat, elowen.inCombat], [false, true], "the form not in the fight by core's reading, Elowen is")
+  const bite = [...shaped.items].find(item => item.name === 'Bite')
+  const biting = [...bite.system.activities].find(activity => activity.type === 'attack')
+  biting.activation = { type: 'bonus', value: 1 }
+  const alone = () => ({ id: `alone-${++ids}`, actorId: 'elowen', kind: 'itemDamage', item: bite.id, activity: biting.id, consume: true, mode: 0, explicit: false, extras: [], dice: [{ faces: 6, results: [3] }] })
+  used(shaped.id)
+  assert.deepEqual(refusal(await made(alone())), ['failed', 'bonus-action', null], "the form's Bonus Action used: refused")
+  used('elowen')
+  from = marks().length
+  shape = await made(alone())
+  assert.deepEqual([shape.result.status, marks().slice(from)], ['done', [shaped.id]], "only Elowen's own used: rolled, marked once, on the form")
+  port.faults.storedActorId = false
+  await back()
+  midi.settings.enforceBonusActions = 'none'
+  if (documents === undefined) delete globalThis.dnd5e.documents
+  else globalThis.dnd5e.documents = documents
+  await campaignAs({ rolls: false, attacks: false })
+  game.combat = viewed
+  ok("damage on its own from the form, a Bonus Action with consume, under Enforce bonus actions \"all\" and core matching the form's combatant by Elowen's stored id: refused \"bonus-action\" while the form's is used; with only Elowen's own used, rolled and marked once, on the form")
 } else {
   // 15. Without Midi-QOL: changed and returned in a fight as before, nothing asked of it.
   const viewed = game.combat

@@ -37,9 +37,11 @@ globalThis.Hooks = {
   callAll(name, ...args) { return Promise.all((registry.get(name) ?? []).map(fn => fn(...args))).then(() => true) },
 }
 // The module's long waits, shortened a hundredfold: a card's ten minutes take six seconds, Midi's
-// minute 0.6; its 250 ms settling kept as it is.
+// minute 0.6; its 250 ms settling kept as it is. A case whose steps take longer than 0.6 s while Midi
+// waits shortens them less, for the waits it starts.
 const realSetTimeout = globalThis.setTimeout
-globalThis.setTimeout = (fn, ms = 0, ...args) => realSetTimeout(fn, ms >= 1000 ? ms / 100 : ms, ...args)
+let shortened = 100
+globalThis.setTimeout = (fn, ms = 0, ...args) => realSetTimeout(fn, ms >= 1000 ? ms / shortened : ms, ...args)
 const wait = ms => new Promise(resolve => realSetTimeout(resolve, ms))
 globalThis.document = { hidden: false }
 // A clock the heartbeat cases move on.
@@ -112,7 +114,7 @@ globalThis.Item = { implementation: class { constructor(data) { Object.assign(th
 foundry.utils.escapeHTML ??= value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' })[ch])
 foundry.applications.ux.TextEditor = { implementation: { async enrichHTML(html) { return String(html ?? '') } } }
 
-const { companionActor, faults, placeToken, scene } = await import('./token-core.mjs')
+const { companionActor, createToken, faults, placeToken, scene } = await import('./token-core.mjs')
 
 // ---- The users ----
 users.activeGM = user('gm', 'Gamemaster', true)
@@ -494,7 +496,14 @@ let card = await saveAt([wolf1.actor, wolf2.actor])
   const listed = (await hello()).data.prompts
   assert.deepEqual(listed.filter(prompt => prompt.messageId === card.id).map(prompt => [prompt.id, prompt.actorId]), [[`${card.id}-wolf1`, WOLF1]])
   await done(card)
-  ok("10. a hello after a reconnect lists the companions' prompts open, Wolf 1's, and not one answered, Brakka's")
+  // A token's creature answered is left out too, found answered by its prompt's part, its token's id,
+  // which is not its key, as Brakka's is.
+  const lone = await saveAt([wolf1.actor])
+  const theirs = await answer({ actorId: WOLF1, of: 'thorin', prompt: `${lone.id}-wolf1` })
+  assert.equal(theirs.status, 'done', JSON.stringify(theirs))
+  assert.deepEqual((await hello()).data.prompts.filter(prompt => prompt.messageId === lone.id), [], "Wolf 1's answered prompt not listed")
+  await done(lone)
+  ok("10. a hello after a reconnect lists the companions' prompts open, Wolf 1's, and not one answered, Brakka's, nor Wolf 1's once answered, by its token's id")
 }
 
 /* -------------------------------------------- */
@@ -679,6 +688,66 @@ if (MIDI) {
   assert.deepEqual([made.status, message.author.id, message.speakerActor], ['done', 'alice', spirit1.actor])
   await setOpen([])
   ok("13. the Draconic Spirit's Midi save, which no player owns, is answered as Alice, Thorin's player")
+
+  // An app answering companions: 1, as 0.40's does, is asked no companion's Midi save, though Thorin
+  // is open: Midi takes it its own way at once, never held for an app that can't answer it.
+  app.answers.set('camp-a', { ...FEATURES, companions: 1 })
+  await hello()
+  await setOpen(['thorin'])
+  count = opened().length
+  queued = midiSaves.queued.length
+  workflow = await hold(wolf1.object)
+  running = runSaves(workflow)
+  await until(() => midiSaves.queued.length > queued, "Midi's own request")
+  await running
+  assert.deepEqual([opened().length, midiSaves.queued.length], [count, queued + 1], 'no prompt sent, Midi its own way')
+  app.answers.delete('camp-a')
+  await hello()
+  ok("13. an app answering companions: 1 is asked no companion's Midi save while Thorin is open, and Midi takes it its own way at once")
+
+  // The cases below wait on Midi longer than its minute shortened a hundredfold, so it's shortened
+  // tenfold for them: six seconds.
+  shortened = 10
+  // Wolf 3 leaving the list while Midi waits on the app for its save: closed gone and released to
+  // Midi at once, never held for Midi's minute on a token that's gone.
+  const wolf3 = await createToken(arena, wolf, { id: 'wolf3', name: 'Wolf' })
+  await until(() => sent('companions.listed').at(-1)?.data.companions.some(entry => entry.key === 'arena-wolf3'), 'Wolf 3 listed')
+  await setOpen(['thorin'])
+  count = opened().length
+  queued = midiSaves.queued.length
+  workflow = await hold(wolf3.object)
+  running = runSaves(workflow)
+  prompt = await nextPrompt(count)
+  assert.deepEqual([prompt.actorId, prompt.source], ['arena-wolf3', 'midi'])
+  await settle(60)
+  assert.equal(midiSaves.queued.length, queued, "Midi's own request waits on the app")
+  await wolf3.delete()
+  await until(() => closeOf(prompt.id), "Wolf 3's Midi prompt to close", 3000)
+  assert.deepEqual(closeOf(prompt.id), { id: prompt.id, reason: 'gone' })
+  await until(() => midiSaves.queued.length > queued, "Midi's own request, once released", 3000)
+  await running
+  ok("13. Wolf 3's token deleted while Midi waits on the app for its save: its prompt closes gone at once, and Midi takes it its own way")
+
+  // The module's readers cleared, as by a reload, while Midi waits on the app for Wolf 1's save: a
+  // hello built before the answer leaves it out; the answer, companions: 2, sends it again; and the
+  // app's answer to it is still the roll Midi takes.
+  count = opened().length
+  workflow = await hold(wolf1.object)
+  running = runSaves(workflow)
+  prompt = await nextPrompt(count)
+  await forgotten()
+  const fresh = await hello()
+  assert.ok(!fresh.data.prompts.some(each => each.id === prompt.id), 'left out of the hello built before its answer')
+  await until(() => openedOf(prompt.id).length === 2, "Wolf 1's Midi prompt sent again")
+  assert.ok(sent('roll.prompt.opened').filter(e => e.data.prompt.id === prompt.id).at(-1).sequence > fresh.sequence, 'after the hello')
+  made = await answer({ actorId: WOLF1, of: 'thorin', prompt: prompt.id, dice: [{ faces: 20, results: [13] }] })
+  await running
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  const taken = midiSaves.processed.find(each => each.workflow === workflow)
+  assert.deepEqual(taken.results[0][0].dice[0].results.map(result => result.result), [13], "the app's roll, Midi's")
+  await setOpen([])
+  shortened = 100
+  ok("13. with the module's readers cleared while Midi waits on the app for Wolf 1's save, a hello built before the answer leaves it out, the answer companions: 2 sends it again after the hello, and the app's answer is Midi's roll")
 }
 
 console.log(`companion-saves${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

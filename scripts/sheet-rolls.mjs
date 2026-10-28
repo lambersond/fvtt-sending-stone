@@ -327,7 +327,8 @@ function activityRolls(item, activity, texts) {
  * of a weapon's attack modes, with one of its ammunition, or in a mode with an ammunition, each named
  * by what it picks, `{level?, attackMode?, ammunition?, normal, critical}`, left out where there would
  * be more than `MOST_ALONE_CHOICES`; and `spends`, what spending its use would spend: `"slot"`,
- * `"uses"`, `"ammunition"`, `"thrown"`.
+ * `"uses"`, `"ammunition"`, `"thrown"`. Each is left out where dnd5e or a module can't work it out,
+ * so that the row rolls as it would without them, its own plan kept, and the sheet is still sent.
  * @param {Item} item
  * @param {Activity} activity
  * @returns {{normal: object, critical: object|null, choices?: object[], spends?: string[]}|null}
@@ -344,8 +345,21 @@ function tableDamageOf(item, activity) {
     rolls = null;
   }
   if ( rolls && tablingChoices ) {
-    const choices = aloneChoicesOf(item, activity, rolls);
-    rolls = { ...rolls, ...(choices && { choices }), spends: aloneSpendsOf(item, activity) };
+    // Each asks dnd5e how the activity would be used, which a module's wrapper or odd data can make
+    // throw: that one is left out, never the row's own plan or the whole sheet.
+    let choices = null;
+    try {
+      choices = aloneChoicesOf(item, activity, rolls);
+    } catch {
+      choices = null;
+    }
+    let spends = null;
+    try {
+      spends = aloneSpendsOf(item, activity);
+    } catch {
+      spends = null;
+    }
+    rolls = { ...rolls, ...(choices && { choices }), ...(spends && { spends }) };
   }
   if ( key ) tabled?.set(key, rolls);
   return rolls;

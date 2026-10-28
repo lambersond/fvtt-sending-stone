@@ -74,7 +74,7 @@ run failed. A full pass takes about seven minutes.
 | `crit-parentheticals.mjs` | Foundry's parenthetical dice terms |
 | `settings-app.mjs` | ApplicationV2 and Handlebars, enough to draw and use the module's settings window in jsdom |
 | `results-world.mjs` | the world `verdict`, `gmrolls`, `chat6` and `foundry-settings` share |
-| `slim-check.mjs`, `slim-expand.mjs` | the slim-sheet check, and the app's expansion of a slim sheet, ported |
+| `slim-check.mjs`, `slim-expand.mjs` | the slim-sheet check, and the app's expansion of a slim sheet, ported; since module 0.41.0 with damage on its own's choices put back from their row's own plan |
 | `texts-hooks.mjs` | a loader that wraps `sheet-links.mjs`'s `findLink` for made-up descriptions |
 | `dnd5e-hooks.mjs`, `dnd5e-register.mjs` | a loader that stubs the roll dialogs dnd5e's dice import, for files under `/module/dice/` |
 | `unref-timers.mjs` | lets Node exit with the module's timers still set |

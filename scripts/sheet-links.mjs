@@ -1723,10 +1723,10 @@ export function previewDamage(activity, { attackMode, ammunition, isCritical=fal
 /**
  * What damage on its own is previewed and rolled on, at a spell slot `scaling` levels above the
  * spell's own, since 0.41.0 (round 0.41.0 §2.7): at its own level, the activity itself; where its
- * damage reads the spell's level as it's cast, `@item.level` or `@scaling`, which only the item's
- * roll data changes, the activity of a copy of the item scaled by dnd5e's own flag, as dnd5e's own
- * card would roll it; otherwise the activity itself, with `scaling` in the damage configuration, as
- * dnd5e scales each part by it. The sheet's plans and the command both come through here, so that a
+ * damage or healing reads the spell's level as it's cast, `@item.level` or `@scaling`, which only the
+ * item's roll data changes, the activity of a copy of the item scaled by dnd5e's own flag, as dnd5e's
+ * own card would roll it; otherwise the activity itself, with `scaling` in the damage configuration,
+ * as dnd5e scales each part by it. The sheet's plans and the command both come through here, so that a
  * plan and its roll can't differ. The real activity is never changed.
  * @param {Activity} activity
  * @param {number} [scaling]   How many levels above the spell's own.
@@ -1743,16 +1743,18 @@ export function aloneSubject(activity, scaling=0) {
 }
 
 /**
- * Does an activity's damage read the spell's level as it's cast, in a part's own formula, where it
- * has one, or its bonus: `@item.level` or `@scaling`, which dnd5e takes from the item's roll data?
+ * Does an activity's damage or healing read the spell's level as it's cast, in a part's own formula,
+ * where it has one, its bonus or its scaling formula: `@item.level` or `@scaling`, which dnd5e takes
+ * from the item's roll data? A heal's one part is its `healing`, as it has no `damage`.
  * @param {Activity} activity
  * @returns {boolean}
  */
 export function readsLevel(activity) {
   const level = /@(?:item\.level|scaling)\b/;
-  return Array.from(activity?.damage?.parts ?? []).some(part => {
+  const parts = [...Array.from(activity?.damage?.parts ?? []), ...(activity?.healing ? [activity.healing] : [])];
+  return parts.some(part => {
     const custom = part?.custom?.enabled ? String(part.custom.formula ?? "") : "";
-    return level.test(custom) || level.test(String(part?.bonus ?? ""));
+    return [custom, part?.bonus, part?.scaling?.formula].some(formula => level.test(String(formula ?? "")));
   });
 }
 
