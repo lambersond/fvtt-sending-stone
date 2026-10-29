@@ -444,10 +444,11 @@ slotted = await spellSlot('restore', 'pact', 0)
 assert.deepEqual([slotted.result.status, slotOf('pact'), slotted.line?.content], ['done', 1, '<p>Regains a spell slot · Pact Magic</p>'])
 ok('0.42.1: Pact Magic spent from 1 to 0 and restored to 1, each line naming Pact Magic')
 
+assert.deepEqual(await refusedSlot(slotCommand('restore', 'spell4', 5), 'restored above its maximum'), ['failed', 'full', null])
 slotted = await spellSlot('spend', 'spell4', 5)
 assert.deepEqual([slotted.result.status, slotOf('spell4'), slotted.line?.content], ['done', 4, '<p>Spends a spell slot · 4th Level</p>'])
 assert.deepEqual(await refusedSlot(slotCommand('restore', 'spell4', 4), 'restored at its maximum'), ['failed', 'full', null])
-ok('0.42.1: temporary slots: a 4th-level pool at 5 of 4 spent to 4; restored at 4 of 4, "full"')
+ok('0.42.1: temporary slots: a 4th-level pool at 5 of 4 restored, "full"; spent to 4; restored at 4 of 4, "full"')
 
 for (const [op, id, from, reason, why] of [
   ['spend', 'spell1', 3, 'changed', 'spent from 3 where it is 2'],

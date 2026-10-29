@@ -274,15 +274,17 @@ ok(`the hello's features.wildShape, last, after effects: off with the switch off
 /**
  * Round 0.42.1 §U.7.1 case 10, under dnd5e 5.3.3 (11c) and 6.0.5 (18): one of her spell slots spent
  * from the app, for an app that takes Wild Shape, is refused while she's shaped, neither her own pool
- * nor the form's changed and nothing posted; once she's back, it's spent from her own. The campaign,
- * her Wild Shape's uses, hit points and slots are left as they were.
+ * nor the form's changed and nothing posted; once she's back, it's spent from her own. While she's
+ * shaped, a count gone stale and a pool she lacks are refused "shaped" as well, since §U.3.2 checks
+ * the form before the pool and its count ("slot", "changed"). The campaign, her Wild Shape's uses,
+ * hit points and slots are left as they were.
  * @param {string} formId   The known form she takes.
  */
 async function slotWhileShaped(formId) {
   await campaignAs({ rolls: true, attacks: true })
   const was = { spent: shapeItem().system.uses.spent, hp: elowen.system.attributes.hp.value, temp: elowen.system.attributes.hp.temp }
   await shapeItem().update({ 'system.uses.spent': 0 })
-  const slot = from => ({ id: `slot-${++ids}`, actorId: 'elowen', kind: 'spellSlot', spellSlot: { op: 'spend', id: 'spell1', from }, mode: 0, explicit: false, extras: [], dice: [] })
+  const slot = (from, id = 'spell1') => ({ id: `slot-${++ids}`, actorId: 'elowen', kind: 'spellSlot', spellSlot: { op: 'spend', id, from }, mode: 0, explicit: false, extras: [], dice: [] })
   assert.equal((await made(transform(formId))).result.status, 'done')
   const form = formOf()
   const pools = () => [elowen.system.spells.spell1.value, form.system.spells?.spell1?.value]
@@ -290,6 +292,10 @@ async function slotWhileShaped(formId) {
   const mark = messages.size
   const shaped = await made(slot(elowen.system.spells.spell1.value))
   assert.deepEqual(refusal(shaped), ['failed', 'shaped', null])
+  const stale = await made(slot(elowen.system.spells.spell1.value + 1))
+  assert.deepEqual(refusal(stale), ['failed', 'shaped', null], 'a count it isn\'t: "shaped" before "changed"')
+  const lacking = await made(slot(0, 'spell9'))
+  assert.deepEqual(refusal(lacking), ['failed', 'shaped', null], 'a pool she lacks: "shaped" before "slot"')
   assert.deepEqual([pools(), messages.size], [before, mark], "neither her pool nor the form's changed, and nothing posted")
   assert.equal((await made(revert())).result.status, 'done')
   const left = elowen.system.spells.spell1.value
@@ -363,7 +369,7 @@ if (DND5E6) {
   }
   ok('dnd5e 6.0.5: transform and return as cases 7 and 11, each token keeping its level, and on the return the level and visibility it has then; a type "condition" Prone gained in form carried back as one condition effect')
   await slotWhileShaped(profilesOf()[0]._id)
-  ok('dnd5e 6.0.5, since 0.42.1: a spell slot spent from the app while she is shaped "shaped", her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
+  ok('dnd5e 6.0.5, since 0.42.1: a spell slot spent from the app while she is shaped "shaped", from a count gone stale or of a pool she lacks too, her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
   await prepareWhileShaped(profilesOf()[0]._id)
   ok('dnd5e 6.0.5, since 0.42.1: one of her spells prepared from the app while she is shaped "shaped", her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
   process.exit(0)
@@ -859,7 +865,7 @@ ok("a party's Long Rest while shaped rests her own actor and advances the clock 
 /* -------------------------------------------- */
 
 await slotWhileShaped(wolfId)
-ok('0.42.1: a spell slot spent from the app while she is shaped, for an app that takes Wild Shape, "shaped", her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
+ok('0.42.1: a spell slot spent from the app while she is shaped, for an app that takes Wild Shape, "shaped", from a count gone stale or of a pool she lacks too, her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
 
 /* -------------------------------------------- */
 /*  11d. A spell prepared while shaped (0.42.1)  */
