@@ -382,6 +382,19 @@ an attack hit only where the game shows players.
   Points", "Gains Heroic Inspiration" or "Spends a spell slot · 1st Level", never how many are left.
   One you make from the app's Gamemaster page is marked "GM" on its card, as your rolls there are.
 
+### Preparing spells
+
+With **Attacks, spells and features** ticked, a player can prepare one of their character's spells
+from the app, or unprepare one, from its menu: on the app's Spells tab, among their favorites, or, to
+unprepare it, on the Actions tab, as dnd5e's sheet's Prepare and Unprepare do: a spell already on the
+character's sheet whose casting prepares, above cantrip level, not always prepared and not cast from
+an item. It works while you, the Gamemaster, have the game open, as every roll from the app does.
+Nothing limits how many, as dnd5e limits none. Nothing is posted in chat, as dnd5e posts nothing, so
+the Gamemaster's page in the app doesn't offer it; nor while the character is in Wild Shape. A new
+spell is still added in Foundry. The app is also sent each spellcasting class's count, as dnd5e's
+sheet shows "Prepared 5 / 6" beside its spell save DC, so a player sees what they're swapping
+against; it moves as spells are prepared, from the app or in Foundry.
+
 ### Moving items and coins
 
 Tick **Players move items and coins** on a campaign's **Player actions** tab, and its players can
@@ -835,6 +848,18 @@ Gamemaster-only information switched on.
   character is in Wild Shape (the slots wait, as the app's Spells tab says).
 - **Temporary slots** above a pool's maximum can be spent from the app, never restored above it.
 - **A restore posts a line everyone sees;** undo a mistaken one in Foundry.
+- **Nothing limits how many spells are prepared** from the app, as dnd5e's own menu limits none: a
+  class's "Prepared 7 / 6" shows it past its maximum, and nothing refuses it.
+- **Cantrips, always prepared spells, spells cast at will, innately or as rituals, and spells an
+  item casts** are never prepared or unprepared from the app.
+- **Spells are prepared from the app only while you have the game open in Foundry:** the module
+  runs in your browser; between sessions, spells are changed in Foundry as before.
+- **Only spells already on the character's sheet** are prepared from the app: dnd5e keeps no class
+  spell list on the character, so a cleric's, druid's or paladin's whole list, or a spell a wizard
+  has just copied into their book, is added in Foundry first, and "Always prepared" stays a setting
+  there. A wizard's spellbook works, as every spell in it is on the sheet.
+- **A spell prepared from the app posts nothing in chat:** you see the change only on the
+  character's sheet in Foundry.
 - **Wild Shape from the app is the 2024 Wild Shape only:** a 2014 druid's Wild Shape is used in
   Foundry, and the app follows the form, shown as Wild Shape, but never times, ends or returns it:
   the 2014 rules end it differently (0 hit points or Unconscious), and you return it in Foundry.
@@ -1041,7 +1066,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player, and what it concentrates on; from 0.39.0, what its player may do to each effect from the app |
 | `scripts/sheet-effect-dice.mjs` | From 0.42.0, the dice a character's effects add to its d20 rolls, as dnd5e will add them, named by the spell or item they come from, for a player typing in their dice; from 0.42.1, the Bardic Inspiration an effect offers |
 | `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
-| `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it, and the pool a slot is spent or restored from |
+| `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it, and the pool a slot is spent or restored from; from 0.42.1, each class's count of prepared spells, and whether a spell is prepared, as the app may change it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites; and the feature each old-style resource stands for; whether one would be listed, for the app's to be added |
@@ -1080,6 +1105,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch; nothing posted |
+| `scripts/command-prepare.mjs` | Preparing and unpreparing a character's spells from the app, as dnd5e's menu does; nothing posted |
 | `scripts/command-effects.mjs` | A player's own effects turned off, on and deleted from the app, from 0.39.0, by the campaign's switch under dnd5e: fetching them from an app that takes them; each checked against what `sheet-effects.mjs` says its player may do, written with the mark of the app's own Turn off, and read again; the hook that clears the mark on any other change; nothing posted |
 | `scripts/wild-shape.mjs` | Wild Shape, from 0.40.0, by the 2024 rules: a druid's Wild Shape and what the rules allow the druid now; the campaign's compendiums, the Beasts the druid may learn and the known forms' summaries; the record written on every form as dnd5e makes it; the character's tokens switched and put back on every scene; what comes back on every return, as sums, and the character's hit points; the endings, on the bridge; a form deleted by hand, and a player's leftover form |
 | `scripts/sheet-wild-shape.mjs` | A 2024 druid's `wildShape` block and a transformed character's `form` on the sheet, from 0.40.0 |

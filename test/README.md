@@ -1,7 +1,7 @@
 # The harness
 
 The module's own scripts, run in Node against stand-ins for Foundry VTT 14 and Midi-QOL and against
-dnd5e's real dice classes: 43 harnesses, 96 runs of them in `harness-all.sh`. No Foundry, no browser
+dnd5e's real dice classes: 44 harnesses, 98 runs of them in `harness-all.sh`. No Foundry, no browser
 and no network: `fvtt/stub.mjs` stands in for Foundry's core and replaces `fetch`, so every post the
 module makes lands in the harness, and the stand-in app answers it. None of this is part of the
 module: Foundry reads `module.json` only, and the release workflow leaves `test/`, the package files,

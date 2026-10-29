@@ -9,6 +9,7 @@ import { checkFavoriteCommand } from "./command-favorites.mjs";
 import { checkDishCommand } from "./command-dishes.mjs";
 import { checkEffectCommand } from "./command-effects.mjs";
 import { checkWildShapeCommand } from "./command-wildshape.mjs";
+import { checkPrepareCommand } from "./command-prepare.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
 import { commandActor, companionPart, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
@@ -251,7 +252,7 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * Recipe Book, its body. And since 0.39.0 a change to one of the character's own effects, which and
  * how. And since 0.40.0 Wild Shape, which and how. And since 0.42.0 a typed d20 roll's effects' dice,
  * `effectDice`. And since 0.42.1 a spell slot spent or restored: which, how, and the count it was
- * made from.
+ * made from. And since 0.42.1 a spell prepared or unprepared, which and how.
  * @param {object} command
  * @returns {string|null}
  */
@@ -275,6 +276,7 @@ export function checkCommand(command) {
   if ( command.kind === "dish" ) return checkDishCommand(command);
   if ( command.kind === "effect" ) return checkEffectCommand(command);
   if ( command.kind === "wildShape" ) return checkWildShapeCommand(command);
+  if ( command.kind === "prepare" ) return checkPrepareCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);

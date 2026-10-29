@@ -10,18 +10,22 @@ import { finite, localize } from "./sheet-values.mjs";
 
 /**
  * The character's spellcasting: its spellcasting ability, spell save DC and spell attack bonus,
- * and each spellcasting class's. Null for a character with no spells and no spellcasting class.
+ * and each spellcasting class's, with since 0.42.1 how many of its spells are prepared of how many
+ * it may prepare, where dnd5e's sheet shows that. Null for a character with no spells and no
+ * spellcasting class.
  * @param {Actor} actor
  * @returns {object|null}
  */
 export function spellcastingOf(actor) {
   const classes = Object.values(actor.spellcastingClasses ?? {}).map(item => {
     const spellcasting = item.spellcasting ?? {};
+    const prepared = preparationOf(spellcasting.preparation);
     return {
       name: item.name,
       ability: abilityLabel(spellcasting.ability),
       dc: finite(spellcasting.save),
-      attack: finite(spellcasting.attack)
+      attack: finite(spellcasting.attack),
+      ...(prepared && { prepared })
     };
   });
   if ( !classes.length && !(actor.itemTypes?.spell?.length) ) return null;
@@ -110,7 +114,6 @@ function describeSpell(spell, texts) {
   const system = spell.system ?? {};
   const labels = spell.labels ?? {};
   const level = finite(system.level) ?? 0;
-  const canPrepare = system.canPrepare ?? (system.method === "spell");
   const from = castFrom(spell);
   return {
     id: spell.id,
@@ -127,9 +130,7 @@ function describeSpell(spell, texts) {
     // As dnd5e's spell cards put it, such as "Concentration, up to 1 minute".
     duration: labels.concentrationDuration || labels.duration || null,
     target: labels.target || null,
-    // 0 unprepared, 1 prepared, 2 always prepared; null for a spell that isn't prepared, such as a
-    // cantrip, one cast at will, or one cast from an item, as dnd5e's sheet has it.
-    prepared: (canPrepare && (level > 0) && !system.linkedActivity) ? (finite(system.prepared) ?? 0) : null,
+    prepared: preparedOf(spell),
     uses: usesOf(spell),
     castFrom: from,
     // What it rolls, so it's cast or rolled from the Spells tab as from Actions; nothing for one its
@@ -174,6 +175,21 @@ export function hiddenCopy(spell) {
 }
 
 /**
+ * Whether a spell is prepared, as the sheet sends it and the app may change it since 0.42.1: 0
+ * unprepared, 1 prepared, 2 always prepared; null for one that isn't prepared, such as a cantrip, one
+ * cast at will, or one cast from an item, as dnd5e's sheet has it. Whether its casting prepares is
+ * dnd5e's own `canPrepare`, read before its method, as a document's prepared data has it.
+ * @param {Item} spell
+ * @returns {0|1|2|null}
+ */
+export function preparedOf(spell) {
+  const system = spell.system ?? {};
+  const canPrepare = system.canPrepare ?? (system.method === "spell");
+  const level = finite(system.level) ?? 0;
+  return (canPrepare && (level > 0) && !system.linkedActivity) ? (finite(system.prepared) ?? 0) : null;
+}
+
+/**
  * The spell slots a section uses: how many are left, of how many, and the level a spell is cast
  * at with one, which for Pact Magic is its slots' level. A pool without slots may have no level.
  * @param {Actor} actor
@@ -206,6 +222,24 @@ export function slotPoolOf(actor, key) {
   const label = spells[key]?.label;
   const name = ((typeof label === "string") && label) || CONFIG.DND5E?.spellLevels?.[slots.level] || key;
   return { ...slots, name: String(name) };
+}
+
+/**
+ * How many of a spellcasting class's spells are prepared, of how many it may prepare, since 0.42.1,
+ * as dnd5e's sheet shows them beside its spell save DC: its count of prepared spells, and the most
+ * its prepared formula gives, 0 for none; each a whole number, none below 0. Null where dnd5e shows
+ * nothing, both being 0, as for a caster who knows their spells, or where either isn't a number.
+ * Never capped: a class may have more prepared than it may, as dnd5e lets it.
+ * @param {{value?: number, max?: number}} [preparation]    The class's, as dnd5e prepares it.
+ * @returns {{value: number, max: number}|null}
+ */
+function preparationOf(preparation) {
+  const count = number => Math.max(Math.floor(number), 0);
+  const value = finite(preparation?.value);
+  const max = finite(preparation?.max);
+  if ( (value === null) || (max === null) ) return null;
+  const prepared = { value: count(value), max: count(max) };
+  return (prepared.value || prepared.max) ? prepared : null;
 }
 
 /**

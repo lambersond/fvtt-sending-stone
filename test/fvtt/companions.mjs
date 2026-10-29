@@ -389,11 +389,12 @@ ok("Vex's list is none: Bob owns none of them")
 // Changed on purpose (round 0.36.0 §6.13): and ending a turn, the character's to do.
 // Changed on purpose (round 0.36.0 §6.14): and taking one back.
 // Changed on purpose (round 0.42.1 §U.7.1): and a spell slot spent or restored, after Heroic Inspiration.
-const UNTAKEN = ['inspiration', 'hitDie', 'hitDice', 'spend', 'spellSlot', 'transfer', 'remove', 'note', 'endTurn', 'undoEndTurn']
+// Changed on purpose (round 0.42.1 §P.6.1): and a spell prepared or unprepared, after the charges.
+const UNTAKEN = ['inspiration', 'hitDie', 'hitDice', 'spend', 'spellSlot', 'prepare', 'transfer', 'remove', 'note', 'endTurn', 'undoEndTurn']
 assert.deepEqual(hello.data.features.companions, { kinds: hello.data.features.rolls.kinds.filter(kind => !UNTAKEN.includes(kind)), initiative: 'own' })
 assert.ok(hello.data.features.companions.kinds.includes('itemDamage') && hello.data.features.companions.kinds.includes('recharge'))
 assert.ok(!hello.data.features.companions.kinds.some(kind => UNTAKEN.includes(kind)))
-ok("features.companions: the campaign's kinds less inspiration, hit dice, spending, spell slots, moves, removals, notes, ending a turn and taking one back, and each its own initiative")
+ok("features.companions: the campaign's kinds less inspiration, hit dice, spending, spell slots, spells prepared, moves, removals, notes, ending a turn and taking one back, and each its own initiative")
 
 // The big campaign: fifty listed of sixty, under 64 KB, a name of 300 cut to 200 and an img of 3,000 sent null.
 const bigHello = helloOf('camp-big')

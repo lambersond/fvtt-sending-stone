@@ -301,6 +301,39 @@ async function slotWhileShaped(formId) {
   await campaignAs({ rolls: false, attacks: false })
 }
 
+/**
+ * Round 0.42.1 §P.6.1, under dnd5e 5.3.3 (11d) and 6.0.5 (18), after 0.42.1's spell slot: one of her
+ * spells prepared from the app is refused while she's shaped, neither her spell nor a copy her form
+ * holds changed and nothing posted; once she's back, her own is prepared. Her Moonbeam is made one she
+ * prepares, unprepared, for the case: `method` "spell" and `canPrepare` as dnd5e's getter gives it,
+ * then put back as it was. The campaign, her Wild Shape's uses and hit points are left as they were.
+ * @param {string} formId   The known form she takes.
+ */
+async function prepareWhileShaped(formId) {
+  await campaignAs({ rolls: true, attacks: true })
+  const was = { spent: shapeItem().system.uses.spent, hp: elowen.system.attributes.hp.value, temp: elowen.system.attributes.hp.temp }
+  await shapeItem().update({ 'system.uses.spent': 0 })
+  const moonbeam = () => elowen.items.get('elowenMoonbeam00')
+  await moonbeam().update({ 'system.method': 'spell', 'system.canPrepare': true, 'system.prepared': 0 })
+  const preparing = () => ({ id: `prepare-${++ids}`, actorId: 'elowen', kind: 'prepare', prepare: { op: 'prepare', id: 'elowenMoonbeam00' }, mode: 0, explicit: false, extras: [], dice: [] })
+  assert.equal((await made(transform(formId))).result.status, 'done')
+  const form = formOf()
+  const states = () => [moonbeam().system.prepared, form.items.find(item => item.name === 'Moonbeam')?.system.prepared ?? null]
+  const before = states()
+  const mark = messages.size
+  const shaped = await made(preparing())
+  assert.deepEqual(refusal(shaped), ['failed', 'shaped', null])
+  assert.deepEqual([states(), messages.size], [before, mark], "neither her spell nor the form's copy changed, and nothing posted")
+  assert.equal((await made(revert())).result.status, 'done')
+  const returned = messages.size
+  const back = await made(preparing())
+  assert.deepEqual([back.result.status, back.result.messageId, moonbeam().system.prepared, messages.size], ['done', null, 1, returned], 'her own prepared once she is back, nothing posted')
+  await moonbeam().update({ 'system.method': undefined, 'system.canPrepare': undefined, 'system.prepared': undefined })
+  await elowen.update({ 'system.attributes.hp.value': was.hp, 'system.attributes.hp.temp': was.temp })
+  await shapeItem().update({ 'system.uses.spent': was.spent })
+  await campaignAs({ rolls: false, attacks: false })
+}
+
 if (DND5E6) {
   /* ------------------------------------------ */
   /*  18. dnd5e 6.0.5                           */
@@ -331,6 +364,8 @@ if (DND5E6) {
   ok('dnd5e 6.0.5: transform and return as cases 7 and 11, each token keeping its level, and on the return the level and visibility it has then; a type "condition" Prone gained in form carried back as one condition effect')
   await slotWhileShaped(profilesOf()[0]._id)
   ok('dnd5e 6.0.5, since 0.42.1: a spell slot spent from the app while she is shaped "shaped", her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
+  await prepareWhileShaped(profilesOf()[0]._id)
+  ok('dnd5e 6.0.5, since 0.42.1: one of her spells prepared from the app while she is shaped "shaped", her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
   process.exit(0)
 }
 
@@ -825,6 +860,13 @@ ok("a party's Long Rest while shaped rests her own actor and advances the clock 
 
 await slotWhileShaped(wolfId)
 ok('0.42.1: a spell slot spent from the app while she is shaped, for an app that takes Wild Shape, "shaped", her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
+
+/* -------------------------------------------- */
+/*  11d. A spell prepared while shaped (0.42.1)  */
+/* -------------------------------------------- */
+
+await prepareWhileShaped(wolfId)
+ok('0.42.1: one of her spells prepared from the app while she is shaped "shaped", her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
 
 /* -------------------------------------------- */
 /*  12. Change while shaped                     */

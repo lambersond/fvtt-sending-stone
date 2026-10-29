@@ -1,6 +1,6 @@
 import {
-  ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PROTOCOL_VERSION,
-  ROLL_KINDS, TURN_KINDS
+  ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PREPARE_KINDS,
+  PROTOCOL_VERSION, ROLL_KINDS, TURN_KINDS
 } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
@@ -14,6 +14,7 @@ import { favoriteReader, favoritesOn, noteFavoriteReader, runFavoriteCommand } f
 import { dishesOn, dishInFlight, dishReader, noteDishReader, runDishCommand } from "./command-dishes.mjs";
 import { effectReader, effectsOn, noteEffectReader, runEffectCommand } from "./command-effects.mjs";
 import { noteWildShapeReader, runWildShapeCommand, wildShapeOn, wildShapeReader } from "./command-wildshape.mjs";
+import { runPrepareCommand } from "./command-prepare.mjs";
 import { runEndTurnCommand, runUndoTurnCommand } from "./command-turn.mjs";
 import {
   noteRemovalReader, noteTransferReader, removalReader, removalsOn, runRemoveCommand, runTransferCommand,
@@ -172,6 +173,8 @@ const made = new Map();
  * them (`companionPrompts`), wherever its players are asked for theirs. And from 0.42.0, whether a
  * typed roll's effects' dice are its player's (`effectDice`), under dnd5e 5, and whether its rerolls
  * may be (`keptRerolls`): each wherever its players may type in their dice and its self-test passed.
+ * And since 0.42.1, among the kinds right after the charges and wherever they are, one of their
+ * spells prepared or unprepared, which throws no dice either.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
@@ -197,7 +200,7 @@ export function rollFeatures(campaign) {
       ...CONCENTRATION_KINDS,
       ...TURN_KINDS,
       ...(attacks ? [...ATTACK_KINDS, ...ENCHANT_KINDS] : []),
-      ...(campaign.attacks ? CHARGE_KINDS : []),
+      ...(campaign.attacks ? [...CHARGE_KINDS, ...PREPARE_KINDS] : []),
       ...texts,
       ...(alone ? ALONE_KINDS : [])
     ],
@@ -731,6 +734,7 @@ function runCommand(command, campaign, signal) {
     case "dish": return runDishCommand(command, campaign);
     case "effect": return runEffectCommand(command, campaign);
     case "wildShape": return runWildShapeCommand(command, campaign);
+    case "prepare": return runPrepareCommand(command, campaign);
     case "note": return runNoteCommand(command, campaign);
     default: return runRollCommand(command, campaign, { signal });
   }
