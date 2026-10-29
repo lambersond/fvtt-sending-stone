@@ -373,10 +373,14 @@ an attack hit only where the game shows players.
 - **Recharges.** A spent Recharge 5–6 can be rolled from the app.
 - **Heroic Inspiration.** With the same switch, a player can use or gain Heroic Inspiration, as
   dnd5e's sheet header toggles it.
+- **Spell slots.** Since 0.42.1, with the same switch, a player can spend one of their character's
+  spell slots, or restore one, from the dots on the app's Spells tab or a spell-slots favorite, one
+  at a time, asked first, as dnd5e's sheet's pips do; Pact Magic too. One the count of which changed
+  in Foundry meanwhile is refused, and none while the character is in Wild Shape.
 - **A line in chat.** dnd5e posts nothing for what's changed on its sheet, so each spend, and each
   use or gain of Heroic Inspiration, posts a line as the character, such as "Spends 2 · Sorcery
-  Points" or "Gains Heroic Inspiration", never how many are left. One you make from the app's
-  Gamemaster page is marked "GM" on its card, as your rolls there are.
+  Points", "Gains Heroic Inspiration" or "Spends a spell slot · 1st Level", never how many are left.
+  One you make from the app's Gamemaster page is marked "GM" on its card, as your rolls there are.
 
 ### Moving items and coins
 
@@ -824,6 +828,13 @@ Gamemaster-only information switched on.
 - **A dish's save bonus counts once on death saves** since 0.42.0: dnd5e adds the saving throws'
   bonus to a death save too, and a dish no longer writes the death save's own. A dish eaten before
   keeps both until it ends.
+- **Spell slots are spent and restored one at a time** from the app; several are several taps, each
+  asked.
+- **Spell slots can't be changed from the app** while Send to the table is off on that device, with a
+  module before 0.42.1, where you don't let players attack and cast from the app, or while the
+  character is in Wild Shape (the slots wait, as the app's Spells tab says).
+- **Temporary slots** above a pool's maximum can be spent from the app, never restored above it.
+- **A restore posts a line everyone sees;** undo a mistaken one in Foundry.
 - **Wild Shape from the app is the 2024 Wild Shape only:** a 2014 druid's Wild Shape is used in
   Foundry, and the app follows the form, shown as Wild Shape, but never times, ends or returns it:
   the 2014 rules end it differently (0 hit points or Unconscious), and you return it in Foundry.
@@ -1030,7 +1041,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player, and what it concentrates on; from 0.39.0, what its player may do to each effect from the app |
 | `scripts/sheet-effect-dice.mjs` | From 0.42.0, the dice a character's effects add to its d20 rolls, as dnd5e will add them, named by the spell or item they come from, for a player typing in their dice; from 0.42.1, the Bardic Inspiration an effect offers |
 | `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
-| `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it |
+| `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it, and the pool a slot is spent or restored from |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites; and the feature each old-style resource stands for; whether one would be listed, for the app's to be added |
@@ -1064,7 +1075,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
 | `scripts/command-turn.mjs` | Ending the current turn from the app, the character's or one of its companions', where it's still the turn the app was shown, by Foundry's own Next Turn; and taking back the turn one just ended, with Foundry's turn events off |
-| `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat |
+| `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat; from 0.42.1, a spell slot spent or restored |
 | `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |

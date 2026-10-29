@@ -9,7 +9,7 @@ import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
 import { noteAloneReader, runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
-import { runInspirationCommand, runSpendCommand } from "./command-charges.mjs";
+import { runInspirationCommand, runSpellSlotCommand, runSpendCommand } from "./command-charges.mjs";
 import { favoriteReader, favoritesOn, noteFavoriteReader, runFavoriteCommand } from "./command-favorites.mjs";
 import { dishesOn, dishInFlight, dishReader, noteDishReader, runDishCommand } from "./command-dishes.mjs";
 import { effectReader, effectsOn, noteEffectReader, runEffectCommand } from "./command-effects.mjs";
@@ -719,6 +719,7 @@ function runCommand(command, campaign, signal) {
     case "undoEndTurn": return runUndoTurnCommand(command, campaign);
     case "spend": return runSpendCommand(command, campaign);
     case "inspiration": return runInspirationCommand(command, campaign);
+    case "spellSlot": return runSpellSlotCommand(command, campaign);
     case "ask": return runAskCommand(command, campaign);
     case "textDamage": return runTextDamageCommand(command, campaign);
     case "textRoll": return runTextRollCommand(command, campaign);

@@ -38,7 +38,8 @@ run activities X=1 SLIM_CHECK=1; run activities MIDI=1 SLIM_CHECK=1; run activit
 for v in X=1 MIDI=1; do run enchant $v SLIM_CHECK=1; done
 run errors X=1
 # Ending a concentration, spending charges and Heroic Inspiration, and hits, misses and saves in chat
-# (module 0.29.0): dnd5e's alone, and with Midi-QOL's stand-ins.
+# (module 0.29.0), and since 0.42.1 spell slots spent and restored: dnd5e's alone, and with Midi-QOL's
+# stand-ins.
 for v in X=1 MIDI=1; do run concentration $v SLIM_CHECK=1; run charges $v SLIM_CHECK=1; run outcomes $v; done
 # Module 0.30.0: party sheets (dnd5e 5.3.3 and 6.0.5 stand-ins), the Foundry settings field and its
 # verdict against every gate, and chat results matching what Foundry shows players.

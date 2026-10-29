@@ -190,6 +190,25 @@ function slotsOf(actor, key) {
 }
 
 /**
+ * A pool of the character's spell slots the app may spend or restore one of, since 0.42.1, read as
+ * the sheet reads it: how many are left, of how many, and the level, with the name its line in chat
+ * gives it, dnd5e's label for it, such as "1st Level" or "Pact Magic". Null for a key the character
+ * has no pool under of its own, as one inherited from every object, or one with no slots.
+ * @param {Actor} actor
+ * @param {string} key      Such as "spell3" or "pact".
+ * @returns {{value: number, max: number, level: number|null, name: string}|null}
+ */
+export function slotPoolOf(actor, key) {
+  const spells = actor.system?.spells ?? {};
+  if ( !Object.hasOwn(spells, key) ) return null;
+  const slots = slotsOf(actor, key);
+  if ( slots.max <= 0 ) return null;
+  const label = spells[key]?.label;
+  const name = ((typeof label === "string") && label) || CONFIG.DND5E?.spellLevels?.[slots.level] || key;
+  return { ...slots, name: String(name) };
+}
+
+/**
  * @param {string} [ability]    Such as "int".
  * @returns {string|null}
  */

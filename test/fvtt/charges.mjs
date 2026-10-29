@@ -1,6 +1,7 @@
 // Spending charges and Heroic Inspiration from the app (module 0.29.0): the sheet's counters, which
 // it says may be spent, and what each use spends; the spend and inspiration commands, their
-// refusals, the line each posts in chat, and the Gamemaster's, marked theirs. The real module and
+// refusals, the line each posts in chat, and the Gamemaster's, marked theirs; and since 0.42.1 the
+// spellSlot command, one of the character's spell slots spent or restored. The real module and
 // its language file, dnd5e 5.3.3's real dice classes, dnd5e's items and activities ported
 // (activity5e.mjs), a stand-in Foundry core and app. Under X=1 the attack self-test fails, as this
 // world has no damage rolls; under MIDI=1 it passes, Midi-QOL makes items' uses, and the Gamemaster
@@ -126,6 +127,17 @@ thorin.system.resources = {
 }
 thorin.system.attributes.inspiration = false
 thorin.system.favorites = [{ type: 'activity', id: '.Item.legacy.Activity.dark', sort: 1 }]
+// Spell slots as dnd5e prepares them (round 0.42.1 §U.7.1): a 1st-level pool 2/3, a 2nd with none
+// left, a 3rd with no slots, a 4th above its maximum (temporary slots), and Pact Magic. The stand-in's
+// spellcasting methods build no slot sections, so the spellSlot cases read these, and the order of
+// the sheet and the result.
+thorin.system.spells = {
+  spell1: { value: 2, max: 3, level: 1, label: '1st Level' },
+  spell2: { value: 0, max: 2, level: 2, label: '2nd Level' },
+  spell3: { value: 0, max: 0, level: 3 },
+  spell4: { value: 5, max: 4, level: 4, label: '4th Level' },
+  pact: { value: 1, max: 2, level: 3, label: 'Pact Magic' },
+}
 const stranger = add(new Actor5e({ id: 'stranger', name: 'Stranger', owners: ['bob'] }))
 equip(stranger, { items: [feat('grit', 'Grit', [], { uses: { max: 2, spent: 0, recovery: [] } })] })
 
@@ -214,7 +226,8 @@ assert.equal(diceStatus.ready, true, `self-test: ${diceStatus.error}`)
 assert.equal(attacksUnavailable(), MIDI ? 'midi-off' : 'self-test')
 const kinds = app.events.filter(e => e.type === 'bridge.hello').at(-1).data.features.rolls.kinds
 assert.deepEqual(['attack', 'use', 'endEnchantment'].filter(kind => kinds.includes(kind)), [])
-assert.deepEqual(['endConcentration', 'spend', 'inspiration'].filter(kind => kinds.includes(kind)), ['endConcentration', 'spend', 'inspiration'])
+// Changed on purpose (round 0.42.1 §U.7.1): and a spell slot spent or restored, after Heroic Inspiration.
+assert.deepEqual(['endConcentration', 'spend', 'inspiration', 'spellSlot'].filter(kind => kinds.includes(kind)), ['endConcentration', 'spend', 'inspiration', 'spellSlot'])
 ok(`while players' attacks can't be made here (${MIDI ? "Midi's integration off" : 'the attack self-test failed'}), the hello still offers spending charges and Heroic Inspiration, wherever the Gamemaster lets players attack`)
 
 // ---- The sheet ----
@@ -368,6 +381,138 @@ for (const [fields, error] of [[{ inspiration: 'maybe' }, 'inspiration'], [{ ins
   assert.deepEqual(refusal(await send('inspiration', fields)), ['failed', 'invalid', error], JSON.stringify(fields))
 }
 ok("uses and gains Heroic Inspiration as dnd5e's header does, each posting its line; refuses using none and gaining it twice; the Gamemaster's marked theirs")
+
+// ---- 0.42.1: spell slots spent and restored ----
+// Round 0.42.1 §U.7.1: one of the character's spell slots spent from the app, or one restored, as
+// dnd5e's sheet's pips do, made only from the count the app showed, one at a time.
+const { announce } = await import(`${MODULE}/scripts/bridge.mjs`)
+const slotOf = id => thorin.system.spells[id].value
+const pools = () => Object.fromEntries(Object.entries(thorin.system.spells).map(([key, pool]) => [key, pool.value]))
+const slotCommand = (op, id, from, fields) => ({ spellSlot: { op, id, from }, ...fields })
+const spellSlot = (op, id, from, fields) => send('spellSlot', slotCommand(op, id, from, fields))
+/** A spellSlot that's refused, with nothing written, posted or changed: why. */
+async function refusedSlot(fields, why) {
+  const before = [writes.length, messages.size, pools()]
+  const made = await send('spellSlot', fields)
+  assert.deepEqual([writes.length, messages.size, pools()], before, `${why}: nothing written, posted or changed`)
+  return refusal(made)
+}
+/** The campaign's hello sent again now: its features. */
+async function helloNow() {
+  const hellos = () => app.events.filter(e => e.type === 'bridge.hello')
+  const sent = hellos().length
+  announce({ campaignId: 'camp-a' })
+  await until(() => hellos().length > sent, 'the hello')
+  await new Promise(resolve => realSetTimeout(resolve, 60))
+  return hellos().at(-1).data.features
+}
+
+let offered = app.events.filter(e => e.type === 'bridge.hello').at(-1).data.features
+assert.equal(offered.rolls.kinds.indexOf('spellSlot'), offered.rolls.kinds.indexOf('inspiration') + 1, 'right after inspiration')
+assert.ok(offered.companions.kinds.length && !offered.companions.kinds.includes('spellSlot'), "never among a companion's kinds")
+settings.set('campaigns', campaigns.map(campaign => ({ ...campaign, attacks: false })))
+offered = await helloNow()
+assert.deepEqual(['spend', 'inspiration', 'spellSlot'].filter(kind => offered.rolls.kinds.includes(kind)), [], 'none where players may not attack')
+settings.set('campaigns', campaigns)
+offered = await helloNow()
+assert.ok(offered.rolls.kinds.includes('spellSlot'), 'offered again')
+ok("0.42.1: spell slots spent and restored: the hello offers spellSlot right after inspiration wherever players may attack, never among the companions' kinds, and not where they may not")
+
+// A favorite of the 1st-level pool, as the app shows its dots: the stand-in builds no slot sections,
+// so this is where the sheet sent ahead of the result shows the count it left.
+thorin.system.favorites.push({ type: 'slots', id: 'spell1', sort: 2 })
+let slotted = await spellSlot('spend', 'spell1', 2)
+assert.equal(slotted.result.status, 'done', JSON.stringify(slotted.result))
+assert.deepEqual(writes.at(-1), ['actor', 'thorin', { 'system.spells.spell1.value': 1 }])
+assert.equal(slotOf('spell1'), 1)
+assert.equal(slotted.line.content, '<p>Spends a spell slot · 1st Level</p>')
+assert.deepEqual([slotted.line.author.id, slotted.line.speaker.actor, slotted.line.whisper, slotted.line.blind, slotted.line.flags['sending-stone']],
+  ['alice', 'thorin', [], false, { request: slotted.command.id }])
+assert.deepEqual(slotted.result, { id: slotted.command.id, status: 'done', reason: null, error: null, messageId: slotted.line.id, visible: true, rolls: [] })
+const slotSheet = slotted.after.filter(e => (e.type === 'character.updated') && (e.data.character.id === 'thorin')).at(-1)?.data.character.sheet
+assert.equal(slotSheet?.favorites.find(f => f.type === 'slots')?.value, 1, 'the sheet, with what it left, goes before the result')
+ok('0.42.1: spends a 1st-level slot from 2 to 1, written to system.spells.spell1.value; "Spends a spell slot · 1st Level" as Thorin, by his player, for everyone, flagged with the request; done with its message and no rolls, the sheet before the result')
+
+slotted = await spellSlot('restore', 'spell1', 1)
+assert.deepEqual([slotted.result.status, slotOf('spell1'), slotted.line?.content, writes.at(-1)],
+  ['done', 2, '<p>Regains a spell slot · 1st Level</p>', ['actor', 'thorin', { 'system.spells.spell1.value': 2 }]])
+ok('0.42.1: restores a 1st-level slot from 1 to 2, "Regains a spell slot · 1st Level"')
+
+slotted = await spellSlot('spend', 'pact', 1)
+assert.deepEqual([slotted.result.status, slotOf('pact'), slotted.line?.content], ['done', 0, '<p>Spends a spell slot · Pact Magic</p>'])
+slotted = await spellSlot('restore', 'pact', 0)
+assert.deepEqual([slotted.result.status, slotOf('pact'), slotted.line?.content], ['done', 1, '<p>Regains a spell slot · Pact Magic</p>'])
+ok('0.42.1: Pact Magic spent from 1 to 0 and restored to 1, each line naming Pact Magic')
+
+slotted = await spellSlot('spend', 'spell4', 5)
+assert.deepEqual([slotted.result.status, slotOf('spell4'), slotted.line?.content], ['done', 4, '<p>Spends a spell slot · 4th Level</p>'])
+assert.deepEqual(await refusedSlot(slotCommand('restore', 'spell4', 4), 'restored at its maximum'), ['failed', 'full', null])
+ok('0.42.1: temporary slots: a 4th-level pool at 5 of 4 spent to 4; restored at 4 of 4, "full"')
+
+for (const [op, id, from, reason, why] of [
+  ['spend', 'spell1', 3, 'changed', 'spent from 3 where it is 2'],
+  ['restore', 'spell1', 0, 'changed', 'restored from 0 where it is 2'],
+  ['spend', 'spell2', 0, 'slots', 'spent with none left'],
+  ['spend', 'spell3', 0, 'slot', 'a pool with no slots'],
+  ['spend', 'spell9', 0, 'slot', 'a pool the character has none of'],
+  ['spend', 'constructor', 0, 'slot', 'a key every object has'],
+  ['spend', 'toString', 0, 'slot', 'another'],
+  ['spend', 'nope', 0, 'slot', 'no pool at all'],
+]) assert.deepEqual(await refusedSlot(slotCommand(op, id, from), why), ['failed', reason, null], why)
+// A pool only inherited, as a key every object has, never the character's own: refused, slots or not.
+Object.setPrototypeOf(thorin.system.spells, { spell6: { value: 1, max: 1, level: 6, label: '6th Level' } })
+assert.deepEqual(await refusedSlot(slotCommand('spend', 'spell6', 1), 'an inherited pool'), ['failed', 'slot', null])
+Object.setPrototypeOf(thorin.system.spells, Object.prototype)
+slotted = await spellSlot('restore', 'spell1', 2)
+assert.deepEqual([slotted.result.status, slotOf('spell1')], ['done', 3])
+assert.deepEqual(await refusedSlot(slotCommand('restore', 'spell1', 3), 'restored with none used'), ['failed', 'full', null])
+const valid = { op: 'spend', id: 'spell1', from: 3 }
+for (const [fields, error] of [
+  [{ spellSlot: undefined }, 'spellSlot'],
+  [{ spellSlot: { ...valid, op: 'set' } }, 'spellSlot'],
+  [{ spellSlot: { ...valid, id: '' } }, 'spellSlot'],
+  [{ spellSlot: { ...valid, id: '1st' } }, 'spellSlot'],
+  [{ spellSlot: { ...valid, id: 7 } }, 'spellSlot'],
+  [{ spellSlot: { op: 'spend', id: 'spell1' } }, 'spellSlot'],
+  [{ spellSlot: { ...valid, from: -1 } }, 'spellSlot'],
+  [{ spellSlot: { ...valid, from: 1.5 } }, 'spellSlot'],
+  [{ spellSlot: { ...valid, from: '3' } }, 'spellSlot'],
+  [{ spellSlot: { ...valid, count: 1 } }, 'spellSlot'],
+  [{ spellSlot: valid, slot: 'spell1' }, 'spellSlot'],
+  [{ spellSlot: valid, mode: 1 }, 'dice'],
+  [{ spellSlot: valid, dice: [{ faces: 20, results: [3] }] }, 'dice'],
+  [{ spellSlot: valid, of: 'thorin' }, 'of'],
+  [{ spellSlot: valid, by: 'x' }, 'by'],
+]) assert.deepEqual(await refusedSlot(fields, JSON.stringify(fields)), ['failed', 'invalid', error], JSON.stringify(fields))
+assert.deepEqual(await refusedSlot({ spellSlot: { op: 'spend', id: 'grit', from: 0 }, actorId: 'stranger' }, 'not in the campaign'), ['failed', 'unknown', null])
+settings.set('campaigns', campaigns.map(campaign => ({ ...campaign, attacks: false })))
+const slotAttacksOff = await refusedSlot({ spellSlot: valid }, 'attacks off')
+settings.set('campaigns', campaigns.map(campaign => ({ ...campaign, transfers: true })))
+diceStatus.ready = false
+const slotDiceOff = await refusedSlot({ spellSlot: valid }, 'the dice not ready')
+diceStatus.ready = true
+settings.set('campaigns', campaigns)
+assert.deepEqual([slotAttacksOff, slotDiceOff], [['failed', 'attacks-off', null], ['failed', 'off', null]])
+ok('0.42.1: refused with nothing written or posted: "changed" from a count it isn\'t, "slots" with none left, "full" with none used, "slot" for a pool with no slots, none, a key every object has or one only inherited; "invalid" for a spellSlot that isn\'t exactly {op, id, from} as they may be, beside a roll\'s field, throwing dice, for a companion or by anyone but the Gamemaster; "unknown" for a character not in the campaign; "attacks-off"; "off"')
+
+slotted = await spellSlot('spend', 'spell1', 3, { by: 'gm' })
+assert.deepEqual([slotted.result.status, slotOf('spell1'), slotted.line?.content], ['done', 2, '<p>Spends a spell slot · 1st Level</p>'])
+assert.deepEqual([slotted.line.author.id, slotted.line.flags['sending-stone']], ['alice', { request: slotted.command.id, by: 'gm' }])
+assert.deepEqual(slotted.result.messages, [slotted.line.id])
+ok("0.42.1: the Gamemaster's spell slot spent from the app posts its line as Thorin's player's, marked the Gamemaster's, and their result lists it")
+
+thorin.system.spells.spell1.label = '<b>1st</b>'
+slotted = await spellSlot('spend', 'spell1', 2)
+thorin.system.spells.spell1.label = '1st Level'
+assert.deepEqual([slotted.result.status, slotOf('spell1'), slotted.line?.content], ['done', 1, '<p>Spends a spell slot · &lt;b&gt;1st&lt;/b&gt;</p>'])
+assert.equal((await spellSlot('restore', 'spell1', 1)).result.status, 'done')
+ok("0.42.1: the pool's name escaped in its line")
+
+assert.deepEqual(await refusedSlot(slotCommand('spend', 'spell9', 5), 'no pool, and a count it never had'), ['failed', 'slot', null])
+assert.deepEqual(await refusedSlot(slotCommand('spend', 'spell2', 1), 'none left, and a count it isn\'t'), ['failed', 'changed', null])
+assert.deepEqual(pools(), { spell1: 2, spell2: 0, spell3: 0, spell4: 4, pact: 1 })
+thorin.system.favorites.pop()
+ok('0.42.1: refused in order: no such pool before a count it isn\'t ("slot"); a count it isn\'t before none left ("changed", not "slots")')
 
 // ---- Where they're offered ----
 const changed = change => campaigns.map(campaign => ({ ...campaign, ...change }))

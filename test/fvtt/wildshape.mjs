@@ -271,6 +271,36 @@ await campaignAs({ wildShape: true })
 assert.deepEqual(helloOf().features.wildShape, ON)
 ok(`the hello's features.wildShape, last, after effects: off with the switch off, a campaign saved without it among them; "system" with it on under another system, "off" before it; on under dnd5e ${DND5E6 ? '6.0.5' : '5.3.3'}; a saved switch sends the hello again; never among the rolls' or a companion's kinds`)
 
+/**
+ * Round 0.42.1 §U.7.1 case 10, under dnd5e 5.3.3 (11c) and 6.0.5 (18): one of her spell slots spent
+ * from the app, for an app that takes Wild Shape, is refused while she's shaped, neither her own pool
+ * nor the form's changed and nothing posted; once she's back, it's spent from her own. The campaign,
+ * her Wild Shape's uses, hit points and slots are left as they were.
+ * @param {string} formId   The known form she takes.
+ */
+async function slotWhileShaped(formId) {
+  await campaignAs({ rolls: true, attacks: true })
+  const was = { spent: shapeItem().system.uses.spent, hp: elowen.system.attributes.hp.value, temp: elowen.system.attributes.hp.temp }
+  await shapeItem().update({ 'system.uses.spent': 0 })
+  const slot = from => ({ id: `slot-${++ids}`, actorId: 'elowen', kind: 'spellSlot', spellSlot: { op: 'spend', id: 'spell1', from }, mode: 0, explicit: false, extras: [], dice: [] })
+  assert.equal((await made(transform(formId))).result.status, 'done')
+  const form = formOf()
+  const pools = () => [elowen.system.spells.spell1.value, form.system.spells?.spell1?.value]
+  const before = pools()
+  const mark = messages.size
+  const shaped = await made(slot(elowen.system.spells.spell1.value))
+  assert.deepEqual(refusal(shaped), ['failed', 'shaped', null])
+  assert.deepEqual([pools(), messages.size], [before, mark], "neither her pool nor the form's changed, and nothing posted")
+  assert.equal((await made(revert())).result.status, 'done')
+  const left = elowen.system.spells.spell1.value
+  const back = await made(slot(left))
+  assert.deepEqual([back.result.status, elowen.system.spells.spell1.value, messages.get(back.result.messageId)?.content],
+    ['done', left - 1, '<p>Spends a spell slot · spell1</p>'], 'spent from her own once she is back')
+  await elowen.update({ 'system.spells.spell1.value': left, 'system.attributes.hp.value': was.hp, 'system.attributes.hp.temp': was.temp })
+  await shapeItem().update({ 'system.uses.spent': was.spent })
+  await campaignAs({ rolls: false, attacks: false })
+}
+
 if (DND5E6) {
   /* ------------------------------------------ */
   /*  18. dnd5e 6.0.5                           */
@@ -299,6 +329,8 @@ if (DND5E6) {
     assert.deepEqual(lastSheet().form, undefined)
   }
   ok('dnd5e 6.0.5: transform and return as cases 7 and 11, each token keeping its level, and on the return the level and visibility it has then; a type "condition" Prone gained in form carried back as one condition effect')
+  await slotWhileShaped(profilesOf()[0]._id)
+  ok('dnd5e 6.0.5, since 0.42.1: a spell slot spent from the app while she is shaped "shaped", her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
   process.exit(0)
 }
 
@@ -786,6 +818,13 @@ assert.deepEqual([elowen.system.spells.spell1.value, elowen.system.spells.spell2
 await elowen.update({ 'system.spells.spell1.value': 4 })
 assert.deepEqual([endedOf().why, linesSince(messageMark)], ['time', ["<p>Elowen's Wild Shape ends: its 2 hours ran out.</p>"]])
 ok("a party's Long Rest while shaped rests her own actor and advances the clock 8 hours to the time ending: after it she is rested, less only what she spent in form (sums, not values), her hit points her maximum less the damage taken in form, temp 0, her spell slots rested less the one spent in form")
+
+/* -------------------------------------------- */
+/*  11c. A spell slot while shaped (0.42.1)      */
+/* -------------------------------------------- */
+
+await slotWhileShaped(wolfId)
+ok('0.42.1: a spell slot spent from the app while she is shaped, for an app that takes Wild Shape, "shaped", her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
 
 /* -------------------------------------------- */
 /*  12. Change while shaped                     */

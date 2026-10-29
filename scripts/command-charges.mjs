@@ -1,18 +1,21 @@
 import { MODULE_ID } from "./constants.mjs";
-import { seatActor } from "./characters.mjs";
+import { activeForm, seatActor } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { appFlags, authorFor, checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
 import { wildShapeReader } from "./command-wildshape.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { activityName, shownActivity } from "./sheet-rolls.mjs";
+import { slotPoolOf } from "./sheet-spells.mjs";
 import { finite, limitedUses, RESOURCES, spendsDirectly } from "./sheet-values.mjs";
 
 /**
  * Spending a character's charges from the Sending Stone app, since module 0.29.0, as a player
  * would on dnd5e's sheet: so many of a feature's or an item's uses, an activity's own, or an
  * old-style resource's, such as two Sorcery Points or a Luck point, of a counter the sheet names
- * and says may be spent so; and using or gaining Heroic Inspiration, as dnd5e's sheet header does.
- * Nothing is ever given back from the app: a mistake is the Gamemaster's to put right.
+ * and says may be spent so; and using or gaining Heroic Inspiration, as dnd5e's sheet header does;
+ * and since 0.42.1 spending one of their spell slots, or restoring one, as dnd5e's sheet's pips do,
+ * one at a time and only from the count the app showed. Nothing else is ever given back from the
+ * app: a mistake is the Gamemaster's to put right.
  *
  * dnd5e posts nothing for what's changed on its sheet, so each posts a line in chat saying what
  * the character did, as the character, such as "Spends 2 · Sorcery Points": never how many are
@@ -132,7 +135,44 @@ export async function runInspirationCommand(command, campaign) {
 }
 
 /* -------------------------------------------- */
-/*  Both                                        */
+/*  Spell slots                                 */
+/* -------------------------------------------- */
+
+/**
+ * Spend one of a character's spell slots, or restore one, as fetched from the app, since 0.42.1:
+ * one of a pool the character has with slots, as `slotPoolOf` reads it, and only while its count is
+ * still the one the app showed (`changed`), so that a slot spent in Foundry meanwhile is never spent
+ * again, nor a cast the app hadn't heard of undone. None is spent with none left (`slots`), and none
+ * restored at or above its maximum (`full`), so dnd5e's temporary slots above it can be spent but
+ * never restored. None while the character is transformed (`shaped`): the character's own slots
+ * wait for the return, and the form's are a copy the return loses. Then the line that says so, as the
+ * character.
+ * @param {object} command      `{spellSlot: {op, id, from}}`, as fetched from the app.
+ * @param {Campaign} campaign
+ * @returns {Promise<CommandResult>}
+ */
+export async function runSpellSlotCommand(command, campaign) {
+  const refusal = chargeRefusal(command, campaign);
+  if ( refusal ) return failedResult(command, refusal.reason, refusal.error);
+  const character = characterOf(command, campaign);
+  if ( !character ) return failedResult(command, "unknown");
+  if ( activeForm(character) ) return failedResult(command, "shaped");
+  const { op, id, from } = command.spellSlot;
+  const pool = slotPoolOf(character, id);
+  if ( !pool ) return failedResult(command, "slot");
+  if ( pool.value !== from ) return failedResult(command, "changed");
+  const spend = op === "spend";
+  if ( spend && (pool.value <= 0) ) return failedResult(command, "slots");
+  if ( !spend && (pool.value >= pool.max) ) return failedResult(command, "full");
+  await character.update({ [`system.spells.${id}.value`]: pool.value + (spend ? -1 : 1) });
+  const text = game.i18n.format(spend ? "SENDINGSTONE.Chat.SpendsSlot" : "SENDINGSTONE.Chat.RegainsSlot", {
+    name: foundry.utils.escapeHTML(pool.name)
+  });
+  return lineResult(command, character, campaign, await postLine(command, character, text));
+}
+
+/* -------------------------------------------- */
+/*  All                                         */
 /* -------------------------------------------- */
 
 /**
