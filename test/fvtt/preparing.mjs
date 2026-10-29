@@ -96,10 +96,11 @@ foundry.utils.escapeHTML = value => String(value).replace(/[&<>"']/g, ch => ({ '
 foundry.applications.ux.TextEditor = { implementation: { async enrichHTML(html) { return html } } }
 
 // What this harness stands in for, as dnd5e has it, 5.3.3's or 6.0.5's: a spell's `canPrepare` and
-// `countsPrepared`, its linked activity, its count toward its class's preparations; a class's and a
-// subclass's count reset, its maximum from its formula, and the spellcasting an item gives, its
-// subclass's where that has a progression; its sheet's Prepare and Unprepare, a toggle; and its
-// sheet's "Prepared x / y", shown where either is above 0.
+// `countsPrepared`, its linked activity, its count toward its class's and its subclass's preparations;
+// a class's and a subclass's count reset, its maximum from its formula, and the spellcasting a class
+// gives, its subclass's where that has a progression; an actor's spellcasting classes, those whose
+// spellcasting has one; its sheet's Prepare and Unprepare, a toggle; and its sheet's "Prepared x / y",
+// shown where either is above 0.
 const source = path => readFileSync(`${ROOT}/${path}`, 'utf8')
 for (const [path, lines] of [
   ['module/data/item/spell.mjs', [
@@ -113,14 +114,18 @@ for (const [path, lines] of [
   ['module/data/item/class.mjs', ['this.spellcasting.preparation.value = 0;']],
   ['module/data/item/subclass.mjs', ['this.spellcasting.preparation.value = 0;']],
   ['module/data/item/fields/spellcasting-field.mjs', ['this.spellcasting.preparation.max = simplifyBonus(this.spellcasting.preparation.formula, rollData);']],
-  ['module/documents/item.mjs', ['( subclassSC && (subclassSC.progression !== "none") ) ? subclassSC : classSC']],
+  ['module/documents/item.mjs', [
+    'const subclassSC = isSubclass ? spellcasting : this.subclass?.system.spellcasting;',
+    '( subclassSC && (subclassSC.progression !== "none") ) ? subclassSC : classSC',
+  ]],
+  ['module/documents/actor/actor.mjs', ['if ( cls.spellcasting && (cls.spellcasting.progression !== "none") ) obj[identifier] = cls;']],
   ['module/applications/components/inventory.mjs', ['return item.update({ "system.prepared": Number(!item.system.prepared) });']],
   ['templates/actors/tabs/creature-spells.hbs', ['{{#if (or preparation.value preparation.max)}}', '{{#if preparation.max}}']],
 ]) {
   const text = source(path)
   for (const line of lines) assert.ok(text.includes(line), `dnd5e's ${path} has: ${line}`)
 }
-okay(`dnd5e ${DND5E6 ? '6.0.5' : '5.3.3'}'s canPrepare, countsPrepared, linked activity, class preparations, item spellcasting, Prepare toggle and "Prepared x / y" are as this harness stands in for them`)
+okay(`dnd5e ${DND5E6 ? '6.0.5' : '5.3.3'}'s canPrepare, countsPrepared, linked activity, class and subclass preparations, item spellcasting, spellcasting classes, Prepare toggle and "Prepared x / y" are as this harness stands in for them`)
 
 /* -------------------------------------------- */
 /*  Embedded items, as Foundry's documents      */
@@ -238,26 +243,39 @@ function embed(actor, items = []) {
 }
 
 /**
- * A character's spellcasting classes, as dnd5e prepares them: each with its `spellcasting`, as
- * documents/item.mjs gives it, a copy, whose `preparation` is its formula's maximum (an empty formula
- * 0, as simplifyBonus gives it) and its count of prepared spells, each of the character's spells that
- * `countsPrepared` and whose class is this one, as data/item/spell.mjs counts them.
+ * A character's spellcasting classes, as dnd5e prepares them. Each class's own `system.spellcasting`,
+ * and its subclass's where it has one, has a `preparation` whose maximum is its formula's (an empty
+ * formula 0, as simplifyBonus gives it) and whose count is each of the character's spells that
+ * `countsPrepared` and whose class is this one, counted on the class and on its subclass both, as
+ * data/item/spell.mjs counts them. The class's `spellcasting` is a copy of the subclass's where that
+ * has a progression of its own, else of the class's own, as documents/item.mjs gives it; and the
+ * actor's spellcasting classes are those whose `spellcasting` has a progression, as actor.mjs has them.
  */
 function spellcasting(actor, classes) {
   const counted = spell => Boolean(CONFIG.DND5E.spellcasting[spell.system.method]?.prepares)
     && ((spell.system.level ?? 0) > 0) && (spell.system.prepared === 1)
-  const items = classes.map(({ identifier, name, formula, ability }) => ({
-    id: `${identifier}Class`, type: 'class', name, identifier,
-    get spellcasting() {
-      const value = actor.items.filter(item => (item.type === 'spell') && (item.system.classIdentifier === identifier) && counted(item)).length
-      return structuredClone({
-        progression: 'full', ability, attack: 7, save: 15,
-        preparation: { formula, max: formula ? Number(formula) : 0, value },
-      })
-    },
-  }))
+  const items = classes.map(({ identifier, name, formula, ability, progression = 'full', subclass = null }) => {
+    const own = (progression, formula) => ({
+      progression, ability, attack: 7, save: 15,
+      preparation: {
+        formula, max: formula ? Number(formula) : 0,
+        value: actor.items.filter(item => (item.type === 'spell') && (item.system.classIdentifier === identifier) && counted(item)).length,
+      },
+    })
+    return {
+      id: `${identifier}Class`, type: 'class', name, identifier,
+      system: { get spellcasting() { return own(progression, formula) } },
+      subclass: subclass && { type: 'subclass', name: subclass.name, system: { get spellcasting() { return own(subclass.progression, subclass.formula) } } },
+      get spellcasting() {
+        const classSC = this.system.spellcasting
+        const subclassSC = this.subclass?.system.spellcasting
+        return structuredClone((subclassSC && (subclassSC.progression !== 'none')) ? subclassSC : classSC)
+      },
+    }
+  })
   Object.defineProperty(actor, 'spellcastingClasses', {
-    configurable: true, get: () => Object.fromEntries(items.map(item => [item.identifier, item])),
+    configurable: true,
+    get: () => Object.fromEntries(items.filter(item => item.spellcasting.progression !== 'none').map(item => [item.identifier, item])),
   })
 }
 
@@ -302,8 +320,11 @@ const spellData = (id, name, level, method, prepared, { canPrepare = Boolean(CON
 // gone, the Wand, and a Longsword. Mira (Bob), a cleric 5 and wizard 3, whose cleric may prepare 6 and
 // has 5 prepared, beside an always prepared one, a cantrip and two unprepared, and whose wizard may
 // prepare 4 and has 1; Sable (Bob), a 2014 sorcerer, whose class prepares none, with a spell of hers
-// prepared she added by hand, of no class, and one of the class unprepared. Stranger (Eve), no
-// character of the campaign's; The Company, its party; and Fallen, a character whose actor is gone.
+// prepared she added by hand, of no class, and one of the class unprepared; Kael (Bob), a fighter who
+// is an Eldritch Knight, whose Fighter's own spellcasting has no progression and an empty formula,
+// and whose Eldritch Knight's, a third caster's, may prepare 4, of which 3 are prepared, and one not.
+// Stranger (Eve), no character of the campaign's; The Company, its party; and Fallen, a character
+// whose actor is gone.
 const thorin = character('thorin', 'Thorin', ['alice'], {
   items: [
     spellData('witch', 'Witch Bolt', 1, 'spell', 0),
@@ -340,6 +361,14 @@ const sable = character('sable', 'Sable', ['bob'], {
   ],
 })
 spellcasting(sable, [{ identifier: 'sorcerer', name: 'Sorcerer', formula: '', ability: 'cha' }])
+const kael = character('kael', 'Kael', ['bob'], {
+  items: [['k1', 'Shield', 1], ['k2', 'Magic Missile', 1], ['k3', 'Thunderwave', 1], ['k4', 'Sleep', 0]]
+    .map(([id, name, prepared]) => spellData(id, name, 1, 'spell', prepared, { classIdentifier: 'fighter' })),
+})
+spellcasting(kael, [{
+  identifier: 'fighter', name: 'Fighter', formula: '', ability: 'int', progression: 'none',
+  subclass: { name: 'Eldritch Knight', progression: 'third', formula: '4' },
+}])
 character('stranger', 'Stranger', ['eve'], { items: [spellData('sbless', 'Bless', 1, 'spell', 0)] })
 const party = embed({
   documentName: 'Actor', id: 'party', name: 'The Company', type: 'group', uuid: 'Actor.party', img: 'party.webp', flags: {},
@@ -439,7 +468,7 @@ settings.set('chatEvents', true)
 settings.set('campaignSecrets', { 'camp-a': 'ashlands-secret', 'camp-b': 'mirkwood-secret', 'camp-c': 'dale-secret' })
 // Ashlands lets its players attack and cast from the app; Mirkwood makes their rolls but not that;
 // Dale makes no rolls of theirs, attacks or not.
-const ASHLANDS = { id: 'camp-a', title: 'Ashlands', characters: ['thorin', 'mira', 'sable', 'fallen'], groups: ['party'], rolls: true, attacks: true, transfers: false }
+const ASHLANDS = { id: 'camp-a', title: 'Ashlands', characters: ['thorin', 'mira', 'sable', 'kael', 'fallen'], groups: ['party'], rolls: true, attacks: true, transfers: false }
 const CAMPAIGNS = [
   ASHLANDS,
   { id: 'camp-b', title: 'Mirkwood', characters: ['thorin'], groups: [], rolls: true, attacks: false, transfers: false },
@@ -464,7 +493,11 @@ const helloOf = id => app.events.filter(e => (e.type === 'bridge.hello') && (e.c
 /*  1. Kinds                                    */
 /* -------------------------------------------- */
 
-const CHARGES = ['spend', 'inspiration', 'spellSlot']
+// The charge kinds as the module under test has them, not named here: "prepare" follows them with or
+// without item 1's spellSlot, so a revert of item 1 alone keeps this case (round 0.42.1 §P.2.4).
+const { CHARGE_KINDS } = await import(`${MODULE}/scripts/constants.mjs`)
+const CHARGES = [...CHARGE_KINDS]
+assert.deepEqual(CHARGES.slice(0, 2), ['spend', 'inspiration'], 'the charge kinds, spend and inspiration first')
 const kindsOf = id => helloOf(id).data.features.rolls.kinds
 const ashlands = kindsOf('camp-a')
 const at = ashlands.indexOf('prepare')
@@ -598,6 +631,10 @@ okay("refuses `gone`, nothing written: a spell Thorin lacks, his Longsword, Ligh
 /* -------------------------------------------- */
 
 const shaped = field => ({ ...prepare('witch'), prepare: field })
+// Each field another kind names (§P.2.1), alone beside it, refused whatever its value, 0 too: only a
+// field undefined or null isn't given.
+const OTHER_FIELDS = ['transfer', 'remove', 'typed', 'favorite', 'note', 'dish', 'effect', 'wildShape', 'spellSlot', 'counter', 'count',
+  'inspiration', 'concentration', 'turn', 'undo']
 for (const [command, error, why] of [
   [{ ...prepare('witch'), prepare: undefined }, 'prepare', 'no prepare'],
   [shaped(null), 'prepare', 'prepare null'],
@@ -619,6 +656,7 @@ for (const [command, error, why] of [
   [{ ...prepare('witch'), transfer: { from: 'thorin', to: 'mira', items: [{ id: 'sword', quantity: 1 }] } }, 'prepare', 'a move beside it'],
   [{ ...prepare('witch'), counter: { item: 'wand' }, count: 1 }, 'prepare', 'a counter beside it'],
   [{ ...prepare('witch'), typed: true }, 'prepare', 'typed: true'],
+  ...OTHER_FIELDS.flatMap(key => [1, 0].map(value => [{ ...prepare('witch'), [key]: value }, 'prepare', `${key}: ${value} beside it`])),
   [{ ...prepare('witch'), mode: 1 }, 'dice', 'advantage'],
   [{ ...prepare('witch'), dice: [{ faces: 20, results: [12] }] }, 'dice', 'a die'],
   [{ ...prepare('witch'), extras: [{ sign: 1, count: 1, sides: 4 }] }, 'dice', 'something added'],
@@ -632,7 +670,7 @@ for (const [command, error, why] of [
   assert.deepEqual(sheetsIn(it), [], `${why}: no sheet`)
 }
 assert.deepEqual([updates.length, messages.size, stored()], [count, lines, before], 'nothing written or posted')
-okay("refuses as `invalid`, nothing written, posted or sent: `prepare` missing, null, a string, an array, without id or op, with an extra key, an op but prepare or unprepare, an id empty, dotted, of 65 letters or not a string, or a roll's field, an effect, a spell slot, a favorite, a move, a counter or `typed` beside it (`prepare`); advantage, a die or anything added (`dice`); the Gamemaster's or a `by` but theirs (`by`); a companion's, or an `of` that is no id (`of`)")
+okay("refuses as `invalid`, nothing written, posted or sent: `prepare` missing, null, a string, an array, without id or op, with an extra key, an op but prepare or unprepare, an id empty, dotted, of 65 letters or not a string, or a roll's field, an effect, a spell slot, a favorite, a move, a counter or `typed` beside it, or any of the 15 fields other kinds name, each given as 1 and as 0 (`prepare`); advantage, a die or anything added (`dice`); the Gamemaster's or a `by` but theirs (`by`); a companion's, or an `of` that is no id (`of`)")
 
 /* -------------------------------------------- */
 /*  8. Refused: unknown, attacks-off, off       */
@@ -728,6 +766,10 @@ const counted = actorId => countsIn(lastSheet(actorId))
 assert.deepEqual(counted('mira'), [['Cleric', { value: 5, max: 6 }], ['Wizard', { value: 1, max: 4 }]], "Mira's classes, each its own count")
 assert.deepEqual(counted('sable'), [['Sorcerer', 'none']], "Sable's 2014 sorcerer: no count")
 assert.ok(!Object.hasOwn(lastSheet('sable').spellcasting.classes[0], 'prepared'), 'no `prepared` key at all')
+// Kael's Fighter: its own spellcasting prepares none (3 of 0), its Eldritch Knight's 4. The sheet
+// sends the count dnd5e gives the class, its subclass's, never the class's own.
+assert.deepEqual(kael.spellcastingClasses.fighter.system.spellcasting.preparation, { formula: '', max: 0, value: 3 }, "the Fighter's own: 3 of 0")
+assert.deepEqual(counted('kael'), [['Fighter', { value: 3, max: 4 }]], "Kael's Fighter, its Eldritch Knight's count: 3 / 4")
 assert.deepEqual(lastSheet('mira').spellcasting.classes[0], { name: 'Cleric', ability: 'WIS', dc: 15, attack: 7, prepared: { value: 5, max: 6 } }, 'the class as before, `prepared` added')
 assert.deepEqual(countsIn(characterSheet(thorin)), [], 'Thorin, with no spellcasting class, none')
 // What dnd5e may give a class otherwise: no preparation, numbers that aren't, a fraction from a
@@ -781,7 +823,14 @@ await settle()
 it = await made(preparing('unprepare', 's2', { actorId: 'sable' }))
 done(it)
 assert.deepEqual(countsIn(lastSheet('sable', it.after)), [['Sorcerer', 'none']], 'none again')
-okay(`each spellcasting class's count, as dnd5e's sheet shows "Prepared x / y": Mira's cleric 5 / 6 and wizard 1 / 4, each counting only its own spells, never an always prepared one or a cantrip; from the app ${counts.join(', ')}, a seventh past her limit never refused nor capped, her sheet ahead of each result; a Prepare in Foundry moves it with the next sheet; Sable's 2014 sorcerer, whose formula is empty, sends no prepared key, and with one of its spells prepared 1 of 0; a slim sheet keeps it; Thorin, of no class, none; a class's preparation without numbers none, a fraction rounded down, below 0 taken as 0`)
+// Kael's fourth prepared from the app, and unprepared: his Eldritch Knight's count moves with it.
+for (const [op, value] of [['prepare', 4], ['unprepare', 3]]) {
+  await settle()
+  it = await made(preparing(op, 'k4', { actorId: 'kael' }))
+  done(it)
+  assert.deepEqual(countsIn(lastSheet('kael', it.after)), [['Fighter', { value, max: 4 }]], `Kael's Sleep ${op}d: ${value} / 4`)
+}
+okay(`each spellcasting class's count, as dnd5e's sheet shows "Prepared x / y": Mira's cleric 5 / 6 and wizard 1 / 4, each counting only its own spells, never an always prepared one or a cantrip; from the app ${counts.join(', ')}, a seventh past her limit never refused nor capped, her sheet ahead of each result; a Prepare in Foundry moves it with the next sheet; Sable's 2014 sorcerer, whose formula is empty, sends no prepared key, and with one of its spells prepared 1 of 0; Kael's Fighter, an Eldritch Knight, its subclass's 3 / 4 though its own is 3 of 0, 4 / 4 with one more prepared from the app and back; a slim sheet keeps it; Thorin, of no class, none; a class's preparation without numbers none, a fraction rounded down, below 0 taken as 0`)
 
 // ---- END ----
 console.log(`preparing${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

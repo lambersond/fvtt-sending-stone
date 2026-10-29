@@ -310,9 +310,12 @@ async function slotWhileShaped(formId) {
 /**
  * Round 0.42.1 §P.6.1, under dnd5e 5.3.3 (11d) and 6.0.5 (18), after 0.42.1's spell slot: one of her
  * spells prepared from the app is refused while she's shaped, neither her spell nor a copy her form
- * holds changed and nothing posted; once she's back, her own is prepared. Her Moonbeam is made one she
- * prepares, unprepared, for the case: `method` "spell" and `canPrepare` as dnd5e's getter gives it,
- * then put back as it was. The campaign, her Wild Shape's uses and hit points are left as they were.
+ * holds changed and nothing posted; once she's back, her own is prepared. While she's shaped, a spell
+ * she lacks, her quarterstaff and a spell she doesn't prepare are refused "shaped" as well, since
+ * §P.2.2 checks the form before the spell ("gone") and whether it prepares ("prepare"). Her Moonbeam is
+ * made one she prepares, unprepared, for the case: `method` "spell" and `canPrepare` as dnd5e's getter
+ * gives it, then put back as it was. The campaign, her Wild Shape's uses and hit points are left as
+ * they were.
  * @param {string} formId   The known form she takes.
  */
 async function prepareWhileShaped(formId) {
@@ -321,7 +324,7 @@ async function prepareWhileShaped(formId) {
   await shapeItem().update({ 'system.uses.spent': 0 })
   const moonbeam = () => elowen.items.get('elowenMoonbeam00')
   await moonbeam().update({ 'system.method': 'spell', 'system.canPrepare': true, 'system.prepared': 0 })
-  const preparing = () => ({ id: `prepare-${++ids}`, actorId: 'elowen', kind: 'prepare', prepare: { op: 'prepare', id: 'elowenMoonbeam00' }, mode: 0, explicit: false, extras: [], dice: [] })
+  const preparing = (id = 'elowenMoonbeam00') => ({ id: `prepare-${++ids}`, actorId: 'elowen', kind: 'prepare', prepare: { op: 'prepare', id }, mode: 0, explicit: false, extras: [], dice: [] })
   assert.equal((await made(transform(formId))).result.status, 'done')
   const form = formOf()
   const states = () => [moonbeam().system.prepared, form.items.find(item => item.name === 'Moonbeam')?.system.prepared ?? null]
@@ -329,6 +332,13 @@ async function prepareWhileShaped(formId) {
   const mark = messages.size
   const shaped = await made(preparing())
   assert.deepEqual(refusal(shaped), ['failed', 'shaped', null])
+  for (const [id, why] of [['nope', 'a spell she lacks: "shaped" before "gone"'], ['elowenStaff00000', 'her quarterstaff, no spell: "shaped" before "gone"']]) {
+    assert.deepEqual(refusal(await made(preparing(id))), ['failed', 'shaped', null], why)
+  }
+  // Her Moonbeam, for a moment one whose casting doesn't prepare.
+  await moonbeam().update({ 'system.canPrepare': false })
+  assert.deepEqual(refusal(await made(preparing())), ['failed', 'shaped', null], 'a spell she doesn\'t prepare: "shaped" before "prepare"')
+  await moonbeam().update({ 'system.canPrepare': true })
   assert.deepEqual([states(), messages.size], [before, mark], "neither her spell nor the form's copy changed, and nothing posted")
   assert.equal((await made(revert())).result.status, 'done')
   const returned = messages.size
@@ -371,7 +381,7 @@ if (DND5E6) {
   await slotWhileShaped(profilesOf()[0]._id)
   ok('dnd5e 6.0.5, since 0.42.1: a spell slot spent from the app while she is shaped "shaped", from a count gone stale or of a pool she lacks too, her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
   await prepareWhileShaped(profilesOf()[0]._id)
-  ok('dnd5e 6.0.5, since 0.42.1: one of her spells prepared from the app while she is shaped "shaped", her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
+  ok('dnd5e 6.0.5, since 0.42.1: one of her spells prepared from the app while she is shaped "shaped", as are a spell she lacks, her quarterstaff and a spell she doesn\'t prepare, her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
   process.exit(0)
 }
 
@@ -872,7 +882,7 @@ ok('0.42.1: a spell slot spent from the app while she is shaped, for an app that
 /* -------------------------------------------- */
 
 await prepareWhileShaped(wolfId)
-ok('0.42.1: one of her spells prepared from the app while she is shaped "shaped", her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
+ok('0.42.1: one of her spells prepared from the app while she is shaped "shaped", as are a spell she lacks, her quarterstaff and a spell she doesn\'t prepare, her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
 
 /* -------------------------------------------- */
 /*  12. Change while shaped                     */
