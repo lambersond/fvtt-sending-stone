@@ -20,7 +20,8 @@ import { combinedMode, finite, localize, rollMode } from "./sheet-values.mjs";
  * Every number is the one dnd5e itself shows on its sheet, already including proficiency and
  * fixed bonuses. Bonuses that are dice, such as Bless or Guidance, are not in the totals: dnd5e
  * adds them only when it rolls. Since 0.42.0 the dice effects add are listed apart, `effectDice`,
- * for a player typing in their dice.
+ * for a player typing in their dice, and since 0.42.1 a die the character may add, as Bardic
+ * Inspiration's, `offer`.
  *
  * Descriptions are not in the sheet itself: it refers to each by hash, and they are sent apart.
  * See sheet-texts.mjs.

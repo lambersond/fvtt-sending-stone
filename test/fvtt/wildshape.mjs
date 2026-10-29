@@ -271,6 +271,85 @@ await campaignAs({ wildShape: true })
 assert.deepEqual(helloOf().features.wildShape, ON)
 ok(`the hello's features.wildShape, last, after effects: off with the switch off, a campaign saved without it among them; "system" with it on under another system, "off" before it; on under dnd5e ${DND5E6 ? '6.0.5' : '5.3.3'}; a saved switch sends the hello again; never among the rolls' or a companion's kinds`)
 
+/**
+ * Round 0.42.1 §U.7.1 case 10, under dnd5e 5.3.3 (11c) and 6.0.5 (18): one of her spell slots spent
+ * from the app, for an app that takes Wild Shape, is refused while she's shaped, neither her own pool
+ * nor the form's changed and nothing posted; once she's back, it's spent from her own. While she's
+ * shaped, a count gone stale and a pool she lacks are refused "shaped" as well, since §U.3.2 checks
+ * the form before the pool and its count ("slot", "changed"). The campaign, her Wild Shape's uses,
+ * hit points and slots are left as they were.
+ * @param {string} formId   The known form she takes.
+ */
+async function slotWhileShaped(formId) {
+  await campaignAs({ rolls: true, attacks: true })
+  const was = { spent: shapeItem().system.uses.spent, hp: elowen.system.attributes.hp.value, temp: elowen.system.attributes.hp.temp }
+  await shapeItem().update({ 'system.uses.spent': 0 })
+  const slot = (from, id = 'spell1') => ({ id: `slot-${++ids}`, actorId: 'elowen', kind: 'spellSlot', spellSlot: { op: 'spend', id, from }, mode: 0, explicit: false, extras: [], dice: [] })
+  assert.equal((await made(transform(formId))).result.status, 'done')
+  const form = formOf()
+  const pools = () => [elowen.system.spells.spell1.value, form.system.spells?.spell1?.value]
+  const before = pools()
+  const mark = messages.size
+  const shaped = await made(slot(elowen.system.spells.spell1.value))
+  assert.deepEqual(refusal(shaped), ['failed', 'shaped', null])
+  const stale = await made(slot(elowen.system.spells.spell1.value + 1))
+  assert.deepEqual(refusal(stale), ['failed', 'shaped', null], 'a count it isn\'t: "shaped" before "changed"')
+  const lacking = await made(slot(0, 'spell9'))
+  assert.deepEqual(refusal(lacking), ['failed', 'shaped', null], 'a pool she lacks: "shaped" before "slot"')
+  assert.deepEqual([pools(), messages.size], [before, mark], "neither her pool nor the form's changed, and nothing posted")
+  assert.equal((await made(revert())).result.status, 'done')
+  const left = elowen.system.spells.spell1.value
+  const back = await made(slot(left))
+  assert.deepEqual([back.result.status, elowen.system.spells.spell1.value, messages.get(back.result.messageId)?.content],
+    ['done', left - 1, '<p>Spends a spell slot · spell1</p>'], 'spent from her own once she is back')
+  await elowen.update({ 'system.spells.spell1.value': left, 'system.attributes.hp.value': was.hp, 'system.attributes.hp.temp': was.temp })
+  await shapeItem().update({ 'system.uses.spent': was.spent })
+  await campaignAs({ rolls: false, attacks: false })
+}
+
+/**
+ * Round 0.42.1 §P.6.1, under dnd5e 5.3.3 (11d) and 6.0.5 (18), after 0.42.1's spell slot: one of her
+ * spells prepared from the app is refused while she's shaped, neither her spell nor a copy her form
+ * holds changed and nothing posted; once she's back, her own is prepared. While she's shaped, a spell
+ * she lacks, her quarterstaff and a spell she doesn't prepare are refused "shaped" as well, since
+ * §P.2.2 checks the form before the spell ("gone") and whether it prepares ("prepare"). Her Moonbeam is
+ * made one she prepares, unprepared, for the case: `method` "spell" and `canPrepare` as dnd5e's getter
+ * gives it, then put back as it was. The campaign, her Wild Shape's uses and hit points are left as
+ * they were.
+ * @param {string} formId   The known form she takes.
+ */
+async function prepareWhileShaped(formId) {
+  await campaignAs({ rolls: true, attacks: true })
+  const was = { spent: shapeItem().system.uses.spent, hp: elowen.system.attributes.hp.value, temp: elowen.system.attributes.hp.temp }
+  await shapeItem().update({ 'system.uses.spent': 0 })
+  const moonbeam = () => elowen.items.get('elowenMoonbeam00')
+  await moonbeam().update({ 'system.method': 'spell', 'system.canPrepare': true, 'system.prepared': 0 })
+  const preparing = (id = 'elowenMoonbeam00') => ({ id: `prepare-${++ids}`, actorId: 'elowen', kind: 'prepare', prepare: { op: 'prepare', id }, mode: 0, explicit: false, extras: [], dice: [] })
+  assert.equal((await made(transform(formId))).result.status, 'done')
+  const form = formOf()
+  const states = () => [moonbeam().system.prepared, form.items.find(item => item.name === 'Moonbeam')?.system.prepared ?? null]
+  const before = states()
+  const mark = messages.size
+  const shaped = await made(preparing())
+  assert.deepEqual(refusal(shaped), ['failed', 'shaped', null])
+  for (const [id, why] of [['nope', 'a spell she lacks: "shaped" before "gone"'], ['elowenStaff00000', 'her quarterstaff, no spell: "shaped" before "gone"']]) {
+    assert.deepEqual(refusal(await made(preparing(id))), ['failed', 'shaped', null], why)
+  }
+  // Her Moonbeam, for a moment one whose casting doesn't prepare.
+  await moonbeam().update({ 'system.canPrepare': false })
+  assert.deepEqual(refusal(await made(preparing())), ['failed', 'shaped', null], 'a spell she doesn\'t prepare: "shaped" before "prepare"')
+  await moonbeam().update({ 'system.canPrepare': true })
+  assert.deepEqual([states(), messages.size], [before, mark], "neither her spell nor the form's copy changed, and nothing posted")
+  assert.equal((await made(revert())).result.status, 'done')
+  const returned = messages.size
+  const back = await made(preparing())
+  assert.deepEqual([back.result.status, back.result.messageId, moonbeam().system.prepared, messages.size], ['done', null, 1, returned], 'her own prepared once she is back, nothing posted')
+  await moonbeam().update({ 'system.method': undefined, 'system.canPrepare': undefined, 'system.prepared': undefined })
+  await elowen.update({ 'system.attributes.hp.value': was.hp, 'system.attributes.hp.temp': was.temp })
+  await shapeItem().update({ 'system.uses.spent': was.spent })
+  await campaignAs({ rolls: false, attacks: false })
+}
+
 if (DND5E6) {
   /* ------------------------------------------ */
   /*  18. dnd5e 6.0.5                           */
@@ -299,6 +378,10 @@ if (DND5E6) {
     assert.deepEqual(lastSheet().form, undefined)
   }
   ok('dnd5e 6.0.5: transform and return as cases 7 and 11, each token keeping its level, and on the return the level and visibility it has then; a type "condition" Prone gained in form carried back as one condition effect')
+  await slotWhileShaped(profilesOf()[0]._id)
+  ok('dnd5e 6.0.5, since 0.42.1: a spell slot spent from the app while she is shaped "shaped", from a count gone stale or of a pool she lacks too, her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
+  await prepareWhileShaped(profilesOf()[0]._id)
+  ok('dnd5e 6.0.5, since 0.42.1: one of her spells prepared from the app while she is shaped "shaped", as are a spell she lacks, her quarterstaff and a spell she doesn\'t prepare, her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
   process.exit(0)
 }
 
@@ -786,6 +869,45 @@ assert.deepEqual([elowen.system.spells.spell1.value, elowen.system.spells.spell2
 await elowen.update({ 'system.spells.spell1.value': 4 })
 assert.deepEqual([endedOf().why, linesSince(messageMark)], ['time', ["<p>Elowen's Wild Shape ends: its 2 hours ran out.</p>"]])
 ok("a party's Long Rest while shaped rests her own actor and advances the clock 8 hours to the time ending: after it she is rested, less only what she spent in form (sums, not values), her hit points her maximum less the damage taken in form, temp 0, her spell slots rested less the one spent in form")
+
+/* -------------------------------------------- */
+/*  11c. A spell slot while shaped (0.42.1)      */
+/* -------------------------------------------- */
+
+await slotWhileShaped(wolfId)
+ok('0.42.1: a spell slot spent from the app while she is shaped, for an app that takes Wild Shape, "shaped", from a count gone stale or of a pool she lacks too, her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
+// PROTOCOL.md says so wherever it tells what a shaped character's commands do (round 0.42.1 §U.8.1,
+// its review fixes): the charges section's Wild Shape paragraph, which said every command of the
+// section acts on the form's copy, excepts spell slots, and the seat while shaped lists them among
+// what's refused "shaped" for every listener. Its paragraphs are read with their lines joined.
+{
+  const protocol = readFileSync(`${MODULE}/PROTOCOL.md`, 'utf8')
+  const section = protocol.slice(protocol.indexOf('\n### Concentration, charges and Heroic Inspiration\n'))
+  const paragraphs = text => text.split(/\n\s*\n/).map(each => each.replace(/\s+/g, ' ').trim())
+  const inForm = paragraphs(section.slice(0, section.indexOf('\n### ', 1))).find(each => each.startsWith('Since module 0.40.0, while the character is in Wild Shape'))
+  assert.match(inForm, /these, but spell slots, act on the form's copy/)
+  assert.match(inForm, /A spell slot spent or restored, since module 0\.42\.1, is refused `"shaped"` while the character is transformed, for any listener/)
+  const seat = paragraphs(protocol).find(each => each.startsWith('**The seat while shaped.**'))
+  assert.match(seat, /Refused `"shaped"`, for every listener, while the character is transformed: [^;]*, and since module 0\.42\.1 a spell slot spent or restored[,;]/)
+  ok('0.42.1, PROTOCOL.md: the charges section\'s Wild Shape paragraph excepts spell slots from what acts on the form, refused "shaped" for any listener, and the seat while shaped lists a spell slot spent or restored among what is refused "shaped" for every listener')
+}
+
+/* -------------------------------------------- */
+/*  11d. A spell prepared while shaped (0.42.1)  */
+/* -------------------------------------------- */
+
+await prepareWhileShaped(wolfId)
+ok('0.42.1: one of her spells prepared from the app while she is shaped "shaped", as are a spell she lacks, her quarterstaff and a spell she doesn\'t prepare, her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
+// PROTOCOL.md's seat while shaped lists a spell prepared or unprepared among what's refused "shaped"
+// for every listener, beside the spell slot (round 0.42.1 §P.7.1, its review fixes), and a listener
+// before 0.40.0 shows neither, as it never sends them. Its paragraphs are read with their lines joined.
+{
+  const protocol = readFileSync(`${MODULE}/PROTOCOL.md`, 'utf8')
+  const seat = protocol.split(/\n\s*\n/).map(each => each.replace(/\s+/g, ' ').trim()).find(each => each.startsWith('**The seat while shaped.**'))
+  assert.match(seat, /Refused `"shaped"`, for every listener, while the character is transformed: [^;]*, and since module 0\.42\.1 a spell slot spent or restored, [^;]*, and a spell prepared or unprepared[,;]/)
+  assert.match(seat, /a listener before 0\.40\.0, sent the character's own sheet, shows all but the spell slot and the spell prepared, which it never sends/)
+  ok('0.42.1, PROTOCOL.md: the seat while shaped lists a spell prepared or unprepared beside the spell slot among what is refused "shaped" for every listener, neither shown by a listener before 0.40.0')
+}
 
 /* -------------------------------------------- */
 /*  12. Change while shaped                     */

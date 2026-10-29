@@ -399,8 +399,10 @@ const checks = ['skill', 'tool', 'ability', 'save', 'death', 'initiative', 'hitD
 // Changed on purpose (round 0.36.0 §3.1): damage on its own and recharges wherever players may attack.
 // Changed on purpose (round 0.36.0 §6.13): ending a turn wherever rolls are made, after ending a concentration.
 // Changed on purpose (round 0.36.0 §6.14): and taking one back, right after it.
+// Changed on purpose (round 0.42.1 §U.7.1): and a spell slot spent or restored, after Heroic Inspiration.
+// Changed on purpose (round 0.42.1 §P.6.1): and a spell prepared or unprepared, after the charges.
 assert.deepEqual(hellos, {
-  Ashlands: [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'textRoll', 'textDamage', 'itemDamage', 'recharge'],
+  Ashlands: [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'spellSlot', 'prepare', 'textRoll', 'textDamage', 'itemDamage', 'recharge'],
   Mirkwood: [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'textRoll'],
 })
 ok('offers uses alongside attacks, only where the Gamemaster lets players attack and cast')

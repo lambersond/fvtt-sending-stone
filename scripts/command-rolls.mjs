@@ -1,6 +1,6 @@
 import {
   ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, EFFECT_DICE_KINDS, ENCHANT_KINDS,
-  MODULE_ID, MOST_EFFECT_DICE, MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG, TURN_KINDS
+  MODULE_ID, MOST_EFFECT_DICE, MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG, SPELL_SLOT_OPS, TURN_KINDS
 } from "./constants.mjs";
 import { originalOf, playerOwners, seatActor, standingFor } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
@@ -9,6 +9,7 @@ import { checkFavoriteCommand } from "./command-favorites.mjs";
 import { checkDishCommand } from "./command-dishes.mjs";
 import { checkEffectCommand } from "./command-effects.mjs";
 import { checkWildShapeCommand } from "./command-wildshape.mjs";
+import { checkPrepareCommand } from "./command-prepare.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
 import { commandActor, companionPart, ownedByPlayers } from "./creatures.mjs";
 import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
@@ -250,7 +251,8 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * And since 0.37.0 a favorite added or removed, what it is. And since 0.38.0 a dish from the Magical
  * Recipe Book, its body. And since 0.39.0 a change to one of the character's own effects, which and
  * how. And since 0.40.0 Wild Shape, which and how. And since 0.42.0 a typed d20 roll's effects' dice,
- * `effectDice`.
+ * `effectDice`. And since 0.42.1 a spell slot spent or restored: which, how, and the count it was
+ * made from. And since 0.42.1 a spell prepared or unprepared, which and how.
  * @param {object} command
  * @returns {string|null}
  */
@@ -266,6 +268,7 @@ export function checkCommand(command) {
   if ( CONCENTRATION_KINDS.includes(command.kind) ) return checkConcentrationCommand(command);
   if ( command.kind === "spend" ) return checkSpendCommand(command);
   if ( command.kind === "inspiration" ) return checkInspirationCommand(command);
+  if ( command.kind === "spellSlot" ) return checkSpellSlotCommand(command);
   if ( command.kind === "transfer" ) return checkTransferCommand(command);
   if ( command.kind === "remove" ) return checkRemoveCommand(command);
   if ( command.kind === "favorite" ) return checkFavoriteCommand(command);
@@ -273,6 +276,7 @@ export function checkCommand(command) {
   if ( command.kind === "dish" ) return checkDishCommand(command);
   if ( command.kind === "effect" ) return checkEffectCommand(command);
   if ( command.kind === "wildShape" ) return checkWildShapeCommand(command);
+  if ( command.kind === "prepare" ) return checkPrepareCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);
@@ -567,6 +571,25 @@ function checkSpendCommand(command) {
  */
 function checkInspirationCommand(command) {
   if ( namesRollFields(command) || !["use", "gain"].includes(command.inspiration) ) return "inspiration";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Why a fetched spell slot spent or restored isn't one to make, if it isn't, since 0.42.1: it names
+ * exactly whether it spends or restores one, `op`, the pool by its key, `id`, as the sheet's
+ * spellbook section and a slots favorite name it, and the count of that pool the app showed, `from`,
+ * a whole number from 0; nothing a roll names, and it throws no dice. A key the character has no such
+ * pool under is the character's to refuse, not the command's.
+ * @param {object} command
+ * @returns {string|null}
+ */
+function checkSpellSlotCommand(command) {
+  const slot = command.spellSlot;
+  if ( namesRollFields(command) || !isObject(slot) ) return "spellSlot";
+  const keys = Object.keys(slot);
+  if ( (keys.length !== 3) || !["op", "id", "from"].every(key => keys.includes(key)) ) return "spellSlot";
+  if ( !SPELL_SLOT_OPS.includes(slot.op) || !isKey(slot.id) ) return "spellSlot";
+  if ( !Number.isSafeInteger(slot.from) || (slot.from < 0) ) return "spellSlot";
   return throwsNoDice(command) ? null : "dice";
 }
 

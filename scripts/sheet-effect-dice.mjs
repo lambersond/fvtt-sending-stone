@@ -11,6 +11,10 @@ import { effectIdOf, fromTheParty, hiddenFromPlayer } from "./sheet-effects.mjs"
  * from, never by an actor, and says which rolls it's on (`on`). A die no effect explains, one written
  * otherwise, such as `1d4 + 1` or with roll data, or one on some kinds of attack alone is left out,
  * for Foundry to roll as ever.
+ *
+ * Since 0.42.1, the die the 2024 Bardic Inspiration another character gave this one offers, which
+ * dnd5e never adds: marked `offer`, on every kind of d20 roll but initiative, for its player to add
+ * once the roll fails; its `effect` the Inspired that adding it uses up.
  */
 
 /**
@@ -25,6 +29,26 @@ export const EFFECT_TOKEN = /^(attack|check|save|skill|tool|initiative|death|con
  * @type {string[]}
  */
 const KINDS = ["attack", "check", "save", "skill", "tool", "initiative", "death", "concentration"];
+
+/**
+ * The kinds of roll a die offered is on, in `on`'s order: every kind but initiative, which has no
+ * DC, so never fails, as the 2024 Bardic Inspiration asks.
+ * @type {string[]}
+ */
+const OFFER_KINDS = KINDS.filter(kind => kind !== "initiative");
+
+/**
+ * The identifier dnd5e gives the Bardic Inspiration feature, 2014's and 2024's alike.
+ * @type {string}
+ */
+const BARDIC_INSPIRATION = "bardic-inspiration";
+
+/**
+ * The start of a change's key that makes it a Midi-QOL optional bonus, which Midi-QOL offers itself
+ * after the roll.
+ * @type {string}
+ */
+const MIDI_OPTIONAL = "flags.midi-qol.optional.";
 
 /**
  * The most rolls one die's `on` lists, and the longest name a die has.
@@ -128,8 +152,13 @@ export function effectDiceField(actor) {
  * of attack. A die taken away only where this world's rolls take one away as their own, as the
  * self-test has seen (`negativeDice`). None under another system than dnd5e 5, or for anything that
  * can't be read.
+ *
+ * Since 0.42.1, the die the 2024 Bardic Inspiration another character gave this one offers, which
+ * dnd5e never adds: marked `offer`, on every kind of d20 roll but initiative, for its player to add
+ * once the roll fails; its `effect` the Inspired that adding it uses up. At most one for each
+ * effect, after that effect's own dice, and counted among the ten.
  * @param {Actor} actor
- * @returns {{name: string, effect: string, faces: number, count: number, sign: 1|-1, on: string[]}[]}
+ * @returns {{name: string, effect: string, faces: number, count: number, sign: 1|-1, on: string[], offer?: true}[]}
  */
 export function effectDiceOf(actor) {
   try {
@@ -148,10 +177,13 @@ export function effectDiceOf(actor) {
         if ( (entry.die.sign < 0) && (diceStatus.negativeDice !== true) ) continue;
         entries.push(entry);
       }
+      const offer = offerOf(effect, actor);
+      if ( offer ) entries.push(offer);
     }
     const listed = entries.slice(0, MOST_EFFECT_DICE);
-    return namedApart(listed).map(({ effect, name, die, on }) => ({
-      name, effect: effectIdOf(effect), faces: die.faces, count: die.count, sign: die.sign, on
+    return namedApart(listed).map(({ effect, name, die, on, offer }) => ({
+      name, effect: effectIdOf(effect), faces: die.faces, count: die.count, sign: die.sign, on,
+      ...(offer && { offer: true })
     }));
   } catch {
     return [];
@@ -215,6 +247,45 @@ function effectEntries(effect, system, held) {
     const on = orderedTokens(tokens);
     return on.length ? [{ effect, die, on }] : [];
   });
+}
+
+/**
+ * The die an effect offers the character, which dnd5e never adds (module 0.42.1): the 2024 Bardic
+ * Inspiration's, from the Inspired another character's Bardic Inspiration put on this one, which
+ * dnd5e applies with no change, its origin the effect on the bard's feature. Only from an effect on
+ * the character itself, never an item's; with an origin, not expired; with no Midi-QOL optional
+ * bonus among its changes, which Midi-QOL offers itself; from a feature dnd5e knows as Bardic
+ * Inspiration, by its identifier or its name, not one for the 2014 rules, whose die is chosen
+ * before the roll's result, as an item that doesn't say is in a world on the legacy rules; of a bard
+ * who isn't this character, nor the character a Wild Shape form was made from; the die and its count
+ * the bard's scale's now, as dnd5e keeps none on the effect. Its own throws give none, so an odd
+ * bard never costs the character the other dice its effects add.
+ * @param {ActiveEffect} effect
+ * @param {Actor} actor
+ * @returns {{effect: ActiveEffect, die: object, on: string[], offer: true}|null}
+ */
+function offerOf(effect, actor) {
+  try {
+    if ( (effect.parent !== actor) || (typeof effect.origin !== "string") || !effect.origin ) return null;
+    if ( effect.duration?.expired === true ) return null;
+    if ( changesOf(effect).some(change => String(change?.key ?? "").startsWith(MIDI_OPTIONAL)) ) return null;
+    const { item } = originOf(effect);
+    if ( item?.documentName !== "Item" ) return null;
+    if ( (item.identifier ?? item.system?.identifier) !== BARDIC_INSPIRATION ) return null;
+    if ( item.system?.source?.rules === "2014" ) return null;
+    const bard = actorOfItem(item);
+    if ( !bard || (bard === actor) || (bard.uuid === actor.uuid) ) return null;
+    const original = actor.getFlag?.("dnd5e", "originalActor");
+    if ( original && (original === bard.id) ) return null;
+    const scale = bard.system?.scale?.bard?.inspiration;
+    const faces = scale?.faces;
+    if ( (faces === 20) || !DIE_FACES.has(faces) ) return null;
+    const count = Number(scale.number) || 1;
+    if ( !Number.isInteger(count) || (count < 1) || (count > 20) ) return null;
+    return { effect, die: { count, faces, sign: 1 }, on: [...OFFER_KINDS], offer: true };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -408,13 +479,26 @@ export function effectDieName(effect) {
  * What an effect comes from, by its name, and who gave it: the item it's on and that item's actor;
  * or, from its origin, the item a caster's concentration is on and the caster, the item an effect it
  * was applied from is on and its actor, or the item it was applied from and its actor. Never an
- * actor's name: an origin that is an actor, or nothing found, names nothing.
+ * actor's name: an origin that is an actor, or nothing found, names nothing. With the item it named
+ * it by, where that's an item.
  * @param {ActiveEffect} effect
- * @returns {{name: string|null, caster: Actor|null}}
+ * @returns {{name: string|null, caster: Actor|null, item: Item|null}}
  */
 function sourceOf(effect) {
-  const none = { name: null, caster: null };
-  if ( effect?.parent?.documentName === "Item" ) return { name: effect.parent.name, caster: actorOfItem(effect.parent) };
+  const parent = effect?.parent;
+  if ( parent?.documentName === "Item" ) return { name: parent.name, caster: actorOfItem(parent), item: parent };
+  return originOf(effect);
+}
+
+/**
+ * What an effect was applied from, by its origin alone: the item a caster's concentration is on and
+ * the caster, the item an effect it was applied from is on and its actor, or the item it was applied
+ * from and its actor; with that item, where its origin leads to one.
+ * @param {ActiveEffect} effect
+ * @returns {{name: string|null, caster: Actor|null, item: Item|null}}
+ */
+function originOf(effect) {
+  const none = { name: null, caster: null, item: null };
   if ( !effect?.origin ) return none;
   let source;
   try {
@@ -425,11 +509,11 @@ function sourceOf(effect) {
   if ( source?.documentName === "ActiveEffect" ) {
     const parent = source.parent;
     // A caster's concentration, which dnd5e applies a concentration spell's effect from.
-    if ( parent?.documentName === "Actor" ) return { name: concentrationItemName(source), caster: parent };
-    if ( parent?.documentName === "Item" ) return { name: parent.name, caster: actorOfItem(parent) };
+    if ( parent?.documentName === "Actor" ) return { name: concentrationItemName(source), caster: parent, item: null };
+    if ( parent?.documentName === "Item" ) return { name: parent.name, caster: actorOfItem(parent), item: parent };
     return none;
   }
-  if ( source?.documentName === "Item" ) return { name: source.name, caster: actorOfItem(source) };
+  if ( source?.documentName === "Item" ) return { name: source.name, caster: actorOfItem(source), item: source };
   return none;
 }
 

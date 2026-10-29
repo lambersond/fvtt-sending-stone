@@ -259,8 +259,10 @@ const checks = ['skill', 'tool', 'ability', 'save', 'death', 'initiative', 'hitD
 // Changed on purpose (round 0.36.0 §3.1): damage on its own and recharges wherever players may attack.
 // Changed on purpose (round 0.36.0 §6.13): ending a turn wherever rolls are made, after ending a concentration.
 // Changed on purpose (round 0.36.0 §6.14): and taking one back, right after it.
+// Changed on purpose (round 0.42.1 §U.7.1): and a spell slot spent or restored, after Heroic Inspiration.
+// Changed on purpose (round 0.42.1 §P.6.1): and a spell prepared or unprepared, after the charges.
 assert.deepEqual(hellos, {
-  Ashlands: [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'textRoll', 'textDamage', 'itemDamage', 'recharge'],
+  Ashlands: [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'attack', 'use', 'damage', 'endEnchantment', 'spend', 'inspiration', 'spellSlot', 'prepare', 'textRoll', 'textDamage', 'itemDamage', 'recharge'],
   Mirkwood: [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'textRoll'],
 })
 const areas = Object.fromEntries(app.events.filter(e => e.type === 'bridge.hello').map(e => [e.campaign.title, e.data.features.rolls.areaAttacks]))
@@ -1139,7 +1141,9 @@ if (!MIDI) {
   // Changed on purpose (round 0.36.0 §3.1): nor are damage on its own and recharges, outside Midi's workflow.
   // Changed on purpose (round 0.36.0 §6.13): nor ending a turn, made wherever rolls are.
   // Changed on purpose (round 0.36.0 §6.14): nor taking one back.
-  assert.deepEqual(ashlands().at(-1).data.features.rolls.kinds, [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'spend', 'inspiration', 'textRoll', 'textDamage', 'itemDamage', 'recharge'])
+  // Changed on purpose (round 0.42.1 §U.7.1): and a spell slot spent or restored, after Heroic Inspiration.
+  // Changed on purpose (round 0.42.1 §P.6.1): and a spell prepared or unprepared, after the charges.
+  assert.deepEqual(ashlands().at(-1).data.features.rolls.kinds, [...checks, 'endConcentration', 'endTurn', 'undoEndTurn', 'spend', 'inspiration', 'spellSlot', 'prepare', 'textRoll', 'textDamage', 'itemDamage', 'recharge'])
   assert.equal(ashlands().at(-1).data.features.rolls.areaAttacks, false)
   assert.equal(ashlands().at(-1).data.features.rolls.modifiers, true)
   const off = await attack()

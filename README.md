@@ -166,8 +166,13 @@ while the roll is being made.
   effects applied to the character in Foundry are found: a Bless the table narrates is added with
   Modify Roll. The die they type is the die kept: Foundry rerolls none of it, a Halfling's 1 or a
   Great Weapon Fighter's 1 or 2, as they rerolled at the table; a die the game throws itself still
-  rerolls. An explosion is still Foundry's. Bardic Inspiration is added with Modify Roll. Midi-QOL's
-  optional bonuses are still offered on the Gamemaster's screen.
+  rerolls. An explosion is still Foundry's. Since 0.42.1, the 2024 Bardic Inspiration a bard gave
+  the character is offered beside Done, left out until the player adds it once the Gamemaster says
+  the roll fails; once the roll is made, the app removes Inspired where the campaign lets players
+  remove their own effects, and otherwise says to ask the Gamemaster. Inspired is applied from the
+  bard's card by the Gamemaster (a player can't apply it to another player's character). The 2014
+  one is added with Modify Roll. Midi-QOL's optional bonuses are still offered on the Gamemaster's
+  screen.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -194,8 +199,8 @@ while the roll is being made.
   values as with dice rolled in the app, and its card is marked with a keyboard, "Entered by hand on
   Sending Stone", in place of the phone; the Gamemaster's own rolls in the app stay marked GM. A
   character with Elven Accuracy enters a third d20 for an attack with advantage made with an
-  ability it's for. A player's own Manual Dice toggle in Foundry lives in their browser alone, and
-  plays no part in the app.
+  ability it's for, or, since app 0.42.1, skips it for Foundry to roll. A player's own Manual Dice
+  toggle in Foundry lives in their browser alone, and plays no part in the app.
 - **Ending a turn.** Players can end their turn from the app, and their companions' turns: the turn
   panel's **End turn**, or the Combat tab held for a second. It's Foundry's own Next Turn, made by
   your Foundry, so dnd5e's and Midi-QOL's start- and end-of-turn work happens as if you had clicked
@@ -368,10 +373,27 @@ an attack hit only where the game shows players.
 - **Recharges.** A spent Recharge 5–6 can be rolled from the app.
 - **Heroic Inspiration.** With the same switch, a player can use or gain Heroic Inspiration, as
   dnd5e's sheet header toggles it.
+- **Spell slots.** Since 0.42.1, with the same switch, a player can spend one of their character's
+  spell slots, or restore one, from the dots on the app's Spells tab or a spell-slots favorite, one
+  at a time, asked first, as dnd5e's sheet's pips do; Pact Magic too. One the count of which changed
+  in Foundry meanwhile is refused, and none while the character is in Wild Shape.
 - **A line in chat.** dnd5e posts nothing for what's changed on its sheet, so each spend, and each
   use or gain of Heroic Inspiration, posts a line as the character, such as "Spends 2 · Sorcery
-  Points" or "Gains Heroic Inspiration", never how many are left. One you make from the app's
-  Gamemaster page is marked "GM" on its card, as your rolls there are.
+  Points", "Gains Heroic Inspiration" or "Spends a spell slot · 1st Level", never how many are left.
+  One you make from the app's Gamemaster page is marked "GM" on its card, as your rolls there are.
+
+### Preparing spells
+
+With **Attacks, spells and features** ticked, a player can prepare one of their character's spells
+from the app, or unprepare one, from its menu: on the app's Spells tab, among their favorites, or, to
+unprepare it, on the Actions tab, as dnd5e's sheet's Prepare and Unprepare do: a spell already on the
+character's sheet whose casting prepares, above cantrip level, not always prepared and not cast from
+an item. It works while you, the Gamemaster, have the game open, as every roll from the app does.
+Nothing limits how many, as dnd5e limits none. Nothing is posted in chat, as dnd5e posts nothing, so
+the Gamemaster's page in the app doesn't offer it; nor while the character is in Wild Shape. A new
+spell is still added in Foundry. The app is also sent each spellcasting class's count, as dnd5e's
+sheet shows "Prepared 5 / 6" beside its spell save DC, so a player sees what they're swapping
+against; it moves as spells are prepared, from the app or in Foundry.
 
 ### Moving items and coins
 
@@ -775,8 +797,34 @@ Gamemaster-only information switched on.
 - **An effect's die that isn't one plain die term**, such as `1d4 + 1` or one written with roll
   data, or a d20, is rolled by Foundry.
 - **Under dnd5e 6**, no effect's die is asked for (dnd5e 6 is v2.0).
-- **Bardic Inspiration** is added with Modify Roll's extra dice until 0.42.1, which offers the 2024
-  one; the 2014 one, which leaves no effect, stays so.
+- **Bardic Inspiration isn't offered** on what Midi-QOL asks, with typing off, on a roll not sent to
+  the table, or on initiative (which can't fail): Modify Roll's extra dice, or the Gamemaster in
+  Foundry. The 2014 Bardic Inspiration, which leaves no effect, and Midi-QOL's own Bardic
+  Inspiration (an optional bonus) stay as before.
+- **Once Done is pressed, Bardic Inspiration can't be added to that roll from the app:** the
+  Gamemaster adds it in Foundry.
+- **With Bless, Bane or Elven Accuracy's d20 skipped,** the dialog's total leaves out a die only the
+  game rolls, so whether the roll fails can't be told before Done: the player types that die in to
+  use Bardic Inspiration on it.
+- **Inspired is applied by the Gamemaster** from the bard's card (a player can't apply it to another
+  player's character); until it's on the character, nothing is offered.
+- **A spent die's Inspired, where the app may not remove it** (the campaign's switch off, a
+  companion, a shaped druid, a bard who isn't a player's character): it isn't offered again on that
+  page until it's removed, but is after the page is reloaded; and a bard's Inspire given again
+  before it's removed isn't offered, dnd5e refreshing the same effect: the Gamemaster removes it
+  first.
+- **A roll that took too long** (`timeout`, as when a module asks the Gamemaster something first)
+  may still be made once the Gamemaster answers, so the Bardic Inspiration die added to it stays
+  spent: once the roll is made, Inspired is removed as after any other roll; if it never is, the die
+  isn't offered again on that page, but is after the page is reloaded.
+- **Bardic Inspiration's die is the bard's now,** as the inspired character's sheet last read it,
+  not as it was when given; it follows the bard's within a turn in combat.
+- **Two bards' Inspired:** each is offered; the 2024 rule allows one die at a time. Two bards who
+  aren't the party's are offered under the same name.
+- **In Wild Shape**, Inspired is offered from the form; removed there, the druid's own Inspired
+  stays and is offered again once the druid changes back: the Gamemaster removes it from both.
+- **A world on the legacy (2014) rules:** a Bardic Inspiration item that doesn't say its rules
+  counts as 2014's and isn't offered; dnd5e's 2024 compendium feature is.
 - **Advantage the game adds as the roll is made**, such as Midi-QOL's from a target, takes Foundry's
   d20s, Elven Accuracy's among them, and a Halfling's reroll of those stays Foundry's.
 - **A die skipped for the game** isn't in the app's own total, which says so; the tray's table total
@@ -793,6 +841,25 @@ Gamemaster-only information switched on.
 - **A dish's save bonus counts once on death saves** since 0.42.0: dnd5e adds the saving throws'
   bonus to a death save too, and a dish no longer writes the death save's own. A dish eaten before
   keeps both until it ends.
+- **Spell slots are spent and restored one at a time** from the app; several are several taps, each
+  asked.
+- **Spell slots can't be changed from the app** while Send to the table is off on that device, with a
+  module before 0.42.1, where you don't let players attack and cast from the app, or while the
+  character is in Wild Shape (the slots wait, as the app's Spells tab says).
+- **Temporary slots** above a pool's maximum can be spent from the app, never restored above it.
+- **A restore posts a line everyone sees;** undo a mistaken one in Foundry.
+- **Nothing limits how many spells are prepared** from the app, as dnd5e's own menu limits none: a
+  class's "Prepared 7 / 6" shows it past its maximum, and nothing refuses it.
+- **Cantrips, always prepared spells, spells cast at will, innately or as rituals, and spells an
+  item casts** are never prepared or unprepared from the app.
+- **Spells are prepared from the app only while you have the game open in Foundry:** the module
+  runs in your browser; between sessions, spells are changed in Foundry as before.
+- **Only spells already on the character's sheet** are prepared from the app: dnd5e keeps no class
+  spell list on the character, so a cleric's, druid's or paladin's whole list, or a spell a wizard
+  has just copied into their book, is added in Foundry first, and "Always prepared" stays a setting
+  there. A wizard's spellbook works, as every spell in it is on the sheet.
+- **A spell prepared from the app posts nothing in chat:** you see the change only on the
+  character's sheet in Foundry.
 - **Wild Shape from the app is the 2024 Wild Shape only:** a 2014 druid's Wild Shape is used in
   Foundry, and the app follows the form, shown as Wild Shape, but never times, ends or returns it:
   the 2014 rules end it differently (0 hit points or Unconscious), and you return it in Foundry.
@@ -997,9 +1064,9 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
 | `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player, and what it concentrates on; from 0.39.0, what its player may do to each effect from the app |
-| `scripts/sheet-effect-dice.mjs` | From 0.42.0, the dice a character's effects add to its d20 rolls, as dnd5e will add them, named by the spell or item they come from, for a player typing in their dice |
+| `scripts/sheet-effect-dice.mjs` | From 0.42.0, the dice a character's effects add to its d20 rolls, as dnd5e will add them, named by the spell or item they come from, for a player typing in their dice; from 0.42.1, the Bardic Inspiration an effect offers |
 | `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
-| `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it |
+| `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it, and the pool a slot is spent or restored from; from 0.42.1, each class's count of prepared spells, and whether a spell is prepared, as the app may change it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites; and the feature each old-style resource stands for; whether one would be listed, for the app's to be added |
@@ -1033,11 +1100,12 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-enchant.mjs` | Using enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items, and ending enchantments, through dnd5e's cards or Midi-QOL's workflow; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
 | `scripts/command-turn.mjs` | Ending the current turn from the app, the character's or one of its companions', where it's still the turn the app was shown, by Foundry's own Next Turn; and taking back the turn one just ended, with Foundry's turn events off |
-| `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat |
+| `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat; from 0.42.1, a spell slot spent or restored |
 | `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch; nothing posted |
+| `scripts/command-prepare.mjs` | Preparing and unpreparing a character's spells from the app, as dnd5e's menu does; nothing posted |
 | `scripts/command-effects.mjs` | A player's own effects turned off, on and deleted from the app, from 0.39.0, by the campaign's switch under dnd5e: fetching them from an app that takes them; each checked against what `sheet-effects.mjs` says its player may do, written with the mark of the app's own Turn off, and read again; the hook that clears the mark on any other change; nothing posted |
 | `scripts/wild-shape.mjs` | Wild Shape, from 0.40.0, by the 2024 rules: a druid's Wild Shape and what the rules allow the druid now; the campaign's compendiums, the Beasts the druid may learn and the known forms' summaries; the record written on every form as dnd5e makes it; the character's tokens switched and put back on every scene; what comes back on every return, as sums, and the character's hit points; the endings, on the bridge; a form deleted by hand, and a player's leftover form |
 | `scripts/sheet-wild-shape.mjs` | A 2024 druid's `wildShape` block and a transformed character's `form` on the sheet, from 0.40.0 |

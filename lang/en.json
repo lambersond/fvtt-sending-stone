@@ -356,6 +356,8 @@
       "Spends": "Spends {count} · {name}",
       "InspirationUsed": "Uses Heroic Inspiration",
       "InspirationGained": "Gains Heroic Inspiration",
+      "SpendsSlot": "Spends a spell slot · {name}",
+      "RegainsSlot": "Regains a spell slot · {name}",
       "Gives": "Gives {things} to {target}",
       "Takes": "Takes {things} from {source}",
       "Sends": "Sends {things} from {source} to {target}",

@@ -258,13 +258,13 @@ export const CONCENTRATION_KINDS = Object.freeze(["endConcentration"]);
 /**
  * What a player, or their Gamemaster as them, can have done here from the app to what their
  * character spends: spend charges of a feature, an item, an activity or a resource directly, as
- * they would on dnd5e's sheet, such as two Sorcery Points; and use or gain Heroic Inspiration.
- * Each posts a line in chat saying so. Offered wherever the Gamemaster lets the campaign's players
- * attack and cast from the app, whether or not those can be made here now: neither throws dice or
- * goes through Midi-QOL.
+ * they would on dnd5e's sheet, such as two Sorcery Points; and use or gain Heroic Inspiration;
+ * and since 0.42.1 spend or restore one of their spell slots. Each posts a line in chat saying so.
+ * Offered wherever the Gamemaster lets the campaign's players attack and cast from the app, whether
+ * or not those can be made here now: none throws dice or goes through Midi-QOL.
  * @type {readonly string[]}
  */
-export const CHARGE_KINDS = Object.freeze(["spend", "inspiration"]);
+export const CHARGE_KINDS = Object.freeze(["spend", "inspiration", "spellSlot"]);
 
 /**
  * What a player, or their Gamemaster, can have done here from the app with what their character
@@ -329,6 +329,18 @@ export const EFFECT_OPS = Object.freeze(["disable", "enable", "delete"]);
  * @type {RegExp}
  */
 export const EFFECT_ID = /^[A-Za-z0-9]{1,64}(\.[A-Za-z0-9]{1,64})?$/;
+
+/**
+ * What a player can have done here from the app to one of their character's spells, since module
+ * 0.42.1: prepared or unprepared, as dnd5e's sheet's menu does. Offered where the charge kinds are,
+ * wherever the Gamemaster lets the campaign's players attack and cast from the app: it throws no dice
+ * and posts nothing.
+ * @type {readonly string[]}
+ */
+export const PREPARE_KINDS = Object.freeze(["prepare"]);
+
+/** What may be done to a spell's preparation, as the state wanted, never a toggle, since 0.42.1. */
+export const PREPARE_OPS = Object.freeze(["prepare", "unprepare"]);
 
 /**
  * What a player can have done here from the app with their druid's Wild Shape, since module 0.40.0:
@@ -423,13 +435,15 @@ export const MOST_COMPANIONS_EACH = 20;
  * The kinds a companion's command is never, since 0.36.0: what an NPC has none of, what isn't asked,
  * and what edits it rather than acting, as charges spent by hand, or its favorites, which an NPC has
  * none of, or a dish, which no companion eats (round 0.36.0 §2.5), or a change to its effects, which
- * only a character's player makes (round 0.39.0 §1.1), or Wild Shape, which only a character uses, and
- * what's its character's to do, as ending a turn or taking one back, which the character's command does
- * for the companion's turn too (round 0.36.0 §2.8).
+ * only a character's player makes (round 0.39.0 §1.1), or Wild Shape, which only a character uses, or a
+ * spell slot, which an NPC's sheet changes in Foundry (round 0.42.1 §U.1), or since 0.42.1 a spell
+ * prepared, which an NPC's sheet has prepared already, and what's its character's to do, as ending a
+ * turn or taking one back, which the character's command does for the companion's turn too (round
+ * 0.36.0 §2.8).
  */
 export const COMPANION_UNTAKEN = Object.freeze([
-  "inspiration", "hitDie", "hitDice", "spend", "transfer", "remove", "favorite", "dish", "effect", "wildShape", "note",
-  "endTurn", "undoEndTurn"
+  "inspiration", "hitDie", "hitDice", "spend", "spellSlot", "transfer", "remove", "favorite", "dish", "effect",
+  "wildShape", "prepare", "note", "endTurn", "undoEndTurn"
 ]);
 
 /**
@@ -505,6 +519,13 @@ export const OWN_WRITE = Object.freeze({ [MODULE_ID]: true });
  * @type {number}
  */
 export const MOST_SPENT = 999;
+
+/**
+ * What a spell slot's command does to one of the character's spell slots, since 0.42.1: spends one,
+ * or restores one, as dnd5e's sheet's pips do.
+ * @type {readonly string[]}
+ */
+export const SPELL_SLOT_OPS = Object.freeze(["spend", "restore"]);
 
 /**
  * The most of an item, or of a coin, a player can move at once from the app.

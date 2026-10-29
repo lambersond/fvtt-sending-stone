@@ -38,7 +38,8 @@ run activities X=1 SLIM_CHECK=1; run activities MIDI=1 SLIM_CHECK=1; run activit
 for v in X=1 MIDI=1; do run enchant $v SLIM_CHECK=1; done
 run errors X=1
 # Ending a concentration, spending charges and Heroic Inspiration, and hits, misses and saves in chat
-# (module 0.29.0): dnd5e's alone, and with Midi-QOL's stand-ins.
+# (module 0.29.0), and since 0.42.1 spell slots spent and restored: dnd5e's alone, and with Midi-QOL's
+# stand-ins.
 for v in X=1 MIDI=1; do run concentration $v SLIM_CHECK=1; run charges $v SLIM_CHECK=1; run outcomes $v; done
 # Module 0.30.0: party sheets (dnd5e 5.3.3 and 6.0.5 stand-ins), the Foundry settings field and its
 # verdict against every gate, and chat results matching what Foundry shows players.
@@ -52,7 +53,8 @@ run chat6 X=1 DND5E6=1
 for v in X=1 "X=1 DND5E6=1"; do run transfers $v SLIM_CHECK=1; done
 # Module 0.32.0: players type in what their own dice show (dnd5e 5.3.3 and 6.0.5 stand-ins, and Midi-QOL's),
 # and an app roll's critical damage as dnd5e makes it, whatever Midi-QOL's rules for critical hits say;
-# and since 0.42.0, the dice effects add, typed or skipped, and rerolls kept.
+# and since 0.42.0, the dice effects add, typed or skipped, and rerolls kept; and since 0.42.1, the
+# Bardic Inspiration an effect offers.
 for v in X=1 "X=1 DND5E6=1" MIDI=1; do run typed $v SLIM_CHECK=1; done
 for v in X=1 "X=1 DND5E6=1" MIDI=1 "MIDI=1 DND5E6=1"; do run crit-rules $v; done
 # Module 0.32.0: a party's things sent elsewhere by its Owner, party to party, and a party's coin
@@ -77,6 +79,8 @@ for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run turns $v; done
 # Module 0.37.0: favorites added and removed from the app by dnd5e's own methods (dnd5e 5.3.3 and
 # 6.0.5 stand-ins), fetched with rolls, moves, removals and notes off.
 for v in X=1 "X=1 DND5E6=1"; do run favoriting $v SLIM_CHECK=1; done
+# Module 0.42.1: spells prepared and unprepared from the app (dnd5e 5.3.3 and 6.0.5 stand-ins).
+for v in X=1 "X=1 DND5E6=1"; do run preparing $v SLIM_CHECK=1; done
 # Module 0.38.0: dishes from the Magical Recipe Book, a card for the Gamemaster and an effect on
 # each character chosen (dnd5e 5.3.3), and off under dnd5e 6.0.5.
 for v in X=1 "X=1 DND5E6=1"; do run dishes $v SLIM_CHECK=1; done
