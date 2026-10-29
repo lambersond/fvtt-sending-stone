@@ -876,6 +876,21 @@ ok("a party's Long Rest while shaped rests her own actor and advances the clock 
 
 await slotWhileShaped(wolfId)
 ok('0.42.1: a spell slot spent from the app while she is shaped, for an app that takes Wild Shape, "shaped", from a count gone stale or of a pool she lacks too, her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
+// PROTOCOL.md says so wherever it tells what a shaped character's commands do (round 0.42.1 §U.8.1,
+// its review fixes): the charges section's Wild Shape paragraph, which said every command of the
+// section acts on the form's copy, excepts spell slots, and the seat while shaped lists them among
+// what's refused "shaped" for every listener. Its paragraphs are read with their lines joined.
+{
+  const protocol = readFileSync(`${MODULE}/PROTOCOL.md`, 'utf8')
+  const section = protocol.slice(protocol.indexOf('\n### Concentration, charges and Heroic Inspiration\n'))
+  const paragraphs = text => text.split(/\n\s*\n/).map(each => each.replace(/\s+/g, ' ').trim())
+  const inForm = paragraphs(section.slice(0, section.indexOf('\n### ', 1))).find(each => each.startsWith('Since module 0.40.0, while the character is in Wild Shape'))
+  assert.match(inForm, /these, but spell slots, act on the form's copy/)
+  assert.match(inForm, /A spell slot spent or restored, since module 0\.42\.1, is refused `"shaped"` while the character is transformed, for any listener/)
+  const seat = paragraphs(protocol).find(each => each.startsWith('**The seat while shaped.**'))
+  assert.match(seat, /Refused `"shaped"`, for every listener, while the character is transformed: [^;]*, and since module 0\.42\.1 a spell slot spent or restored[,;]/)
+  ok('0.42.1, PROTOCOL.md: the charges section\'s Wild Shape paragraph excepts spell slots from what acts on the form, refused "shaped" for any listener, and the seat while shaped lists a spell slot spent or restored among what is refused "shaped" for every listener')
+}
 
 /* -------------------------------------------- */
 /*  11d. A spell prepared while shaped (0.42.1)  */

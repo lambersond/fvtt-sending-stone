@@ -2891,10 +2891,12 @@ rolls do, and the character's sheet as it then stands is sent ahead of the
 nothing new of what changed, the sheet does.
 
 Since module 0.40.0, while the character is in Wild Shape (to a listener that says `"wildShape": 1`),
-these act on the form's copy, and what they spend is carried back on the return (see [Wild
-Shape](#wild-shape)); the character's own resources aren't on the form, whose sheet lists none. A
-concentration ended while the character is transformed is ended on both copies, the form's and the
-character's own, for any listener, so that it doesn't come back on the return.
+these, but spell slots, act on the form's copy, and what they spend is carried back on the return
+(see [Wild Shape](#wild-shape)); the character's own resources aren't on the form, whose sheet lists
+none. A spell slot spent or restored, since module 0.42.1, is refused `"shaped"` while the character
+is transformed, for any listener: the character's own slots wait for the return (**Spell slots**,
+below). A concentration ended while the character is transformed is ended on both copies, the
+form's and the character's own, for any listener, so that it doesn't come back on the return.
 
 | Roll field | Meaning |
 | --- | --- |
@@ -4457,8 +4459,10 @@ that sheet lists it: checks, saves, death saves, attacks, uses, damage, a utilit
 description's roll, hit dice, charges and Heroic Inspiration, each result the character's, queued by
 the character's id; what they spend in form is carried back on the return. Refused `"shaped"`, for
 every listener, while the character is transformed: a favorite added or removed, an effect changed, a
-move to, from or by the character, and a removal; a listener before 0.40.0, sent the character's own
-sheet, shows these and has no words for the reason. To any other listener, which is sent the
+move to, from or by the character, and a removal, and since module 0.42.1 a spell slot spent or
+restored, the character's own slots waiting for the return; a listener before 0.40.0, sent the
+character's own sheet, shows all but the spell slot, which it never sends, and has no words for the
+reason. To any other listener, which is sent the
 character's own sheet, the rest are made on the character's own actor, as before. For every listener,
 initiative is rolled for the combatant that is the character's now, the form's while transformed (of
 the form's token, or of the character's own), on that combatant's actor, as dnd5e rolls it; End Turn
