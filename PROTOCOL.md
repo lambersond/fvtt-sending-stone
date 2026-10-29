@@ -4460,9 +4460,10 @@ description's roll, hit dice, charges and Heroic Inspiration, each result the ch
 the character's id; what they spend in form is carried back on the return. Refused `"shaped"`, for
 every listener, while the character is transformed: a favorite added or removed, an effect changed, a
 move to, from or by the character, and a removal, and since module 0.42.1 a spell slot spent or
-restored, the character's own slots waiting for the return; a listener before 0.40.0, sent the
-character's own sheet, shows all but the spell slot, which it never sends, and has no words for the
-reason. To any other listener, which is sent the
+restored, the character's own slots waiting for the return, and a spell prepared or unprepared, the
+form's spells being copies the return loses ([Preparing spells](#preparing-spells)); a listener
+before 0.40.0, sent the character's own sheet, shows all but the spell slot and the spell prepared,
+which it never sends, and has no words for the reason. To any other listener, which is sent the
 character's own sheet, the rest are made on the character's own actor, as before. For every listener,
 initiative is rolled for the combatant that is the character's now, the form's while transformed (of
 the form's token, or of the character's own), on that combatant's actor, as dnd5e rolls it; End Turn

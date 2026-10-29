@@ -898,6 +898,16 @@ ok('0.42.1: a spell slot spent from the app while she is shaped, for an app that
 
 await prepareWhileShaped(wolfId)
 ok('0.42.1: one of her spells prepared from the app while she is shaped "shaped", as are a spell she lacks, her quarterstaff and a spell she doesn\'t prepare, her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
+// PROTOCOL.md's seat while shaped lists a spell prepared or unprepared among what's refused "shaped"
+// for every listener, beside the spell slot (round 0.42.1 §P.7.1, its review fixes), and a listener
+// before 0.40.0 shows neither, as it never sends them. Its paragraphs are read with their lines joined.
+{
+  const protocol = readFileSync(`${MODULE}/PROTOCOL.md`, 'utf8')
+  const seat = protocol.split(/\n\s*\n/).map(each => each.replace(/\s+/g, ' ').trim()).find(each => each.startsWith('**The seat while shaped.**'))
+  assert.match(seat, /Refused `"shaped"`, for every listener, while the character is transformed: [^;]*, and since module 0\.42\.1 a spell slot spent or restored, [^;]*, and a spell prepared or unprepared[,;]/)
+  assert.match(seat, /a listener before 0\.40\.0, sent the character's own sheet, shows all but the spell slot and the spell prepared, which it never sends/)
+  ok('0.42.1, PROTOCOL.md: the seat while shaped lists a spell prepared or unprepared beside the spell slot among what is refused "shaped" for every listener, neither shown by a listener before 0.40.0')
+}
 
 /* -------------------------------------------- */
 /*  12. Change while shaped                     */
