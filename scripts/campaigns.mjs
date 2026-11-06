@@ -46,6 +46,10 @@ import { diceStatus } from "./dice-plan.mjs";
  *                                    2024 druid's player choosing the Beasts she knows and changing
  *                                    into them and back? Off until the Gamemaster turns it on, apart
  *                                    from `rolls`, under dnd5e.
+ * @property {boolean} hitPoints      May its players set their characters' hit points and temporary
+ *                                    hit points from the app, since 0.44.0, their forms' and
+ *                                    companions' too? On until the Gamemaster turns it off, apart from
+ *                                    `rolls`, under dnd5e.
  * @property {string[]} wildShapePacks  The Actor compendiums, by collection, its druids learn Beasts
  *                                    from, since 0.40.0: dnd5e's 2024 Actors until the Gamemaster
  *                                    chooses; one missing since, as a module's uninstalled, left out.
@@ -63,7 +67,7 @@ export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
   return stored.map(({
     id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, dishes, effects, wildShape, wildShapePacks,
-    companionInitiative
+    companionInitiative, hitPoints
   }) => ({
     id,
     title,
@@ -80,6 +84,9 @@ export function getCampaigns() {
     // A campaign saved before 0.40.0 has neither: its players use no Wild Shape from the app, and the
     // 2024 Actors are its pool.
     wildShape: wildShape === true,
+    // On unless the Gamemaster turned it off: a campaign saved before 0.44.0 has none, and its players
+    // set their hit points from the app, as every new campaign's do.
+    hitPoints: hitPoints !== false,
     wildShapePacks: Array.isArray(wildShapePacks) ? wildShapePacks.filter(pack => !game.packs || game.packs.get(pack))
       : [...WILD_SHAPE_PACKS],
     // A campaign saved before 0.36.0, or holding anything else, rolls its companions' own.

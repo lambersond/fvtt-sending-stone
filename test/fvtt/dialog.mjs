@@ -31,9 +31,11 @@ await save(win)
 // Changed on purpose (round 0.39.0 §1.9): and whether its players change their own effects, off.
 // Changed on purpose (round 0.40.0 §10.2): and whether its players use Wild Shape, off, and the 2024
 // Actors its druids learn Beasts from.
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): and whether its players set their hit
+// points from the app, on, as every new campaign is.
 assert.deepEqual(settings.get('campaigns'), [
-  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], companionInitiative: 'own' },
-  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], companionInitiative: 'own' },
+  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, companionInitiative: 'own' },
+  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, companionInitiative: 'own' },
 ])
 assert.equal(win.element.isConnected, false, 'saved, it closes')
 console.log('ok - saves campaigns in order, trims titles, drops unticked and missing characters')
@@ -332,6 +334,8 @@ assert.ok((campaignFields.effects instanceof foundry.data.fields.BooleanField) &
 assert.ok((campaignFields.wildShape instanceof foundry.data.fields.BooleanField) && (campaignFields.wildShape.initial === false), 'wildShape is in the schema')
 assert.ok((campaignFields.wildShapePacks instanceof foundry.data.fields.ArrayField) && (campaignFields.wildShapePacks.element instanceof foundry.data.fields.StringField), 'wildShapePacks is in the schema')
 assert.deepEqual(campaignFields.wildShapePacks.initial(), ['dnd5e.actors24'])
+// Module 0.44.0 (the v0.44 plan's item 4): so is hitPoints, the only switch on until it's turned off.
+assert.ok((campaignFields.hitPoints instanceof foundry.data.fields.BooleanField) && (campaignFields.hitPoints.initial === true), 'hitPoints is in the schema, on')
 assert.equal(campaignFields.manualDice.initial, false)
 assert.deepEqual(Object.keys(campaignFields).sort(), Object.keys(settings.get('campaigns')[0]).sort())
 const hellosNow = () => Object.fromEntries(posts.splice(0).filter(post => post.envelope.type === 'bridge.hello')
@@ -552,8 +556,9 @@ assert.equal(dishes.querySelector('.hint').textContent.trim(), 'SENDINGSTONE.Con
 const order = [...win.element.querySelectorAll('fieldset')].map(each => each.className)
 // Changed on purpose (round 0.39.0 §1.9): Active effects between it and Companions.
 // Changed on purpose (round 0.40.0 §10.2): and Wild Shape after Active effects.
-assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 5),
-  ['sending-stone-transfers', 'sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-companions'], 'between Items and coins and Active effects')
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): and Hit points after Wild Shape.
+assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 6),
+  ['sending-stone-transfers', 'sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-hit-points', 'sending-stone-companions'], 'between Items and coins and Active effects')
 assert.equal(find(win, '[name="campaign.dishes"]').checked, false)
 assert.equal(find(win, '[name="campaign.dishes"]').disabled, false, 'whatever the rolls')
 tick(win, 'campaign.dishes')
@@ -562,6 +567,40 @@ assert.equal(settings.get('campaigns').find(c => c.id === a).dishes, true, 'save
 assert.equal(settings.get('campaigns').find(c => c.id === b).dishes, false, "the other's as it was")
 settings.set('campaigns', settings.get('campaigns').map(c => ({ ...c, dishes: false })))
 console.log("ok - 0.38.0: Dishes from the Magical Recipe Book has its own fieldset on the Player actions tab, between Items and coins and Companions, and saves with its campaign")
+
+// Module 0.44.0 (the v0.44 plan's item 4): Hit points, its own fieldset on the Player actions tab
+// between Wild Shape and Companions, not greyed by the rolls, ticked for a campaign saved before it,
+// which has no such key, saved off and on again with its campaign.
+{
+  const without = settings.get('campaigns')
+  settings.set('campaigns', without.map(({ hitPoints, ...rest }) => rest))
+  assert.ok(settings.get('campaigns').every(c => !Object.hasOwn(c, 'hitPoints')), 'saved before 0.44.0, without the key')
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  const fieldset = find(win, 'fieldset.sending-stone-hit-points')
+  assert.equal(fieldset.querySelector('legend').textContent.trim(), 'SENDINGSTONE.Config.Actions.HitPoints')
+  assert.equal(fieldset.querySelector('label[for="sending-stone-hit-points"]').textContent.trim(), 'SENDINGSTONE.Config.Actions.HitPointsPlayers')
+  assert.equal(fieldset.querySelector('.hint').textContent.trim(), 'SENDINGSTONE.Config.Actions.HitPointsHint')
+  assert.equal(fieldset.querySelectorAll('.sending-stone-warning').length, 0, 'no warning under dnd5e, with no app heard from')
+  const box = () => find(win, '[name="campaign.hitPoints"]')
+  assert.deepEqual([box().checked, box().disabled], [true, false], 'ticked, read as on, whatever the rolls')
+  tick(win, 'campaign.hitPoints', false)
+  await save(win)
+  assert.deepEqual(settings.get('campaigns').map(c => [c.id, c.hitPoints]), [[a, false], [b, true]], "saved off, the other's on as read")
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.equal(box().checked, false, 'shown as saved')
+  tick(win, 'campaign.hitPoints')
+  await save(win)
+  assert.equal(settings.get('campaigns').find(c => c.id === a).hitPoints, true, 'saved on again')
+  game.system.id = 'pf2e'
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.equal(find(win, 'fieldset.sending-stone-hit-points .sending-stone-warning')?.textContent.trim().startsWith('SENDINGSTONE.Config.Actions.Unavailable'), true, 'under another system')
+  await win.close()
+  game.system.id = 'dnd5e'
+}
+console.log("ok - 0.44.0: Hit points has its own fieldset on the Player actions tab, between Wild Shape and Companions, ticked for a campaign saved without it and for a new one, never greyed by the rolls, saved off and on with its campaign; not available under another system")
 
 // Module 0.36.0 (round 0.36.0 §6.12): Companions' initiative, its own fieldset on the Player actions
 // tab after Items and coins, a choice never disabled, saved with its campaign; a new campaign's its
@@ -596,6 +635,7 @@ await click(win, '[data-action="addCampaign"]')
 type(win, 'campaign.title', 'Rohan')
 await save(win)
 assert.equal(settings.get('campaigns').find(c => c.title === 'Rohan').companionInitiative, 'own', "a new campaign's its own roll")
+assert.equal(settings.get('campaigns').find(c => c.title === 'Rohan').hitPoints, true, "a new campaign's hit points from the app, on")
 settings.set('campaigns', kept.map(c => ({ ...c, companionInitiative: 'own' })))
 {
   const { registered } = await import('./stub.mjs')

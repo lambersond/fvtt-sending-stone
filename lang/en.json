@@ -152,7 +152,7 @@
       "Actions": {
         "FromApp": "From the app",
         "Rolls": "Players roll in the app",
-        "RollsHint": "Checks, saves, initiative, death saves and hit dice use the dice they roll there.",
+        "RollsHint": "Checks, saves, initiative, death saves, hit dice and the dice tray's plain rolls use the dice they roll there.",
         "Attacks": "Attacks, spells and features",
         "AttacksHint": "Made here at the targets they pick, spending slots, uses and ammunition, with their dice.",
         "Prompts": "Save and concentration prompts",
@@ -197,6 +197,10 @@
         "WildShapeApp": "The app this campaign sends to doesn't take Wild Shape yet.",
         "WildShapePacks": "Beasts come from",
         "WildShapePacksHint": "The compendiums a druid's player learns Beasts from. Players see these Beasts' names and statistics in the app. A form put on a Wild Shape feature in Foundry from anywhere else, or outside the rules, is used only in Foundry.",
+        "HitPoints": "Hit points",
+        "HitPointsPlayers": "Allow Players to change their hit points from the app",
+        "HitPointsHint": "On by default. From the app, a player sets the hit points and temporary hit points of their own character, its Wild Shape form and their companions, as they could on the sheet here: just the numbers, with no damage types, resistances or rolls. dnd5e still asks for a concentration check when they go down, and a Wild Shape form at 0 hit points ends. Nothing is posted in chat.",
+        "HitPointsApp": "The app this campaign sends to doesn't let players change hit points yet.",
         "Companions": "Companions",
         "CompanionInitiative": "Companions' initiative",
         "CompanionInitiativeOwn": "Its own roll",
@@ -350,7 +354,8 @@
       "Badge": "Rolled on Sending Stone",
       "BadgeGM": "Rolled on Sending Stone by the Gamemaster",
       "BadgeTyped": "Entered by hand on Sending Stone",
-      "GM": "GM"
+      "GM": "GM",
+      "Plain": "Dice roll"
     },
     "Chat": {
       "Spends": "Spends {count} · {name}",

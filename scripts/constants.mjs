@@ -217,11 +217,12 @@ export const EVENTS = Object.freeze({
  * The rolls a player can have made here from the app, with the dice they rolled there: a skill
  * check, a tool check, an ability check, a saving throw, a death saving throw, or initiative; a hit
  * die spent, or several, of one size or more, at once, offered once the self-test has checked a hit
- * die; or a utility's own roll, such as a d4 of luck.
+ * die; a utility's own roll, such as a d4 of luck; or since 0.44.0 a plain roll of dice from the
+ * app's dice tray, such as 2d6 + 1d8 + 2, for what the Gamemaster asks.
  * @type {readonly string[]}
  */
 export const ROLL_KINDS = Object.freeze([
-  "skill", "tool", "ability", "save", "death", "initiative", "hitDie", "hitDice", "formula"
+  "skill", "tool", "ability", "save", "death", "initiative", "hitDie", "hitDice", "formula", "plainRoll"
 ]);
 
 /**
@@ -229,6 +230,14 @@ export const ROLL_KINDS = Object.freeze([
  * @type {number}
  */
 export const MOST_HIT_DICE = 20;
+
+/**
+ * The most dice a plain roll from the app's dice tray throws, since 0.44.0, as many as hit dice
+ * spent at once; and the largest number it may add or take away, as a die a player adds may.
+ * @type {number}
+ */
+export const MOST_PLAIN_DICE = 20;
+export const MOST_PLAIN_BONUS = 100;
 
 /**
  * What a player can have made here from the app by using an item, as in Foundry: an attack, with the
@@ -320,6 +329,22 @@ export const DISH_VERSIONS = Object.freeze([1]);
  * @type {readonly string[]}
  */
 export const EFFECT_KINDS = Object.freeze(["effect"]);
+
+/**
+ * What a player can have done here from the app to their own character's hit points, since module
+ * 0.44.0: its hit points and temporary hit points set, its Wild Shape form's while shaped, or a
+ * companion's, as they could on dnd5e's sheet. Offered under D&D Fifth Edition where the campaign's
+ * Gamemaster lets its players, by its own switch, on until turned off, apart from the rolls: it throws
+ * no dice and posts nothing.
+ * @type {readonly string[]}
+ */
+export const HIT_POINT_KINDS = Object.freeze(["hitPoints"]);
+
+/** The most hit points, or temporary hit points, a player may set from the app, since 0.44.0. */
+export const MOST_HIT_POINTS = 9999;
+
+/** What may be done to hit points, since 0.44.0: set, to the numbers wanted, never by an amount. */
+export const HIT_POINT_OPS = Object.freeze(["set"]);
 
 /** What may be done to an effect, as the state wanted, never a toggle, since 0.39.0. */
 export const EFFECT_OPS = Object.freeze(["disable", "enable", "delete"]);
@@ -439,11 +464,13 @@ export const MOST_COMPANIONS_EACH = 20;
  * spell slot, which an NPC's sheet changes in Foundry (round 0.42.1 §U.1), or since 0.42.1 a spell
  * prepared, which an NPC's sheet has prepared already, and what's its character's to do, as ending a
  * turn or taking one back, which the character's command does for the companion's turn too (round
- * 0.36.0 §2.8).
+ * 0.36.0 §2.8), or since 0.44.0 a plain roll of the dice tray, which is the character's player's and
+ * names no one's sheet. But not hit points, which since 0.44.0 a player sets for their companion as
+ * they could on its sheet.
  */
 export const COMPANION_UNTAKEN = Object.freeze([
   "inspiration", "hitDie", "hitDice", "spend", "spellSlot", "transfer", "remove", "favorite", "dish", "effect",
-  "wildShape", "prepare", "note", "endTurn", "undoEndTurn"
+  "wildShape", "prepare", "note", "endTurn", "undoEndTurn", "plainRoll"
 ]);
 
 /**

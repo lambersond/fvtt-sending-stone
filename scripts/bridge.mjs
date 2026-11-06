@@ -6,6 +6,7 @@ import { getCampaigns } from "./campaigns.mjs";
 import { favoriteFeatures } from "./command-favorites.mjs";
 import { dishFeatures } from "./command-dishes.mjs";
 import { effectFeatures } from "./command-effects.mjs";
+import { hitPointFeatures } from "./command-hit-points.mjs";
 import { wildShapeFeatures } from "./command-wildshape.mjs";
 import { removalFeatures, transferFeatures } from "./command-transfers.mjs";
 import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
@@ -95,7 +96,8 @@ const resent = new Map();
  * dnd5e 5. Since 0.39.0, whether its players may turn off, turn on and delete their own characters'
  * effects from the app, `features.effects`, by its own switch under D&D Fifth Edition. Since 0.40.0,
  * whether its players may use Wild Shape from the app, `features.wildShape`, by its own switch under
- * D&D Fifth Edition.
+ * D&D Fifth Edition. Since 0.44.0, whether its players may set their hit points from the app,
+ * `features.hitPoints`, by its own switch, on until turned off, under D&D Fifth Edition.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -134,7 +136,8 @@ export function announce({ campaignId }={}) {
       features: {
         rolls: rollFeatures(campaign), transfers: transferFeatures(campaign), removals: removalFeatures(),
         notes: noteFeatures(campaign), companions: companionFeatures(campaign), favorites: favoriteFeatures(),
-        dishes: dishFeatures(campaign), effects: effectFeatures(campaign), wildShape: wildShapeFeatures(campaign)
+        dishes: dishFeatures(campaign), effects: effectFeatures(campaign), wildShape: wildShapeFeatures(campaign),
+        hitPoints: hitPointFeatures(campaign)
       },
       sheetsApart: true,
       characters: roster(campaign),

@@ -437,12 +437,12 @@ function tagOf(process, config, index) {
  * since, as a module granting advantage might; and change the first of a player's damage rolls, a
  * use's or a description's, as they chose in the app, once: another damage roll made with them
  * after, as Midi-QOL's other damage, is left as it is. A hit die, a utility's roll, a description's
- * roll or since 0.36.0 a recharge another module changed so that the player's dice can't reach it,
- * as inside a function, is called off: nothing is spent or healed, and nothing posted; so is damage
- * that, built and changed, can't take every die the player rolled for it, as where a module added
- * dice to it afterwards otherwise than planned, or a die more was chosen of a part with none of its
- * own. Since 0.32.0 a d20 roll then takes no more of the player's d20s than it throws first
- * (`fitD20s`).
+ * roll, since 0.36.0 a recharge or since 0.44.0 a plain roll of the dice tray another module changed
+ * so that the player's dice can't reach it, as inside a function, is called off: nothing is spent or
+ * healed, and nothing posted; so is damage that, built and changed, can't take every die the player
+ * rolled for it, as where a module added dice to it afterwards otherwise than planned, or a die more
+ * was chosen of a part with none of its own. Since 0.32.0 a d20 roll then takes no more of the
+ * player's d20s than it throws first (`fitD20s`).
  * @param {Roll[]} rolls
  * @returns {boolean|void}   False to call the roll off.
  */
@@ -460,7 +460,7 @@ function onRollConfiguration(rolls) {
   for ( const [index, roll] of (rolls ?? []).entries() ) {
     const plan = planFor(roll.options?.[ROLL_TAG]);
     if ( DAMAGE_COMMANDS.has(plan?.command.kind) ) continue;
-    if ( ["hitDie", "formula", "textRoll", "recharge"].includes(plan?.command.kind) ) {
+    if ( ["hitDie", "formula", "textRoll", "recharge", "plainRoll"].includes(plan?.command.kind) ) {
       if ( (index === 0) && !takesPlayersDice(roll, plan.command.dice) ) {
         plan.refusal = "dice";
         return false;

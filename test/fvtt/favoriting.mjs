@@ -411,7 +411,8 @@ assert.deepEqual(helloOf().data.features.favorites, ON)
 // the switch off, under dnd5e 6 too.
 // Changed on purpose (round 0.39.0 §1.9): a player's own effects after dishes, `"off"` with the switch off.
 // Changed on purpose (round 0.40.0 §10.2): and whether its players use Wild Shape, after effects.
-assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape'], 'after companions')
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): `features.hitPoints`, whether its players set their hit points from the app, after Wild Shape.
+assert.deepEqual(Object.keys(helloOf().data.features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape', 'hitPoints'], 'after companions')
 assert.deepEqual([helloOf().data.features.rolls.enabled, helloOf().data.features.transfers.enabled], [false, false], "the campaign's rolls and moves off")
 // Apart from the rolls, the moves and the dice: whatever they are.
 diceStatus.ready = false

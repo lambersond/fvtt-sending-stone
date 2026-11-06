@@ -237,7 +237,8 @@ const ON = { enabled: true, kinds: ['effect'], reason: null }
 const SYSTEM = { enabled: false, kinds: [], reason: 'system' }
 assert.deepEqual(helloOf().features.effects, OFF, 'off by default, a campaign saved without the field')
 // Changed on purpose (round 0.40.0 §10.2): and whether its players use Wild Shape, after effects.
-assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape'])
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): `features.hitPoints`, whether its players set their hit points from the app, after Wild Shape.
+assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape', 'hitPoints'])
 await campaignAs({ effects: true })
 assert.deepEqual(helloOf().features.effects, ON, 'a saved switch sends the hello again, on')
 assert.ok(!helloOf().features.rolls.kinds.includes('effect') && !helloOf().features.companions.kinds.includes('effect'), "never among the rolls' kinds, nor a companion's")
@@ -559,8 +560,9 @@ assert.equal(fieldset().querySelector('label[for="sending-stone-effects"]').text
 assert.equal(fieldset().querySelector('.hint').textContent.trim(), words['SENDINGSTONE.Config.Actions.EffectsHint'])
 const order = [...win.element.querySelectorAll('fieldset')].map(each => each.className)
 // Changed on purpose (round 0.40.0 §10.2): Wild Shape between it and Companions.
-assert.deepEqual(order.slice(order.indexOf('sending-stone-dishes'), order.indexOf('sending-stone-dishes') + 4),
-  ['sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-companions'], 'between Magical Recipe Book and Wild Shape')
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): and Hit points after Wild Shape.
+assert.deepEqual(order.slice(order.indexOf('sending-stone-dishes'), order.indexOf('sending-stone-dishes') + 5),
+  ['sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-hit-points', 'sending-stone-companions'], 'between Magical Recipe Book and Wild Shape')
 assert.equal(find(win, '[name="campaign.effects"]').checked, true, 'ticked, as saved')
 assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'no warning: the app takes effects')
 tick(win, 'campaign.effects', false)
@@ -596,7 +598,8 @@ game.system.id = 'dnd5e'
 const rowsOf = () => helloOf().settings.sections.find(section => section.id === 'campaign').rows
 await hello()
 // Changed on purpose (round 0.40.0 §10.2): whether its players use Wild Shape after their effects.
-assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'companionInitiative', 'groups'])
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): the hit points switch's row, after Wild Shape's.
+assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'hitPoints', 'companionInitiative', 'groups'])
 assert.deepEqual(rowsOf().find(each => each.id === 'effects'), { id: 'effects', label, value: true, text: 'On' })
 game.system.id = 'pf2e'
 await hello()

@@ -8,8 +8,8 @@ It is built for D&D Fifth Edition (dnd5e 5.3.x): roll messages carry the kind of
 and the item, activity and targets involved. Chat and combat events work under any system.
 
 It also works the other way, for a campaign whose Gamemaster lets it: checks, saving throws,
-initiative, death saving throws, hit dice and features' own dice, such as a d4 of luck, that a
-player rolls in the app are made in Foundry with the dice they rolled, as if they had rolled them
+initiative, death saving throws, hit dice, features' own dice, such as a d4 of luck, and any dice
+from the app's dice tray, that a player rolls in the app are made in Foundry with the dice they rolled, as if they had rolled them
 there, and so can their attacks, spells and features and their damage or healing, through
 Midi-QOL's workflow where it's in use, and the saving throws, checks, damage and rolls their
 descriptions call for. See [Players' rolls](#players-rolls),
@@ -84,7 +84,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Allow Players to change their hit points from the app, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Hit points**, whether its players may set their characters', forms' and companions' hit points and temporary hit points from the app, on by default ([Hit points](#hit-points)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -138,8 +138,9 @@ character's next, whatever else you save in Manage Campaigns, and through a relo
 Tick **Players roll in the app** on a campaign's **Player actions** tab, and its players'
 skill, tool and ability checks, saving throws, initiative and death saving throws in the app are
 made in Foundry too, with the dice they rolled there: the d20s, and any dice they added, such as a
-d4 for Bless. So are the hit dice they spend, and a feature's own roll, such as a d4 of luck. dnd5e
-makes each roll, without its dialog, as the character's player, so its card, critical hits, death
+d4 for Bless. So are the hit dice they spend, a feature's own roll, such as a d4 of luck, and since
+0.44.0 a plain roll of any dice from the app's dice tray, such as 2d6 + 1d8 + 2, flavored "Dice roll"
+and spoken by the character, or her form in Wild Shape. dnd5e makes each roll, without its dialog, as the character's player, so its card, critical hits, death
 saving throws, the combat tracker, Dice So Nice and Midi-QOL all behave as if they had rolled in
 Foundry. Each card is marked as rolled on Sending Stone. A campaign's Gamemaster can open any of
 its characters' sheets in the app and roll as them; those rolls are marked GM on their cards, and
@@ -533,6 +534,24 @@ flagged by hand to look like one never is. It's
 off by default, apart from players' rolls, under D&D Fifth Edition 5 and 6. A 2014 druid's Wild Shape
 stays in Foundry, and so does any other transformation, such as Polymorph: the app shows the form,
 and you return it in Foundry.
+
+### Hit points
+
+Since 0.44.0 a campaign's players can set their character's hit points and temporary hit points from
+the app, as they could on its sheet here, for what happens outside any action ("you fall through the
+floor and take 4 damage"): their own character's, its Wild Shape form's while it's shaped, and their
+companions'. **Allow Players to change their hit points from the app**, under **Hit points** on the
+campaign's Player actions tab, is **on by default**, for campaigns saved before 0.44.0 too, apart from
+players' rolls, under D&D Fifth Edition 5 and 6; untick it to keep hit points yours. It's just the
+numbers, one update on your Foundry: no damage types, resistances, rolls or Midi-QOL workflow, and
+nothing posted in chat; the change shows on the sheet and in dnd5e's floating numbers over the token.
+A change is made only from the numbers the player saw: if they changed in Foundry meanwhile, it's
+refused and the app shows them as they are. dnd5e still does what it does for any change of hit
+points: it asks for a concentration check when they go down, asked in the app where the campaign asks
+its players for their saves, resets death saves on the way up from 0, and under dnd5e 6 applies its
+downed conditions in combat where its Auto-Apply Downed setting asks; and a Wild Shape form set to 0
+ends, as at 0 any other way. The Gamemaster's page in the app doesn't offer it: you change hit points
+here.
 
 ### Hit, miss and save results
 
@@ -1107,6 +1126,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch; nothing posted |
 | `scripts/command-prepare.mjs` | Preparing and unpreparing a character's spells from the app, as dnd5e's menu does; nothing posted |
 | `scripts/command-effects.mjs` | A player's own effects turned off, on and deleted from the app, from 0.39.0, by the campaign's switch under dnd5e: fetching them from an app that takes them; each checked against what `sheet-effects.mjs` says its player may do, written with the mark of the app's own Turn off, and read again; the hook that clears the mark on any other change; nothing posted |
+| `scripts/command-hit-points.mjs` | Hit points and temporary hit points set from the app, from 0.44.0, by the campaign's switch, on by default, under dnd5e: fetching them from an app that takes them; the character's, its form's or a companion's, each field only from the number the app showed, within the maximum the sheet shows, one plain update read again; nothing posted |
+| `scripts/command-plain.mjs` | A plain roll of the app's dice tray, from 0.44.0, wherever players' rolls are made: its formula from the dice and the number added, made by dnd5e's basic roll with the player's dice, its card dnd5e 5's generic roll or dnd5e 6's generic message |
 | `scripts/wild-shape.mjs` | Wild Shape, from 0.40.0, by the 2024 rules: a druid's Wild Shape and what the rules allow the druid now; the campaign's compendiums, the Beasts the druid may learn and the known forms' summaries; the record written on every form as dnd5e makes it; the character's tokens switched and put back on every scene; what comes back on every return, as sums, and the character's hit points; the endings, on the bridge; a form deleted by hand, and a player's leftover form |
 | `scripts/sheet-wild-shape.mjs` | A 2024 druid's `wildShape` block and a transformed character's `form` on the sheet, from 0.40.0 |
 | `scripts/command-wildshape.mjs` | Wild Shape from the app, from 0.40.0, by the campaign's switch under dnd5e: fetching it from an app that takes it; `transform`, `revert`, `learn` and `forms`, every check before any write; the use spent on the character's own feature and refunded where the change doesn't happen; dnd5e's own change with the module's numbers; the chat lines |

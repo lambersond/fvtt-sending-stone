@@ -1,6 +1,7 @@
 import {
   ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, EFFECT_DICE_KINDS, ENCHANT_KINDS,
-  MODULE_ID, MOST_EFFECT_DICE, MOST_HIT_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG, SPELL_SLOT_OPS, TURN_KINDS
+  MODULE_ID, MOST_EFFECT_DICE, MOST_HIT_DICE, MOST_PLAIN_BONUS, MOST_PLAIN_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG,
+  SPELL_SLOT_OPS, TURN_KINDS
 } from "./constants.mjs";
 import { originalOf, playerOwners, seatActor, standingFor } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
@@ -8,6 +9,7 @@ import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mj
 import { checkFavoriteCommand } from "./command-favorites.mjs";
 import { checkDishCommand } from "./command-dishes.mjs";
 import { checkEffectCommand } from "./command-effects.mjs";
+import { checkHitPointsCommand } from "./command-hit-points.mjs";
 import { checkWildShapeCommand } from "./command-wildshape.mjs";
 import { checkPrepareCommand } from "./command-prepare.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
@@ -252,7 +254,9 @@ export async function runRollCommand(command, campaign, { signal }={}) {
  * Recipe Book, its body. And since 0.39.0 a change to one of the character's own effects, which and
  * how. And since 0.40.0 Wild Shape, which and how. And since 0.42.0 a typed d20 roll's effects' dice,
  * `effectDice`. And since 0.42.1 a spell slot spent or restored: which, how, and the count it was
- * made from. And since 0.42.1 a spell prepared or unprepared, which and how.
+ * made from. And since 0.42.1 a spell prepared or unprepared, which and how. And since 0.44.0 hit
+ * points set, to what and from what; and a plain roll of the dice tray, its dice and what it adds,
+ * which no other kind names.
  * @param {object} command
  * @returns {string|null}
  */
@@ -261,6 +265,7 @@ export function checkCommand(command) {
   if ( !isOptional(command.of, isId) ) return "of";
   if ( isId(command.of) && COMPANION_UNTAKEN.includes(command.kind) ) return "of";
   if ( !isOptional(command.effectDice, () => isEffectDice(command)) ) return "effectDice";
+  if ( !isOptional(command.plainRoll, () => command.kind === "plainRoll") ) return "plainRoll";
   if ( TURN_KINDS.includes(command.kind) ) return (command.kind === "undoEndTurn") ? checkUndoTurnCommand(command) : checkEndTurnCommand(command);
   const named = checkItemCommand(command);
   if ( named ) return named;
@@ -277,6 +282,8 @@ export function checkCommand(command) {
   if ( command.kind === "effect" ) return checkEffectCommand(command);
   if ( command.kind === "wildShape" ) return checkWildShapeCommand(command);
   if ( command.kind === "prepare" ) return checkPrepareCommand(command);
+  if ( command.kind === "hitPoints" ) return checkHitPointsCommand(command);
+  if ( command.kind === "plainRoll" ) return checkPlainRollCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);
@@ -418,6 +425,51 @@ function checkPlainCommand(command) {
   if ( !isId(command.item) || !isId(command.activity) ) return "item";
   if ( !Array.isArray(dice) || (dice.length > 20) || !dice.every(isRolled) ) return "dice";
   return null;
+}
+
+/**
+ * What a plain roll names besides its dice, none of which it may: what a check, initiative, hit dice,
+ * an end of a turn or damage name.
+ * @type {string[]}
+ */
+const PLAIN_UNTAKEN = ["combatId", "denomination", "hitDice", "turn", "critical", "modifiers", "types"];
+
+/**
+ * Why a fetched plain roll of the dice tray isn't one to make, if it isn't, since 0.44.0. It's rolled
+ * with no advantage and nothing added, as a hit die is; names nothing a roll names, nor what a check,
+ * initiative, hit dice, a turn or damage name; and names its dice, `plainRoll.terms`, one to seven
+ * entries `{ faces, count }`, each a die a player rolls, each size once, at most 20 dice in all, and
+ * may name a whole number to add or take away, `plainRoll.bonus`, of at most 100; and has the dice
+ * rolled of each term, in the same order.
+ * @param {object} command
+ * @returns {string|null}
+ */
+function checkPlainRollCommand(command) {
+  if ( (command.mode !== 0) || (command.explicit !== false) ) return "mode";
+  if ( !Array.isArray(command.extras) || command.extras.length ) return "extras";
+  const named = PLAIN_UNTAKEN.some(field => (command[field] !== undefined) && (command[field] !== null));
+  if ( namesRollFields(command) || named || !isPlainRoll(command.plainRoll) ) return "plainRoll";
+  const { terms } = command.plainRoll;
+  const { dice } = command;
+  const each = Array.isArray(dice) && (dice.length === terms.length) && dice.every((rolled, index) =>
+    isRolled(rolled) && (rolled.faces === terms[index].faces) && (rolled.results.length === terms[index].count));
+  return each ? null : "dice";
+}
+
+/**
+ * Is this a plain roll's body as the app sends it: `{ terms, bonus? }`, and nothing else?
+ * @param {unknown} plainRoll
+ * @returns {boolean}
+ */
+function isPlainRoll(plainRoll) {
+  if ( !isObject(plainRoll) || !Object.keys(plainRoll).every(key => ["terms", "bonus"].includes(key)) ) return false;
+  const { terms, bonus } = plainRoll;
+  if ( !isOptional(bonus, value => Number.isInteger(value) && (Math.abs(value) <= MOST_PLAIN_BONUS)) ) return false;
+  if ( !Array.isArray(terms) || !terms.length || (terms.length > DIE_FACES.size) ) return false;
+  const term = entry => isObject(entry) && (Object.keys(entry).length === 2) && DIE_FACES.has(entry.faces)
+    && Number.isInteger(entry.count) && (entry.count >= 1) && (entry.count <= MOST_PLAIN_DICE);
+  if ( !terms.every(term) || (new Set(terms.map(({ faces }) => faces)).size !== terms.length) ) return false;
+  return terms.reduce((total, { count }) => total + count, 0) <= MOST_PLAIN_DICE;
 }
 
 /**
