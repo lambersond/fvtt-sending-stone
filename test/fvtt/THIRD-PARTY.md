@@ -8,7 +8,9 @@ The harness in this folder is test code. None of it is in module.zip (the releas
 actor5e.mjs, activity5e.mjs, enchant5e.mjs, dnd5e-cards.mjs, favorites-core.mjs and transform5e.mjs
 are stand-ins ported from the dnd5e system 5.3.3 (https://github.com/foundryvtt/dnd5e), as far as the
 module's commands use it; transform5e.mjs ports its Actor5e#transformInto and #revertOriginalForm,
-its transformation presets and TransformationSetting, and the Transform activity's data. dnd5e's software is distributed under the MIT license, whose notice follows. The
+its transformation presets and TransformationSetting, and the Transform activity's data. hp-core.mjs
+ports its handling of a change of hit points, AttributesFields.preUpdateHP and onUpdateHP of 5.3.3 and
+6.0.5, and 6.0.5's Actor5e#updateDowned. dnd5e's software is distributed under the MIT license, whose notice follows. The
 harness also loads dnd5e's own dice classes, its lang/en.json and one of its templates at run time,
 from the releases pinned in `test/pins.env`; those are fetched by `test/dnd5e.sh` and never
 committed here.

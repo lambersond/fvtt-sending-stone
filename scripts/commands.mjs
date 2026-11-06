@@ -13,6 +13,8 @@ import { runInspirationCommand, runSpellSlotCommand, runSpendCommand } from "./c
 import { favoriteReader, favoritesOn, noteFavoriteReader, runFavoriteCommand } from "./command-favorites.mjs";
 import { dishesOn, dishInFlight, dishReader, noteDishReader, runDishCommand } from "./command-dishes.mjs";
 import { effectReader, effectsOn, noteEffectReader, runEffectCommand } from "./command-effects.mjs";
+import { hitPointReader, hitPointsOn, noteHitPointReader, runHitPointsCommand } from "./command-hit-points.mjs";
+import { runPlainRollCommand } from "./command-plain.mjs";
 import { noteWildShapeReader, runWildShapeCommand, wildShapeOn, wildShapeReader } from "./command-wildshape.mjs";
 import { runPrepareCommand } from "./command-prepare.mjs";
 import { runEndTurnCommand, runUndoTurnCommand } from "./command-turn.mjs";
@@ -174,7 +176,8 @@ const made = new Map();
  * typed roll's effects' dice are its player's (`effectDice`), under dnd5e 5, and whether its rerolls
  * may be (`keptRerolls`): each wherever its players may type in their dice and its self-test passed.
  * And since 0.42.1, among the kinds right after the charges and wherever they are, one of their
- * spells prepared or unprepared, which throws no dice either.
+ * spells prepared or unprepared, which throws no dice either. And since 0.44.0, right after a
+ * utility's roll and wherever it is, a plain roll of the app's dice tray.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
@@ -257,8 +260,10 @@ export function registerCommandHooks() {
  * reads damage on its own's choices, `aloneChoices`, to which the campaign's sheets, its companions'
  * too, are sent again where it starts or stops in a heartbeat's answer, and whether it reads what the
  * game asks of companions, `companions` 2, to which their open prompts are sent again where it first
- * says so (creature-sync.mjs). A hello's answer wakes the
- * campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
+ * says so (creature-sync.mjs); and since 0.44.0, whether it takes hit points set, for which it's
+ * fetched from where the campaign's Gamemaster lets its players, under dnd5e, with everything else
+ * off. A hello's answer wakes the campaign's fetching, which may be waiting as an answer given before
+ * the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -276,6 +281,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteDishReader(campaignId, features, type);
   noteEffectReader(campaignId, features);
   noteWildShapeReader(campaignId, features, type);
+  noteHitPointReader(campaignId, features);
   noteAloneReader(campaignId, features, type);
   noteNotesReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);
@@ -291,8 +297,9 @@ export function noteListenerFeatures(campaignId, features, type) {
  * or since 0.38.0 take their dishes from the Magical Recipe Book, where its Gamemaster takes them,
  * under dnd5e 5, wherever its app takes them, or since 0.39.0 change their own effects, where its
  * Gamemaster lets them, under dnd5e, wherever its app takes them, or since 0.40.0 use Wild Shape, where
- * its Gamemaster lets them, under dnd5e, wherever its app takes it, and that the app has commands for,
- * while this client is the bridge; and for no other.
+ * its Gamemaster lets them, under dnd5e, wherever its app takes it, or since 0.44.0 set their hit
+ * points, where its Gamemaster lets them, under dnd5e, wherever its app takes them, and that the app
+ * has commands for, while this client is the bridge; and for no other.
  * @param {object} [options]
  * @param {boolean} [options.retry]   Try again the campaigns whose fetch the app refused, as after
  *                                    a change to the settings.
@@ -325,8 +332,10 @@ export function syncPollers({ retry=false }={}) {
  * them, with rolls, moves, removals, notes and favorites off too; or since 0.39.0 a player's own effects
  * turned off, on and deleted, by the campaign's own switch, under dnd5e, wherever its app takes them,
  * with everything else off too; or since 0.40.0 Wild Shape, by the campaign's own switch, under dnd5e,
- * wherever its app takes it, with everything else off too. A roll fetched while only moves, removals,
- * notes, favorites, dishes, effects or Wild Shape are is refused as one fetched while rolls are off.
+ * wherever its app takes it, with everything else off too; or since 0.44.0 hit points set, by the
+ * campaign's own switch, on until turned off, under dnd5e, wherever its app takes them, with
+ * everything else off too. A roll fetched while only moves, removals, notes, favorites, dishes,
+ * effects, Wild Shape or hit points are is refused as one fetched while rolls are off.
  * @param {Campaign} campaign
  * @returns {boolean}
  */
@@ -334,7 +343,8 @@ function fetchesFor(campaign) {
   return (campaign.rolls && diceStatus.ready) || (transfersOn(campaign) && transferReader(campaign.id))
     || (removalsOn() && removalReader(campaign.id)) || (notesOn() && notesReader(campaign.id))
     || (favoritesOn() && favoriteReader(campaign.id)) || (dishesOn(campaign) && dishReader(campaign.id))
-    || (effectsOn(campaign) && effectReader(campaign.id)) || (wildShapeOn(campaign) && wildShapeReader(campaign.id));
+    || (effectsOn(campaign) && effectReader(campaign.id)) || (wildShapeOn(campaign) && wildShapeReader(campaign.id))
+    || (hitPointsOn(campaign) && hitPointReader(campaign.id));
 }
 
 /**
@@ -552,6 +562,9 @@ class Poller {
  * and their next ones for it. Since 0.40.0 Wild Shape waits for its character's earlier commands, as an
  * effect does, but for a list of Beasts, which writes nothing, and waits on a queue of its own; and a
  * queue settling checks whether a Wild Shape of that character's is due to end (wild-shape.mjs).
+ * Since 0.44.0 hit points set, and a plain roll of the dice tray, wait for their character's earlier
+ * commands, as a roll does, a companion's hit points its character's too, and their next ones for
+ * them: so a form set to 0 hit points ends once the setting is done.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -735,6 +748,8 @@ function runCommand(command, campaign, signal) {
     case "effect": return runEffectCommand(command, campaign);
     case "wildShape": return runWildShapeCommand(command, campaign);
     case "prepare": return runPrepareCommand(command, campaign);
+    case "hitPoints": return runHitPointsCommand(command, campaign);
+    case "plainRoll": return runPlainRollCommand(command, campaign);
     case "note": return runNoteCommand(command, campaign);
     default: return runRollCommand(command, campaign, { signal });
   }

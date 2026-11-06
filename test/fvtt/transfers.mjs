@@ -1348,7 +1348,8 @@ const rowsOf = (settings, id) => settings.sections.find(section => section.id ==
 // Changed on purpose (round 0.38.0 §D8.3): its dishes from the Magical Recipe Book after its moves, off.
 // Changed on purpose (round 0.39.0 §1.9): whether its players change their own effects after its dishes, off.
 // Changed on purpose (round 0.40.0 §10.2): whether its players use Wild Shape after their effects, off.
-assert.deepEqual(rowsOf(report(), 'campaign').map(row => row.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'companionInitiative', 'groups'])
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): the hit points switch's row, after Wild Shape's.
+assert.deepEqual(rowsOf(report(), 'campaign').map(row => row.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'hitPoints', 'companionInitiative', 'groups'])
 assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'dishes'), { id: 'dishes', label: 'Dishes from the Magical Recipe Book', value: false, text: 'Off' })
 assert.deepEqual(rowsOf(report(), 'campaign').find(row => row.id === 'effects'), { id: 'effects', label: 'Allow Players to disable & remove their own active effects', value: false, text: 'Off' })
 // Changed on purpose (round 0.38.0 §D8.3): on, it says why it does nothing under dnd5e 6 or another system.

@@ -375,6 +375,19 @@
         </div>
     </fieldset>
 
+    <fieldset class="sending-stone-hit-points">
+        <legend>{{localize "SENDINGSTONE.Config.Actions.HitPoints"}}</legend>
+        <div class="form-group">
+            <label for="sending-stone-hit-points">{{localize "SENDINGSTONE.Config.Actions.HitPointsPlayers"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-hit-points" name="campaign.hitPoints" {{#if campaign.hitPoints}}checked{{/if}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.HitPointsHint"}}</p>
+            {{#if campaign.hitPointsUnavailable}}<p class="hint sending-stone-warning">{{campaign.hitPointsUnavailable}}</p>{{/if}}
+            {{#if campaign.hitPointsApp}}<p class="hint sending-stone-warning">{{localize "SENDINGSTONE.Config.Actions.HitPointsApp"}}</p>{{/if}}
+        </div>
+    </fieldset>
+
     <fieldset class="sending-stone-companions">
         <legend>{{localize "SENDINGSTONE.Config.Actions.Companions"}}</legend>
         <div class="form-group">

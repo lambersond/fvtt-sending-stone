@@ -251,7 +251,9 @@ assert.equal(diceStatus.ready, true, `self-test: ${diceStatus.error}`)
 assert.equal(diceStatus.attacks, true, `attack self-test: ${diceStatus.attacksError}`)
 assert.equal(diceStatus.modifiers, true, `modifiers self-test: ${diceStatus.modifiersError}`)
 const hellos = Object.fromEntries(app.events.filter(e => e.type === 'bridge.hello').map(e => [e.campaign.title, e.data.features.rolls.kinds]))
-const checks = ['skill', 'tool', 'ability', 'save', 'death', 'initiative', 'hitDie', 'hitDice', 'formula']
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 7): a plain roll of the dice tray, right
+// after a utility's roll, wherever rolls are made.
+const checks = ['skill', 'tool', 'ability', 'save', 'death', 'initiative', 'hitDie', 'hitDice', 'formula', 'plainRoll']
 // A description's own roll everywhere, and its damage where players may attack; asking the table
 // needs dnd5e's roll labels, which this world hasn't.
 // Ending an enchantment wherever uses are made (module 0.21.0). Ending a concentration wherever

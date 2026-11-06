@@ -91,4 +91,11 @@ for v in X=1 "X=1 DND5E6=1"; do run effects $v SLIM_CHECK=1; done
 # endings (dnd5e 5.3.3 and 6.0.5 stand-ins), and Midi-QOL's saves asked of and answered for a form.
 # Module 0.41.0: under MIDI=1, a change and a return refused and marked by Midi-QOL's Bonus Actions.
 for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run wildshape $v; done
+# Module 0.44.0: hit points and temporary hit points set from the app, the character's and a
+# companion's, by the campaign's own switch, on by default, fetched with every other switch off, and
+# what dnd5e does around them (hp-core.mjs; dnd5e 5.3.3 and 6.0.5, and Midi-QOL's stand-ins); a form's,
+# and its end at 0, in wildshape. And a plain roll of the dice tray, made with the player's dice under
+# dnd5e 5.3.3 and 6.0.5, with Midi-QOL's stand-ins and through libWrapper.
+for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run hitpoints $v; done
+for v in X=1 "X=1 DND5E6=1" MIDI=1 LIBWRAPPER=1; do run plain $v; done
 exit $fail

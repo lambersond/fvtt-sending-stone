@@ -254,7 +254,8 @@ const OFF = { enabled: false, kinds: [], reason: 'off' }
 const ON = { enabled: true, kinds: ['wildShape'], reason: null }
 const SYSTEM = { enabled: false, kinds: [], reason: 'system' }
 assert.deepEqual(helloOf().features.wildShape, OFF, 'off by default, a campaign saved without the field')
-assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape'])
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): `features.hitPoints`, whether its players set their hit points from the app, after Wild Shape.
+assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape', 'hitPoints'])
 await campaignAs({ wildShape: true })
 assert.deepEqual(helloOf().features.wildShape, ON, 'a saved switch sends the hello again, on')
 assert.ok(!helloOf().features.rolls.kinds.includes('wildShape') && !helloOf().features.companions.kinds.includes('wildShape'), "never among the rolls' kinds, nor a companion's")
@@ -350,6 +351,81 @@ async function prepareWhileShaped(formId) {
   await campaignAs({ rolls: false, attacks: false })
 }
 
+/**
+ * Module 0.44.0 (the v0.44 plan's item 4), under dnd5e 5.3.3 (13b) and 6.0.5 (18): hit points set from
+ * the app while she's shaped, for an app that takes Wild Shape and hit points, are set on her form, the
+ * sheet she's sent, her own actor untouched until the return carries them back; one from a number the
+ * form no longer has is refused "changed"; and the form set to 0 ends her Wild Shape at 0 hit points,
+ * with its line, once the setting is done, never before its result; held after its write, the form at
+ * 0, it isn't ended until the setting is done, by her queue alone. She starts at her maximum, and her
+ * Wild Shape's uses and hit points are put back as they were.
+ * @param {string} formId   The known form she takes.
+ */
+async function hitPointsWhileShaped(formId) {
+  app.features.set('camp-a', { commands: true, wildShape: 1, hitPoints: 1 })
+  await hello()
+  const was = { spent: shapeItem().system.uses.spent, hp: elowen.system.attributes.hp.value, temp: elowen.system.attributes.hp.temp }
+  await shapeItem().update({ 'system.uses.spent': 0 })
+  await elowen.update({ 'system.attributes.hp.value': elowen.system.attributes.hp.max, 'system.attributes.hp.temp': 0 })
+  const setting = (to, from) => ({ id: `hp-${++ids}`, actorId: 'elowen', kind: 'hitPoints', hitPoints: { op: 'set', ...to, from }, mode: 0, explicit: false, extras: [], dice: [] })
+  assert.equal((await made(transform(formId))).result.status, 'done')
+  const form = formOf()
+  const own = elowen.system.attributes.hp.value
+  const shown = form.system.attributes.hp.value
+  let it = await made(setting({ value: shown - 4 }, { value: shown }))
+  assert.deepEqual([it.result.status, it.result.hitPoints.value, form.system.attributes.hp.value, elowen.system.attributes.hp.value],
+    ['done', shown - 4, shown - 4, own], 'set on her form, her own actor untouched')
+  assert.deepEqual([sheetsIn(it).at(-1)?.data.character.sheet.hp.value, Boolean(sheetsIn(it).at(-1)?.data.character.sheet.form)], [shown - 4, true],
+    "the form's sheet, under her id, ahead of the result")
+  assert.deepEqual(refusal(await made(setting({ value: 1 }, { value: shown }))), ['failed', 'changed', null], "from a number the form hasn't now")
+  assert.equal((await made(revert())).result.status, 'done')
+  assert.equal(elowen.system.attributes.hp.value, shown - 4, 'carried back on the return')
+  // At 0, once the setting is done.
+  assert.equal((await made(transform(formId))).result.status, 'done')
+  const second = formOf()
+  const mark = messages.size
+  let told = null
+  const returning = Hooks.on('dnd5e.revertOriginalForm', () => { told ??= resultIndex(command.id) })
+  const command = setting({ value: 0 }, { value: second.system.attributes.hp.value })
+  it = await made(command)
+  assert.deepEqual([it.result.status, it.result.hitPoints.value], ['done', 0])
+  await until(() => !game.actors.get(second.id), 'the 0 hit points ending')
+  await settle(80)
+  Hooks.off('dnd5e.revertOriginalForm', returning)
+  assert.ok(told >= 0, 'ended once the setting was told, never before')
+  assert.deepEqual([endedOf().why, linesSince(mark)], ['hp', ["<p>Elowen's Wild Shape ends at 0 hit points.</p>"]], 'ended at 0 hit points, with its line')
+  // Held after the write, its form at 0: her queue, not the next tick, keeps the ending back. A
+  // setting on a queue of its own would end her form here, with the setting still on its way.
+  await elowen.update({ 'system.attributes.hp.value': elowen.system.attributes.hp.max })
+  await shapeItem().update({ 'system.uses.spent': 0 })
+  assert.equal((await made(transform(formId))).result.status, 'done')
+  const third = formOf()
+  let release
+  const gate = new Promise(resolve => { release = resolve })
+  let held = false
+  const holding = Hooks.on('updateActor', async actor => {
+    if ((actor.id !== third.id) || held) return
+    held = true
+    await gate
+  })
+  const heldSetting = setting({ value: 0 }, { value: third.system.attributes.hp.value })
+  app.waiting.set('camp-a', [heldSetting])
+  app.wake?.()
+  await until(() => held, 'the setting held after its write')
+  await settle(120)
+  assert.deepEqual([third.system.attributes.hp.value, Boolean(game.actors.get(third.id)), resultIndex(heldSetting.id)], [0, true, -1],
+    'at 0 while her setting is on its way: not ended, nothing told')
+  release()
+  Hooks.off('updateActor', holding)
+  await until(() => resultIndex(heldSetting.id) >= 0, 'the held setting told')
+  await until(() => !game.actors.get(third.id), 'ended once the held setting is done')
+  assert.equal(endedOf().why, 'hp', 'at 0 hit points')
+  await elowen.update({ 'system.attributes.hp.value': was.hp, 'system.attributes.hp.temp': was.temp })
+  await shapeItem().update({ 'system.uses.spent': was.spent })
+  app.features.delete('camp-a')
+  await hello()
+}
+
 if (DND5E6) {
   /* ------------------------------------------ */
   /*  18. dnd5e 6.0.5                           */
@@ -382,6 +458,8 @@ if (DND5E6) {
   ok('dnd5e 6.0.5, since 0.42.1: a spell slot spent from the app while she is shaped "shaped", from a count gone stale or of a pool she lacks too, her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
   await prepareWhileShaped(profilesOf()[0]._id)
   ok('dnd5e 6.0.5, since 0.42.1: one of her spells prepared from the app while she is shaped "shaped", as are a spell she lacks, her quarterstaff and a spell she doesn\'t prepare, her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
+  await hitPointsWhileShaped(profilesOf()[0]._id)
+  ok('dnd5e 6.0.5, since 0.44.0: hit points set from the app while she is shaped set on her form, her own untouched until the return carries them back, a stale one "changed"; set to 0, her Wild Shape ends at 0 hit points, with its line, once the setting is told; held after its write at 0, not ended until it is done, her queue keeping it back')
   process.exit(0)
 }
 
@@ -1073,6 +1151,13 @@ assert.deepEqual([lastSheet('fern').form.kind, lastSheet('fern').form.hours, las
 await fernWolf.revertOriginalForm()
 await settle(80)
 ok('endings: 2 hours of world time ("time"), 0 hit points ("hp") and Paralyzed ("incapacitated", one Paralyzed effect on her after, no separate Incapacitated, and Wild Shape again once it is gone), each with its line; a druid of level 2 "its hour ran out"; on the bridge alone, a second Gamemaster\'s client ending nothing, once; time run out with no bridge ended at checkBridge, minutesLeft 0 and never below past its end; 0 hit points while her roll is held ended once it is done; the switch off, nothing ends, her sheet the form\'s with minutesLeft null and her Wild Shape; Fern\'s 2014 Wild Shape Stunned not returned, minutesLeft null')
+
+/* -------------------------------------------- */
+/*  13b. Hit points while shaped (0.44.0)        */
+/* -------------------------------------------- */
+
+await hitPointsWhileShaped(wolfId)
+ok('0.44.0: hit points set from the app while she is shaped, for an app that takes Wild Shape and hit points, set on her form, the sheet she is sent, her own untouched until the return carries them back; one from a number the form has no longer "changed"; set to 0, her Wild Shape ends at 0 hit points, with its line, once the setting is told; held after its write at 0, not ended until it is done, her queue keeping it back')
 
 /* -------------------------------------------- */
 /*  14. Made in Foundry                         */
@@ -1916,8 +2001,9 @@ const fieldset = () => find(win, 'fieldset.sending-stone-wild-shape')
 assert.equal(fieldset().querySelector('legend').textContent.trim(), 'Wild Shape')
 assert.equal(fieldset().querySelector('label[for="sending-stone-wild-shape"]').textContent.trim(), label)
 const order2 = [...win.element.querySelectorAll('fieldset')].map(each => each.className)
-assert.deepEqual(order2.slice(order2.indexOf('sending-stone-effects'), order2.indexOf('sending-stone-effects') + 3),
-  ['sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-companions'], 'between Active effects and Companions')
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): Hit points between it and Companions.
+assert.deepEqual(order2.slice(order2.indexOf('sending-stone-effects'), order2.indexOf('sending-stone-effects') + 4),
+  ['sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-hit-points', 'sending-stone-companions'], 'between Active effects and Hit points')
 assert.equal(find(win, '[name="campaign.wildShape"]').checked, true, 'ticked, as saved')
 const boxes = () => [...fieldset().querySelectorAll('.sending-stone-wild-shape-packs input[type="checkbox"]')].map(box => [box.name, box.checked])
 assert.deepEqual(boxes(), [
@@ -1963,7 +2049,8 @@ await win.close()
 game.system.id = 'dnd5e'
 const rowsOf = () => helloOf().settings.sections.find(section => section.id === 'campaign').rows
 await hello()
-assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'companionInitiative', 'groups'])
+// Changed on purpose (module 0.44.0, the v0.44 plan's item 4): the hit points switch's row, after Wild Shape's.
+assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'hitPoints', 'companionInitiative', 'groups'])
 assert.deepEqual(rowsOf().find(each => each.id === 'wildShape'), { id: 'wildShape', label, value: true, text: 'On' })
 game.system.id = 'pf2e'
 await hello()

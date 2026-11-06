@@ -90,6 +90,9 @@ export function registerSettings() {
       effects: new BooleanField({ initial: false }),
       // May its players use Wild Shape from the app, since 0.40.0? Apart from its rolls, under dnd5e.
       wildShape: new BooleanField({ initial: false }),
+      // May its players set their hit points from the app, since 0.44.0? On until the Gamemaster turns
+      // it off, apart from its rolls, under dnd5e; a campaign saved before has none, read as on.
+      hitPoints: new BooleanField({ initial: true }),
       // The compendiums its druids learn Beasts from, since 0.40.0.
       wildShapePacks: new ArrayField(new StringField({ blank: false }), { initial: () => [...WILD_SHAPE_PACKS] }),
       // How its characters' companions enter initiative, since 0.36.0: each its own roll, or right
