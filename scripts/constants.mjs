@@ -91,8 +91,9 @@ export const SETTINGS = Object.freeze({
   HELP_MENU: "helpMenu",
 
   /** World-scope list of campaigns: {id, title, characters, groups, rolls, attacks, prompts,
-   *  manualDice, transfers, dishes, effects, wildShape, wildShapePacks, companionInitiative},
-   *  characters and groups being actor ids, and since 0.40.0 the Beasts' packs by collection. */
+   *  manualDice, transfers, dishes, effects, wildShape, wildShapePacks, hitPoints,
+   *  companionInitiative}, characters and groups being actor ids, since 0.40.0 the Beasts' packs by
+   *  collection, and since 0.44.0 `hitPoints`, a missing one read as on. */
   CAMPAIGNS: "campaigns",
 
   /** World-scope list of the dish cards deleted undecided, since 0.38.0, so that their app hears of

@@ -562,7 +562,7 @@ const order = [...win.element.querySelectorAll('fieldset')].map(each => each.cla
 // Changed on purpose (round 0.40.0 §10.2): Wild Shape between it and Companions.
 // Changed on purpose (module 0.44.0, the v0.44 plan's item 4): and Hit points after Wild Shape.
 assert.deepEqual(order.slice(order.indexOf('sending-stone-dishes'), order.indexOf('sending-stone-dishes') + 5),
-  ['sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-hit-points', 'sending-stone-companions'], 'between Magical Recipe Book and Wild Shape')
+  ['sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-hit-points', 'sending-stone-companions'], 'after Magical Recipe Book, ahead of Wild Shape, Hit points and Companions')
 assert.equal(find(win, '[name="campaign.effects"]').checked, true, 'ticked, as saved')
 assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'no warning: the app takes effects')
 tick(win, 'campaign.effects', false)

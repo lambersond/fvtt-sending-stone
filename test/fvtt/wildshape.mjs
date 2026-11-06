@@ -356,7 +356,8 @@ async function prepareWhileShaped(formId) {
  * the app while she's shaped, for an app that takes Wild Shape and hit points, are set on her form, the
  * sheet she's sent, her own actor untouched until the return carries them back; one from a number the
  * form no longer has is refused "changed"; and the form set to 0 ends her Wild Shape at 0 hit points,
- * with its line, once the setting is done, never before its result. She starts at her maximum, and her
+ * with its line, once the setting is done, never before its result; held after its write, the form at
+ * 0, it isn't ended until the setting is done, by her queue alone. She starts at her maximum, and her
  * Wild Shape's uses and hit points are put back as they were.
  * @param {string} formId   The known form she takes.
  */
@@ -393,6 +394,32 @@ async function hitPointsWhileShaped(formId) {
   Hooks.off('dnd5e.revertOriginalForm', returning)
   assert.ok(told >= 0, 'ended once the setting was told, never before')
   assert.deepEqual([endedOf().why, linesSince(mark)], ['hp', ["<p>Elowen's Wild Shape ends at 0 hit points.</p>"]], 'ended at 0 hit points, with its line')
+  // Held after the write, its form at 0: her queue, not the next tick, keeps the ending back. A
+  // setting on a queue of its own would end her form here, with the setting still on its way.
+  await elowen.update({ 'system.attributes.hp.value': elowen.system.attributes.hp.max })
+  await shapeItem().update({ 'system.uses.spent': 0 })
+  assert.equal((await made(transform(formId))).result.status, 'done')
+  const third = formOf()
+  let release
+  const gate = new Promise(resolve => { release = resolve })
+  let held = false
+  const holding = Hooks.on('updateActor', async actor => {
+    if ((actor.id !== third.id) || held) return
+    held = true
+    await gate
+  })
+  const heldSetting = setting({ value: 0 }, { value: third.system.attributes.hp.value })
+  app.waiting.set('camp-a', [heldSetting])
+  app.wake?.()
+  await until(() => held, 'the setting held after its write')
+  await settle(120)
+  assert.deepEqual([third.system.attributes.hp.value, Boolean(game.actors.get(third.id)), resultIndex(heldSetting.id)], [0, true, -1],
+    'at 0 while her setting is on its way: not ended, nothing told')
+  release()
+  Hooks.off('updateActor', holding)
+  await until(() => resultIndex(heldSetting.id) >= 0, 'the held setting told')
+  await until(() => !game.actors.get(third.id), 'ended once the held setting is done')
+  assert.equal(endedOf().why, 'hp', 'at 0 hit points')
   await elowen.update({ 'system.attributes.hp.value': was.hp, 'system.attributes.hp.temp': was.temp })
   await shapeItem().update({ 'system.uses.spent': was.spent })
   app.features.delete('camp-a')
@@ -432,7 +459,7 @@ if (DND5E6) {
   await prepareWhileShaped(profilesOf()[0]._id)
   ok('dnd5e 6.0.5, since 0.42.1: one of her spells prepared from the app while she is shaped "shaped", as are a spell she lacks, her quarterstaff and a spell she doesn\'t prepare, her spell and any copy of the form\'s unchanged, nothing posted; once she is back, her own prepared')
   await hitPointsWhileShaped(profilesOf()[0]._id)
-  ok('dnd5e 6.0.5, since 0.44.0: hit points set from the app while she is shaped set on her form, her own untouched until the return carries them back, a stale one "changed"; set to 0, her Wild Shape ends at 0 hit points, with its line, once the setting is told')
+  ok('dnd5e 6.0.5, since 0.44.0: hit points set from the app while she is shaped set on her form, her own untouched until the return carries them back, a stale one "changed"; set to 0, her Wild Shape ends at 0 hit points, with its line, once the setting is told; held after its write at 0, not ended until it is done, her queue keeping it back')
   process.exit(0)
 }
 
@@ -1130,7 +1157,7 @@ ok('endings: 2 hours of world time ("time"), 0 hit points ("hp") and Paralyzed (
 /* -------------------------------------------- */
 
 await hitPointsWhileShaped(wolfId)
-ok('0.44.0: hit points set from the app while she is shaped, for an app that takes Wild Shape and hit points, set on her form, the sheet she is sent, her own untouched until the return carries them back; one from a number the form has no longer "changed"; set to 0, her Wild Shape ends at 0 hit points, with its line, once the setting is told')
+ok('0.44.0: hit points set from the app while she is shaped, for an app that takes Wild Shape and hit points, set on her form, the sheet she is sent, her own untouched until the return carries them back; one from a number the form has no longer "changed"; set to 0, her Wild Shape ends at 0 hit points, with its line, once the setting is told; held after its write at 0, not ended until it is done, her queue keeping it back')
 
 /* -------------------------------------------- */
 /*  14. Made in Foundry                         */

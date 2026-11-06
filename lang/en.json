@@ -199,7 +199,7 @@
         "WildShapePacksHint": "The compendiums a druid's player learns Beasts from. Players see these Beasts' names and statistics in the app. A form put on a Wild Shape feature in Foundry from anywhere else, or outside the rules, is used only in Foundry.",
         "HitPoints": "Hit points",
         "HitPointsPlayers": "Allow Players to change their hit points from the app",
-        "HitPointsHint": "On by default. From the app, a player sets the hit points and temporary hit points of their own character, its Wild Shape form and their companions, as they could on the sheet here: just the numbers, with no damage types, resistances or rolls. dnd5e still asks for a concentration check when they go down, and a Wild Shape form at 0 hit points ends. Nothing is posted in chat.",
+        "HitPointsHint": "On by default. From the app, a player sets the hit points and temporary hit points of their own character, its Wild Shape form and their companions, as they could on the sheet here: just the numbers, with no damage types, resistances or rolls. dnd5e still asks for a concentration check when they go down; and with Wild Shape allowed above, a 2024 druid's Wild Shape form set to 0 hit points ends, as at 0 any other way. Nothing is posted in chat.",
         "HitPointsApp": "The app this campaign sends to doesn't let players change hit points yet.",
         "Companions": "Companions",
         "CompanionInitiative": "Companions' initiative",

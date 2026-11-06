@@ -2593,16 +2593,21 @@ as dnd5e 6 posts a utility's roll. It's flagged `request` and marked as any roll
 the Gamemaster's page rolled it as the character. Each die takes the player's value; Foundry's total
 is the roll's. `rerolls` changes nothing, as a plain die has no reroll.
 
-A plain roll is refused `"invalid"`, nothing posted, with `error`: `"mode"` and `"extras"`, as a hit
-die; `"plainRoll"` for a `plainRoll` missing or not as above, for anything a roll names (`key`,
-`text`, `link`, `prompt`, `slot`, `target`, `targets`, `self`, `enchant`), for `combatId`,
-`denomination`, `hitDice`, `turn`, `critical`, `modifiers` or `types`, and for a `plainRoll` on any
-other kind; `"item"` for an `item` or `activity`; `"dice"` where they aren't one entry per term as
-above; `"of"`, as a companion makes none; `"effectDice"`. Then `"off"` where the campaign's rolls
-are off or the self-test hasn't passed, `"unknown"` for no such character, `"dice"` where a module
-changed the roll so that the player's dice can't reach it, as inside a function, `"cancelled"` where
-a module called it off, `"error"` and `"timeout"`. Its [`command.result`](#commandresult) is any
-roll's: `messageId`, `visible` and `rolls`.
+A plain roll is refused, nothing posted, in this order, as any roll is: first `"off"` where the
+campaign's rolls are off or the self-test hasn't passed, whatever the command holds; then
+`"invalid"`, with `error`: `"mode"` and `"extras"`, as a hit die; `"plainRoll"` for a `plainRoll`
+missing or not as above, for anything a roll names (`key`, `text`, `link`, `prompt`, `slot`,
+`target`, `targets`, `self`, `enchant`), for `combatId`, `denomination`, `hitDice`, `turn`,
+`critical`, `modifiers` or `types`, and for a `plainRoll` on any other kind; `"item"` for an `item`
+or `activity`; `"dice"` where they aren't one entry per term as above; `"of"`, as a companion makes
+none; `"effectDice"`. Then `"unknown"` for no such character, `"dice"` where a module changed the
+roll so that the player's dice can't reach it, as inside a function, `"cancelled"` where a module
+called it off, `"error"` and `"timeout"`. Its [`command.result`](#commandresult) is any roll's:
+`messageId`, `visible` and `rolls`.
+
+Its body is strict: a key in `plainRoll` beyond `terms` and `bonus` is refused `"invalid"`, `error`
+`"plainRoll"`, by module 0.44.0. A later field there, such as a label, is sent only to a module that
+announces it, never added on the app's side alone.
 
 A listener before module 0.44.0 never sends one. A module before 0.44.0 never lists the kind; handed
 one anyway, it refuses it `"off"` where the campaign's rolls are off, else `"invalid"`, `error`

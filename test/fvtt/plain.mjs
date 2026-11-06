@@ -407,5 +407,5 @@ for (const [plainRoll, formula] of [
 ]) assert.equal(plainFormula(plainRoll), formula)
 ok('plainFormula: each size\'s dice in order, then " + n" or " - n", none for 0 or null, a d100 as "1d100"')
 
-assert.ok(oks >= 9)
+assert.equal(oks, 9)
 process.exit(0)
