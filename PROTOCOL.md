@@ -1454,7 +1454,8 @@ campaign's characters that touches Tidy's flags, an entry added, edited, reorder
 Tidy, Tidy 13's `-=<key>` delete and Tidy 14's `_del` alike, or a Classic box written, or that
 changes the character's ownership, which decides its secrets. Never for a group, a token's own actor
 or a Wild Shape form, and never twice the same, until the campaign's next hello. What's changed
-while no Gamemaster is connected goes with the next hello.
+while no Gamemaster is connected goes with the next hello. One lost to failures that might not last
+sends the hello again 30 seconds later, which every one follows.
 
 **What's never sent.** A journal entry whose key isn't 1 to 64 letters and digits, as a stray
 `-=<key>` key, which Tidy 13's delete may leave behind on Foundry 14.365 to 14.368, or whose value

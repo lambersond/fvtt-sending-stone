@@ -1,3 +1,4 @@
+import { TIDY } from "./constants.mjs";
 import { enchantmentsOf } from "./sheet-enchant.mjs";
 import { usesOf } from "./sheet-features.mjs";
 import {
@@ -22,9 +23,6 @@ import { finite, localize } from "./sheet-values.mjs";
  * with no activation of its own, such as Hex's Bonus Hex Damage, goes with the item's first. The
  * spells an item casts are cast from the item: the copies dnd5e keeps of them aren't listed.
  */
-
-/** Tidy 5e's flags. */
-const TIDY = "tidy5e-sheet";
 
 /** The sections, in Tidy 5e's order. Actions activated any other way go under Other. */
 const SECTIONS = ACTION_KINDS;

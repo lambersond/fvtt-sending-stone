@@ -165,6 +165,10 @@ export const EVENTS = Object.freeze({
    *  only to an app that says it reads them, `features.notes`. */
   JOURNAL_UPDATED: "journal.updated",
 
+  /** The journal Tidy 5e Sheets keeps on one of a campaign's characters, whole, read only, since
+   *  0.45.0: sent only to an app that says it reads it, `features.notes` 3 or more. */
+  JOURNAL_TIDY: "journal.tidy",
+
   /** The campaign's characters' companions, whole, since 0.36.0: sent only to an app that says it
    *  reads them, `features.companions`, whenever they change. */
   COMPANIONS_LISTED: "companions.listed",
@@ -534,6 +538,30 @@ export const NOTE_ID = /^[A-Za-z0-9]{16}$/;
 
 /** The listener's notes format, `features.notes`, from which it's told who changed a journal in Foundry (`journal.changed`), since 0.35.0. */
 export const NOTES_CHANGES = 2;
+
+/** The listener's notes format from which it's sent Tidy 5e Sheets' journal (`journal.tidy`), since 0.45.0. */
+export const NOTES_TIDY = 3;
+
+/**
+ * Tidy 5e Sheets' id, the scope of its flags: its Actions tab's sections, and since 0.45.0 the
+ * journal it keeps on a character.
+ * @type {string}
+ */
+export const TIDY = "tidy5e-sheet";
+
+/** A Tidy journal entry's key in its flag, as the app takes one, since 0.45.0: Tidy makes 16 letters and digits. */
+export const TIDY_ID = /^[A-Za-z0-9]{1,64}$/;
+
+/**
+ * The boxes of Tidy's Classic sheet's Journal tab, in its order, since 0.45.0: Persons of Interest,
+ * Locations of Interest, Quests and Miscellaneous, each `{name, value}`, then Journal Entries,
+ * `{value}`.
+ * @type {readonly string[]}
+ */
+export const TIDY_CLASSIC = Object.freeze(["notes1", "notes2", "notes3", "notes4", "notes"]);
+
+/** The most entries a character's Tidy journal is sent with, since 0.45.0: past it, it's withheld. */
+export const MOST_TIDY_ENTRIES = 400;
 
 /**
  * The options the module's own writes of journals and pages carry, since 0.35.0, so that the hooks

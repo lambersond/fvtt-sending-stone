@@ -265,6 +265,10 @@
         "Title": "libWrapper",
         "Hint": "Keeps players' rolls working alongside other dice modules."
       },
+      "Tidy": {
+        "Title": "Tidy 5e Sheets",
+        "Hint": "Players read their character's Tidy journal in the app's journal."
+      },
       "System": {
         "Title": "D&D Fifth Edition",
         "Hint": "Needed for players' rolls, attacks and save prompts."
@@ -286,7 +290,8 @@
       "RollsRecovered": "{campaign}'s players' rolls reach the game again.",
       "SheetTooLarge": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes. Its player is told.",
       "SheetTooLargeUntold": "Sending Stone can't send {name}'s sheet to {campaign}: it came to {size}, more than the {limit} the app takes.",
-      "JournalTooLarge": "{name} came to {size}, more than {campaign} takes, so its notes aren’t sent. Players see them as they were."
+      "JournalTooLarge": "{name} came to {size}, more than {campaign} takes, so its notes aren’t sent. Players see them as they were.",
+      "TidyTooLarge": "{name}'s Tidy 5e Sheets journal is too large to send to {campaign}: {count} entries, {size}, where the app takes {most} entries and {limit}. Players see it as it was."
     },
     "Problem": {
       "unreachable": "Sending Stone can't reach the app at {address}.",

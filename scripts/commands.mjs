@@ -36,6 +36,7 @@ import { answersMidiPrompt, midiPromptsOffered, noteMidiReader, noteOpen } from 
 import { prompting } from "./prompts.mjs";
 import { effectDiceSystem } from "./sheet-effect-dice.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
+import { noteTidyReader } from "./tidy-journal.mjs";
 import { currentSession, DeliveryError, refusalError, send } from "./transport.mjs";
 
 /**
@@ -262,8 +263,9 @@ export function registerCommandHooks() {
  * game asks of companions, `companions` 2, to which their open prompts are sent again where it first
  * says so (creature-sync.mjs); and since 0.44.0, whether it takes hit points set, for which it's
  * fetched from where the campaign's Gamemaster lets its players, under dnd5e, with everything else
- * off. A hello's answer wakes the campaign's fetching, which may be waiting as an answer given before
- * the hello was taken asked.
+ * off; and since 0.45.0, whether it reads Tidy 5e Sheets' journal, `notes` 3, which is sent at once
+ * where it starts to in a heartbeat's answer (tidy-journal.mjs). A hello's answer wakes the
+ * campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -284,6 +286,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteHitPointReader(campaignId, features);
   noteAloneReader(campaignId, features, type);
   noteNotesReader(campaignId, features, type);
+  noteTidyReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);
   syncPollers();
   if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.wake?.();

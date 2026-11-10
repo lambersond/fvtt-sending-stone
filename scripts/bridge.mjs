@@ -22,6 +22,7 @@ import { noteFeatures } from "./journals.mjs";
 import { releaseHeldCards } from "./midi-prompts.mjs";
 import { openPrompts } from "./prompts.mjs";
 import { forgetSent } from "./sheet-texts.mjs";
+import { tidyHello } from "./tidy-journal.mjs";
 import { send } from "./transport.mjs";
 import { deleteLeftovers, endDueForms } from "./wild-shape.mjs";
 
@@ -97,7 +98,9 @@ const resent = new Map();
  * effects from the app, `features.effects`, by its own switch under D&D Fifth Edition. Since 0.40.0,
  * whether its players may use Wild Shape from the app, `features.wildShape`, by its own switch under
  * D&D Fifth Edition. Since 0.44.0, whether its players may set their hit points from the app,
- * `features.hitPoints`, by its own switch, on until turned off, under D&D Fifth Edition.
+ * `features.hitPoints`, by its own switch, on until turned off, under D&D Fifth Edition. Since 0.45.0,
+ * under D&D Fifth Edition, what of Tidy 5e Sheets' journal its characters hold, and whether Tidy is
+ * active, `features.notes.tidy` (tidy-journal.mjs).
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -135,7 +138,8 @@ export function announce({ campaignId }={}) {
       ...shared,
       features: {
         rolls: rollFeatures(campaign), transfers: transferFeatures(campaign), removals: removalFeatures(),
-        notes: noteFeatures(campaign), companions: companionFeatures(campaign), favorites: favoriteFeatures(),
+        notes: { ...noteFeatures(campaign), ...tidyHello(campaign) }, companions: companionFeatures(campaign),
+        favorites: favoriteFeatures(),
         dishes: dishFeatures(campaign), effects: effectFeatures(campaign), wildShape: wildShapeFeatures(campaign),
         hitPoints: hitPointFeatures(campaign)
       },

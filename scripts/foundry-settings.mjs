@@ -1,5 +1,5 @@
 import {
-  CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, HELLO_DELIVERED_HOOK, MODULE_ID, RESULTS_MODES, SETTINGS
+  CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, HELLO_DELIVERED_HOOK, MODULE_ID, RESULTS_MODES, SETTINGS, TIDY
 } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
@@ -31,10 +31,11 @@ import { helloPending, send } from "./transport.mjs";
 const FORMAT = 1;
 
 /**
- * The modules listed, where installed, in this order.
+ * The modules listed, where installed, in this order: since 0.45.0 Tidy 5e Sheets last, whose
+ * journal the app reads.
  * @type {readonly string[]}
  */
-const MODULES = Object.freeze(["midi-qol", "lib-wrapper", MANUAL_DICE, "combat-focus"]);
+const MODULES = Object.freeze(["midi-qol", "lib-wrapper", MANUAL_DICE, "combat-focus", TIDY]);
 
 /**
  * Midi-QOL's settings shown, all among its configSettings() (MQ settings:1675-1679), by their

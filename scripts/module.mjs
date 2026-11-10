@@ -21,6 +21,7 @@ import { registerJournalHooks } from "./journals.mjs";
 import { installMidiPrompts, registerMidiPromptHooks } from "./midi-prompts.mjs";
 import { registerPromptHooks } from "./prompts.mjs";
 import { registerSettings } from "./settings.mjs";
+import { registerTidyHooks } from "./tidy-journal.mjs";
 
 Hooks.once("init", () => {
   registerSettings();
@@ -30,6 +31,7 @@ Hooks.once("init", () => {
   registerCharacterHooks();
   registerCreatureHooks();
   registerJournalHooks();
+  registerTidyHooks();
   registerPromptHooks();
   registerMidiPromptHooks();
   registerCommandHooks();
