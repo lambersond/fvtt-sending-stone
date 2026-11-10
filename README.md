@@ -186,7 +186,11 @@ while the roll is being made.
   left, with **Roll it now**. After a minute, or once the character is closed in the app, Foundry's
   computer dice roll it, never your own Manual Dice. Rolls of other players, of targets, NPCs and
   your own are never asked, a damage you roll for a player's attack among them, from the app or on
-  Midi's card, your own use of the player's item, nor d20s: the saves a spell asks come as prompts.
+  Midi's card, your own use of the player's item from its sheet or Midi's card, nor a d20 the game
+  rolls later: the saves a spell asks come as prompts. A roll of yours may be asked wrongly only
+  where a macro or module of yours makes it with the very item the player is rolling, with no
+  click, while their roll is being made, or builds it just as Midi builds a bonus damage, in the
+  instant before Midi rolls one; PROTOCOL.md names both.
   Not yet under dnd5e 6, whose campaigns' hellos say so. See
   [PROTOCOL.md](PROTOCOL.md#dice-the-game-rolls-later). And under dnd5e 5 or 6, the module's own
   check of what a use from the app would spend, which it throws away, rolls a dice cost with
