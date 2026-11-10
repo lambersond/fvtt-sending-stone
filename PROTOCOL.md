@@ -4068,24 +4068,28 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   taken so uses up none of what either awaits; and while one of them waits on an ask made before
   the other's came, nothing is taken for it, so a roll of that formula meanwhile that no other
   awaits is the Gamemaster's own, as with one workflow.
-- **What's never asked.** A d20 roll, in the run's workflow or not: the attack is the roll's own,
-  and the saves and checks a run asks of the character are asked as
-  [prompts](#midi-qols-own-saves) already. The roll's own dice, as the 1d10 of an Ice Knife's
-  `damage`, nor another player's typed roll being made meanwhile. A roll in another browser; another
-  player's, a target's, an NPC's or the Gamemaster's own, made outside the run, of another actor, in
-  another workflow, or in the run's own once it has ended or been aborted; a roll of the run's item
-  with no workflow once the roll is made, while its workflow goes on; a roll made with a click, as
-  the Gamemaster's from a Midi card's damage button for the player's workflow, which also takes that
-  workflow out of the run, as their `damage` from the app does; a roll whose dice are all numbers,
-  maximized or minimized; where Midi-QOL averages the actor's damage, its damage. The one roll that
-  may be asked wrongly is one the Gamemaster's own code makes, of the same item of the same
-  character, with no click and no workflow of its own, while the player's roll is being made: a few
-  seconds, or as long as its asks wait, up to a minute each, five minutes at most with dice thrown
-  again; or, with Midi-QOL, in the instant before each of a run's bonus formulas is rolled, within
-  its workflow's roll of them, never while one waits, a damage roll made just as Midi would make
-  it, of its formula, type and flavor: it's asked as the run's, and Midi's own bonus rolls of that
-  workflow while it waits are then the Gamemaster's own; or, where two runs' are awaited at once,
-  it's Foundry's computer dice, and theirs are still.
+- **What's never asked.** A d20 roll the game makes later, in the run's workflow or not: the attack
+  is the roll's own, and the saves and checks a run asks of the character are asked as
+  [prompts](#midi-qols-own-saves) already; a die of a typed d20 roll thrown again is asked as below.
+  The roll's own dice, as the 1d10 of an Ice Knife's `damage`, nor another player's typed roll being
+  made meanwhile. A roll in another browser; another player's, a target's, an NPC's or the
+  Gamemaster's own, made outside the run, of another actor, in another workflow, or in the run's own
+  once it has ended or been aborted; a roll of the run's item with no workflow once the roll is made,
+  while its workflow goes on; a roll made with a click, as the Gamemaster's from a Midi card's damage
+  button for the player's workflow, which also takes that workflow out of the run, as their `damage`
+  from the app does; a roll whose dice are all numbers, maximized or minimized; where Midi-QOL
+  averages the actor's damage, its damage. The one roll that may be asked wrongly is one the
+  Gamemaster's own code makes, of the same item of the same character, with no click and no
+  workflow of its own, as a macro using the item, while the player's roll is being made: a few
+  seconds, or as long as its asks wait, up to a minute each, or, with Midi-QOL, as long as Midi goes
+  on with a `damage` rolled into its workflow before that roll returns, as it may while waiting for
+  its targets' saves or the Gamemaster to confirm the damage, and an area's up to a minute more as
+  the module waits for Midi to go past its targeting; five minutes at most in all. Or, with
+  Midi-QOL, in the instant before each of a run's bonus formulas is rolled, within its workflow's
+  roll of them, never while one waits, a damage roll made just as Midi would make it, of its
+  formula, type and flavor: it's asked as the run's, and Midi's own bonus rolls of that workflow
+  while it waits are then the Gamemaster's own; or, where two runs' are awaited at once, it's
+  Foundry's computer dice, and theirs are still.
 - **Checks of a cost.** Before it uses an item from the app, the module works out what the use
   would spend, and throws that away, as it has since before 0.45.0. Since 0.45.0 a dice cost rolled
   for that check, for any use from the app, typed or not, any player's or the Gamemaster's, under
