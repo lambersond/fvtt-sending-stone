@@ -117,6 +117,14 @@ const runs = new Map();
 const byWorkflow = new Map();
 
 /**
+ * The Midi-QOL workflows taken out of any run: fed by a roll that opens none, as the Gamemaster's
+ * damage from the app or an untyped one, or rolled with a click, as the Gamemaster's from Midi's
+ * card. Their rolls are no run's, though a use from the app tags them still.
+ * @type {WeakSet<object>}
+ */
+const released = new WeakSet();
+
+/**
  * Every ask, by its id, kept a while once closed.
  * @type {Map<string, Ask>}
  */
@@ -408,16 +416,38 @@ export function endRun(run) {
 
 /**
  * Bind a Midi-QOL workflow to the run of the roll that started or fed it, as soon as it's known: its
- * rolls are that run's from then on, its later ones among them, until it ends.
+ * rolls are that run's from then on, its later ones among them, until it ends. Fed by a roll that
+ * opens no run, as the Gamemaster's damage from the app or a player's untyped one, it's no run's
+ * from then on: what Midi rolls with that damage, and after it, is Foundry's, as before 0.45.0.
  * @param {string} commandId
  * @param {object} workflow
  * @returns {void}
  */
 export function bindWorkflow(commandId, workflow) {
+  if ( !workflow || (typeof workflow !== "object") ) return;
   const run = runs.get(commandId);
-  if ( !run || run.closed || !run.window || !workflow || (typeof workflow !== "object") ) return;
+  if ( !run || run.closed || !run.window ) return void releaseWorkflow(workflow);
+  released.delete(workflow);
   run.workflows.add(workflow);
   byWorkflow.set(workflow, run);
+}
+
+/**
+ * Take a Midi-QOL workflow out of every run it started or fed, for good unless a run's roll feeds
+ * it again: its rolls are no run's. Such a run, made, closes once no other workflow of its goes on.
+ * @param {object} workflow
+ * @returns {void}
+ */
+function releaseWorkflow(workflow) {
+  released.add(workflow);
+  byWorkflow.delete(workflow);
+  let bound = false;
+  for ( const run of runs.values() ) bound = run.workflows.delete(workflow) || bound;
+  if ( !bound ) return;
+  for ( const bracket of Array.from(brackets) ) {
+    if ( bracket.owner === workflow ) closeBracket(bracket);
+  }
+  sweepRuns();
 }
 
 /**
@@ -480,11 +510,12 @@ function actorOf(run, actor) {
 /**
  * The run a Midi-QOL workflow's rolls belong to: the one it's bound to; or, not yet bound, that of
  * the use from the app it was started for, which tags it. None for any other workflow, the
- * Gamemaster's own among them.
+ * Gamemaster's own among them, nor for one taken out of its run.
  * @param {object} workflow
  * @returns {Run|null}
  */
 function runOfWorkflow(workflow) {
+  if ( released.has(workflow) ) return null;
   const bound = byWorkflow.get(workflow);
   if ( bound && !bound.closed ) return bound;
   const tag = workflow.workflowOptions?.[ROLL_TAG];
@@ -516,8 +547,9 @@ function runOfSubject(subject) {
 /**
  * The run a step of rolls dnd5e has configured belongs to, if any, and so is asked: not a plan's own
  * step, nor a d20 roll; of the run's character; with Midi-QOL, named its workflow by its process;
- * otherwise, its subject an activity of the run's item while it's made, with no click. Not damage
- * Midi-QOL averages.
+ * otherwise, its subject an activity of the run's item while it's made; with no click either way.
+ * One with a click in a run's workflow, as the Gamemaster's from Midi's card, takes the workflow out
+ * of the run, as their damage from the app does. Not damage Midi-QOL averages.
  * @param {Roll[]} rolls
  * @param {object} process   The roll process's configuration.
  * @returns {Run|null}
@@ -531,6 +563,10 @@ function runOfStep(rolls, process) {
   if ( workflow && (typeof workflow === "object") ) {
     run = runOfWorkflow(workflow);
     if ( run && !actorOf(run, process.subject?.actor ?? workflow.actor) ) return null;
+    if ( run && process.event ) {
+      releaseWorkflow(workflow);
+      return null;
+    }
   } else {
     if ( process?.event ) return null;
     run = runOfSubject(process?.subject);
