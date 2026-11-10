@@ -496,14 +496,18 @@ const strangers = []
 const spending = Hooks.on('dnd5e.preActivityConsumption', () => {
   strangers.push(new foundry.dice.Roll('0 + 1d4').evaluate(), new BasicRoll('0 + 1d4', {}, { flavor: 'Mine' }).evaluate())
 })
+before = usesOf('charm')
 using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
 ask = await nextAsk(count)
 Hooks.off('dnd5e.preActivityConsumption', spending)
-await Promise.all(strangers)
-assert.deepEqual([ask.purpose, asked().length - count, checks()], ['cost', 1, ['0 + 1d4', '0 + 1d4', '0 + 1d4']], "the check, then the two others, the Gamemaster's, while the cost waits")
+/** Are these rolls thrown at once, rather than held on an ask? */
+const atOnce = rolls => Promise.race([Promise.all(rolls).then(() => 'thrown'), wait(100).then(() => 'held')])
+assert.equal(await atOnce(strangers), 'thrown', 'never held')
+assert.deepEqual([ask.purpose, ask.rolls, asked().length - count, checks()],
+  ['cost', [{ formula: '0 + 1d4', terms: [{ faces: 4, number: 1 }] }], 1, ['0 + 1d4', '0 + 1d4', '0 + 1d4']], "the check, then the two others, the Gamemaster's, while the cost waits")
 await make(answerOf(ask, [{ roll: 0, term: 0, results: [2] }]))
 used = await using
-assert.deepEqual([used.status, checks()], ['done', []])
+assert.deepEqual([used.status, usesOf('charm') - before, checks()], ['done', 2, []], 'dnd5e\'s cost took the answer')
 ok("as dnd5e begins spending, a plain roll and a BasicRoll of the cost's formula without dnd5e's delta: never the cost, the Gamemaster's manual dice at once; dnd5e's cost alone asked")
 
 /* -------------------------------------------- */
@@ -776,11 +780,11 @@ const sneak = await attack('dagger', 'dagger-stab', 16)
 dealing = damage(sneak.id, [{ faces: 4, results: [3] }])
 ask = await nextAsk(count)
 assert.deepEqual([ask.purpose, ask.label, ask.rolls.map(roll => [roll.type, roll.flavor, roll.terms])], ['bonus', 'Dagger: Attack', [['piercing', 'Sneak Attack', [{ faces: 6, number: 2 }]]]])
-await Promise.all([new foundry.dice.Roll('1d6'), new DamageRoll('1d6', {}, { type: 'force', flavor: "Hunter's Mark" })].map(roll => roll.evaluate()))
+assert.equal(await atOnce([new foundry.dice.Roll('1d6'), new DamageRoll('1d6', {}, { type: 'force', flavor: "Hunter's Mark" })].map(roll => roll.evaluate())), 'thrown', 'never held')
 assert.deepEqual([asked().length - count, checks()], [1, ['1d6', '1d6']], "the Gamemaster's two while Sneak Attack's waits: theirs, never asked")
 await make(answerOf(ask, [{ roll: 0, term: 0, results: [4, 4] }]))
 const mark = await nextAsk(count + 1)
-await Promise.all(instant)
+assert.equal(await atOnce(instant), 'thrown', 'never held')
 assert.deepEqual([mark.purpose, mark.rolls.map(roll => [roll.type, roll.flavor, roll.terms]), checks()],
   ['bonus', [['force', "Hunter's Mark", [{ faces: 6, number: 1 }]]], ['1d6', '1d6']], "Hunter's Mark's asked; the instant's two the Gamemaster's")
 await make(answerOf(mark, [{ roll: 0, term: 0, results: [1] }]))
