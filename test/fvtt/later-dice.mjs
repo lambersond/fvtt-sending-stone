@@ -535,6 +535,53 @@ const late = await make(answerOf(ask, [{ roll: 0, term: 0, results: [1] }]))
 assert.deepEqual(refusal(late), ['failed', 'diceAsk', 'answered'], 'answered after it was rolled')
 ok("the Gamemaster's Roll it now: closed rolled, Foundry's die, an answer after refused diceAsk answered")
 
+// What waits: a roll whose run waits on an ask isn't timed out meanwhile. The module's own check of
+// the use's cost held 5 seconds, as a slow Foundry's might be, so that its one ask opens 5 seconds
+// in: still open at the use's minute, none closed before it, answered 58 seconds after it was asked,
+// 63 into the use: the use done, its one result, never a timeout first.
+/** When a command's first result came, by the module's clock. */
+const resultAt = id => app.events.find(e => (e.type === 'command.result') && (e.data.id === id))?.at
+const prepareUpdates = Activity.prototype._prepareUsageUpdates
+Activity.prototype._prepareUsageUpdates = async function (config, options, ...rest) {
+  if (options?.returnErrors && (this.item?.id === 'charm')) await pass(5000)
+  return prepareUpdates.call(this, config, options, ...rest)
+}
+count = asked().length
+const acrossId = `use-${++ids}`
+using = make(typed({ id: acrossId, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
+const handed = Date.now()
+ask = await nextAsk(count)
+Activity.prototype._prepareUsageUpdates = prepareUpdates
+assert.ok(Date.parse(ask.askedAt) - handed >= 5_000, `asked ${Date.parse(ask.askedAt) - handed} ms into the use`)
+await pass(58_000)
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [2] }]))
+used = await using
+await pass(2000)
+assert.deepEqual([resultsOf(acrossId).map(result => result.status), closeOf(ask.id), checks()], [['done'], { id: ask.id, reason: 'answered' }, []], 'never a timeout first')
+assert.ok(resultAt(acrossId) - handed >= 60_000, `done ${resultAt(acrossId) - handed} ms into the use, past its minute`)
+// Its ask answered at 50 seconds, then the use goes on 15 seconds more, its card written slowly: 65
+// seconds in all, 50 of them waiting on its ask, which its minute doesn't count: never timed out.
+count = asked().length
+const slowId = `use-${++ids}`
+const slowCard = Hooks.on('createChatMessage', message => {
+  if (message.flags?.['sending-stone']?.use !== slowId) return
+  const setFlag = message.setFlag
+  message.setFlag = async function (scope, key, value) {
+    if (key === 'usage') await pass(15_000)
+    return setFlag.call(this, scope, key, value)
+  }
+})
+using = make(typed({ id: slowId, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
+ask = await nextAsk(count)
+await pass(50_000)
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [2] }]))
+used = await using
+Hooks.off('createChatMessage', slowCard)
+await pass(2000)
+assert.deepEqual([resultsOf(slowId).map(result => result.status), checks()], [['done'], []], 'never a timeout first')
+assert.ok(resultAt(slowId) - Date.parse(ask.askedAt) >= 65_000, `done ${resultAt(slowId) - Date.parse(ask.askedAt)} ms after its ask, past its minute`)
+ok("a roll whose run waits on an ask isn't timed out: its one ask, asked 5 seconds in, open across the use's minute with none closed before it, answered 63 seconds in, the use done, never a timeout first; an ask answered at 50 seconds, the use going on 15 seconds more, done at 65 seconds, its minute not counting the 50 its ask waited")
+
 // The character not open in the app: nothing asked, the computer's die.
 app.open = new Set()
 await pass(1000)
