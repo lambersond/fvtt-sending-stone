@@ -1790,9 +1790,10 @@ export async function selfTest() {
     await withPlan({ id, dice }, () => copy.evaluate());
     check(JSON.stringify(results(copy)) === expected, `a copy's dice were ${JSON.stringify(results(copy))}`);
 
-    // Once made, the roll's tag matches nothing.
+    // Once made, the roll's tag matches nothing. Since 0.45.0 it's thrown without asking anyone, as
+    // the Gamemaster's Manual Dice would ask them for it at every start-up.
     const before = served;
-    await later.evaluate();
+    await later.evaluate({ allowInteractive: false });
     check(served === before, "a roll made earlier was given a player's dice");
 
     Object.assign(diceStatus, { ready: true, reason: null, error: null });
