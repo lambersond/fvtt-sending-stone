@@ -167,9 +167,10 @@ while the roll is being made.
   effects applied to the character in Foundry are found: a Bless the table narrates is added with
   Modify Roll. The die they type is the die kept: Foundry rerolls none of it, a Halfling's 1 or a
   Great Weapon Fighter's 1 or 2, as they rerolled at the table; a die the game throws itself still
-  rerolls. An explosion is still Foundry's. Since 0.42.1, the 2024 Bardic Inspiration a bard gave
-  the character is offered beside Done, left out until the player adds it once the Gamemaster says
-  the roll fails; once the roll is made, the app removes Inspired where the campaign lets players
+  rerolls. An explosion is still Foundry's, but since 0.45.0, under dnd5e 5, the player is asked
+  for the die it throws too (below). Since 0.42.1, the 2024 Bardic Inspiration a bard gave the
+  character is offered beside Done, left out until the player adds it once the Gamemaster says the
+  roll fails; once the roll is made, the app removes Inspired where the campaign lets players
   remove their own effects, and otherwise says to ask the Gamemaster. Inspired is applied from the
   bard's card by the Gamemaster (a player can't apply it to another player's character). The 2014
   one is added with Modify Roll. Midi-QOL's optional bonuses are still offered on the Gamemaster's
@@ -889,7 +890,8 @@ Gamemaster-only information switched on.
   d20s, Elven Accuracy's among them, and a Halfling's reroll of those stays Foundry's.
 - **A die skipped for the game** isn't in the app's own total, which says so; the tray's table total
   has it.
-- **An exploding die** typed in still has Foundry throw its extra die.
+- **An exploding die** typed in has its extra die asked of the player since 0.45.0, under dnd5e 5;
+  under dnd5e 6, or where the app doesn't take the dice the game rolls later, Foundry throws it.
 - **Midi-QOL's optional bonuses**, its Bardic Inspiration among them, are offered on the
   Gamemaster's screen after the roll, with Foundry's dice.
 - **Bane where the game nests a lone negative die** (checked by the self-test) is rolled by Foundry.
