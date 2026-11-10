@@ -7,10 +7,11 @@
 // other activity that spends something deferred until saves are checked, healing and an ammunition's
 // own activity rolled with the damage, a utility's formula, and bonus damage macros rolled through
 // callMacros and rollBonusDamage, one after another; a companion of Thorin's and a Wild Shape form
-// of his; a stand-in app that answers asks, says which characters are open, and whether it reads
-// asks (OLD_APP=1: an app before them); a DialogV2 for the Gamemaster's window, who rolls their own
-// dice with Manual Dice; and a clock run a hundred times as fast, timers and Date.now alike, so that
-// a minute's wait takes 0.6 seconds. BREAK_ASK=1: a core whose die doesn't wait for a value its
+// of his; Mira, another player's character, whose use spends what Thorin's charm does; a stand-in
+// app that answers asks, says which characters are open, and whether it reads asks (OLD_APP=1: an
+// app before them); a DialogV2 for the Gamemaster's window, who rolls their own dice with Manual
+// Dice; and a clock run a hundred times as fast, timers and Date.now alike, so that a minute's wait
+// takes 0.6 seconds. BREAK_ASK=1: a core whose die doesn't wait for a value its
 // fulfillment promises (dice-core.mjs's unawaitedRoll), which fails the self-test. LIBWRAPPER=1:
 // the module wraps through libWrapper. Run with --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
@@ -85,7 +86,7 @@ globalThis._loc ??= (key, data) => (data ? game.i18n.format(key, data) : game.i1
 foundry.utils.escapeHTML ??= value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' })[ch])
 
 const { Actor5e } = await import('./actor5e.mjs')
-const { AttackActivity, SaveActivity, DamageActivity, HealActivity, equip } = await import('./activity5e.mjs')
+const { Activity, AttackActivity, SaveActivity, DamageActivity, HealActivity, equip } = await import('./activity5e.mjs')
 const { midi, placeables, installMidi } = await import('./midi-fake.mjs')
 globalThis.dnd5e = {
   settings: { rulesVersion: 'modern' },
@@ -147,7 +148,7 @@ const thorin = add(new Actor5e({ id: 'thorin', name: 'Thorin', owners: ['alice']
 thorin.system.attributes.spellcasting = 'int'
 alice.character = thorin
 equip(thorin, {
-  spells: { spell1: { value: 6, max: 6, level: 1 }, spell2: { value: 3, max: 3, level: 2 } },
+  spells: { spell1: { value: 12, max: 12, level: 1 }, spell2: { value: 3, max: 3, level: 2 } },
   items: [
     // dnd5e's own Ice Knife (spells24): its attack, and its save Midi pairs with it, which spends no slot.
     { id: 'ice-knife', name: 'Ice Knife', type: 'spell', system: { level: 1, method: 'spell', properties: [] }, activities: [
@@ -170,6 +171,10 @@ equip(thorin, {
     // A charm whose use spends 1d4 of its charges.
     { id: 'charm', name: 'Charm of Sparks', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 200, spent: 0 } }, activities: [
       { id: 'charm-zap', name: 'Zap', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['lightning'] }], consumption: [{ type: 'itemUses', value: '1d4' }] },
+    ] },
+    // A charm whose use spends 1d4 of its charges, exploding: a die thrown again in a roll asked.
+    { id: 'wild-charm', name: 'Wild Charm', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 200, spent: 0 } }, activities: [
+      { id: 'wild-zap', name: 'Zap', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['lightning'] }], consumption: [{ type: 'itemUses', value: '1d4x' }] },
     ] },
     // A staff that casts Spark, spending 1d4 of its charges: the spell's own use spends the staff's.
     { id: 'staff', name: 'Staff of Sparks', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 10, spent: 0 } },
@@ -206,6 +211,16 @@ brakka.testUserPermission = user => ((brakka.ownership[user.id] ?? brakka.owners
 equip(brakka, { items: [
   { id: 'brakka-charm', name: 'Brakka\'s Charm', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 50, spent: 0 } }, activities: [
     { id: 'brakka-zap', name: 'Zap', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['lightning'] }], consumption: [{ type: 'itemUses', value: '1d4' }] },
+  ] },
+] })
+
+// Mira, Bob's, who types in her dice too: her charm spends 1d4 of its charges, as Thorin's does.
+const bob = user('bob', 'Bob', false, 2)
+const mira = add(new Actor5e({ id: 'mira', name: 'Mira', owners: ['bob'], mods: { dex: 2 }, hp: { value: 18, max: 18, temp: 0 } }))
+bob.character = mira
+equip(mira, { items: [
+  { id: 'mira-charm', name: 'Mira\'s Charm', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 50, spent: 0 } }, activities: [
+    { id: 'mira-zap', name: 'Zap', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['lightning'] }], consumption: [{ type: 'itemUses', value: '1d4' }] },
   ] },
 ] })
 
@@ -301,7 +316,7 @@ await Hooks.callAll('init')
 settings.set('listenerUrl', 'https://stone.example')
 settings.set('campaignSecrets', { 'camp-a': 'a', 'camp-b': 'b' })
 settings.set('campaigns', [
-  { id: 'camp-a', title: 'Ashlands', characters: ['thorin'], rolls: true, attacks: true, manualDice: true },
+  { id: 'camp-a', title: 'Ashlands', characters: ['thorin', 'mira'], rolls: true, attacks: true, manualDice: true },
   { id: 'camp-b', title: 'Mirkwood', characters: ['thorin'], rolls: true, attacks: true, manualDice: true },
 ])
 await Hooks.callAll('ready')
@@ -510,6 +525,51 @@ used = await using
 assert.deepEqual([used.status, usesOf('charm') - before, checks()], ['done', 2, []], 'dnd5e\'s cost took the answer')
 ok("as dnd5e begins spending, a plain roll and a BasicRoll of the cost's formula without dnd5e's delta: never the cost, the Gamemaster's manual dice at once; dnd5e's cost alone asked")
 
+if (!MIDI) {
+  // Two runs await a roll of one formula at once: Thorin's charm and Mira's, each spending 1d4, made
+  // from one fetch. Each is checked first; then Thorin's begins spending, but his cost's roll is built
+  // only once Mira's is spent, so that hers is rolled while both await one: which is whose can't be
+  // told, so neither is asked, both Foundry's computer dice, never the Gamemaster's manual dice.
+  // (Without Midi: through it, uses from the app are made one at a time.)
+  app.open = new Set(['thorin', 'mira'])
+  await pass(1000)
+  let miraSpent
+  const spent = new Promise(resolve => { miraSpent = resolve })
+  const prepare = Activity.prototype._prepareUsageUpdates
+  let thorinSpending = false
+  Activity.prototype._prepareUsageUpdates = async function (...args) {
+    if ((this.item?.id === 'charm') && thorinSpending) {
+      thorinSpending = false
+      await spent
+    }
+    return prepare.apply(this, args)
+  }
+  const watching = [
+    Hooks.on('dnd5e.preActivityConsumption', activity => { if (activity.item?.id === 'charm') thorinSpending = true }),
+    Hooks.on('dnd5e.activityConsumption', activity => { if (activity.item?.id === 'mira-charm') miraSpent() }),
+  ]
+  count = asked().length
+  before = usesOf('charm')
+  const miraBefore = mira.items.get('mira-charm').system.uses.spent
+  const both = [
+    typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }),
+    typed({ id: `use-${++ids}`, actorId: 'mira', kind: 'use', item: 'mira-charm', activity: 'mira-zap', targets: [], slot: null }),
+  ]
+  queue('camp-a', ...both)
+  await until(() => both.every(command => resultsOf(command.id).length), 'both uses', 12000)
+  const [thorinUsed, miraUsed] = both.map(command => resultsOf(command.id)[0])
+  Activity.prototype._prepareUsageUpdates = prepare
+  Hooks.off('dnd5e.preActivityConsumption', watching[0])
+  Hooks.off('dnd5e.activityConsumption', watching[1])
+  app.open = new Set(['thorin'])
+  await pass(1000)
+  const spentBy = [usesOf('charm') - before, mira.items.get('mira-charm').system.uses.spent - miraBefore]
+  assert.deepEqual([thorinUsed.status, miraUsed.status, asked().length - count], ['done', 'done', 0], JSON.stringify(asked().slice(count)))
+  assert.ok(spentBy.every(n => (n >= 1) && (n <= 4)), `Foundry's d4 spent from each: ${spentBy}`)
+  assert.deepEqual(checks(), ['0 + 1d4', '0 + 1d4'], "the module's own two checks; never the Gamemaster's manual dice for either cost")
+  ok("two runs awaiting a 1d4 cost at once, Thorin's and Mira's from one fetch, hers rolled first: which is whose can't be told, neither asked, each Foundry's computer d4, never the Gamemaster's manual dice")
+}
+
 /* -------------------------------------------- */
 /*  What's never asked                          */
 /* -------------------------------------------- */
@@ -539,15 +599,19 @@ assert.equal(asked().length - count, 1, 'none of them asked')
 const residual = charmZap.rollDamage({}, quiet, unposted)
 const wrongly = await nextAsk(count + 1)
 assert.deepEqual([wrongly.purpose, wrongly.label, wrongly.command], ['damage', 'Charm of Sparks: Zap', ask.command])
+await pass(20_000)
 await make(answerOf(wrongly, [{ roll: 0, term: 0, results: [4] }]))
 assert.deepEqual(faces((await residual)[0]), [[4]])
 await make(answerOf(ask, [{ roll: 0, term: 0, results: [1] }]))
 used = await using
 assert.equal(used.status, 'done')
+// Its two asks waited together for 20 seconds: the watchdog counts that time once.
+const { held: waitedFor } = later.heldFor(ask.command)
+assert.ok((waitedFor >= 20_000) && (waitedFor <= Date.now() - Date.parse(ask.askedAt)), `held ${waitedFor}, the use's asks open ${Date.now() - Date.parse(ask.askedAt)}`)
 // The click's, the dagger's, the club's, the roll of no run's: the Gamemaster's dice, as ever; the
 // maximized and minimized ones throw none.
 assert.deepEqual(checks(), ['0 + 1d4', clicked[0].formula, dagger[0].formula, club[0].formula, outside.formula])
-ok("never asked while a typed use waits on its cost: the same item's damage rolled with a click, another item of his, another actor's, one whose dice are maximized or minimized, and a roll of no run; the one way left to ask wrongly, the same item's damage with no click while the use is made, is asked as the run's")
+ok("never asked while a typed use waits on its cost: the same item's damage rolled with a click, another item of his, another actor's, one whose dice are maximized or minimized, and a roll of no run; the one way left to ask wrongly, the same item's damage with no click while the use is made, is asked as the run's; the two asks waiting together counted once by the watchdog")
 
 /* -------------------------------------------- */
 /*  A die thrown again                          */
@@ -582,6 +646,25 @@ const kept = await make(typed({ id: `sv-${++ids}`, kind: 'save', key: 'dex', rer
 thorin.flags.dnd5e.halflingLucky = false
 assert.deepEqual([kept.status, asked().length - count], ['done', 0])
 ok("a die thrown again: a typed 1d6x's 6 explodes and each die after is asked one at a time, purpose again, 6 then 2, answered at 40 seconds each, the roll 14 and done, never timed out; a typed save's Halfling 1 rerolled is asked, 15 kept; kept at the table, nothing asked")
+
+// A die thrown again in a roll asked: Wild Charm's 1d4x cost, answered 4, explodes; its next die is
+// asked as the cost's, purpose again, under the use's command, answered 2: 6 charges spent. (The
+// Gamemaster's manual dice off: the module's own check of the cost, with them, would explode for ever
+// at the stand-in's highest face; bugs-found.md, 049-typed-mod.)
+core.interactive = false
+count = asked().length
+using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'wild-charm', activity: 'wild-zap', targets: [], slot: null }))
+ask = await nextAsk(count)
+assert.deepEqual([ask.purpose, ask.label, ask.rolls.map(roll => [roll.formula, roll.terms])], ['cost', 'Wild Charm: Zap', [['0 + 1d4x', [{ faces: 4, number: 1 }]]]])
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [4] }]))
+const boom = await nextAsk(count + 1)
+assert.deepEqual([boom.purpose, boom.again, boom.label, boom.command, boom.rolls.map(roll => roll.terms)],
+  ['again', 'explode', 'Wild Charm: Zap', ask.command, [[{ faces: 4, number: 1 }]]])
+await make(answerOf(boom, [{ roll: 0, term: 0, results: [2] }]))
+used = await using
+assert.deepEqual([used.status, usesOf('wild-charm'), asked().length - count, closeOf(boom.id), checks()], ['done', 6, 2, { id: boom.id, reason: 'answered' }, []])
+core.interactive = true
+ok("a die thrown again in a roll asked: Wild Charm's 1d4x cost answered 4 explodes, the next die asked as the cost's, purpose again, explode, label Wild Charm: Zap, its command the use's; answered 2, 6 charges spent; never the Gamemaster's manual dice")
 
 /* -------------------------------------------- */
 /*  Answers refused                             */
@@ -745,6 +828,36 @@ await make(answerOf(ask, [{ roll: 0, term: 0, results: [1, 1, 1] }]))
 dealt = await dealing
 assert.deepEqual(faces(workflowOf(knife.id).otherDamageRolls[0]), [[1, 1, 1]])
 ok('at 2nd level, Shard Explosion asked as 3d6, typed 1, 1, 1')
+
+// A typed attack's damage that opens no run, the Gamemaster's from the app or the player's own
+// untyped one, thrown with the app's 3D dice: the workflow leaves the attack's run, so Shard
+// Explosion's 2d6, rolled within that damage, is Foundry's computer dice, as before 0.45.0: never
+// asked, nor the Gamemaster's manual dice.
+for (const fields of [{ by: 'gm', typed: false }, { typed: false }]) {
+  checks()
+  count = asked().length
+  knife = await attack('ice-knife', 'ice-attack', 15, { slot: 'spell1' })
+  dealt = await damage(knife.id, [{ faces: 10, results: [7] }], fields)
+  workflow = workflowOf(knife.id)
+  await until(() => workflow.otherDamageRolls?.length, 'the other damage')
+  assert.deepEqual([knife.status, dealt.status, asked().length - count, faces(workflow.damageRolls[0]), workflow.otherDamageRolls[0].dice[0].number],
+    ['done', 'done', 0, [[7]], 2], JSON.stringify(fields))
+  assert.deepEqual(checks(), [], `${JSON.stringify(fields)}: never the Gamemaster's manual dice`)
+}
+ok("a typed Ice Knife attack's damage that opens no run, the Gamemaster's from the app (by gm) or the player's own untyped one: its 1d10 the app's 7, Shard Explosion's 2d6 Foundry's computer dice within it, as before 0.45.0, never asked")
+
+// The Gamemaster rolls a typed attack's damage in Foundry, from Midi's card, with a click: theirs,
+// the 1d10 and Shard Explosion's 2d6 their own dice, never asked; the workflow leaves the run.
+checks()
+count = asked().length
+knife = await attack('ice-knife', 'ice-attack', 15, { slot: 'spell1' })
+workflow = workflowOf(knife.id)
+const byClick = await thorin.items.get('ice-knife').system.activities.get('ice-attack').rollDamage(
+  { workflow, event: { type: 'click', target: { closest: () => null } } }, { configure: false }, { create: false })
+await until(() => workflow.otherDamageRolls?.length, 'the other damage')
+assert.deepEqual([byClick?.length, asked().length - count, workflow.otherDamageRolls[0].dice[0].number], [1, 0, 2])
+assert.deepEqual(checks(), [byClick[0].formula, workflow.otherDamageRolls[0].formula], "the 1d10 and the 2d6 the Gamemaster's manual dice")
+ok("the Gamemaster's damage for a typed Ice Knife attack's workflow, rolled in Foundry with a click, as from Midi's card: the 1d10 and Shard Explosion's 2d6 their own manual dice, never asked")
 
 // A critical hit's: Flame Knife's Burst, a damage activity of two parts, one ask for both rolls, its
 // dice doubled, critical; the fire answered, the cold left out, Foundry's.
