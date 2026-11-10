@@ -112,6 +112,13 @@ export const midi = {
    */
   beforeBonusRoll: null,
   /**
+   * Since module 0.45.0: called with the workflow, and awaited, as it finishes its roll
+   * (Workflow.ts:3202, WorkflowState_RollFinished), where Midi calls the item's postActiveEffects
+   * macros (3416-3420): a homebrew macro may roll more of the item's dice in the workflow then. None
+   * by default.
+   */
+  postActiveEffects: null,
+  /**
    * Since module 0.45.0: whether an attack's loaded ammunition's own activity is rolled with its
    * damage, as Midi's other damage is (MidiActivityMixin.ts:170-177, 1085, 1157-1158, 2258-2262).
    * Midi always does; off by default, so that the harnesses before 0.45.0, whose arrows carry
@@ -620,7 +627,10 @@ class Workflow {
     return this.WorkflowState_RollFinished
   }
 
-  WorkflowState_RollFinished() { return this.WorkflowState_Cleanup }
+  async WorkflowState_RollFinished() {
+    await midi.postActiveEffects?.(this)
+    return this.WorkflowState_Cleanup
+  }
   WorkflowState_Cleanup() { return this.WorkflowState_Completed }
   WorkflowState_Completed() { return null }
   WorkflowState_Abort() {
