@@ -190,7 +190,8 @@ while the roll is being made.
   Not yet under dnd5e 6, whose campaigns' hellos say so. See
   [PROTOCOL.md](PROTOCOL.md#dice-the-game-rolls-later). And under dnd5e 5 or 6, the module's own
   check of what a use from the app would spend, which it throws away, rolls a dice cost with
-  Foundry's computer dice, never your Manual Dice.
+  Foundry's computer dice, never your Manual Dice; so do Midi-QOL's own check of the cost of a
+  player's typed run's other activity, under dnd5e 5, and the module's dice self-test as it starts.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
