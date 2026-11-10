@@ -1180,6 +1180,24 @@ assert.deepEqual([byClick?.length, asked().length - count, workflow.otherDamageR
 assert.deepEqual(checks(), [byClick[0].formula, workflow.otherDamageRolls[0].formula], "the 1d10 and the 2d6 the Gamemaster's manual dice")
 ok("the Gamemaster's own code's damage of the item, no click and no workflow, once a typed Ice Knife attack is made, its run open with its workflow: theirs, never asked; and their damage for its workflow, rolled in Foundry with a click, as from Midi's card: the 1d10 and Shard Explosion's 2d6 their own manual dice, never asked")
 
+// A workflow fed by a later roll is that roll's run from then on: the Gamemaster's click roll in a
+// typed Ice Knife attack's workflow, one that doesn't feed it, takes it out of the attack's run; the
+// player's typed damage then feeds it, and it's the damage's run: Shard Explosion's 2d6 asked.
+checks()
+count = asked().length
+knife = await attack('ice-knife', 'ice-attack', 15, { slot: 'spell1' })
+workflow = workflowOf(knife.id)
+const aside = await thorin.items.get('ice-knife').system.activities.get('ice-attack').rollDamage(
+  { workflow, event: { type: 'click', target: { closest: () => null } }, midiOptions: { updateWorkflow: false } }, { configure: false }, { create: false })
+assert.deepEqual([aside?.length, asked().length - count, checks(), workflow.damageRolls ?? null], [1, 0, [aside[0].formula], null], "the click's roll the Gamemaster's, the workflow still waiting for its damage")
+dealing = damage(knife.id, [{ faces: 10, results: [7] }])
+ask = await nextAsk(count)
+assert.deepEqual([ask.purpose, ask.label, ask.command, ask.rolls[0].terms], ['damage', 'Ice Knife: Shard Explosion', `dmg-${ids}`, [{ faces: 6, number: 2 }]])
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [6, 1] }]))
+dealt = await dealing
+assert.deepEqual([dealt.status, faces(workflow.damageRolls[0]), faces(workflow.otherDamageRolls[0]), checks()], ['done', [[7]], [[6, 1]], []])
+ok("a typed Ice Knife attack's workflow taken out of its run by the Gamemaster's click roll in it, one that doesn't feed it, then fed by the player's typed damage: the damage's run from then on, Shard Explosion's 2d6 asked of the player, typed 6 and 1")
+
 // The same click while the player's typed dagger attack is still being made, held as the module
 // writes its card, so its run is open: Sneak Attack's bonus 2d6, rolled after the click's 1d4, is no
 // run's either, though the use from the app tags the workflow still. The Gamemaster's dice, both.
@@ -1233,7 +1251,8 @@ ok("a critical hit's other damage, Flame Knife's Burst of two parts: one ask for
 // Bonus damage macros: each formula asked in turn, purpose bonus; a macro's own Roll never. While
 // Sneak Attack's waits, the Gamemaster's own rolls of Hunter's Mark's formula, a plain one and a
 // damage roll of its very type and flavor, are theirs at once; so are those made in the instant
-// before Midi builds Hunter's Mark's, a plain roll and a damage roll of another flavor.
+// before Midi builds Hunter's Mark's, a plain roll, a damage roll of another flavor, and one of its
+// very flavor but another type.
 checks()
 midi.bonusDamage = [
   { formula: '2d6', type: 'piercing', flavor: 'Sneak Attack' },
@@ -1248,6 +1267,7 @@ midi.beforeBonusRoll = index => {
   // own dice, never the bonus.
   instant.push(withPlan({ id: 'miraOwn', typed: true, kind: 'damage', dice: [{ faces: 6, results: [5] }] },
     () => new DamageRoll('1d6', {}, { type: 'force', flavor: "Hunter's Mark", sendingStone: 'miraOwn' }).evaluate()))
+  instant.push(new DamageRoll('1d6', {}, { type: 'fire', flavor: "Hunter's Mark" }).evaluate())
 }
 count = asked().length
 const sneak = await attack('dagger', 'dagger-stab', 16)
@@ -1261,7 +1281,7 @@ const mark = await nextAsk(count + 1)
 assert.equal(await atOnce(instant), 'thrown', 'never held')
 assert.equal((await instant[2]).total, 5, "the other player's own roll took its own die")
 assert.deepEqual([mark.purpose, mark.rolls.map(roll => [roll.type, roll.flavor, roll.terms]), checks()],
-  ['bonus', [['force', "Hunter's Mark", [{ faces: 6, number: 1 }]]], ['1d6', '1d6']], "Hunter's Mark's asked; the instant's two the Gamemaster's")
+  ['bonus', [['force', "Hunter's Mark", [{ faces: 6, number: 1 }]]], ['1d6', '1d6', '1d6']], "Hunter's Mark's asked; the instant's three the Gamemaster's")
 await make(answerOf(mark, [{ roll: 0, term: 0, results: [1] }]))
 dealt = await dealing
 await until(() => workflowOf(sneak.id).bonusDamageRolls?.length === 3, 'the bonus damage')
@@ -1270,13 +1290,18 @@ await pass(5000)
 assert.deepEqual([asked().length - count, checks()], [2, ['1d4']], "the macro's own 1d4 never asked: the Gamemaster's manual dice")
 midi.bonusDamage = null
 midi.beforeBonusRoll = null
-ok("Midi bonus damage macros' formulas, Sneak Attack's 2d6 piercing and Hunter's Mark's 1d6 force: each asked in turn once the macros returned, purpose bonus, label Dagger: Attack, typed 4 and 4, then 1; while the first waits, the Gamemaster's own 1d6, plain and of Hunter's Mark's very type and flavor, theirs at once; in the instant before Hunter's Mark's is built, a plain 1d6 and a 1d6 force of another flavor, theirs, and another player's own typed 1d6 force of Hunter's Mark's very flavor, made with its plan, its own 5; a macro's own Roll never asked")
+ok("Midi bonus damage macros' formulas, Sneak Attack's 2d6 piercing and Hunter's Mark's 1d6 force: each asked in turn once the macros returned, purpose bonus, label Dagger: Attack, typed 4 and 4, then 1; while the first waits, the Gamemaster's own 1d6, plain and of Hunter's Mark's very type and flavor, theirs at once; in the instant before Hunter's Mark's is built, a plain 1d6, a 1d6 force of another flavor and a 1d6 fire of its very flavor, theirs, and another player's own typed 1d6 force of Hunter's Mark's very flavor, made with its plan, its own 5; a macro's own Roll never asked")
 
 // Two runs' workflows await bonus rolls of one formula at once: Thorin's dagger's and Mira's, each
 // rolling Sneak Attack's 2d6 and Hunter's Mark's 1d6. Thorin's 2d6 is asked; while it waits, Mira's
 // damage is made, her workflow expecting Hunter's Mark's 1d6 too: which of the two is whose can't be
 // told, so from then on neither's bonus roll is asked, her 2d6 among them, nor his 1d6 once his 2d6
-// is answered: Foundry's computer dice, never the Gamemaster's manual dice.
+// is answered: Foundry's computer dice, never the Gamemaster's manual dice. Once hers are rolled,
+// while his 2d6 still waits, the Gamemaster's own damage roll of Hunter's Mark's very formula, type
+// and flavor is theirs, their manual dice: his workflow rolls nothing else meanwhile, so it's taken
+// for neither. And one made just so in the instant before his 1d6 is built (the residual PROTOCOL
+// names) is Foundry's computer dice, and uses up nothing: his own 1d6 after it is still Foundry's
+// computer dice, never the Gamemaster's manual dice.
 midi.bonusDamage = [
   { formula: '2d6', type: 'piercing', flavor: 'Sneak Attack' },
   { formula: '1d6', type: 'force', flavor: "Hunter's Mark" },
@@ -1293,16 +1318,28 @@ const sneakAsk = await nextAsk(count)
 assert.deepEqual([sneakAsk.actorId, sneakAsk.purpose, sneakAsk.rolls.map(roll => roll.flavor)], ['thorin', 'bonus', ['Sneak Attack']])
 const miraDealt = await make(typed({ id: `dmg-${++ids}`, actorId: 'mira', kind: 'damage', use: miraStab.id, dice: [{ faces: 4, results: [2] }] }))
 await until(() => workflowOf(miraStab.id)?.bonusDamageRolls?.length === 2, "Mira's bonus damage")
-assert.deepEqual([miraDealt.status, asked().length - count], ['done', 1], "Mira's bonus rolls never asked")
+assert.deepEqual([miraDealt.status, asked().length - count, checks()], ['done', 1, []], "Mira's bonus rolls never asked, never the Gamemaster's manual dice")
+const gmMark = new DamageRoll('1d6', {}, { type: 'force', flavor: "Hunter's Mark" }).evaluate()
+assert.equal(await atOnce([gmMark]), 'thrown', 'never held')
+assert.deepEqual([asked().length - count, checks()], [1, ['1d6']], "the Gamemaster's own Hunter's Mark while his 2d6 waits: theirs, their manual dice")
+let instantMark = null
+midi.beforeBonusRoll = (index, flow) => {
+  if ((index !== 1) || (flow !== workflowOf(thorinStab.id))) return
+  instantMark = new DamageRoll('1d6', {}, { type: 'force', flavor: "Hunter's Mark" }).evaluate()
+}
 await make(answerOf(sneakAsk, [{ roll: 0, term: 0, results: [5, 5] }]))
 assert.equal((await thorinDealing).status, 'done')
 await until(() => workflowOf(thorinStab.id).bonusDamageRolls?.length === 2, "Thorin's bonus damage")
+midi.beforeBonusRoll = null
+assert.ok(instantMark, 'a roll made in the instant before his 1d6')
+assert.equal(await atOnce([instantMark]), 'thrown', 'never held')
 await pass(5000)
-assert.deepEqual([asked().length - count, faces(workflowOf(thorinStab.id).bonusDamageRolls[0]), checks()], [1, [[5, 5]], []])
+assert.deepEqual([asked().length - count, faces(workflowOf(thorinStab.id).bonusDamageRolls[0]), checks()], [1, [[5, 5]], []],
+  "his 1d6, and the Gamemaster's in the instant before it, Foundry's computer dice, never their manual dice")
 midi.bonusDamage = null
 app.open = new Set(['thorin'])
 await pass(1000)
-ok("two runs' bonus rolls of one formula at once, Thorin's and Mira's daggers' Sneak Attack 2d6 and Hunter's Mark 1d6: Thorin's 2d6 asked first, typed 5 and 5; once Mira's workflow expects Hunter's Mark's 1d6 beside his, neither's bonus roll is asked, her 2d6 and 1d6 nor his 1d6: Foundry's computer dice, never the Gamemaster's manual dice")
+ok("two runs' bonus rolls of one formula at once, Thorin's and Mira's daggers' Sneak Attack 2d6 and Hunter's Mark 1d6: Thorin's 2d6 asked first, typed 5 and 5; once Mira's workflow expects Hunter's Mark's 1d6 beside his, neither's bonus roll is asked, her 2d6 and 1d6 nor his 1d6: Foundry's computer dice, never the Gamemaster's manual dice; the Gamemaster's own Hunter's Mark of that very formula, type and flavor while his 2d6 waits is theirs, their manual dice, taken for neither; one made in the instant before his 1d6, Foundry's computer dice, uses up nothing, his own 1d6 still Foundry's computer dice")
 
 // Deferred: Frost Brand's Rime spends 1d4 charges, so Midi rolls it once saves are checked, after
 // the damage's result: its cost asked once (Midi's check of it beforehand thrown away, Foundry's

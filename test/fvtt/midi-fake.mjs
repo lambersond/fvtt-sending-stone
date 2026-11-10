@@ -106,9 +106,9 @@ export const midi = {
   /** Since module 0.45.0, each other activity whose deferred cost was spent, by its id, in order. */
   otherConsumed: [],
   /**
-   * Since module 0.45.0: called with each bonus damage entry's index just before rollBonusDamage
-   * builds its roll, where nothing of Midi's own runs: a roll a test makes then stands for another
-   * client's or module's, made in that instant. None by default.
+   * Since module 0.45.0: called with each bonus damage entry's index, and the workflow, just before
+   * rollBonusDamage builds its roll, where nothing of Midi's own runs: a roll a test makes then stands
+   * for another client's or module's, made in that instant. None by default.
    */
   beforeBonusRoll: null,
   /**
@@ -327,7 +327,7 @@ class Workflow {
         rolls.push(entry)
         continue
       }
-      midi.beforeBonusRoll?.(index)
+      midi.beforeBonusRoll?.(index, this)
       const { damageRoll, damageType, flavor } = entry
       if (!damageRoll) continue
       const options = { type: damageType, flavor: flavor ?? damageType }
