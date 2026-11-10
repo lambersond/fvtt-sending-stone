@@ -82,6 +82,10 @@ export const SETTINGS = Object.freeze({
    *  the app (see midi-prompts.mjs). Never shown: only tests shorten it. */
   MIDI_PROMPT_WAIT: "midiPromptWait",
 
+  /** World-scope wait, in milliseconds, since 0.45.0, before Foundry's computer dice roll the dice
+   *  asked of a player typing theirs (see later-dice.mjs). Never shown: only tests shorten it. */
+  DICE_ASK_WAIT: "diceAskWait",
+
   /** Setting menu key for the settings window, where every setting is edited. The key is from when
    *  it held the campaigns alone. */
   CAMPAIGNS_MENU: "campaignsMenu",
@@ -204,6 +208,14 @@ export const EVENTS = Object.freeze({
   /** A saving throw the game asked for no longer waits on its player: they rolled it, here or from
    *  the app, its card was deleted, or it was left too long. */
   PROMPT_CLOSED: "roll.prompt.closed",
+
+  /** Since 0.45.0, a roll in the run of a player's typed roll waits for its dice, or a die of it
+   *  thrown again for its value: asked of an app that reads them (later-dice.mjs). */
+  DICE_ASKED: "roll.dice.asked",
+
+  /** Since 0.45.0, such an ask no longer waits: answered or skipped from the app, rolled by the
+   *  Gamemaster, left past its wait, or called off. */
+  DICE_CLOSED: "roll.dice.closed",
 
   /** A Gamemaster served a dish from the Magical Recipe Book, since 0.38.0: everyone it was
    *  served to so far. Sent only to an app that says it reads dishes, `features.dishes`. */
@@ -485,6 +497,22 @@ export const COMPANION_UNTAKEN = Object.freeze([
  * @type {readonly string[]}
  */
 export const ALONE_KINDS = Object.freeze(["itemDamage", "recharge"]);
+
+/**
+ * The kinds of a player's typed roll whose item's later rolls are asked of them, since 0.45.0: its
+ * run (later-dice.mjs). A die of any typed roll's thrown again is asked too.
+ * @type {readonly string[]}
+ */
+export const RUN_KINDS = Object.freeze([
+  "attack", "use", "damage", "itemDamage", "formula", "textRoll", "textDamage", "recharge"
+]);
+
+/**
+ * The answer to a dice ask, since 0.45.0, last among the kinds wherever its players are asked for
+ * their later dice: not a roll of its own.
+ * @type {readonly string[]}
+ */
+export const DICE_KINDS = Object.freeze(["dice"]);
 
 /**
  * The most plans of damage on its own a row is sent beside its own, since 0.41.0: past it, none, and

@@ -362,6 +362,12 @@
       "GM": "GM",
       "Plain": "Dice roll"
     },
+    "DiceAsk": {
+      "Title": "Waiting for a player's dice",
+      "Waiting": "Waiting for {name}'s player: {label}, {dice}",
+      "Left": "{time} left, then Foundry rolls them",
+      "RollNow": "Roll it now"
+    },
     "Chat": {
       "Spends": "Spends {count} · {name}",
       "InspirationUsed": "Uses Heroic Inspiration",

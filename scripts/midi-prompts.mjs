@@ -283,11 +283,12 @@ export function noteOpen(campaignId, open) {
 
 /**
  * Is a character open in a campaign's app: listed by a fetch answered within the last 45 seconds?
+ * Since 0.45.0 the dice asked of a player typing theirs wait on it too (later-dice.mjs).
  * @param {string} campaignId
  * @param {string} actorId
  * @returns {boolean}
  */
-function isOpen(campaignId, actorId) {
+export function isOpen(campaignId, actorId) {
   const seen = presence.get(campaignId);
   return Boolean(seen) && ((Date.now() - seen.at) <= OPEN_FRESH) && seen.ids.has(actorId);
 }

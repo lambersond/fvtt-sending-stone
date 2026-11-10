@@ -19,6 +19,7 @@ import { expireDishEffects } from "./dish-effects.mjs";
 import { foundrySettings, noteSettingsSent } from "./foundry-settings.mjs";
 import { campaignGroups, groupEntry } from "./groups.mjs";
 import { noteFeatures } from "./journals.mjs";
+import { openDiceAsks } from "./later-dice.mjs";
 import { releaseHeldCards } from "./midi-prompts.mjs";
 import { openPrompts } from "./prompts.mjs";
 import { forgetSent } from "./sheet-texts.mjs";
@@ -100,7 +101,8 @@ const resent = new Map();
  * D&D Fifth Edition. Since 0.44.0, whether its players may set their hit points from the app,
  * `features.hitPoints`, by its own switch, on until turned off, under D&D Fifth Edition. Since 0.45.0,
  * under D&D Fifth Edition, what of Tidy 5e Sheets' journal its characters hold, and whether Tidy is
- * active, `features.notes.tidy` (tidy-journal.mjs).
+ * active, `features.notes.tidy` (tidy-journal.mjs); and it lists the dice asks waiting on its
+ * players, `diceAsks`, so that a hello sent again, as when the settings change, closes none.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}
@@ -149,7 +151,8 @@ export function announce({ campaignId }={}) {
       companions,
       settings,
       combats: combats.map(combat => snapshotCombat(combat, campaign)),
-      prompts: openPrompts(campaign)
+      prompts: openPrompts(campaign),
+      diceAsks: openDiceAsks(campaign)
     }, campaign);
   }
   syncPollers({ retry: true });

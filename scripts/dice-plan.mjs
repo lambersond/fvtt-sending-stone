@@ -25,6 +25,12 @@ import { CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from 
  * Since 0.42.0, for a roll its player typed in, the dice its effects add are theirs where they typed
  * them, by faces and sign; and where they say they rerolled at the table, `rerolls: "kept"`, each die
  * term they typed every die of keeps no reroll: the die typed is the die kept.
+ *
+ * Since 0.45.0, a roll later-dice.mjs says belongs to a typed roll's run, as Midi-QOL's other damage
+ * after a typed damage, is evaluated once its player has answered, each of its dice taking the
+ * values they gave for its own term alone, and a die of a typed roll thrown again, an explosion or a
+ * reroll not kept, takes the value its player gives for it, one die at a time. That file registers
+ * itself here (`registerLaterDice`), so that this one never imports it.
  */
 
 /**
@@ -89,6 +95,13 @@ class DicePlan {
      * @type {boolean}
      */
     this.d20Fitted = false;
+
+    /**
+     * Since 0.45.0: has the roll's own step, the first rolls dnd5e built for it, been configured?
+     * A later step tagged for it, as Midi-QOL's other damage, is a later roll of its run.
+     * @type {boolean}
+     */
+    this.ownStep = false;
   }
 
   /**
@@ -164,6 +177,53 @@ const termPlans = new WeakMap();
 const termSigns = new WeakMap();
 
 /**
+ * What later-dice.mjs gives, since 0.45.0, once it registers itself: the later step a roll belongs
+ * to, if any; a die thrown again's value, asked of its player; and its self-test.
+ * @type {{stepOf: (roll: Roll) => LaterStep|null, again: (term: DiceTerm, why: "explode"|"reroll",
+ *   owner: DicePlan|TermValues|null) => Promise<number|undefined>|null, selfTest: () => Promise<void>}|null}
+ */
+let laterDice = null;
+
+/**
+ * Since 0.45.0, the rolls of each plan's own step: never a later roll of its run.
+ * @type {WeakSet<Roll>}
+ */
+const ownRolls = new WeakSet();
+
+/**
+ * Since 0.45.0, the rolls being evaluated as a later step's: a die of theirs takes only the values
+ * given for its own term, never its plan's, should it be tagged with one.
+ * @type {WeakSet<Roll>}
+ */
+const laterRolls = new WeakSet();
+
+/**
+ * The values a player gave for one term of a later roll, since 0.45.0, in the order typed: a die of
+ * the term takes the next, its own faces only; one left with none is Foundry's.
+ */
+class TermValues {
+  /**
+   * @param {number[]} values
+   * @param {object} later   The later step's handle, whose run a die thrown again is asked in.
+   */
+  constructor(values, later) {
+    this.values = [...values];
+    this.later = later;
+  }
+
+  /**
+   * @param {number} faces
+   * @returns {number|undefined}
+   */
+  take(faces) {
+    const value = this.values[0];
+    if ( !Number.isInteger(value) || (value < 1) || (value > faces) ) return undefined;
+    this.values.shift();
+    return value;
+  }
+}
+
+/**
  * The self-tests' own rolls, which take a player's typed dice before the self-test has said they may.
  * A command from the app is JSON, and can't carry it.
  * @type {symbol}
@@ -226,6 +286,35 @@ function planFor(tag) {
   return (typeof tag === "string") ? plans.get(tag) : undefined;
 }
 
+/**
+ * Since 0.45.0, let later-dice.mjs say which rolls are later ones of a typed roll's run, and ask
+ * for a die thrown again: registered once, as the dice are set up.
+ * @param {object} later   `{stepOf, again, selfTest}`.
+ * @returns {void}
+ */
+export function registerLaterDice(later) {
+  laterDice = later;
+}
+
+/**
+ * Is a roll one of its plan's own step, since 0.45.0: the first rolls dnd5e built for a player's
+ * roll, as a damage's own, never a later roll of its run?
+ * @param {Roll} roll
+ * @returns {boolean}
+ */
+export function isOwnRoll(roll) {
+  return ownRolls.has(roll);
+}
+
+/**
+ * Is a player's roll being made now, its plan alive, since 0.45.0?
+ * @param {string} id   The roll's id.
+ * @returns {boolean}
+ */
+export function planAlive(id) {
+  return plans.has(id);
+}
+
 /* -------------------------------------------- */
 /*  Rolling                                     */
 /* -------------------------------------------- */
@@ -236,6 +325,10 @@ function planFor(tag) {
  * Foundry rolls one with `reroll` or `explode`, as its `r`, `rr`, `x` and `xo` modifiers do, which
  * the self-test checks. Since 0.42.0 one of the roll's own dice, once the player's own of its faces
  * are used, takes a value they typed for an effect's die of its faces and sign, such as Bless's.
+ * Since 0.45.0 a die of a later roll takes a value given for its own term alone; and a die of a
+ * typed roll's, or a later roll's, thrown again, may wait for the value its player gives for it
+ * (later-dice.mjs), Foundry's own where none is given: so it returns a Promise, as Foundry's own
+ * `_roll` may.
  * @this {DiceTerm}
  * @param {Function} wrapped   Foundry's own roll of the die.
  * @param {...any} args
@@ -244,11 +337,17 @@ function planFor(tag) {
 function plannedRoll(wrapped, ...args) {
   const [options] = args;
   const first = !options?.reroll && !options?.explode && !options?.minimize && !options?.maximize;
+  // A later roll's dice take what was given for their own terms, never its plan's.
+  const plan = termPlans.get(this) ?? (laterRolls.has(this._root) ? undefined : planFor(this._root?.options?.[ROLL_TAG]));
   if ( first ) {
-    const plan = termPlans.get(this) ?? planFor(this._root?.options?.[ROLL_TAG]);
     const value = plan?.take(this.faces, termSigns.get(this));
     if ( value !== undefined ) return value;
+    return wrapped(...args);
   }
+  // Since 0.45.0, a typed roll's die thrown again is asked of its player, where it can be.
+  const again = (!options?.minimize && !options?.maximize && laterDice)
+    ? laterDice.again(this, options?.explode ? "explode" : "reroll", plan ?? null) : null;
+  if ( again ) return again.then(value => value ?? wrapped(...args));
   return wrapped(...args);
 }
 
@@ -257,7 +356,8 @@ function plannedRoll(wrapped, ...args) {
  * they are the player's. Its dice are noted with its plan, in case they don't know their roll, and
  * since 0.42.0 with whether each adds or takes away, for the dice its effects add. And a roll its
  * player typed in, saying they rerolled at the table, keeps none of the rerolls of the dice they
- * typed (`keepTypedRerolls`): by now dnd5e has expanded its advantage and configured it.
+ * typed (`keepTypedRerolls`): by now dnd5e has expanded its advantage and configured it. Since 0.45.0
+ * a later roll of a typed roll's run is evaluated as `laterEvaluate` has it.
  * @this {Roll}
  * @param {Function} wrapped   Foundry's own evaluation.
  * @param {object} [options]
@@ -265,6 +365,8 @@ function plannedRoll(wrapped, ...args) {
  * @returns {Promise<Roll>}
  */
 function taggedEvaluate(wrapped, options={}, ...rest) {
+  const later = laterDice?.stepOf(this) ?? null;
+  if ( later ) return laterEvaluate(this, later, wrapped, options, rest);
   const plan = planFor(this.options?.[ROLL_TAG]);
   if ( !plan ) return wrapped(options, ...rest);
   const { DiceTerm } = foundry.dice.terms;
@@ -277,7 +379,41 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
   if ( keepsRerolls(plan.command) ) keepTypedRerolls(this, plan);
   // Damage the player chose at its highest has every die at its highest, Foundry's own too.
   const maximize = DAMAGE_COMMANDS.has(plan.command.kind) && (plan.command.modifiers?.maximize === true);
-  return wrapped({ ...options, allowInteractive: false, ...(maximize && { maximize: true }) }, ...rest);
+  const made = wrapped({ ...options, allowInteractive: false, ...(maximize && { maximize: true }) }, ...rest);
+  // Since 0.45.0 an ask for a die of it thrown again answers once it's thrown.
+  if ( !laterDice ) return made;
+  return Promise.resolve(made).finally(() => laterDice.thrown(this));
+}
+
+/**
+ * Evaluate a later roll of a typed roll's run, since 0.45.0, once its player has answered, or the
+ * wait is over: each of its own dice terms takes the values given for it, die by die, and every other
+ * die, as one left out, is Foundry's computer dice, never the Gamemaster's manual dice. What it's
+ * given is never its plan's, should it be tagged with one.
+ * @param {Roll} roll
+ * @param {object} later       The step's handle, `values(roll)` giving each term's values.
+ * @param {Function} wrapped   Foundry's own evaluation.
+ * @param {object} options
+ * @param {any[]} rest
+ * @returns {Promise<Roll>}
+ */
+async function laterEvaluate(roll, later, wrapped, options, rest) {
+  let values = null;
+  try {
+    values = await later.values(roll);
+  } catch {
+    values = null;
+  }
+  const { DiceTerm } = foundry.dice.terms;
+  laterRolls.add(roll);
+  for ( const term of roll.terms ) {
+    if ( term instanceof DiceTerm ) termPlans.set(term, new TermValues(values?.get(term) ?? [], later));
+  }
+  try {
+    return await wrapped({ ...options, allowInteractive: false }, ...rest);
+  } finally {
+    laterDice?.thrown?.(roll);
+  }
 }
 
 /**
@@ -442,12 +578,20 @@ function tagOf(process, config, index) {
  * healed, and nothing posted; so is damage that, built and changed, can't take every die the player
  * rolled for it, as where a module added dice to it afterwards otherwise than planned, or a die more
  * was chosen of a part with none of its own. Since 0.32.0 a d20 roll then takes no more of the
- * player's d20s than it throws first (`fitD20s`).
+ * player's d20s than it throws first (`fitD20s`). Since 0.45.0 the first step tagged for a plan is
+ * its own (`isOwnRoll`): a later one, as Midi-QOL's other damage, is its run's.
  * @param {Roll[]} rolls
  * @returns {boolean|void}   False to call the roll off.
  */
 function onRollConfiguration(rolls) {
-  const damage = planFor(rolls?.[0]?.options?.[ROLL_TAG]);
+  const own = planFor(rolls?.[0]?.options?.[ROLL_TAG]);
+  if ( own && !own.ownStep ) {
+    own.ownStep = true;
+    for ( const roll of rolls ) {
+      if ( planFor(roll.options?.[ROLL_TAG]) === own ) ownRolls.add(roll);
+    }
+  }
+  const damage = own;
   if ( DAMAGE_COMMANDS.has(damage?.command.kind) && !damage.configured ) {
     damage.configured = true;
     reshapeDamage(rolls[0], damage.command.modifiers);
@@ -1525,6 +1669,13 @@ export async function selfTest() {
 
   // Since 0.42.0, typed dice: right after the core's, so that no other part's failure skips them.
   await typedSelfTests();
+
+  // Since 0.45.0, the dice asked of a player typing theirs: silent, its outcome in later-dice.mjs.
+  try {
+    await laterDice?.selfTest?.();
+  } catch {
+    // Its own outcome says it failed.
+  }
 
   try {
     await hitDieSelfTest();
