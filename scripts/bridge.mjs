@@ -19,7 +19,6 @@ import { expireDishEffects } from "./dish-effects.mjs";
 import { foundrySettings, noteSettingsSent } from "./foundry-settings.mjs";
 import { campaignGroups, groupEntry } from "./groups.mjs";
 import { noteFeatures } from "./journals.mjs";
-import { openDiceAsks } from "./later-dice.mjs";
 import { releaseHeldCards } from "./midi-prompts.mjs";
 import { openPrompts } from "./prompts.mjs";
 import { forgetSent } from "./sheet-texts.mjs";
@@ -72,6 +71,24 @@ const RESEND_AFTER = 30_000;
  * @type {Map<string, number>}
  */
 const resent = new Map();
+
+/**
+ * Since 0.45.0, what lists a campaign's open dice asks for its hello, once later-dice.mjs registers
+ * it as it's set up (`registerDiceAsks`), so that this file never imports it: none until then, as
+ * under dnd5e 6, where none is ever asked.
+ * @type {(campaign: Campaign) => object[]}
+ */
+let diceAsksOf = () => [];
+
+/**
+ * Let later-dice.mjs list a campaign's open dice asks in its hello, since 0.45.0: registered once,
+ * as it's set up.
+ * @param {(campaign: Campaign) => object[]} reader
+ * @returns {void}
+ */
+export function registerDiceAsks(reader) {
+  diceAsksOf = reader;
+}
 
 /* -------------------------------------------- */
 
@@ -152,7 +169,7 @@ export function announce({ campaignId }={}) {
       settings,
       combats: combats.map(combat => snapshotCombat(combat, campaign)),
       prompts: openPrompts(campaign),
-      diceAsks: openDiceAsks(campaign)
+      diceAsks: diceAsksOf(campaign)
     }, campaign);
   }
   syncPollers({ retry: true });

@@ -1,5 +1,5 @@
 import { DIE_FACES, EVENTS, MODULE_ID, ROLL_TAG, RUN_KINDS, SETTINGS } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend, registerDiceAsks } from "./bridge.mjs";
 import { getCampaigns, manualDiceOn } from "./campaigns.mjs";
 import { summarizeRoll } from "./chat-data.mjs";
 import { failedResult, isId } from "./command-rolls.mjs";
@@ -262,9 +262,10 @@ function dnd5e5() {
 
 /**
  * Set up asking for later dice, on a Gamemaster's client, once, after the dice plans: dnd5e's roll
- * and consumption hooks, and where Midi-QOL is active and has them, its bonus damage's macros and
- * rolls, wrapped through libWrapper where it's active. Under any system but dnd5e 5 nothing is set
- * up, and the hello says why.
+ * and consumption hooks; the hello's list of open asks (bridge.mjs, which never imports this file);
+ * and where Midi-QOL is active and has them, its bonus damage's macros and rolls, wrapped through
+ * libWrapper where it's active. Under any system but dnd5e 5 nothing is set up, and the hello says
+ * why.
  * @returns {void}
  */
 export function installLaterDice() {
@@ -275,6 +276,7 @@ export function installLaterDice() {
   }
   installed = true;
   registerLaterDice({ stepOf, again, thrown, selfTest: laterSelfTest });
+  registerDiceAsks(openDiceAsks);
   Hooks.on("dnd5e.postRollConfiguration", onRollConfiguration);
   Hooks.on("dnd5e.preActivityConsumption", openCost);
   Hooks.on("dnd5e.activityConsumption", closeCost);
