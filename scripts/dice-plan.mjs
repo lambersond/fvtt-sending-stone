@@ -33,7 +33,8 @@ import { COST_CHECK, CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL
  * follows took its player's value: never after a die Foundry's computer threw. That file registers
  * itself here (`registerLaterDice`), so that this one never imports it. And since 0.45.0 the dice
  * costs dnd5e rolls for the module's own check of what a use would spend, which it throws away, are
- * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6: told by dnd5e's
+ * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6, as are, under
+ * dnd5e 5, those of Midi-QOL's check of a typed roll's run's other activity: told by dnd5e's
  * consumption targets' `resolveCost`, which is passed the use's configuration, and which tells
  * later-dice.mjs of each dice cost a run spends.
  */
@@ -184,11 +185,13 @@ const termSigns = new WeakMap();
 /**
  * What later-dice.mjs gives, since 0.45.0, once it registers itself: the later step a roll belongs
  * to, if any; a die thrown again's value, asked of its player; who's told of a roll thrown; what
- * notes a dice cost of a run's spending as that run's, for a use's configuration, if any; and its
- * self-test.
+ * notes a dice cost of a run's spending as that run's, for a use's configuration, if any; whether a
+ * dice cost of an activity is Midi-QOL's check of a run's other activity's consumption, thrown away;
+ * and its self-test.
  * @type {{stepOf: (roll: Roll) => LaterStep|null, again: (term: DiceTerm, why: "explode"|"reroll",
  *   owner: DicePlan|TermValues|null) => Promise<number|undefined>|null, thrown: (roll: Roll) => void,
- *   costOf: (config: object) => ((roll: Roll) => void)|null, selfTest: () => Promise<void>}|null}
+ *   costOf: (config: object) => ((roll: Roll) => void)|null, checking: (activity: object) => boolean,
+ *   selfTest: () => Promise<void>}|null}
  */
 let laterDice = null;
 
@@ -318,7 +321,7 @@ function planFor(tag) {
 /**
  * Since 0.45.0, let later-dice.mjs say which rolls are later ones of a typed roll's run, and ask
  * for a die thrown again: registered once, as the dice are set up.
- * @param {object} later   `{stepOf, again, selfTest}`.
+ * @param {object} later   `{stepOf, again, thrown, costOf, checking, selfTest}`.
  * @returns {void}
  */
 export function registerLaterDice(later) {
@@ -491,8 +494,9 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
 /**
  * Around dnd5e's roll of a dice cost, since 0.45.0, `ConsumptionTargetData#resolveCost`, which is
  * passed the use's configuration: for the module's own check of what a use would spend
- * (`costCheck`), or a run's own spending (later-dice.mjs), the roll is built unevaluated, noted, then
- * evaluated, as dnd5e would have evaluated it; any other, as dnd5e has it.
+ * (`costCheck`), or Midi-QOL's of a typed roll's run's other activity, both thrown away, or a run's
+ * own spending (later-dice.mjs), the roll is built unevaluated, noted, then evaluated, as dnd5e
+ * would have evaluated it; any other, as dnd5e has it.
  * @this {object}              The consumption target.
  * @param {Function} wrapped   dnd5e's own.
  * @param {object} [options]   `{config, evaluate, ...}`, as dnd5e's.
@@ -501,7 +505,7 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
  */
 function resolveCost(wrapped, options, ...rest) {
   const config = options?.config;
-  const check = config?.[COST_CHECK] === true;
+  const check = (config?.[COST_CHECK] === true) || (laterDice?.checking?.(this.activity) === true);
   const later = (!check && config && laterDice?.costOf) ? laterDice.costOf(config) : null;
   if ( !check && !later ) return wrapped(options, ...rest);
   const roll = wrapped({ ...options, evaluate: false }, ...rest);
