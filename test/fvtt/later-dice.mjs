@@ -1667,6 +1667,82 @@ assert.deepEqual([dealt.status, closeOf(ask.id), early(ask, closedAt(ask.id))], 
 const gone = await make(answerOf(ask, [{ roll: 0, term: 0, results: [1, 1] }]))
 assert.deepEqual(refusal(gone), ['failed', 'diceAsk', 'gone'])
 ok("a workflow aborted while its ask waits: closed gone, well before its minute is out, Foundry's dice, an answer after refused diceAsk gone")
+// A spending of a run's that a later hook of the world's stops, as dnd5e lets any hook of
+// dnd5e.preActivityConsumption: once Midi's check of Thorin's deferred Rime returns, its spending
+// stopped so, that spending is over, so a roll of its cost made with its configuration afterwards in
+// his workflow, as a macro reusing it might, is no run's: the Gamemaster's manual dice, never asked.
+checks()
+count = asked().length
+const stopped = await attack('frost-brand', 'frost-attack', 17)
+let stoppedConfig = null
+const stopper = Hooks.on('dnd5e.preActivityConsumption', (activity, config) => {
+  if (stoppedConfig || (activity !== workflowOf(stopped.id)?.otherActivity)) return true
+  stoppedConfig = config
+  return false
+})
+let strayCost = null
+midi.postActiveEffects = async flow => {
+  if (flow !== workflowOf(stopped.id)) return
+  midi.postActiveEffects = null
+  strayCost = await flow.otherActivity.consumption.targets[0].resolveCost({ config: stoppedConfig })
+}
+const consumedBefore2 = midi.otherConsumed.length
+const stoppedUses = usesOf('frost-brand')
+dealt = await damage(stopped.id, [{ faces: 8, results: [5] }])
+await until(() => strayCost, 'the roll with the stopped spending')
+Hooks.off('dnd5e.preActivityConsumption', stopper)
+await pass(3000)
+assert.deepEqual([dealt.status, midi.otherConsumed.length - consumedBefore2, usesOf('frost-brand') - stoppedUses, workflowOf(stopped.id).otherDamageRolls ?? null, asked().length - count, checks()],
+  ['done', 0, 0, null, 0, [strayCost.formula]], "Rime's spending stopped: nothing spent, no 2d6; its configuration's cost after, the Gamemaster's manual dice")
+ok("a typed Frost Brand attack's deferred Rime, its spending stopped by a later hook: nothing spent, never asked; once Midi's check returns, a roll of its cost with that spending's configuration in his workflow is no run's, the Gamemaster's manual dice")
+
+// A run spends one use at a time: a spending of its own that a later hook stopped is over once its
+// next begins. Two spendings of the charm named for Thorin's open dagger run, as the module names its
+// own use's: the first stopped by a later hook; once the second has begun, a roll of the cost with
+// the first's configuration is no run's, the Gamemaster's manual dice; the second's asked of him.
+checks()
+count = asked().length
+const twice = await attack('dagger', 'dagger-stab', 16)
+const zap = thorin.items.get('charm').system.activities.get('charm-zap')
+let firstSpending = null
+const stopFirst = Hooks.on('dnd5e.preActivityConsumption', (activity, config) => {
+  if (firstSpending || (activity !== zap)) return true
+  firstSpending = config
+  return false
+})
+assert.equal(await zap.consume(zap._prepareUsageConfig({ sendingStone: twice.id }), { data: {} }), false, 'the first stopped')
+Hooks.off('dnd5e.preActivityConsumption', stopFirst)
+before = usesOf('charm')
+const secondSpending = zap.consume(zap._prepareUsageConfig({ sendingStone: twice.id }), { data: {} })
+ask = await nextAsk(count)
+assert.deepEqual([ask.purpose, ask.command], ['cost', twice.id])
+const strayFirst = await zap.consumption.targets[0].resolveCost({ config: firstSpending })
+assert.deepEqual([asked().length - count, checks()], [1, [strayFirst.formula]], "the first's configuration once the second began: no run's, the Gamemaster's manual dice")
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [2] }]))
+await secondSpending
+dealt = await damage(twice.id, [{ faces: 4, results: [1] }])
+assert.deepEqual([usesOf('charm') - before, dealt.status, asked().length - count, checks()], [2, 'done', 1, []])
+ok("two spendings named for one run, the first stopped by a later hook: once the second begins, the first's configuration's cost is no run's, the Gamemaster's manual dice; the second's asked of him, typed 2")
+
+// A typed use whose own spending a later hook stops: the use isn't made, and once its call returns,
+// that spending is over, though its run waits on the workflow Midi began for it: a roll of the cost
+// with its configuration then is no run's, the Gamemaster's manual dice, never asked.
+checks()
+count = asked().length
+let stoppedOwn = null
+const stopOwn = Hooks.on('dnd5e.preActivityConsumption', (activity, config) => {
+  if (stoppedOwn || (activity.id !== 'charm-zap')) return true
+  stoppedOwn = config
+  return false
+})
+before = usesOf('charm')
+const stoppedUse = await make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
+Hooks.off('dnd5e.preActivityConsumption', stopOwn)
+const strayOwn = await thorin.items.get('charm').system.activities.get('charm-zap').consumption.targets[0].resolveCost({ config: stoppedOwn })
+assert.deepEqual([stoppedUse.status, usesOf('charm') - before, asked().length - count, checks()], ['failed', 0, 0, [strayOwn.formula]],
+  `${JSON.stringify(stoppedUse)}: not made, nothing spent; its configuration's cost after, the Gamemaster's manual dice`)
+ok(`a typed use whose own spending a later hook stops: not made (${stoppedUse.reason}), nothing spent, never asked; once its call returns, a roll of its cost with that spending's configuration is no run's, the Gamemaster's manual dice`)
+
 if (process.env.LIBWRAPPER) {
   assert.ok(['MidiQOL.Workflow.prototype.rollBonusDamage', 'MidiQOL.Workflow.prototype.callMacros'].every(target => wrapped.includes(target)), JSON.stringify(wrapped))
   ok("through libWrapper: Midi's rollBonusDamage and callMacros wrapped by it")
