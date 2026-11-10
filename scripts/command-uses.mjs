@@ -4,7 +4,7 @@ import {
   appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
 import {
-  costCheck, diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable, withPlan
+  checkedUntilSpent, costCheck, diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable, withPlan
 } from "./dice-plan.mjs";
 import { dnd5eEnchant, enchantChoice, midiEnchantNow } from "./command-enchant.mjs";
 import { resultsAlways } from "./config.mjs";
@@ -1020,9 +1020,11 @@ async function midiUseNow(command, campaign, actor, use) {
     // A forward has the activity it names used as dnd5e's forward has it used, made here rather than
     // through Midi-QOL's own forward, whose source isn't to be had: so that what Midi writes the
     // workflow on is what's given.
-    const midiCall = use.forward
+    // Since 0.45.0 Midi's own check of what it would spend, worked out from it and thrown away
+    // before dnd5e spends it, is Foundry's computer dice, as the module's own check is (dice-plan.mjs).
+    const midiCall = checkedUntilSpent(use.forward
       ? foundry.utils.mergeObject(forwardUsage(use.forward), midiUsage, { inplace: false })
-      : midiUsage;
+      : midiUsage);
 
     let card = null;
     let workflow = null;

@@ -5,6 +5,7 @@ import { appFlags, authorFor, describeResult, failedResult, PUBLIC, visibleTo } 
 import { castFromItem, commandRefusal, currentTargets, setTargets, workflowSettled } from "./command-uses.mjs";
 import { commandActor } from "./creatures.mjs";
 import { companionFirst } from "./creature-sync.mjs";
+import { checkedUntilSpent } from "./dice-plan.mjs";
 import {
   availableProfiles, canTake, effectsOf, endable, goingAway, listedOn, originOf, ownName
 } from "./sheet-enchant.mjs";
@@ -152,7 +153,9 @@ export async function midiEnchantNow(command, campaign, actor, use) {
       ...(prepared.concentration ? { concentration: { begin: true, end: prepared.concentration.end ?? null } } : {}),
       midiOptions: { targetsToUse: new Set(), configureDialog: false, workflowOptions }
     };
-    const results = await activity.use(midiUsage, { configure: false }, {
+    // Since 0.45.0 Midi's own check of what it would spend, worked out from it and thrown away
+    // before dnd5e spends it, is Foundry's computer dice, as the module's own check is (dice-plan.mjs).
+    const results = await activity.use(checkedUntilSpent(midiUsage), { configure: false }, {
       rollMode: PUBLIC,
       data: { flags: { dnd5e: { targets: [] }, [MODULE_ID]: appFlags(command, "use") } }
     });

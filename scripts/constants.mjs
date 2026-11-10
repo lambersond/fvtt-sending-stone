@@ -645,9 +645,10 @@ export const ROLL_TAG = "sendingStone";
 export const CRITICAL_AS_DND5E = "sendingStoneCritical";
 
 /**
- * The key of a use's configuration marking, since 0.45.0, the module's own check of what the use
- * would spend, worked out and thrown away: a dice cost dnd5e rolls for it is Foundry's computer
- * dice, never asked of anyone (dice-plan.mjs's `costCheck`).
+ * The key of a use's configuration marking, since 0.45.0, a check of what the use would spend,
+ * worked out and thrown away, the module's own or Midi-QOL's of a use the module hands it until
+ * dnd5e begins spending it: a dice cost dnd5e rolls for it is Foundry's computer dice, never asked
+ * of anyone (dice-plan.mjs's `costCheck` and `checkedUntilSpent`).
  * @type {string}
  */
 export const COST_CHECK = "sendingStoneCheck";

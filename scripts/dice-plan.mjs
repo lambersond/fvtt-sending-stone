@@ -33,8 +33,9 @@ import { COST_CHECK, CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL
  * follows took its player's value: never after a die Foundry's computer threw. That file registers
  * itself here (`registerLaterDice`), so that this one never imports it. And since 0.45.0 the dice
  * costs dnd5e rolls for the module's own check of what a use would spend, which it throws away, are
- * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6, as are, under
- * dnd5e 5, those of Midi-QOL's check of a typed roll's run's other activity: told by dnd5e's
+ * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6, as are those of
+ * Midi-QOL's own check of a use the module hands it (`checkedUntilSpent`), and, under dnd5e 5, of
+ * Midi's check of a typed roll's run's other activity: told by dnd5e's
  * consumption targets' `resolveCost`, which is passed the use's configuration, and which tells
  * later-dice.mjs of each dice cost a run spends.
  */
@@ -376,6 +377,35 @@ export async function costCheck(config, check) {
   }
 }
 
+/**
+ * Mark, since 0.45.0, a use the module hands to Midi-QOL as a check until dnd5e begins spending it:
+ * Midi's own use works out what the use would spend, from the very usage it's given, and throws that
+ * away (its `checkAutoConsume`, as the module's uses from the app consume without a dialog), before
+ * dnd5e's use spends it. A dice cost rolled for that is Foundry's computer dice, never asked of
+ * anyone nor taken for a run's cost, as the module's own check's is (`costCheck`). The mark goes from
+ * the configuration dnd5e spends with as it begins spending (`dnd5e.preActivityConsumption`,
+ * `spendingBegins`), so that the use itself spends as ever: its cost the Gamemaster's dice, or a
+ * typed run's asked of its player.
+ * @template {object} T
+ * @param {T} usage   What the module hands to Midi's `use`.
+ * @returns {T}       The same, marked.
+ */
+export function checkedUntilSpent(usage) {
+  if ( usage && (typeof usage === "object") ) usage[COST_CHECK] = true;
+  return usage;
+}
+
+/**
+ * dnd5e begins spending what a use spends, since 0.45.0: its configuration is no longer a check
+ * (`checkedUntilSpent`), so that a dice cost dnd5e rolls for it is rolled as ever.
+ * @param {Activity} activity
+ * @param {object} usageConfig
+ * @returns {void}
+ */
+function spendingBegins(activity, usageConfig) {
+  if ( usageConfig && (typeof usageConfig === "object") ) delete usageConfig[COST_CHECK];
+}
+
 /* -------------------------------------------- */
 /*  Rolling                                     */
 /* -------------------------------------------- */
@@ -494,7 +524,8 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
 /**
  * Around dnd5e's roll of a dice cost, since 0.45.0, `ConsumptionTargetData#resolveCost`, which is
  * passed the use's configuration: for the module's own check of what a use would spend
- * (`costCheck`), or Midi-QOL's of a typed roll's run's other activity, both thrown away, or a run's
+ * (`costCheck`), Midi-QOL's of a use the module hands it (`checkedUntilSpent`), or Midi's of a typed
+ * roll's run's other activity, each thrown away, or a run's
  * own spending (later-dice.mjs), the roll is built unevaluated, noted, then evaluated, as dnd5e
  * would have evaluated it; any other, as dnd5e has it.
  * @this {object}              The consumption target.
@@ -1706,8 +1737,8 @@ let installed = false;
  * Since 0.32.0 dnd5e's configuration of damage too, where it has damage rolls, as a WRAPPER, which
  * libWrapper runs outside every other kind, so outside Midi-QOL's: a critical hit's damage for the
  * app is then made as dnd5e makes it. Since 0.45.0 dnd5e's roll of a dice cost too, where its
- * consumption targets have one, as a WRAPPER: the module's own check's are Foundry's computer dice,
- * and a run's are noted for later-dice.mjs.
+ * consumption targets have one, as a WRAPPER: the module's own check's, and Midi-QOL's of a use the
+ * module hands it, are Foundry's computer dice, and a run's are noted for later-dice.mjs.
  * @returns {void}
  */
 export function installDicePlans() {
@@ -1732,7 +1763,10 @@ export function installDicePlans() {
     if ( damage ) wrap(CONFIG.Dice.DamageRoll.prototype, "configureDamage", criticalAsDnd5e);
     if ( cost ) wrap(target.prototype, "resolveCost", resolveCost);
   }
-  if ( cost ) costTarget = target;
+  if ( cost ) {
+    costTarget = target;
+    Hooks.on("dnd5e.preActivityConsumption", spendingBegins);
+  }
   Hooks.on("dnd5e.preRoll", onPreRoll);
   Hooks.on("dnd5e.postBuildRollConfig", onBuildRollConfig);
   Hooks.on("dnd5e.postRollConfiguration", onRollConfiguration);
