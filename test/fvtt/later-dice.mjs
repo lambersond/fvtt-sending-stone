@@ -859,6 +859,41 @@ assert.deepEqual([byClick?.length, asked().length - count, workflow.otherDamageR
 assert.deepEqual(checks(), [byClick[0].formula, workflow.otherDamageRolls[0].formula], "the 1d10 and the 2d6 the Gamemaster's manual dice")
 ok("the Gamemaster's damage for a typed Ice Knife attack's workflow, rolled in Foundry with a click, as from Midi's card: the 1d10 and Shard Explosion's 2d6 their own manual dice, never asked")
 
+// The same click while the player's typed dagger attack is still being made, held as the module
+// writes its card, so its run is open: Sneak Attack's bonus 2d6, rolled after the click's 1d4, is no
+// run's either, though the use from the app tags the workflow still. The Gamemaster's dice, both.
+checks()
+midi.bonusDamage = [{ formula: '2d6', type: 'piercing', flavor: 'Sneak Attack' }]
+count = asked().length
+const heldId = `atk-${++ids}`
+let letGo
+let writing = false
+const holding = new Promise(resolve => { letGo = resolve })
+const hold = Hooks.on('createChatMessage', message => {
+  if (message.flags?.['sending-stone']?.use !== heldId) return
+  const own = message.setFlag
+  message.setFlag = async function (scope, key, value) {
+    if (key === 'usage') {
+      writing = true
+      await holding
+    }
+    return own.call(this, scope, key, value)
+  }
+})
+const stabbing = make(typed({ id: heldId, kind: 'attack', item: 'dagger', activity: 'dagger-stab', target: { combatId: 'fight', combatantId: 'cb-gob' }, dice: [{ faces: 20, results: [16] }] }))
+await until(() => writing, 'the attack writing its card')
+workflow = workflowOf(heldId)
+const stabbed = await thorin.items.get('dagger').system.activities.get('dagger-stab').rollDamage(
+  { workflow, event: { type: 'click', target: { closest: () => null } } }, { configure: false }, { create: false })
+await until(() => workflow.bonusDamageRolls?.length, 'the bonus damage')
+letGo()
+Hooks.off('createChatMessage', hold)
+const stabResult = await stabbing
+midi.bonusDamage = null
+assert.deepEqual([stabResult.status, stabbed?.length, asked().length - count], ['done', 1, 0], JSON.stringify(stabResult))
+assert.deepEqual(checks(), [stabbed[0].formula, '2d6'], "the click's 1d4 and Sneak Attack's 2d6 the Gamemaster's manual dice")
+ok("the Gamemaster's click in a typed dagger attack's workflow while the attack is still being made, its run open: Sneak Attack's bonus 2d6 after it no run's, though the use tags the workflow; the 1d4 and the 2d6 the Gamemaster's own dice, never asked")
+
 // A critical hit's: Flame Knife's Burst, a damage activity of two parts, one ask for both rolls, its
 // dice doubled, critical; the fire answered, the cold left out, Foundry's.
 count = asked().length
