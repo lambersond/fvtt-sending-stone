@@ -6,7 +6,8 @@
 // let a test leave _root off top-level terms, configure interactive (manual) dice, make rolls blind,
 // have the min modifier do nothing, or roll rerolls and explosions as first throws; and since module
 // 0.42.0 have a die keep applying modifiers it was given and has had taken off, a parser make a
-// lone negative die after `+` a die within parentheses, or a roll throw copies of the dice it adds.
+// lone negative die after `+` a die within parentheses, or a roll throw copies of the dice it adds;
+// and since module 0.45.0 have a die not wait for a value its fulfillment promises.
 
 export const core = {
   /** Leave `_root` off a roll's own dice, as Foundry might. */
@@ -37,6 +38,12 @@ export const core = {
    * of the die before isn't of the die thrown; a die it takes away, after `-`, is its own still.
    */
   freshTerms: false,
+  /**
+   * Since module 0.45.0: a die doesn't wait for a value its `_roll` promises, taking the promise as
+   * no value and throwing a random face, as a core whose `roll` didn't await it would [core,
+   * unverified: Foundry v14's DiceTerm#_roll is documented to return a Promise].
+   */
+  unawaitedRoll: false,
 }
 
 /** Rolls that asked the Gamemaster for their dice. */
@@ -271,7 +278,8 @@ class DiceTerm extends RollTerm {
 
   /** Foundry's: the die's fulfillment first, then a random face. */
   async roll({ minimize = false, maximize = false, ...rest } = {}) {
-    let result = await this._roll({ minimize, maximize, ...rest })
+    let result = core.unawaitedRoll ? this._roll({ minimize, maximize, ...rest }) : await this._roll({ minimize, maximize, ...rest })
+    if (result instanceof Promise) result = undefined
     if (minimize) result = 1
     else if (maximize) result = this.faces
     if (result === undefined) result = this.randomFace()
