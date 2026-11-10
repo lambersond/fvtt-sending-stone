@@ -399,8 +399,9 @@ if (DND5E6) {
   const charm = await make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
   assert.equal(charm.status, 'done', JSON.stringify(charm))
   assert.ok(usesOf('charm') >= 1 && usesOf('charm') <= 4, `the charm's 1d4 spent: ${usesOf('charm')}`)
-  assert.deepEqual([asked(), dialogs.length, prompts.splice(0)], [[], 0, ['0 + 1d4']], "nothing asked, no window; the Gamemaster's manual dice for the cost alone, never its check")
-  ok(`under dnd5e 6${MIDI ? ' with Midi-QOL' : ''}: features.rolls.diceAsks false, diceAsksReason "system", no "dice" kind and the hello's diceAsks []; a typed Ice Knife${MIDI ? "'s 1d10 typed and its 2d6 rolled by Foundry with it" : ' and its damage made as before'}, the charm's 1d4 cost the Gamemaster's manual dice as before, the module's own check of it Foundry's computer dice; nothing asked, no window`)
+  assert.deepEqual([asked(), dialogs.length, prompts.splice(0), MIDI && (midi.consumeChecks.at(-1) === 'charm-zap')], [[], 0, ['0 + 1d4'], MIDI],
+    "nothing asked, no window; the Gamemaster's manual dice for the cost alone, never its checks")
+  ok(`under dnd5e 6${MIDI ? ' with Midi-QOL' : ''}: features.rolls.diceAsks false, diceAsksReason "system", no "dice" kind and the hello's diceAsks []; a typed Ice Knife${MIDI ? "'s 1d10 typed and its 2d6 rolled by Foundry with it" : ' and its damage made as before'}, the charm's 1d4 cost the Gamemaster's manual dice as before, the module's own check of it${MIDI ? ", and Midi-QOL's own as its use began," : ''} Foundry's computer dice; nothing asked, no window`)
   process.exit(0)
 }
 
@@ -465,6 +466,10 @@ assert.equal(window.rendered, true)
 assert.equal(window.options.modal, false, 'not in their way')
 assert.equal(window.options.buttons[0].label, 'SENDINGSTONE.DiceAsk.RollNow')
 assert.match(window.options.content, /SENDINGSTONE\.DiceAsk\.Waiting \{"name":"Thorin","label":"Charm of Sparks: Zap","dice":"1d4"\}/)
+// With Midi-QOL, Midi's own use has worked out what it would spend before dnd5e spends it, and thrown
+// that away (its checkAutoConsume): Foundry's computer dice, never the Gamemaster's manual dice, not
+// even while the player's ask waits (ROADMAP item 22).
+assert.deepEqual([MIDI ? midi.consumeChecks.at(-1) : null, checks()], [MIDI ? 'charm-zap' : null, []], "no check of the cost the Gamemaster's manual dice")
 // Listed by a hello sent meanwhile, as when the settings change, which closes nothing.
 announce({ campaignId: 'camp-a' })
 await until(() => helloOf('camp-a').data.diceAsks.length, 'a hello listing it')
@@ -475,7 +480,7 @@ assert.deepEqual([answer.status, answer.messageId, answer.visible, answer.rolls.
 let used = await using
 assert.equal(used.status, 'done', JSON.stringify(used))
 assert.deepEqual([usesOf('charm'), closeOf(ask.id), window.closed, asked().length - count, checks()], [3, { id: ask.id, reason: 'answered' }, true, 1, []])
-ok("a typed use's 1d4 cost: asked once of camp-a alone, purpose cost, label Charm of Sparks: Zap, its terms, a minute to wait; the Gamemaster's window, not modal, with Roll it now; a hello sent meanwhile lists it and closes nothing, another campaign's lists none; answered 3: closed answered, the window closed, the result done with the roll as thrown, 3 charges spent; the Gamemaster's manual dice never asked, not even for the module's own check of the cost beforehand (ROADMAP item 22)")
+ok(`a typed use's 1d4 cost: asked once of camp-a alone, purpose cost, label Charm of Sparks: Zap, its terms, a minute to wait; the Gamemaster's window, not modal, with Roll it now; a hello sent meanwhile lists it and closes nothing, another campaign's lists none; answered 3: closed answered, the window closed, the result done with the roll as thrown, 3 charges spent; the Gamemaster's manual dice never asked, not even for the module's own check of the cost beforehand${MIDI ? ", nor Midi-QOL's own as its use began, while the ask waited" : ''} (ROADMAP item 22)`)
 
 // A linked activity's: Spark cast from the staff spends the staff's 1d4, asked once.
 count = asked().length
@@ -637,12 +642,14 @@ ok("the character not open in the app: nothing asked, the computer's die; closed
 // Untyped, and the Gamemaster's own from the app: no run, nothing asked; the cost the Gamemaster's dice, as before.
 count = asked().length
 for (const fields of [{ typed: false }, { by: 'gm' }]) {
+  const consumeChecks = midi.consumeChecks.length
   used = await make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null, ...fields }))
   assert.equal(used.status, 'done', JSON.stringify(used))
-  assert.deepEqual(checks(), ['0 + 1d4'], `${JSON.stringify(fields)}: the cost the Gamemaster's manual dice, as before; its check beforehand Foundry's computer dice`)
+  assert.deepEqual([checks(), midi.consumeChecks.length - consumeChecks], [['0 + 1d4'], MIDI ? 1 : 0],
+    `${JSON.stringify(fields)}: the cost the Gamemaster's manual dice, as before; its checks beforehand Foundry's computer dice`)
 }
 assert.equal(asked().length, count, 'nothing asked')
-ok("an untyped use, and the Gamemaster's own from the app: no run, nothing asked, the cost rolled by the Gamemaster's own manual dice, as before 0.45.0; the module's own check of it beforehand Foundry's computer dice")
+ok(`an untyped use, and the Gamemaster's own from the app: no run, nothing asked, the cost rolled by the Gamemaster's own manual dice once, as before 0.45.0; the module's own check of it beforehand${MIDI ? ", and Midi-QOL's own as its use began," : ''} Foundry's computer dice`)
 
 // Rolls of the cost's formula made as dnd5e begins spending, which aren't the use's own spending: a
 // plain roll, a BasicRoll without its delta, and one built just as dnd5e builds a cost, delta and

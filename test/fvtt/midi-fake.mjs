@@ -17,7 +17,9 @@
 // them (1084-1090, 1146-1236), or, where that activity spends something and hits are checked,
 // deferred until the saves are (1119-1137), when its cost is checked and thrown away, then spent
 // (Workflow.ts:2494-2575, 2592-2610); and a bonus damage macro's formulas rolled by rollBonusDamage
-// after its callMacros has returned (4078-4105, 4110-4125). It can't stand for Midi itself.
+// after its callMacros has returned (4078-4105, 4110-4125); and a use's check of what it would spend,
+// thrown away before dnd5e's use spends it (MidiActivityMixin.ts:776-779, 949-966). It can't stand
+// for Midi itself.
 // Install it before the module is imported.
 
 import {
@@ -51,6 +53,9 @@ export const midi = {
     // item's one other activity. Midi's own default is "auto" (settings.ts:150); the stand-in's is
     // "none", so that the harnesses before 0.45.0 roll as they did; later-dice.mjs sets "auto".
     defaultOtherActivity: 'none',
+    // Since module 0.45.0: whether a Gamemaster's use spends what it uses without its dialog, where
+    // the workflow's options don't say (utils.ts:4421-4424), at Midi's own default (settings.ts:191).
+    gmConsumeResource: 'none',
   },
   /**
    * Midi's client setting AutoRemoveTargets (settings.ts:1860-1869, 988-991), at its default: which
@@ -105,6 +110,11 @@ export const midi = {
   otherDamage: null,
   /** Since module 0.45.0, each other activity whose deferred cost was spent, by its id, in order. */
   otherConsumed: [],
+  /**
+   * Since module 0.45.0, each activity whose use Midi checked before dnd5e spent it, as its
+   * checkAutoConsume does, working out what it would spend and throwing that away, by its id, in order.
+   */
+  consumeChecks: [],
   /**
    * Since module 0.45.0: called with each bonus damage entry's index, and the workflow, just before
    * rollBonusDamage builds its roll, where nothing of Midi's own runs: a roll a test makes then stands
@@ -196,6 +206,17 @@ function setTargets(ids) {
 
 /** utils.ts:9543-9545 */
 const hasArea = activity => !!activity.target?.template?.type
+
+/**
+ * Since module 0.45.0, utils.ts:4421-4424 and MidiActivityMixin.ts:920-947, activity overrides
+ * aside: does a use spend what it uses without its dialog, by its workflow's own option, else the
+ * Gamemaster's setting?
+ */
+function autoConsumes(activity, workflow) {
+  const setting = workflow.workflowOptions?.autoConsumeResource ?? midi.settings.gmConsumeResource
+  const spell = activity.item?.type === 'spell'
+  return (setting === 'both') || ((setting === 'spell') && spell) || ((setting === 'item') && !spell)
+}
 
 class Workflow {
   static workflows = new Map()
@@ -760,6 +781,16 @@ export const MidiActivity = Base => class extends Base {
     // 867-881: concentration is put off until the workflow's checks pass.
     const defer = this.requiresConcentration
     if (defer) usage.concentration = { begin: false, end: usage.concentration?.end ?? null }
+
+    // Since module 0.45.0, Midi-QOL v14 (GitLab 2ac2f66) MidiActivityMixin.ts:776-779, 949-966: unless
+    // its dialog is to be shown, a use that spends what it uses without one (shouldAutoConsume) has
+    // what it would spend worked out from the usage it's given, and thrown away, before dnd5e's use
+    // spends it; one that couldn't spend it has its dialog shown.
+    if ((dialog.configure !== true) && autoConsumes(this, workflow)) {
+      midi.consumeChecks.push(this.id)
+      const check = await this._prepareUsageUpdates(this._prepareUsageConfig(usage), { returnErrors: true })
+      dialog.configure = Array.isArray(check) && (check.length > 0)
+    }
 
     const preUse = (activity, usageConfig, dialogConfig, messageConfig) => {
       if (workflow.activity.uuid !== activity.uuid) return true
