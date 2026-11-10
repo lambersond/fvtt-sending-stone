@@ -105,6 +105,7 @@ for v in X=1 "X=1 DND5E6=1" MIDI=1 LIBWRAPPER=1; do run plain $v; done
 # Module 0.45.0: the dice the game rolls later, asked of a player typing theirs, under dnd5e 5.3.3 and
 # Midi-QOL's stand-ins (dnd5e's Ice Knife's 2d6, deferred other damage and its cost, bonus damage
 # macros, dice a use spends, a die thrown again), through libWrapper, off under dnd5e 6.0.5, an app
-# before them asked nothing, and a core whose die doesn't await its fulfillment failing the self-test.
-for v in X=1 "X=1 DND5E6=1" MIDI=1 "MIDI=1 DND5E6=1" "MIDI=1 LIBWRAPPER=1" OLD_APP=1 BREAK_ASK=1; do run later-dice $v; done
+# before them asked nothing, and a core whose die doesn't await its fulfillment failing the self-test,
+# with dnd5e alone and Midi-QOL's stand-ins, whose own check of a use's cost stays on computer dice.
+for v in X=1 "X=1 DND5E6=1" MIDI=1 "MIDI=1 DND5E6=1" "MIDI=1 LIBWRAPPER=1" OLD_APP=1 BREAK_ASK=1 "MIDI=1 BREAK_ASK=1"; do run later-dice $v; done
 exit $fail

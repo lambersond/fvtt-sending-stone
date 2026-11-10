@@ -421,8 +421,9 @@ if (BREAK_ASK) {
   prompts.splice(0)
   const charm = await make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
   assert.equal(charm.status, 'done', JSON.stringify(charm))
-  assert.deepEqual([asked(), prompts.splice(0), dialogs.length], [[], ['0 + 1d4'], 0], "nothing asked; the cost the Gamemaster's manual dice, as before 0.45.0, never its check")
-  ok(`a core whose die doesn't wait for its fulfillment: the self-test fails (${later.laterDiceStatus.error}), features.rolls.diceAsks false, diceAsksReason "self-test", no "dice" kind; a typed use's dice cost rolled as before 0.45.0, with the Gamemaster's own manual dice, its check beforehand Foundry's computer dice, nothing asked, no window`)
+  assert.deepEqual([asked(), prompts.splice(0), dialogs.length, MIDI && (midi.consumeChecks.at(-1) === 'charm-zap')], [[], ['0 + 1d4'], 0, MIDI],
+    "nothing asked; the cost the Gamemaster's manual dice, as before 0.45.0, never its checks")
+  ok(`a core whose die doesn't wait for its fulfillment${MIDI ? ', with Midi-QOL' : ''}: the self-test fails (${later.laterDiceStatus.error}), features.rolls.diceAsks false, diceAsksReason "self-test", no "dice" kind; a typed use's dice cost rolled as before 0.45.0, with the Gamemaster's own manual dice, its check beforehand${MIDI ? ", and Midi-QOL's own as its use began," : ''} Foundry's computer dice, nothing asked, no window`)
   process.exit(0)
 }
 
