@@ -154,7 +154,8 @@ const asksOfRoll = new WeakMap();
 
 /**
  * What's open while Midi-QOL rolls a workflow's bonus damage, after its macros have returned: rolls
- * of their formulas are expected, each taken once, built as Midi builds them, one at a time.
+ * of their formulas are expected, each taken once, built as Midi builds them, one at a time; or,
+ * where two runs' expect one formula at once, taken unasked, using nothing up.
  * @type {Bracket[]}
  */
 const brackets = [];
@@ -246,14 +247,15 @@ let testAnswers = null;
  * none. Midi rolls bonus damage one roll after another, each awaited: so while one of a bracket's
  * rolls is being thrown, waiting on its ask among it, no other roll is the bracket's. But nothing on
  * such a roll says whose it is: while another run's bracket expects one of its formulas too,
- * neither's rolls are asked from then on (`shared`).
+ * neither's rolls are asked from then on (`shared`), and a shared one's rolls use up none of what
+ * it expects (`bracketStep`).
  * @typedef {object} Bracket
  * @property {"bonus"} purpose
  * @property {Run} run
  * @property {object} owner       What opened it: the workflow.
  * @property {string} label
  * @property {Expected[]} expected
- * @property {Roll|null} busy     The roll of it being thrown now, until it's thrown.
+ * @property {Roll|null} busy     The roll it took being thrown now, until it's thrown.
  * @property {boolean} shared     Has another run's bracket expected one of its formulas meanwhile?
  */
 
@@ -696,25 +698,39 @@ function stepOf(roll) {
   const noted = steps.get(roll);
   if ( noted ) return noted;
   if ( !brackets.length || isOwnRoll(roll) || planAlive(roll.options?.[ROLL_TAG]) ) return null;
-  for ( const bracket of brackets ) {
-    // One at a time: while one of its rolls is thrown, any other roll is someone else's. A shared
-    // one's are asked of no one, and wait for nothing.
-    if ( bracket.busy && !bracket.shared ) continue;
-    const index = bracket.expected.findIndex(each => fitsBracket(bracket.purpose, each, roll));
-    if ( index === -1 ) continue;
-    bracket.expected.splice(index, 1);
-    // A shared one stays open until what opened it is done: another run's roll may have been taken
-    // in place of one of its own.
-    if ( bracket.shared ) bracket.busy = null;
-    else if ( bracket.expected.length ) bracket.busy = roll;
+  const step = bracketStep(roll);
+  if ( step ) steps.set(roll, step);
+  return step;
+}
+
+/**
+ * The step of a roll a bracket takes, if any, one at a time for each bracket, as Midi-QOL rolls a
+ * workflow's bonus damage one roll after another: while one of its rolls is being thrown, waiting
+ * on its ask among it, any other roll is someone else's. A bracket of one run's own takes a roll of
+ * a formula it expects where none of its rolls is being thrown, uses that up, and asks its run's
+ * player. A shared one takes it where none of its rolls is being thrown, or where the one being
+ * thrown is itself asked of no one: two runs' workflows rolling at once, the one's roll may come
+ * while the other's is thrown. It uses nothing up, so that a roll taken in another's place never
+ * leaves one of its own untaken, and asks no one: Foundry's computer dice, until what opened it is
+ * done. Where its roll being thrown waits on an ask made before it was shared, its workflow rolls
+ * nothing else meanwhile: it takes nothing, and a roll no other bracket takes is no run's, as the
+ * Gamemaster's own.
+ * @param {Roll} roll
+ * @returns {Step|null}
+ */
+function bracketStep(roll) {
+  const indexIn = bracket => bracket.expected.findIndex(each => fitsBracket(bracket.purpose, each, roll));
+  let bracket = brackets.find(each => !each.busy && (indexIn(each) !== -1));
+  if ( bracket && !bracket.shared ) {
+    bracket.expected.splice(indexIn(bracket), 1);
+    if ( bracket.expected.length ) bracket.busy = roll;
     else closeBracket(bracket);
-    const step = new Step(bracket.run, [roll], {
-      purpose: bracket.purpose, label: bracket.label, critical: false, silent: bracket.shared
-    });
-    steps.set(roll, step);
-    return step;
+    return new Step(bracket.run, [roll], { purpose: bracket.purpose, label: bracket.label, critical: false });
   }
-  return null;
+  if ( bracket ) bracket.busy = roll;
+  else bracket = brackets.find(each => each.shared && (steps.get(each.busy)?.silent === true) && (indexIn(each) !== -1));
+  if ( !bracket ) return null;
+  return new Step(bracket.run, [roll], { purpose: bracket.purpose, label: bracket.label, critical: false, silent: true });
 }
 
 /**
@@ -737,8 +753,8 @@ function fitsBracket(purpose, expected, roll) {
 /**
  * Open a bracket: where another run's, of the same purpose, expects a roll of one of its formulas
  * too, as two characters' workflows rolling a bonus 1d6 each at once, which roll is whose can't be
- * told, so neither's rolls are asked from then on; they're still later rolls, Foundry's computer
- * dice.
+ * told, so neither's rolls are asked from then on, until what opened each is done; they're still
+ * later rolls, Foundry's computer dice (`bracketStep`).
  * @param {Omit<Bracket, "busy"|"shared">} details
  * @returns {void}
  */
@@ -755,19 +771,13 @@ function openBracket(details) {
 }
 
 /**
- * Close a bracket. Once what opened it is done, what a shared one still expects is a roll of
- * another run's yet to come, one of whose place its own took: another run's shared bracket of the
- * same purpose, still open, takes it over.
+ * Close a bracket: what it still expects is no longer anyone's.
  * @param {Bracket} bracket
- * @param {boolean} [done]   Is what opened it done: has Midi rolled the bonus damage?
  * @returns {void}
  */
-function closeBracket(bracket, done=false) {
+function closeBracket(bracket) {
   const index = brackets.indexOf(bracket);
   if ( index !== -1 ) brackets.splice(index, 1);
-  if ( !done || !bracket.shared || !bracket.expected.length ) return;
-  const heir = brackets.find(other => other.shared && (other.purpose === bracket.purpose) && (other.run !== bracket.run));
-  heir?.expected.push(...bracket.expected);
 }
 
 /* -------------------------------------------- */
@@ -929,7 +939,7 @@ async function rollBonusDamage(wrapped, ...args) {
   } finally {
     rollingBonus.delete(this);
     for ( const bracket of Array.from(brackets) ) {
-      if ( (bracket.purpose === "bonus") && (bracket.owner === this) ) closeBracket(bracket, true);
+      if ( (bracket.purpose === "bonus") && (bracket.owner === this) ) closeBracket(bracket);
     }
   }
 }
