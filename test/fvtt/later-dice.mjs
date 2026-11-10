@@ -12,7 +12,7 @@
 // Mira, another player's character, whose use spends what Thorin's charm does, and whose dagger
 // rolls Midi's bonus damage beside his; a stand-in
 // app that answers asks, says which characters are open, and whether it reads asks (OLD_APP=1: an
-// app before them); a DialogV2 for the Gamemaster's window, who rolls their own dice with Manual
+// app before them), and may be slow to answer fetches of commands; a DialogV2 for the Gamemaster's window, who rolls their own dice with Manual
 // Dice; and a clock run a hundred times as fast, timers and Date.now alike, so that a minute's wait
 // takes 0.6 seconds. BREAK_ASK=1: a core whose die doesn't wait for a value its
 // fulfillment promises (dice-core.mjs's unawaitedRoll), which fails the self-test. LIBWRAPPER=1:
@@ -258,7 +258,9 @@ fight.getCombatantsByActor = actor => fight.combatants.filter(cb => cb.actor?.id
 game.combat = fight
 
 // ---- The app ----
-const app = { events: [], waiting: new Map(), wake: null, open: new Set(['thorin']), polls: 0, features: {} }
+// `holding`, while set, as a listener slow to answer: each fetch of commands hangs until let go, or
+// given up on (its abort).
+const app = { events: [], waiting: new Map(), wake: null, open: new Set(['thorin']), polls: 0, features: {}, holding: null }
 const json = body => ({ ok: true, status: 200, statusText: 'OK', headers: new Headers({ 'content-type': 'application/json' }), json: async () => body })
 globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body)
@@ -274,6 +276,12 @@ globalThis.fetch = async (url, init) => {
   if (String(url).endsWith('/api/bridge/commands')) {
     app.polls++
     const id = body.campaign.id
+    if (app.holding) {
+      await new Promise((resolve, reject) => {
+        app.holding.push(resolve)
+        init.signal?.addEventListener('abort', () => reject(new DOMException('The fetch was given up on.', 'AbortError')), { once: true })
+      })
+    }
     if (!app.waiting.get(id)?.length) {
       await new Promise(resolve => {
         const timer = realSetTimeout(resolve, 20)
@@ -286,6 +294,13 @@ globalThis.fetch = async (url, init) => {
     return json({ commands, open: [...app.open] })
   }
   throw new TypeError(`Unexpected fetch of ${url}`)
+}
+/** Hold the fetches of commands from now on, as a listener slow to answer, until let go. */
+const holdFetches = () => { app.holding = [] }
+const letGoFetches = () => {
+  const holding = app.holding ?? []
+  app.holding = null
+  for (const resolve of holding) resolve()
 }
 async function until(test, what, ms = 6000) {
   const end = realNow() + ms
@@ -523,6 +538,23 @@ assert.deepEqual([used.status, closeOf(ask.id), checks()], ['done', { id: ask.id
 assert.ok(closedAt(ask.id) - Date.parse(ask.expiresAt) <= 5_000, `throttled: closed ${closedAt(ask.id) - Date.parse(ask.expiresAt)} ms past its wait`)
 settings.set('diceAskWait', 60_000)
 ok("left past its wait (a second, by the hidden setting): closed expired as its wait ends, Foundry's computer die spent, the use done, never the Gamemaster's manual dice; with Foundry's timers throttled, as in a tab in the background, closed at the next fetch's look all the same, a few seconds past its wait")
+
+// Its own minute closes it, with no fetch coming, the listener slow to answer, and the look every 5
+// seconds put off for two minutes, Foundry's timers throttled once the ask is open: as its minute
+// ends, a few seconds past it at most.
+count = asked().length
+using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
+ask = await nextAsk(count)
+holdFetches()
+throttled = true
+await pass(6000)
+await until(() => closeOf(ask.id), 'the ask closing', 12_000)
+throttled = false
+letGoFetches()
+used = await using
+assert.deepEqual([used.status, closeOf(ask.id), checks()], ['done', { id: ask.id, reason: 'expired' }, []])
+assert.ok(Math.abs(closedAt(ask.id) - Date.parse(ask.expiresAt)) <= 5_000, `closed ${closedAt(ask.id) - Date.parse(ask.expiresAt)} ms past its minute`)
+ok("left a minute, with no fetch coming and the look every 5 seconds put off for two minutes: closed expired by its own minute, as it ends, Foundry's computer die spent, the use done")
 
 // Roll it now: closed rolled, Foundry's die.
 count = asked().length
@@ -949,22 +981,35 @@ const unheld = async command => {
 }
 
 // The campaign no longer asks: its players no longer type in their dice (Manual Dice turned off for
-// it): closed expired at the next look, told.
+// it): closed expired at the next look, told; with the listener slow to answer, no fetch coming,
+// at the look every 5 seconds, 5 seconds at most after the change.
 const campaignsBefore = game.settings.get('sending-stone', 'campaigns')
 let made
 ;[made, ask] = await charmAsk()
+holdFetches()
+await pass(3000)
+const turnedOff = Date.now()
 settings.set('campaigns', campaignsBefore.map(campaign => (campaign.id === 'camp-a') ? { ...campaign, manualDice: false } : campaign))
 used = await made
+letGoFetches()
 assert.deepEqual([used.status, closeOf(ask.id), early(ask, closedAt(ask.id))], ['done', { id: ask.id, reason: 'expired' }, true], 'Manual Dice off')
+assert.ok(closedAt(ask.id) - turnedOff <= 6_000, `closed ${closedAt(ask.id) - turnedOff} ms after Manual Dice was turned off, no fetch coming`)
 settings.set('campaigns', campaignsBefore)
 await reopen()
 
 // The listener's answer no longer says "diceAsks": 1: closed expired at once, untold, as the
-// listener no longer reads asks; an answer after refused expired.
+// listener no longer reads asks; an answer after refused expired. At once, as the answer comes: the
+// listener slow to answer fetches, no fetch coming, and Foundry's timers throttled, as in a tab in
+// the background, the look every 5 seconds put off for two minutes.
 ;[made, ask] = await charmAsk()
+holdFetches()
+throttled = true
+await pass(6000)
 app.features = { diceAsks: 0 }
 await helloAgain()
 const unread = await unheld(ask.command)
+throttled = false
+letGoFetches()
 used = await made
 assert.deepEqual([used.status, closeOf(ask.id), early(ask, unread)], ['done', undefined, true], 'no longer read')
 app.features = {}
@@ -1018,7 +1063,7 @@ assert.equal(closeOf(ask.id), undefined, 'untold')
 await until(() => app.polls > 0, 'the fetches')
 await reopen()
 assert.deepEqual(checks(), [], "never the Gamemaster's manual dice")
-ok(`an ask closed well before its minute is out: expired, told, once its campaign's players no longer type in their dice; expired, untold, once the listener's answer no longer says diceAsks 1, an answer after refused expired;${MIDI ? '' : " gone once the roll whose run it's in is made without waiting for it, as for the Gamemaster's own code's roll of the same item;"} expired once its run is over, five minutes after its roll; expired, untold, once this Foundry is no longer the bridge`)
+ok(`an ask closed well before its minute is out: expired, told, once its campaign's players no longer type in their dice, by the look every 5 seconds with no fetch coming; expired, untold, once the listener's answer no longer says diceAsks 1, at once, with no fetch coming and Foundry's timers throttled, an answer after refused expired;${MIDI ? '' : " gone once the roll whose run it's in is made without waiting for it, as for the Gamemaster's own code's roll of the same item;"} expired once its run is over, five minutes after its roll; expired, untold, once this Foundry is no longer the bridge`)
 
 /* -------------------------------------------- */
 /*  Companions and Wild Shape                   */
