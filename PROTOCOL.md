@@ -1698,7 +1698,7 @@ is `true`, and only to the campaign the typed roll was fetched for; see
 | Type | Payload |
 | --- | --- |
 | `roll.dice.asked` | `{ ask }`: a roll in the run of a player's typed roll waits for its dice, or a die of it thrown again waits for its value. |
-| `roll.dice.closed` | `{ id, reason }`: an ask no longer waits. `reason` is exactly one of: `"answered"` (an answer from the listener naming dice was taken), `"skipped"` (an answer naming none, `dice` `[]`, was taken: Foundry rolled every die), `"rolled"` (the Gamemaster chose **Roll it now**), `"expired"` (the wait ended; or the character, for a companion its character, is no longer open in the listener; or the campaign no longer asks, as with its rolls or Manual Dice off) or `"gone"` (its roll was called off before it was answered, as when its Midi-QOL workflow was aborted). Foundry's computer dice roll whatever wasn't answered. |
+| `roll.dice.closed` | `{ id, reason }`: an ask no longer waits. `reason` is exactly one of: `"answered"` (an answer from the listener naming dice was taken), `"skipped"` (an answer naming none, `dice` `[]`, was taken: Foundry rolled every die), `"rolled"` (the Gamemaster chose **Roll it now**), `"expired"` (the wait ended; or the character, for a companion its character, is no longer open in the listener; or the campaign no longer asks, as with its rolls or Manual Dice off; or its run is over, five minutes after its roll; or, untold, as no such event can reach the listener then, a listener's answer no longer says `"diceAsks": 1`, or this Foundry is no longer the bridge: the next hello lists none) or `"gone"` (its roll was called off before it was answered, as when its Midi-QOL workflow was aborted, or, with no Midi-QOL workflow, the roll whose run it's in was made without waiting for it). Foundry's computer dice roll whatever wasn't answered. |
 
 An ask:
 
@@ -4104,7 +4104,8 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   character is no longer open, the campaign no longer asks, as with its rolls or Manual Dice turned
   off or a listener's answer no longer saying `"diceAsks": 1`, this Foundry is no longer the bridge,
   or its run is over, five minutes after the roll. A Midi workflow aborted meanwhile closes it
-  `"gone"`. While it waits, the bridge Gamemaster's Foundry shows a small window, not in their way,
+  `"gone"`, and so does, with no Midi workflow, the roll whose run it's in being made without
+  waiting for it, as the Gamemaster's own code's roll of the same item may be. While it waits, the bridge Gamemaster's Foundry shows a small window, not in their way,
   saying whose player it waits for, what, and how long is left, with **Roll it now**: the ask closes
   `"rolled"` and Foundry's computer dice roll it. A reload of the Gamemaster's
   browser forgets every ask, and the next hello lists none.
