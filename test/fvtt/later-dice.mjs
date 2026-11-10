@@ -179,6 +179,10 @@ equip(thorin, {
     { id: 'wild-charm', name: 'Wild Charm', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 200, spent: 0 } }, activities: [
       { id: 'wild-zap', name: 'Zap', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['lightning'] }], consumption: [{ type: 'itemUses', value: '1d4x' }] },
     ] },
+    // A charm whose use spends 1d4 and 1d6 of its charges, each exploding: a term left out of an answer.
+    { id: 'twin-charm', name: 'Twin Charm', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 500, spent: 0 } }, activities: [
+      { id: 'twin-zap', name: 'Zap', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['lightning'] }], consumption: [{ type: 'itemUses', value: '1d4x + 1d6x' }] },
+    ] },
     // A staff that casts Spark, spending 1d4 of its charges: the spell's own use spends the staff's.
     { id: 'staff', name: 'Staff of Sparks', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 10, spent: 0 } },
       activities: [{ id: 'cast-spark', type: 'cast', spell: { level: 1 }, consumption: [{ type: 'itemUses', value: '1d4' }] }] },
@@ -695,6 +699,69 @@ used = await using
 assert.deepEqual([used.status, usesOf('wild-charm'), asked().length - count, closeOf(boom.id), checks()], ['done', 6, 2, { id: boom.id, reason: 'answered' }, []])
 core.interactive = true
 ok("a die thrown again in a roll asked: Wild Charm's 1d4x cost answered 4 explodes, the next die asked as the cost's, purpose again, explode, label Wild Charm: Zap, its command the use's; answered 2, 6 charges spent; never the Gamemaster's manual dice")
+
+// A die Foundry's computer threw is never asked again: Wild Charm's 1d4x cost, its ask closed by the
+// Gamemaster's Roll it now, skipped, or left past its wait, its computer die a 4, explodes into a 1,
+// Foundry's computer dice, never asked; nor the explosion of a die thrown again whose own ask the
+// Gamemaster rolled. (Foundry's computer dice are made to give 4 then 1, once the use's own check of
+// its cost, Foundry's computer dice too, is done.)
+const { DiceTerm } = foundry.dice.terms
+const ownFace = DiceTerm.prototype.randomFace
+/** Foundry's computer dice give these faces next, in order, then their own again. */
+const computerGives = faces => {
+  const next = [...faces]
+  DiceTerm.prototype.randomFace = function () { return next.length ? next.shift() : ownFace.call(this) }
+  return () => { DiceTerm.prototype.randomFace = ownFace; return next.length }
+}
+const wildUse = () => make(typed({ id: `use-${++ids}`, kind: 'use', item: 'wild-charm', activity: 'wild-zap', targets: [], slot: null }))
+settings.set('diceAskWait', 5000)
+for (const [how, close] of [
+  ['rolled', ask => { dialogs.at(-1).options.buttons[0].callback() }],
+  ['skipped', ask => make(answerOf(ask, []))],
+  ['expired', () => null],
+]) {
+  count = asked().length
+  before = usesOf('wild-charm')
+  using = wildUse()
+  ask = await nextAsk(count)
+  const restore = computerGives([4, 1])
+  await close(ask)
+  used = await using
+  assert.deepEqual([restore(), used.status, usesOf('wild-charm') - before, asked().slice(count).map(each => each.purpose), closeOf(ask.id)],
+    [0, 'done', 5, ['cost'], { id: ask.id, reason: how }], how)
+}
+settings.set('diceAskWait', 60_000)
+// The die thrown again whose own ask the Gamemaster rolled: its computer 4 explodes into a 1, never
+// asked. (The cost's answer is done once its roll is thrown, after the die thrown again.)
+count = asked().length
+before = usesOf('wild-charm')
+using = wildUse()
+ask = await nextAsk(count)
+const answering = make(answerOf(ask, [{ roll: 0, term: 0, results: [4] }]))
+const rolledAgain = await nextAsk(count + 1)
+assert.deepEqual([rolledAgain.purpose, rolledAgain.again], ['again', 'explode'])
+let restore = computerGives([4, 1])
+dialogs.at(-1).options.buttons[0].callback()
+await answering
+used = await using
+assert.deepEqual([restore(), used.status, usesOf('wild-charm') - before, asked().length - count, closeOf(rolledAgain.id)],
+  [0, 'done', 9, 2, { id: rolledAgain.id, reason: 'rolled' }])
+// Twin Charm's 1d4x + 1d6x cost answered for the 1d4 alone, 4: its explosion asked, answered 1; the
+// 1d6 left out, Foundry's computer 6, explodes into a 2, never asked.
+count = asked().length
+before = usesOf('twin-charm')
+using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'twin-charm', activity: 'twin-zap', targets: [], slot: null }))
+ask = await nextAsk(count)
+assert.deepEqual(ask.rolls.map(roll => [roll.formula, roll.terms]), [['0 + 1d4x + 1d6x', [{ faces: 4, number: 1 }, { faces: 6, number: 1 }]]])
+restore = computerGives([6, 2])
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [4] }]))
+const twinAgain = await nextAsk(count + 1)
+assert.deepEqual([twinAgain.purpose, twinAgain.again, twinAgain.rolls[0].terms], ['again', 'explode', [{ faces: 4, number: 1 }]])
+await make(answerOf(twinAgain, [{ roll: 0, term: 0, results: [1] }]))
+used = await using
+assert.deepEqual([restore(), used.status, usesOf('twin-charm') - before, asked().length - count], [0, 'done', 13, 2])
+assert.deepEqual(checks(), [], "never the Gamemaster's manual dice")
+ok("a die Foundry's computer threw is never asked again: Wild Charm's 1d4x cost whose ask closed rolled, skipped or expired, its computer 4 exploding into a 1, never asked; the explosion of a die thrown again whose own ask was rolled, never asked; Twin Charm's 1d4x + 1d6x answered for the 1d4 alone, its 4's explosion asked, the 1d6 left out, Foundry's 6, exploding into a 2, never asked")
 
 /* -------------------------------------------- */
 /*  Answers refused                             */
