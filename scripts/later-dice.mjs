@@ -143,7 +143,7 @@ const asksOfRoll = new WeakMap();
 /**
  * What's open between two moments of a run: the dice a use spends, between dnd5e's consumption
  * hooks, and a Midi-QOL bonus damage macro's formulas, while Midi rolls them. Each expects rolls of
- * these formulas, each taken once.
+ * these formulas, each taken once, built as dnd5e or Midi builds them, one at a time.
  * @type {Bracket[]}
  */
 const brackets = [];
@@ -211,13 +211,27 @@ let testAnswers = null;
  */
 
 /**
- * Between two moments of a run, the rolls of the formulas expected.
+ * Between two moments of a run, the rolls of the formulas expected: a dice cost as dnd5e builds it,
+ * `new BasicRoll("0 + 1d4", rollData, {delta})`; a bonus damage formula as Midi-QOL builds it, a
+ * `DamageRoll` of `{type, flavor}`, its flavor its type where the macro gave none. dnd5e spends, and
+ * Midi rolls bonus damage, one roll after another, each awaited: so while one of a bracket's rolls
+ * is being thrown, waiting on its ask among it, no other roll is the bracket's.
  * @typedef {object} Bracket
  * @property {"cost"|"bonus"} purpose
  * @property {Run} run
  * @property {object} owner       What opened it: the activity spending, or the workflow.
  * @property {string} label
- * @property {{formula: string, type?: string}[]} expected
+ * @property {Expected[]} expected
+ * @property {Roll|null} busy     The roll of it being thrown now, until it's thrown.
+ */
+
+/**
+ * A roll a bracket expects: its formula; for bonus damage, its type where the macro named one of
+ * dnd5e's, and its flavor where the macro gave one (`undefined`: its type).
+ * @typedef {object} Expected
+ * @property {string} formula
+ * @property {string} [type]
+ * @property {unknown} [flavor]
  */
 
 /* -------------------------------------------- */
@@ -337,13 +351,14 @@ function warnOnce(kind, text, err) {
 /**
  * Open the run of a typed roll as it's about to be made: a player's own, `typed` and never the
  * Gamemaster's, of a kind whose item's later rolls are asked, or of any other, whose own dice may
- * be thrown again. Nothing where later dice aren't asked here at all.
+ * be thrown again. Nothing where later dice aren't asked here at all: under another system than
+ * dnd5e 5, or where the self-test failed, the game's later dice are rolled as before 0.45.0.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {Run|null}
  */
 export function beginRun(command, campaign) {
-  if ( !installed || (command?.typed !== true) || ((command.by !== undefined) && (command.by !== null)) ) return null;
+  if ( !active() || (command?.typed !== true) || ((command.by !== undefined) && (command.by !== null)) ) return null;
   if ( (typeof command.id !== "string") || (command.kind === "dice") ) return null;
   sweepRuns();
   let found = null;
@@ -605,19 +620,41 @@ function stepOf(roll) {
   const noted = steps.get(roll);
   if ( noted ) return noted;
   if ( !brackets.length || isOwnRoll(roll) || planAlive(roll.options?.[ROLL_TAG]) ) return null;
-  const D20Roll = CONFIG.Dice?.D20Roll;
-  if ( D20Roll && (roll instanceof D20Roll) ) return null;
   for ( const bracket of brackets ) {
-    const index = bracket.expected.findIndex(each => (each.formula === roll.formula)
-      && ((each.type === undefined) || (each.type === roll.options?.type)));
+    // One at a time: while one of its rolls is thrown, any other roll is someone else's.
+    if ( bracket.busy ) continue;
+    const index = bracket.expected.findIndex(each => fitsBracket(bracket.purpose, each, roll));
     if ( index === -1 ) continue;
     bracket.expected.splice(index, 1);
-    if ( !bracket.expected.length ) closeBracket(bracket);
+    if ( bracket.expected.length ) bracket.busy = roll;
+    else closeBracket(bracket);
     const step = new Step(bracket.run, [roll], { purpose: bracket.purpose, label: bracket.label, critical: false });
     steps.set(roll, step);
     return step;
   }
   return null;
+}
+
+/**
+ * Is a roll about to be thrown one a bracket expects, built as dnd5e or Midi-QOL builds it: of its
+ * formula; for a dice cost, dnd5e's BasicRoll carrying its `delta`, never a damage or d20 roll; for
+ * bonus damage, a DamageRoll of the type the macro named, flavored as Midi flavors it?
+ * @param {"cost"|"bonus"} purpose
+ * @param {Expected} expected
+ * @param {Roll} roll
+ * @returns {boolean}
+ */
+function fitsBracket(purpose, expected, roll) {
+  const { BasicRoll, DamageRoll, D20Roll } = CONFIG.Dice ?? {};
+  if ( (roll.formula !== expected.formula) || (D20Roll && (roll instanceof D20Roll)) ) return false;
+  const options = roll.options ?? {};
+  if ( purpose === "cost" ) {
+    if ( !BasicRoll || !(roll instanceof BasicRoll) || (DamageRoll && (roll instanceof DamageRoll)) ) return false;
+    return Object.hasOwn(options, "delta");
+  }
+  if ( !DamageRoll || !(roll instanceof DamageRoll) || (typeof options.type !== "string") ) return false;
+  if ( (expected.type !== undefined) && (options.type !== expected.type) ) return false;
+  return options.flavor === ((expected.flavor === undefined) ? options.type : expected.flavor);
 }
 
 /**
@@ -652,7 +689,9 @@ function openCost(activity, usageConfig) {
       if ( bracket.owner === activity ) closeBracket(bracket);
     }
     const expected = costsOf(activity, usageConfig);
-    if ( expected.length ) brackets.push({ purpose: "cost", run, owner: activity, label: labelOf(activity, run), expected });
+    if ( expected.length ) {
+      brackets.push({ purpose: "cost", run, owner: activity, label: labelOf(activity, run), expected, busy: null });
+    }
   } catch (err) {
     warnOnce("cost", "Could not tell whether a use's dice cost is to be asked in the app: Foundry rolls it.", err);
   }
@@ -782,7 +821,7 @@ async function callMacros(wrapped, ...args) {
     if ( run && !workflowEnded(this) ) {
       const expected = bonusFormulas(this, args[0], results);
       if ( expected.length ) {
-        brackets.push({ purpose: "bonus", run, owner: this, label: labelOf(this.activity, run), expected });
+        brackets.push({ purpose: "bonus", run, owner: this, label: labelOf(this.activity, run), expected, busy: null });
       }
     }
   } catch (err) {
@@ -792,19 +831,21 @@ async function callMacros(wrapped, ...args) {
 }
 
 /**
- * The formulas of a workflow's bonus damage macros' results, as Midi-QOL builds each into a damage
- * roll (Workflow.ts's rollBonusDamage): with the item's roll data, or the actor's, its kind of damage
- * where it names one; a Roll of the macro's own left out.
+ * The rolls of a workflow's bonus damage macros' results, as Midi-QOL builds each into a damage
+ * roll (Workflow.ts:4078-4105): with the item's roll data, or the actor's; of the kind of damage it
+ * names, where that's one of dnd5e's, else of one Midi works out; flavored as the macro says, else
+ * as its type. A Roll of the macro's own left out.
  * @param {object} workflow
  * @param {Item|undefined} item
  * @param {unknown} results
- * @returns {{formula: string, type?: string}[]}
+ * @returns {Expected[]}
  */
 function bonusFormulas(workflow, item, results) {
   const DamageRoll = CONFIG.Dice?.DamageRoll;
   if ( !DamageRoll ) return [];
   const flat = (Array.isArray(results) ? results : [results]).flat(Infinity);
   const data = item?.getRollData?.() ?? workflow.actor?.getRollData?.() ?? {};
+  const types = { ...(CONFIG.DND5E?.damageTypes ?? {}), ...(CONFIG.DND5E?.healingTypes ?? {}) };
   const expected = [];
   for ( const entry of flat ) {
     if ( !entry || (typeof entry !== "object") || (entry instanceof foundry.dice.Roll) ) continue;
@@ -812,7 +853,9 @@ function bonusFormulas(workflow, item, results) {
     try {
       const roll = new DamageRoll(entry.damageRoll, data, {});
       if ( roll.isDeterministic ) continue;
-      expected.push({ formula: roll.formula });
+      const named = (typeof entry.damageType === "string") && Object.hasOwn(types, entry.damageType);
+      const flavored = (entry.flavor !== undefined) && (entry.flavor !== null);
+      expected.push({ formula: roll.formula, ...(named && { type: entry.damageType }), ...(flavored && { flavor: entry.flavor }) });
     } catch {
       // One Midi can't build either is no roll.
     }
@@ -1061,6 +1104,9 @@ function prune() {
  */
 function thrown(roll) {
   for ( const ask of asksOfRoll.get(roll) ?? [] ) ask.thrown.add(roll);
+  for ( const bracket of brackets ) {
+    if ( bracket.busy === roll ) bracket.busy = null;
+  }
 }
 
 /* -------------------------------------------- */
@@ -1160,10 +1206,10 @@ function showWaiting(ask) {
     const { i18n } = game;
     const name = game.actors?.get?.(ask.run.of ?? ask.run.actorId)?.name ?? "";
     const text = i18n.format("SENDINGSTONE.DiceAsk.Waiting", {
-      name: escape(name), label: escape(ask.label), dice: escape(diceText(ask))
+      name: escapeText(name), label: escapeText(ask.label), dice: escapeText(diceText(ask))
     });
     const content = `<p class="sending-stone-dice-ask">${text}</p>`
-      + `<p class="sending-stone-dice-ask-left">${escape(leftText(ask))}</p>`;
+      + `<p class="sending-stone-dice-ask-left">${escapeText(leftText(ask))}</p>`;
     const dialog = new DialogV2({
       window: { title: i18n.localize("SENDINGSTONE.DiceAsk.Title") },
       content,
@@ -1239,12 +1285,13 @@ function leftText(ask) {
 }
 
 /**
- * Text as HTML, escaped: names and labels are what players and Gamemasters write.
+ * Text as HTML, escaped, as Foundry escapes it: names and labels are what players and Gamemasters
+ * write.
  * @param {string} text
  * @returns {string}
  */
-function escape(text) {
-  return String(text).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+function escapeText(text) {
+  return foundry.utils.escapeHTML(String(text ?? ""));
 }
 
 /* -------------------------------------------- */
@@ -1299,13 +1346,13 @@ function closedError(reason) {
 
 /**
  * Is an answer shaped as one: an ask's id, its dice a list of `{roll, term, results}`, at most 100,
- * thrown with no mode, choice or extras, and no dice for effects nor rerolls?
+ * typed, thrown with no mode, choice or extras, and no dice for effects nor rerolls?
  * @param {object} command
  * @returns {boolean}
  */
 function answerShaped(command) {
   if ( (typeof command.diceAsk !== "string") || !ID.test(command.diceAsk) ) return false;
-  if ( (command.mode !== 0) || (command.explicit !== false) ) return false;
+  if ( (command.typed !== true) || (command.mode !== 0) || (command.explicit !== false) ) return false;
   if ( !Array.isArray(command.extras) || command.extras.length ) return false;
   for ( const key of ["effectDice", "rerolls"] ) {
     if ( (command[key] !== undefined) && (command[key] !== null) ) return false;
@@ -1372,8 +1419,10 @@ export function openDiceAsks(campaign) {
  * Check, at start-up, what asking for later dice relies on, printing nothing, its outcome in
  * `laterDiceStatus`: that a later roll waits for its answer, which reaches the dice of the terms
  * it names, among the roll's own, while a term left out is Foundry's; that a roll outside any run,
- * of another actor, or in another Midi workflow, isn't one; and that a die thrown again, an
- * explosion and a reroll, waits for the value given, as Foundry awaits a die's `_roll`.
+ * of another actor, or in another Midi workflow, isn't one; that a dice cost and a bonus damage
+ * formula keep what a bracket tells them apart by, as Foundry keeps a roll's options; and that a die
+ * thrown again, an explosion and a reroll, waits for the value given, as Foundry awaits a die's
+ * `_roll`.
  * @returns {Promise<void>}
  */
 async function laterSelfTest() {
@@ -1409,6 +1458,19 @@ async function laterSelfTest() {
     check(runOfStep([new BasicRoll("1d6")], { subject: { item, actor }, workflow: { workflowOptions: {} } }) === null,
       "a roll in another workflow was a run's");
     check(runOfStep([new BasicRoll("1d6")], { subject: { item, actor } }) === run, "a roll of the run's item wasn't its");
+
+    // A dice cost as dnd5e builds it, and a bonus damage formula as Midi-QOL builds it, keep what
+    // tells them apart; a plain roll of the same formula is neither.
+    if ( CONFIG.Dice?.BasicRoll ) {
+      check(fitsBracket("cost", { formula: "0 + 1d4" }, new CONFIG.Dice.BasicRoll("0 + 1d4", {}, { delta: undefined })),
+        "a dice cost built as dnd5e builds it wasn't one");
+      check(!fitsBracket("cost", { formula: "0 + 1d4" }, new foundry.dice.Roll("0 + 1d4")), "a plain roll was a dice cost");
+    }
+    if ( CONFIG.Dice?.DamageRoll ) {
+      const bonus = new CONFIG.Dice.DamageRoll("1d6", {}, { type: "fire", flavor: "Self-test" });
+      check(fitsBracket("bonus", { formula: "1d6", flavor: "Self-test" }, bonus), "a bonus damage built as Midi builds it wasn't one");
+      check(!fitsBracket("bonus", { formula: "1d6" }, bonus), "a bonus damage of another flavor was one");
+    }
 
     // A die thrown again waits for the value given: an explosion, and a reroll of a 1.
     for ( const [formula, dice, answers, expected] of [
