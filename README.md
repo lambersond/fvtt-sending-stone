@@ -183,8 +183,9 @@ while the roll is being made.
   item's workflow rolls, homebrew included, from what dnd5e and Midi put on each roll, and a use's
   cost from the use's own spending, with no code for any item. The app asks on the device the
   player rolled from; while it waits, a small window on your screen says whose dice and how long is
-  left, with **Roll it now**. After a minute, or once the character is closed in the app, Foundry's
-  computer dice roll it, never your own Manual Dice. Rolls of other players, of targets, NPCs and
+  left, with **Roll it now**; if you're typing in the chat as it opens, you go on typing there.
+  After a minute, or once the character is closed in the app, Foundry's computer dice roll it,
+  never your own Manual Dice. Rolls of other players, of targets, NPCs and
   your own are never asked, a damage you roll for a player's attack among them, from the app or on
   Midi's card, your own use of the player's item from its sheet or Midi's card, nor a d20 the game
   rolls later: the saves a spell asks come as prompts. A roll of yours may be asked wrongly only
@@ -194,8 +195,11 @@ while the roll is being made.
   Not yet under dnd5e 6, whose campaigns' hellos say so. See
   [PROTOCOL.md](PROTOCOL.md#dice-the-game-rolls-later). And under dnd5e 5 or 6, the module's own
   check of what a use from the app would spend, which it throws away, rolls a dice cost with
-  Foundry's computer dice, never your Manual Dice; so do Midi-QOL's own check of the cost of a
-  player's typed run's other activity, under dnd5e 5, and the module's dice self-test as it starts.
+  Foundry's computer dice, never your Manual Dice; so do Midi-QOL's own check of it as Midi's use
+  begins, its check of the cost of a player's typed run's other activity, under dnd5e 5, and the
+  module's dice self-test as it starts. The cost the use spends is rolled as ever: your own dice
+  settings, or a typing player's dice. Midi's checks of other uses, as the reactions it looks for
+  among the targets, are rolled as Midi rolls them.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -1172,7 +1176,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-dishes.mjs` | Dishes from the Magical Recipe Book, from 0.38.0: whether a campaign takes them, by its own switch under dnd5e 5; fetching them from an app that takes them; each dish command checked and posted once as its card, answered again from its card or its tombstone |
 | `scripts/dish-card.mjs` | A dish's card, whispered to the Gamemasters and the campaign's players: its words, its buttons for Gamemasters, what became of it for anyone, the dialog of who ate it, serving it and setting it aside; telling the app what was decided, again after a drop and after every hello; deleted cards' tombstones; one dish effect per character |
 | `scripts/dish-effects.mjs` | A dish's Active Effect: its changes on dnd5e 5.3.3's paths, its one-offs, its duration and flags; cookbook strings made inert for enrichers; dish effects ended once their time has passed; the long rest's top-up |
-| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.45.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one Foundry's computer dice |
+| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.45.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one, and Midi-QOL's of a use from the app, Foundry's computer dice |
 | `scripts/later-dice.mjs` | From 0.45.0, under dnd5e 5, the dice the game rolls later asked of a player typing theirs: a typed roll's run, bound to its Midi-QOL workflow; which rolls are its, by their subject, workflow, a use's own spending (its consumption hooks, and Midi's check of a workflow's other activity's consumption) and Midi's bonus damage; one ask per step, or per die thrown again, a minute's wait, the Gamemaster's window with Roll it now, the answers and their refusals, what the watchdog doesn't count, the hello's list, and its self-test |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster; and from 0.39.0 the links to the module's issue forms at the end of its side |
 | `scripts/apps/help-window.mjs` | From 0.39.0, Configure Settings' Report a bug or request a feature, which any user may open: the links to the module's issue forms |
