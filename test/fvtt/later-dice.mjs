@@ -4,11 +4,13 @@
 // midi-fake.mjs's workflow, its attack paired with its item's other activity as Midi pairs dnd5e's own
 // Ice Knife (its spells24 pack, 1st-level/ice-knife.yml, identical at release-5.3.3 and 6.0.5: an
 // attack of 1d10 piercing and a save, Shard Explosion, of 2d6 cold, 1d6 more a level above 1st), an
-// other activity that spends something deferred until saves are checked, and bonus damage macros
-// rolled through callMacros and rollBonusDamage; a stand-in app that answers asks, says which
-// characters are open, and whether it reads asks (OLD_APP=1: an app before them); a DialogV2 for the
-// Gamemaster's window; and a clock run a hundred times as fast, timers and Date.now alike, so that a
-// minute's wait takes 0.6 seconds. BREAK_ASK=1: a core whose die doesn't wait for a value its
+// other activity that spends something deferred until saves are checked, healing and an ammunition's
+// own activity rolled with the damage, a utility's formula, and bonus damage macros rolled through
+// callMacros and rollBonusDamage, one after another; a companion of Thorin's and a Wild Shape form
+// of his; a stand-in app that answers asks, says which characters are open, and whether it reads
+// asks (OLD_APP=1: an app before them); a DialogV2 for the Gamemaster's window, who rolls their own
+// dice with Manual Dice; and a clock run a hundred times as fast, timers and Date.now alike, so that
+// a minute's wait takes 0.6 seconds. BREAK_ASK=1: a core whose die doesn't wait for a value its
 // fulfillment promises (dice-core.mjs's unawaitedRoll), which fails the self-test. LIBWRAPPER=1:
 // the module wraps through libWrapper. Run with --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
@@ -62,7 +64,7 @@ const { default: D20Roll } = await import(`${DND5E}/d20-roll.mjs`)
 const { default: DamageRoll } = await import(`${DND5E}/damage-roll.mjs`)
 Object.assign(CONFIG.Dice, { BasicDie, BasicRoll, D20Die, D20Roll, DamageRoll })
 CONFIG.Dice.terms.d = BasicDie
-const TYPES = ['slashing', 'piercing', 'cold', 'fire', 'lightning']
+const TYPES = ['slashing', 'piercing', 'cold', 'fire', 'lightning', 'force']
 CONFIG.DND5E = {
   skills: { prc: { label: 'Perception', ability: 'wis' } },
   tools: {},
@@ -79,6 +81,8 @@ settings.set('attackRollVisibility', 'hideAC')
 if (DND5E6) game.system.version = '6.0.5'
 // dnd5e 6's dice read their labels through its global _loc.
 globalThis._loc ??= (key, data) => (data ? game.i18n.format(key, data) : game.i18n.localize(key))
+// Foundry's escapeHTML (common/utils/helpers.mjs), as the Gamemaster's window escapes names.
+foundry.utils.escapeHTML ??= value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' })[ch])
 
 const { Actor5e } = await import('./actor5e.mjs')
 const { AttackActivity, SaveActivity, DamageActivity, HealActivity, equip } = await import('./activity5e.mjs')
@@ -134,6 +138,7 @@ const alice = user('alice', 'Alice', false, 2)
 if (MIDI) {
   installMidi()
   midi.settings.defaultOtherActivity = 'auto'
+  midi.ammunitionActivities = true
 }
 const add = actor => { actors.set(actor.id, actor); return actor }
 
@@ -177,8 +182,32 @@ equip(thorin, {
     { id: 'dagger', name: 'Dagger', type: 'weapon', system: { properties: [], quantity: 1, attackType: 'melee' }, activities: [
       { id: 'dagger-stab', attack: { ability: 'dex' }, damage: [{ number: 1, denomination: 4, types: ['piercing'] }] },
     ] },
+    // A homebrew blade whose other activity heals him: Midi rolls its healing with the cut's damage.
+    { id: 'leech', name: 'Leech Blade', type: 'weapon', system: { properties: [], quantity: 1, attackType: 'melee' }, activities: [
+      { id: 'leech-cut', name: 'Cut', attack: { ability: 'dex' }, damage: [{ number: 1, denomination: 6, types: ['slashing'] }] },
+      { id: 'leech-drink', name: 'Drink', type: 'heal', healing: { number: 1, denomination: 4 } },
+    ] },
+    // A charm whose utility formula Midi rolls itself, in the use's workflow.
+    { id: 'luck', name: 'Charm of Luck', type: 'equipment', system: { properties: [], quantity: 1 }, activities: [{ id: 'luck-roll', name: 'Luck', type: 'utility', formula: '1d4' }] },
+    // A longbow, and arrows whose own activity Midi rolls with the bow's damage.
+    { id: 'bow', name: 'Longbow', type: 'weapon', system: { properties: ['amm'], quantity: 1, attackType: 'ranged' }, activities: [
+      { id: 'bow-shot', name: 'Shot', attack: { ability: 'dex' }, damage: [{ number: 1, denomination: 8, types: ['piercing'] }] },
+    ] },
+    { id: 'arrows', name: 'Arrows of Frost', type: 'consumable', system: { type: { value: 'ammo' }, quantity: 20, properties: [] }, activities: [
+      { id: 'arrows-frost', name: 'Frost', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['cold'] }] },
+    ] },
   ],
 })
+
+// Brakka, Alice's sidekick, linked: a companion of Thorin's, whose charm spends 1d4 of its charges.
+const brakka = add(new Actor5e({ id: 'brakka', name: 'Brakka', mods: { str: 2 }, hp: { value: 15, max: 15, temp: 0 } }))
+Object.assign(brakka, { type: 'npc', ownership: { default: 0, alice: 3 }, prototypeToken: { actorLink: true } })
+brakka.testUserPermission = user => ((brakka.ownership[user.id] ?? brakka.ownership.default) >= 3)
+equip(brakka, { items: [
+  { id: 'brakka-charm', name: 'Brakka\'s Charm', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 50, spent: 0 } }, activities: [
+    { id: 'brakka-zap', name: 'Zap', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['lightning'] }], consumption: [{ type: 'itemUses', value: '1d4' }] },
+  ] },
+] })
 
 const place = actor => {
   const token = { id: `tok-${actor.id}`, name: actor.name, uuid: `Scene.scene.Token.tok-${actor.id}`, actor, hidden: false }
@@ -199,7 +228,7 @@ fight.getCombatantsByActor = actor => fight.combatants.filter(cb => cb.actor?.id
 game.combat = fight
 
 // ---- The app ----
-const app = { events: [], waiting: new Map(), wake: null, open: new Set(['thorin']), polls: 0 }
+const app = { events: [], waiting: new Map(), wake: null, open: new Set(['thorin']), polls: 0, features: {} }
 const json = body => ({ ok: true, status: 200, statusText: 'OK', headers: new Headers({ 'content-type': 'application/json' }), json: async () => body })
 globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body)
@@ -207,7 +236,7 @@ globalThis.fetch = async (url, init) => {
     app.events.push(body)
     const announcing = ['bridge.hello', 'bridge.heartbeat'].includes(body.type)
     return announcing
-      ? json({ features: { commands: true, ...(!OLD_APP && { diceAsks: 1 }) } })
+      ? json({ features: { commands: true, ...(!OLD_APP && { diceAsks: 1 }), ...app.features } })
       : { ok: true, status: 204, statusText: 'No Content', headers: new Headers() }
   }
   if (String(url).endsWith('/api/bridge/commands')) {
@@ -317,10 +346,14 @@ if (BREAK_ASK) {
   assert.deepEqual([later.laterDiceStatus.ready, later.laterDiceStatus.reason], [false, 'self-test'])
   assert.match(later.laterDiceStatus.error, /1d6x, its dice given, threw/)
   assert.deepEqual([rollsOf('camp-a').diceAsks, rollsOf('camp-a').diceAsksReason, rollsOf('camp-a').kinds.includes('dice')], [false, 'self-test', false])
+  // The Gamemaster configured manual dice for their own rolls: the cost is rolled as before 0.45.0,
+  // with their dice, after the module's own check of it.
+  core.interactive = true
+  prompts.splice(0)
   const charm = await make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
   assert.equal(charm.status, 'done', JSON.stringify(charm))
-  assert.deepEqual(asked(), [], 'nothing asked')
-  ok(`a core whose die doesn't wait for its fulfillment: the self-test fails (${later.laterDiceStatus.error}), features.rolls.diceAsks false, diceAsksReason "self-test", no "dice" kind, and a typed use's dice cost is Foundry's, nothing asked`)
+  assert.deepEqual([asked(), prompts.splice(0), dialogs.length], [[], ['0 + 1d4', '0 + 1d4'], 0], "nothing asked; the check and the cost the Gamemaster's manual dice, as before 0.45.0")
+  ok(`a core whose die doesn't wait for its fulfillment: the self-test fails (${later.laterDiceStatus.error}), features.rolls.diceAsks false, diceAsksReason "self-test", no "dice" kind; a typed use's dice cost rolled as before 0.45.0, with the Gamemaster's own manual dice, nothing asked, no window`)
   process.exit(0)
 }
 
@@ -456,6 +489,23 @@ for (const fields of [{ typed: false }, { by: 'gm' }]) {
 assert.equal(asked().length, count, 'nothing asked')
 ok("an untyped use, and the Gamemaster's own from the app: no run, nothing asked, the cost rolled by the Gamemaster's own manual dice, as before 0.45.0")
 
+// Rolls of the cost's formula made as dnd5e begins spending, which aren't dnd5e's cost: a plain roll,
+// and a BasicRoll without its delta, are the Gamemaster's at once; the cost alone is asked.
+count = asked().length
+const strangers = []
+const spending = Hooks.on('dnd5e.preActivityConsumption', () => {
+  strangers.push(new foundry.dice.Roll('0 + 1d4').evaluate(), new BasicRoll('0 + 1d4', {}, { flavor: 'Mine' }).evaluate())
+})
+using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
+ask = await nextAsk(count)
+Hooks.off('dnd5e.preActivityConsumption', spending)
+await Promise.all(strangers)
+assert.deepEqual([ask.purpose, asked().length - count, checks()], ['cost', 1, ['0 + 1d4', '0 + 1d4', '0 + 1d4']], "the check, then the two others, the Gamemaster's, while the cost waits")
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [2] }]))
+used = await using
+assert.deepEqual([used.status, checks()], ['done', []])
+ok("as dnd5e begins spending, a plain roll and a BasicRoll of the cost's formula without dnd5e's delta: never the cost, the Gamemaster's manual dice at once; dnd5e's cost alone asked")
+
 /* -------------------------------------------- */
 /*  What's never asked                          */
 /* -------------------------------------------- */
@@ -473,8 +523,12 @@ const club = await goblin.items.get('club').system.activities.get('club-hit').ro
 const maxed = Hooks.on('dnd5e.postBuildDamageRollConfig', (process, config) => { config.options.maximize = true })
 const maximized = await charmZap.rollDamage({}, quiet, unposted)
 Hooks.off('dnd5e.postBuildDamageRollConfig', maxed)
+const minned = Hooks.on('dnd5e.postBuildDamageRollConfig', (process, config) => { config.options.minimize = true })
+const minimized = await charmZap.rollDamage({}, quiet, unposted)
+Hooks.off('dnd5e.postBuildDamageRollConfig', minned)
 const outside = await new DamageRoll('1d6', {}, { type: 'fire' }).evaluate()
-assert.deepEqual([clicked, dagger, club, maximized].map(rolls => rolls?.length), [1, 1, 1, 1])
+assert.deepEqual([clicked, dagger, club, maximized, minimized].map(rolls => rolls?.length), [1, 1, 1, 1, 1])
+assert.deepEqual([maximized[0].options.maximize, minimized[0].options.minimize], [true, true])
 assert.ok(outside.total >= 1)
 assert.equal(asked().length - count, 1, 'none of them asked')
 // The one way left to ask wrongly: the same item of the same character, no click, while its roll is made.
@@ -487,9 +541,9 @@ await make(answerOf(ask, [{ roll: 0, term: 0, results: [1] }]))
 used = await using
 assert.equal(used.status, 'done')
 // The click's, the dagger's, the club's, the roll of no run's: the Gamemaster's dice, as ever; the
-// maximized one throws none.
+// maximized and minimized ones throw none.
 assert.deepEqual(checks(), ['0 + 1d4', clicked[0].formula, dagger[0].formula, club[0].formula, outside.formula])
-ok("never asked while a typed use waits on its cost: the same item's damage rolled with a click, another item of his, another actor's, one whose dice are maximized, and a roll of no run; the one way left to ask wrongly, the same item's damage with no click while the use is made, is asked as the run's")
+ok("never asked while a typed use waits on its cost: the same item's damage rolled with a click, another item of his, another actor's, one whose dice are maximized or minimized, and a roll of no run; the one way left to ask wrongly, the same item's damage with no click while the use is made, is asked as the run's")
 
 /* -------------------------------------------- */
 /*  A die thrown again                          */
@@ -543,6 +597,7 @@ for (const [why, fields, expected] of [
   ['too many values', { dice: [{ roll: 0, term: 0, results: [2, 3] }] }, ['invalid', 'diceAsk']],
   ['a value its die lacks', { dice: [{ roll: 0, term: 0, results: [5] }] }, ['invalid', 'diceAsk']],
   ['not whole', { dice: [{ roll: 0, term: 0, results: [2.5] }] }, ['invalid', 'diceAsk']],
+  ['not typed', { typed: false }, ['invalid', 'diceAsk']],
   ['a mode', { mode: 1 }, ['invalid', 'diceAsk']],
   ['extras', { extras: [{ sign: 1, count: 1, sides: 4 }] }, ['invalid', 'diceAsk']],
   ['effect dice', { effectDice: [] }, ['invalid', 'diceAsk']],
@@ -569,7 +624,7 @@ used = await make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activi
 settings.set('diceAskWait', 60_000)
 const expired = await make(answerOf(asked()[count], one))
 assert.deepEqual(refusal(expired), ['failed', 'diceAsk', 'expired'])
-ok('answers refused, nothing taken: by (invalid by); not an id, dice not a list, a roll or term not listed, a term twice, too many values, a value its die lacks, not whole, a mode, extras, effect dice, rerolls (invalid diceAsk); no such ask (diceAsk gone); another character, a companion of his, or fetched for another campaign (diceAsk character); a second answer (answered); one past its wait (expired)')
+ok('answers refused, nothing taken: by (invalid by); not an id, dice not a list, a roll or term not listed, a term twice, too many values, a value its die lacks, not whole, not typed, a mode, extras, effect dice, rerolls (invalid diceAsk); no such ask (diceAsk gone); another character, a companion of his, or fetched for another campaign (diceAsk character); a second answer (answered); one past its wait (expired)')
 
 // An answer while the character's queue is busy: made at once, before the commands queued after his use.
 count = asked().length
@@ -582,6 +637,64 @@ answer = await make(answerOf(ask, one))
 const [usedNow, checked] = await Promise.all([using, behind])
 assert.deepEqual([answer.status, usedNow.status, checked.status], ['done', 'done', 'done'], JSON.stringify(checked))
 ok("an answer while the character's queue is busy with the use it answers, a check waiting behind: made at once, the use done, then the check")
+
+/* -------------------------------------------- */
+/*  Companions and Wild Shape                   */
+/* -------------------------------------------- */
+
+// Brakka's typed use of her charm, of Thorin: its cost asked under her key, of thorin, while Thorin
+// is open; an answer without of refused, one with it taken, spent from her charm.
+assert.deepEqual(checks(), ['0 + 1d4', '0 + 1d4', '0 + 1d4'], "the charm's three uses above: the module's own checks alone")
+const brakkaUse = () => typed({ id: `use-${++ids}`, actorId: 'brakka', of: 'thorin', kind: 'use', item: 'brakka-charm', activity: 'brakka-zap', targets: [], slot: null })
+count = asked().length
+using = make(brakkaUse())
+ask = await nextAsk(count)
+assert.deepEqual([ask.actorId, ask.of, ask.purpose, ask.label, ask.rolls[0].formula], ['brakka', 'thorin', 'cost', "Brakka's Charm: Zap", '0 + 1d4'])
+const unnamed = await make(answerOf(ask, one))
+assert.deepEqual(refusal(unnamed), ['failed', 'diceAsk', 'character'], 'without of')
+answer = await make(answerOf(ask, [{ roll: 0, term: 0, results: [3] }], { of: 'thorin' }))
+used = await using
+assert.deepEqual([answer.status, used.status, closeOf(ask.id), brakka.items.get('brakka-charm').system.uses.spent, checks()],
+  ['done', 'done', { id: ask.id, reason: 'answered' }, 3, ['0 + 1d4']])
+// Open by her character alone: Brakka open and Thorin not, nothing asked, the computer's die.
+app.open = new Set(['brakka'])
+await pass(1000)
+count = asked().length
+used = await make(brakkaUse())
+assert.deepEqual([used.status, asked().length - count, checks()], ['done', 0, ['0 + 1d4']])
+app.open = new Set(['thorin'])
+await pass(1000)
+ok("a companion's typed use, Brakka's of thorin: its 1d4 cost asked with actorId brakka and of thorin while Thorin is open; an answer without of refused diceAsk character, one with it taken, 3 of her charges spent; Brakka open and Thorin not, nothing asked")
+
+// Thorin shaped into a wolf, for an app that takes Wild Shape: the wolf's own charm's cost asked as
+// Thorin's, with no of.
+const hellos = () => app.events.filter(e => (e.type === 'bridge.hello') && (e.campaign.id === 'camp-a')).length
+const reannounce = async () => {
+  const before = hellos()
+  announce({ campaignId: 'camp-a' })
+  await until(() => hellos() > before, 'a hello')
+  await wait(30)
+}
+const wolf = add(new Actor5e({ id: 'thorinWolf', name: 'Thorin (Wolf)', owners: ['alice'], flags: { isPolymorphed: true, originalActor: 'thorin', previousActorIds: [] } }))
+wolf.documentName = 'Actor'
+equip(wolf, { items: [
+  { id: 'wolf-charm', name: 'Wolf Charm', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 50, spent: 0 } }, activities: [
+    { id: 'wolf-zap', name: 'Zap', type: 'damage', damage: [{ number: 1, denomination: 6, types: ['lightning'] }], consumption: [{ type: 'itemUses', value: '1d4' }] },
+  ] },
+] })
+app.features = { wildShape: 1 }
+await reannounce()
+count = asked().length
+using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'wolf-charm', activity: 'wolf-zap', targets: [], slot: null }))
+ask = await nextAsk(count)
+assert.deepEqual([ask.actorId, 'of' in ask, ask.purpose, ask.label], ['thorin', false, 'cost', 'Wolf Charm: Zap'])
+answer = await make(answerOf(ask, [{ roll: 0, term: 0, results: [4] }]))
+used = await using
+assert.deepEqual([answer.status, used.status, wolf.items.get('wolf-charm').system.uses.spent, checks()], ['done', 'done', 4, ['0 + 1d4']])
+actors.delete(wolf.id)
+app.features = {}
+await reannounce()
+ok("shaped into a wolf, for an app that takes Wild Shape: the form's own charm's 1d4 cost asked as Thorin's, actorId thorin and no of, typed 4, spent from the wolf's charm")
 
 /* -------------------------------------------- */
 /*  Midi-QOL                                    */
@@ -598,7 +711,6 @@ if (!MIDI) {
 }
 
 // Ice Knife: the d20 and the 1d10 typed; the 2d6 cold of Shard Explosion asked within the damage.
-assert.deepEqual(checks(), ['0 + 1d4', '0 + 1d4', '0 + 1d4'], "the charm's three uses above: the module's own checks alone")
 count = asked().length
 let knife = await attack('ice-knife', 'ice-attack', 15, { slot: 'spell1' })
 assert.equal(knife.status, 'done', JSON.stringify(knife))
@@ -645,21 +757,41 @@ const burst = workflowOf(flame.id).otherDamageRolls
 assert.deepEqual([dealt.status, burst.length, burst[0].total, burst[1].dice[0].results.length, answer.rolls.length, asked().length - count], ['done', 2, 24, 2, 2, 1])
 ok("a critical hit's other damage, Flame Knife's Burst of two parts: one ask for both rolls, critical, its dice already doubled as dnd5e doubles them, 4d6 fire and 2d4 cold; the fire typed 6s, 24, the cold left out and Foundry's; the result both rolls as thrown")
 
-// Bonus damage macros: a formula asked, purpose bonus; a macro's own Roll never.
-midi.bonusDamage = [{ formula: '2d6', type: 'piercing', flavor: 'Sneak Attack' }, { roll: () => new DamageRoll('1d4', {}, { type: 'fire' }) }]
+// Bonus damage macros: each formula asked in turn, purpose bonus; a macro's own Roll never. While
+// Sneak Attack's waits, the Gamemaster's own rolls of Hunter's Mark's formula, a plain one and a
+// damage roll of its very type and flavor, are theirs at once; so are those made in the instant
+// before Midi builds Hunter's Mark's, a plain roll and a damage roll of another flavor.
+checks()
+midi.bonusDamage = [
+  { formula: '2d6', type: 'piercing', flavor: 'Sneak Attack' },
+  { formula: '1d6', type: 'force', flavor: "Hunter's Mark" },
+  { roll: () => new DamageRoll('1d4', {}, { type: 'fire' }) },
+]
+const instant = []
+midi.beforeBonusRoll = index => {
+  if (index === 1) instant.push(new foundry.dice.Roll('1d6').evaluate(), new DamageRoll('1d6', {}, { type: 'force', flavor: 'Hex' }).evaluate())
+}
 count = asked().length
 const sneak = await attack('dagger', 'dagger-stab', 16)
 dealing = damage(sneak.id, [{ faces: 4, results: [3] }])
 ask = await nextAsk(count)
 assert.deepEqual([ask.purpose, ask.label, ask.rolls.map(roll => [roll.type, roll.flavor, roll.terms])], ['bonus', 'Dagger: Attack', [['piercing', 'Sneak Attack', [{ faces: 6, number: 2 }]]]])
+await Promise.all([new foundry.dice.Roll('1d6'), new DamageRoll('1d6', {}, { type: 'force', flavor: "Hunter's Mark" })].map(roll => roll.evaluate()))
+assert.deepEqual([asked().length - count, checks()], [1, ['1d6', '1d6']], "the Gamemaster's two while Sneak Attack's waits: theirs, never asked")
 await make(answerOf(ask, [{ roll: 0, term: 0, results: [4, 4] }]))
+const mark = await nextAsk(count + 1)
+await Promise.all(instant)
+assert.deepEqual([mark.purpose, mark.rolls.map(roll => [roll.type, roll.flavor, roll.terms]), checks()],
+  ['bonus', [['force', "Hunter's Mark", [{ faces: 6, number: 1 }]]], ['1d6', '1d6']], "Hunter's Mark's asked; the instant's two the Gamemaster's")
+await make(answerOf(mark, [{ roll: 0, term: 0, results: [1] }]))
 dealt = await dealing
-await until(() => workflowOf(sneak.id).bonusDamageRolls?.length === 2, 'the bonus damage')
-assert.deepEqual(faces(workflowOf(sneak.id).bonusDamageRolls[0]), [[4, 4]])
+await until(() => workflowOf(sneak.id).bonusDamageRolls?.length === 3, 'the bonus damage')
+assert.deepEqual(workflowOf(sneak.id).bonusDamageRolls.slice(0, 2).map(faces), [[[4, 4]], [[1]]])
 await pass(5000)
-assert.equal(asked().length - count, 1, "the macro's own 1d4 never asked")
+assert.deepEqual([asked().length - count, checks()], [2, ['1d4']], "the macro's own 1d4 never asked: the Gamemaster's manual dice")
 midi.bonusDamage = null
-ok("a Midi bonus damage macro's formula, Sneak Attack's 2d6: asked once the macros returned, purpose bonus, label Dagger: Attack, typed 4 and 4; a macro's own Roll never asked")
+midi.beforeBonusRoll = null
+ok("Midi bonus damage macros' formulas, Sneak Attack's 2d6 piercing and Hunter's Mark's 1d6 force: each asked in turn once the macros returned, purpose bonus, label Dagger: Attack, typed 4 and 4, then 1; while the first waits, the Gamemaster's own 1d6, plain and of Hunter's Mark's very type and flavor, theirs at once; in the instant before Hunter's Mark's is built, a plain 1d6 and a 1d6 force of another flavor, theirs; a macro's own Roll never asked")
 
 // Deferred: Frost Brand's Rime spends 1d4 charges, so Midi rolls it once saves are checked, after
 // the damage's result: its cost asked once (Midi's check of it beforehand thrown away), then its 2d6.
@@ -678,6 +810,40 @@ await until(() => workflowOf(brand.id).otherDamageRolls?.length, 'the deferred d
 assert.deepEqual([usesOf('frost-brand') - brandUses, faces(workflowOf(brand.id).otherDamageRolls[0]), midi.otherConsumed], [4, [[2, 2]], ['frost-burst']])
 ok("Midi's deferred other damage, Frost Brand's Rime: after the damage's result and the targets' saves, its 1d4 cost asked once (Midi's check of it beforehand thrown away), typed 4, 4 charges spent, then its 2d6 asked and typed")
 
+// Healing Midi rolls with the damage: Leech Blade's Drink, purpose healing.
+checks()
+count = asked().length
+const leech = await attack('leech', 'leech-cut', 15)
+dealing = damage(leech.id, [{ faces: 6, results: [4] }])
+ask = await nextAsk(count)
+assert.deepEqual([ask.purpose, ask.label, ask.rolls.map(roll => [roll.type, roll.terms])], ['healing', 'Leech Blade: Drink', [['healing', [{ faces: 4, number: 1 }]]]])
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [3] }]))
+dealt = await dealing
+assert.deepEqual([dealt.status, faces(workflowOf(leech.id).otherDamageRolls[0]), checks()], ['done', [[3]], []])
+ok("Midi's other healing, Leech Blade's Drink, rolled with the cut's damage: asked, purpose healing, label Leech Blade: Drink, type healing, 1d4, typed 3")
+
+// A utility's formula Midi rolls itself, in the use's workflow: purpose formula.
+count = asked().length
+using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'luck', activity: 'luck-roll', targets: [], slot: null }))
+ask = await nextAsk(count)
+assert.deepEqual([ask.purpose, ask.label, ask.rolls.map(roll => roll.terms)], ['formula', 'Charm of Luck: Luck', [[{ faces: 4, number: 1 }]]])
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [4] }]))
+used = await using
+assert.deepEqual([used.status, workflowOf(used.id)?.utilityRolls?.map(roll => roll.total), checks()], ['done', [4], []])
+ok("a utility's formula Midi rolls in the use's workflow, Charm of Luck's 1d4: asked, purpose formula, label Charm of Luck: Luck, typed 4, the workflow's utility roll 4")
+
+// Ammunition's own activity, which Midi rolls with the bow's damage: Arrows of Frost's 1d6 cold.
+count = asked().length
+const shot = await attack('bow', 'bow-shot', 16, { ammunition: 'arrows' })
+assert.equal(shot.status, 'done', JSON.stringify(shot))
+dealing = damage(shot.id, [{ faces: 8, results: [5] }])
+ask = await nextAsk(count)
+assert.deepEqual([ask.purpose, ask.label, ask.rolls.map(roll => [roll.type, roll.terms])], ['damage', 'Arrows of Frost: Frost', [['cold', [{ faces: 6, number: 1 }]]]])
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [6] }]))
+dealt = await dealing
+assert.deepEqual([dealt.status, faces(workflowOf(shot.id).damageRolls[0]), faces(workflowOf(shot.id).otherDamageRolls[0]), checks()], ['done', [[5]], [[6]], []])
+ok("an ammunition's own activity, Arrows of Frost's Frost, which Midi rolls with the Longbow's damage: asked within the damage, label Arrows of Frost: Frost, 1d6 cold, typed 6, the bow's 1d8 typed 5")
+
 // The Gamemaster's own Midi use of Ice Knife while the player's waits: never asked.
 count = asked().length
 knife = await attack('ice-knife', 'ice-attack', 15, { slot: 'spell1' })
@@ -688,10 +854,15 @@ await gmKnife.use({ midiOptions: { workflowOptions: { autoRollAttack: true, fast
 const gmWorkflow = midi.made.at(-1)
 await until(() => gmWorkflow.otherDamageRolls?.length || gmWorkflow.aborted || (gmWorkflow.currentAction === gmWorkflow.WorkflowState_Completed), "the Gamemaster's workflow")
 assert.equal(asked().length - count, 1, "the Gamemaster's own never asked")
+// A roll of another actor's in the player's very workflow, as a target's: the Gamemaster's, never asked.
+checks()
+const intruder = await goblin.items.get('club').system.activities.get('club-hit').rollDamage(
+  { workflow: workflowOf(knife.id), midiOptions: { updateWorkflow: false } }, { configure: false }, { create: false })
+assert.deepEqual([intruder?.length, asked().length - count, checks()], [1, 1, [intruder?.[0]?.formula]], "the goblin's club in the player's workflow")
 await make(answerOf(ask, [{ roll: 0, term: 0, results: [6, 6] }]))
 dealt = await dealing
 assert.deepEqual([dealt.status, faces(workflowOf(knife.id).otherDamageRolls[0])], ['done', [[6, 6]]])
-ok("the Gamemaster's own Midi use of the same Ice Knife, its damage rolled automatically with no click, while the player's 2d6 waits: another workflow, never asked; the player's answered as asked")
+ok("the Gamemaster's own Midi use of the same Ice Knife, its damage rolled automatically with no click, while the player's 2d6 waits: another workflow, never asked; the goblin's club rolled in the player's very workflow: another actor's, the Gamemaster's manual dice, never asked; the player's answered as asked")
 
 // Aborted while it waits: closed gone, Foundry's dice.
 count = asked().length

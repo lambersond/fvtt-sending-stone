@@ -106,6 +106,19 @@ export const midi = {
   /** Since module 0.45.0, each other activity whose deferred cost was spent, by its id, in order. */
   otherConsumed: [],
   /**
+   * Since module 0.45.0: called with each bonus damage entry's index just before rollBonusDamage
+   * builds its roll, where nothing of Midi's own runs: a roll a test makes then stands for another
+   * client's or module's, made in that instant. None by default.
+   */
+  beforeBonusRoll: null,
+  /**
+   * Since module 0.45.0: whether an attack's loaded ammunition's own activity is rolled with its
+   * damage, as Midi's other damage is (MidiActivityMixin.ts:170-177, 1085, 1157-1158, 2258-2262).
+   * Midi always does; off by default, so that the harnesses before 0.45.0, whose arrows carry
+   * activities of their own, roll as they did; later-dice.mjs turns it on.
+   */
+  ammunitionActivities: false,
+  /**
    * The ammunition each attack activity last fired in a workflow, by its uuid, as Midi keeps it on the
    * activity (AttackActivity.ts:535-536, 576) and adds to its damage rolled after (:268-279), module
    * 0.36.0's damage on its own among them.
@@ -301,12 +314,13 @@ class Workflow {
     const extraDamages = (await this.callMacros(item, damageBonusMacro, 'DamageBonus', 'DamageBonus'))?.flat()
     if (!extraDamages) return []
     const rolls = []
-    for (const entry of extraDamages) {
+    for (const [index, entry] of extraDamages.entries()) {
       if (!entry || (typeof entry !== 'object')) continue
       if (entry instanceof foundry.dice.Roll) {
         rolls.push(entry)
         continue
       }
+      midi.beforeBonusRoll?.(index)
       const { damageRoll, damageType, flavor } = entry
       if (!damageRoll) continue
       const options = { type: damageType, flavor: flavor ?? damageType }
@@ -648,6 +662,18 @@ export const MidiActivity = Base => class extends Base {
   }
 
   /**
+   * MidiActivityMixin.ts:170-177, 2258-2262 (module 0.45.0), where midi.ammunitionActivities is on:
+   * an attack's loaded ammunition's activity, its first that isn't an attack, with damage or healing
+   * of its own; the ammunition the activity last fired, as Midi keeps it on the activity.
+   */
+  get ammunitionActivity() {
+    if (!midi.ammunitionActivities || (this.type !== 'attack')) return undefined
+    const ammunition = this.actor?.items?.get(midi.ammunition.get(this.uuid))
+    return [...(ammunition?.system?.activities?.values() ?? [])]
+      .find(activity => (activity.type !== 'attack') && (activity.hasDamage || activity.hasHealing)) ?? undefined
+  }
+
+  /**
    * MidiActivityMixin.ts:1119-1137 (module 0.45.0): an other activity's damage put off where it
    * spends something and hits are checked, its settings kept on the workflow.
    */
@@ -666,7 +692,8 @@ export const MidiActivity = Base => class extends Base {
    * telling it not to update the workflow, which keeps its rolls as its other damage.
    */
   async rollOtherDamage(config, dialog) {
-    const other = this.otherActivity
+    // 1157-1158: the item's own other activity, else its ammunition's.
+    const other = this.otherActivity ?? this.ammunitionActivity
     if (!other || !config.workflow || !(other.hasDamage || other.hasHealing)) return undefined
     const otherConfig = { ...config, midiOptions: { ...config.midiOptions, updateWorkflow: false, addOptionalBonuses: false } }
     const otherResult = await other.rollDamage(otherConfig, dialog, { create: false })
@@ -819,7 +846,7 @@ export const MidiActivity = Base => class extends Base {
     if (config.midiOptions?.updateWorkflow === false) return result
     workflow.setDamageRolls(result)
     // 1084-1090 (module 0.45.0): the item's other activity's damage, at once or put off.
-    if (this.otherActivity && (workflow.otherActivity !== this) && !this.deferOtherDamage(config, dialog)) {
+    if ((this.otherActivity ?? this.ammunitionActivity) && (workflow.otherActivity !== this) && !this.deferOtherDamage(config, dialog)) {
       await this.rollOtherDamage(config, dialog)
     }
     // 1087-1095 and 1242: the item's other damage is rolled with its damage, here midi.otherDamage.

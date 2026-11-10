@@ -1464,18 +1464,19 @@ class ConsumptionTarget {
   }
 
   /** consumption-targets-field.mjs:709-711 */
-  resolveCost({ config = {} } = {}) {
-    return this._resolveScaledRoll(this.value, (this.scaling.mode === 'amount') ? (config.scaling ?? 0) : 0)
+  resolveCost({ config = {}, delta } = {}) {
+    return this._resolveScaledRoll(this.value, (this.scaling.mode === 'amount') ? (config.scaling ?? 0) : 0, { delta })
   }
 
   /**
    * consumption-targets-field.mjs:743-773: its formula's dice and numbers grown by the scaling, or
-   * the scaling formula, multiplied by it, added.
+   * the scaling formula, multiplied by it, added; since module 0.45.0 a BasicRoll, where dnd5e's
+   * is loaded, carrying what it spends from in its options, `delta`, as dnd5e's does.
    */
-  _resolveScaledRoll(formula, scaling) {
+  _resolveScaledRoll(formula, scaling, { delta } = {}) {
     const { DiceTerm, NumericTerm, OperatorTerm } = foundry.dice.terms
     const rollData = this.activity.getRollData()
-    const roll = new Roll(formula ? `0 + ${formula}` : '0', rollData)
+    const roll = new (CONFIG.Dice?.BasicRoll ?? Roll)(formula ? `0 + ${formula}` : '0', rollData, { delta })
     if (scaling) {
       if (this.scaling.formula) {
         const scalingRoll = new Roll(this.scaling.formula, rollData)
@@ -1508,7 +1509,7 @@ class ConsumptionTarget {
     const item = this.target ? this.activity.actor.items.get(this.target) : this.activity.item
     const spent = Number(item.system.uses?.spent) || 0
     const value = Math.max((Number(item.system.uses?.max) || 0) - spent, 0)
-    const roll = this.resolveCost({ config })
+    const roll = this.resolveCost({ config, delta: { item: item.id, keyPath: 'system.uses.spent' } })
     const cost = roll.isDeterministic ? roll.evaluateSync().total : (await roll.evaluate()).total
     let warning
     if ((cost > 0) && !value) warning = 'DND5E.CONSUMPTION.Warning.None'
@@ -1535,7 +1536,7 @@ class ConsumptionTarget {
   async #consumeAttribute(config, updates) {
     const actor = this.activity.actor
     const keyPath = `system.${this.target}`
-    const roll = this.resolveCost({ config })
+    const roll = this.resolveCost({ config, delta: { keyPath } })
     const cost = roll.isDeterministic ? roll.evaluateSync().total : (await roll.evaluate()).total
     if (getProperty(actor, keyPath) === undefined) throw new ConsumptionError('DND5E.CONSUMPTION.Warning.MissingAttribute')
     let current = getProperty(actor, keyPath)
@@ -1556,7 +1557,7 @@ class ConsumptionTarget {
    */
   async #consumeActivityUses(config, updates) {
     const uses = this.activity.uses ?? { value: 0, spent: 0 }
-    const roll = this.resolveCost({ config })
+    const roll = this.resolveCost({ config, delta: { item: this.activity.item.id, keyPath: `system.activities.${this.activity.id}.uses.spent` } })
     const cost = roll.isDeterministic ? roll.evaluateSync().total : (await roll.evaluate()).total
     let warning
     if ((cost > 0) && !uses.value) warning = 'DND5E.CONSUMPTION.Warning.None'
