@@ -645,6 +645,22 @@ export const ROLL_TAG = "sendingStone";
 export const CRITICAL_AS_DND5E = "sendingStoneCritical";
 
 /**
+ * The key of a use's configuration marking, since 0.45.0, the module's own check of what the use
+ * would spend, worked out and thrown away: a dice cost dnd5e rolls for it is Foundry's computer
+ * dice, never asked of anyone (dice-plan.mjs's `costCheck`).
+ * @type {string}
+ */
+export const COST_CHECK = "sendingStoneCheck";
+
+/**
+ * The key of a use's configuration naming, since 0.45.0, the run whose spending dnd5e is working
+ * out, from `dnd5e.preActivityConsumption` until `dnd5e.activityConsumption`: a dice cost it rolls
+ * is asked as that run's (later-dice.mjs). dnd5e passes it on to a linked activity's spending.
+ * @type {string}
+ */
+export const COST_SPENDING = "sendingStoneSpending";
+
+/**
  * The dice a player can roll in the app.
  * @type {ReadonlySet<number>}
  */

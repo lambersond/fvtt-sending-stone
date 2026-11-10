@@ -4,7 +4,7 @@ import {
   appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
 import {
-  diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable, withPlan
+  costCheck, diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable, withPlan
 } from "./dice-plan.mjs";
 import { dnd5eEnchant, enchantChoice, midiEnchantNow } from "./command-enchant.mjs";
 import { resultsAlways } from "./config.mjs";
@@ -280,17 +280,21 @@ async function prepareUse(command, actor) {
     create: { ...usage.create, measuredTemplate: false },
     subsequentActions: false,
     ...((slot && !forward) ? { spell: { ...usage.spell, slot } } : {}),
-    ...(unslotted ? { consume: { ...usage.consume, spellSlot: false } } : {})
+    ...(unslotted ? { consume: { ...usage.consume, spellSlot: false } } : {}),
+    // Since 0.45.0 dnd5e's spending for it names the roll it's made for: a typed roll's run's
+    // dice costs are told by it (later-dice.mjs).
+    [ROLL_TAG]: command.id
   });
   // What using it would spend, worked out without spending it, at the level dnd5e will scale it to
   // once it's used: anything it can't spend is said here, rather than on the Gamemaster's screen. A
-  // forward's is what the forward spends, as dnd5e works it out with the forward as its cause.
+  // forward's is what the forward spends, as dnd5e works it out with the forward as its cause. Since
+  // 0.45.0 a dice cost rolled for it is Foundry's computer dice, asked of no one, as it's thrown away.
   const prepared = activity._prepareUsageConfig(forward
     ? foundry.utils.mergeObject(freeOf, usage, { inplace: false })
     : usage);
   scaleAsUsed(prepared, activity);
   try {
-    const updates = await activity._prepareUsageUpdates(prepared, { returnErrors: true });
+    const updates = await costCheck(prepared, () => activity._prepareUsageUpdates(prepared, { returnErrors: true }));
     if ( Array.isArray(updates) && updates.length ) return { refusal: "consume", error: updates[0]?.message ?? null };
   } catch (err) {
     return { refusal: "consume", error: err instanceof Error ? err.message : String(err) };

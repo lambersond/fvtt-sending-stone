@@ -1,4 +1,4 @@
-import { CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from "./constants.mjs";
+import { COST_CHECK, CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from "./constants.mjs";
 
 /**
  * Making a player's roll here with the dice they rolled in the Sending Stone app.
@@ -30,7 +30,11 @@ import { CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL_TAG } from 
  * after a typed damage, is evaluated once its player has answered, each of its dice taking the
  * values they gave for its own term alone, and a die of a typed roll thrown again, an explosion or a
  * reroll not kept, takes the value its player gives for it, one die at a time. That file registers
- * itself here (`registerLaterDice`), so that this one never imports it.
+ * itself here (`registerLaterDice`), so that this one never imports it. And since 0.45.0 the dice
+ * costs dnd5e rolls for the module's own check of what a use would spend, which it throws away, are
+ * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6: told by dnd5e's
+ * consumption targets' `resolveCost`, which is passed the use's configuration, and which tells
+ * later-dice.mjs of each dice cost a run spends.
  */
 
 /**
@@ -178,11 +182,28 @@ const termSigns = new WeakMap();
 
 /**
  * What later-dice.mjs gives, since 0.45.0, once it registers itself: the later step a roll belongs
- * to, if any; a die thrown again's value, asked of its player; and its self-test.
+ * to, if any; a die thrown again's value, asked of its player; who's told of a roll thrown; what
+ * notes a dice cost of a run's spending as that run's, for a use's configuration, if any; and its
+ * self-test.
  * @type {{stepOf: (roll: Roll) => LaterStep|null, again: (term: DiceTerm, why: "explode"|"reroll",
- *   owner: DicePlan|TermValues|null) => Promise<number|undefined>|null, selfTest: () => Promise<void>}|null}
+ *   owner: DicePlan|TermValues|null) => Promise<number|undefined>|null, thrown: (roll: Roll) => void,
+ *   costOf: (config: object) => ((roll: Roll) => void)|null, selfTest: () => Promise<void>}|null}
  */
 let laterDice = null;
+
+/**
+ * Since 0.45.0, the dice costs rolled for the module's own check of what a use would spend, which it
+ * throws away: Foundry's computer dice, never asked of anyone.
+ * @type {WeakSet<Roll>}
+ */
+const checkRolls = new WeakSet();
+
+/**
+ * Since 0.45.0, dnd5e's consumption target class whose `resolveCost` is wrapped, once it is: none
+ * where this dnd5e has none to wrap.
+ * @type {Function|null}
+ */
+let costTarget = null;
 
 /**
  * Since 0.45.0, the rolls of each plan's own step: never a later roll of its run.
@@ -315,6 +336,35 @@ export function planAlive(id) {
   return plans.has(id);
 }
 
+/**
+ * Since 0.45.0, dnd5e's consumption target class whose `resolveCost` this file wraps, once it does:
+ * null where this dnd5e has none to wrap, and the dice a use spends can't be told apart.
+ * @returns {Function|null}
+ */
+export function costTargetClass() {
+  return costTarget;
+}
+
+/**
+ * Work out, since 0.45.0, what a use would spend, with its configuration marked as the module's own
+ * check, thrown away: a dice cost dnd5e rolls for it is Foundry's computer dice, never the
+ * Gamemaster's Manual Dice nor a player's ask, nor taken for a run's cost. The mark is gone once
+ * it's worked out, so that the use itself, spending with the same configuration, spends as ever.
+ * @template T
+ * @param {object} config            The use's configuration, as `_prepareUsageConfig` gave it.
+ * @param {() => Promise<T>} check   dnd5e's working out, with it.
+ * @returns {Promise<T>}
+ */
+export async function costCheck(config, check) {
+  if ( !config || (typeof config !== "object") ) return check();
+  config[COST_CHECK] = true;
+  try {
+    return await check();
+  } finally {
+    delete config[COST_CHECK];
+  }
+}
+
 /* -------------------------------------------- */
 /*  Rolling                                     */
 /* -------------------------------------------- */
@@ -357,7 +407,8 @@ function plannedRoll(wrapped, ...args) {
  * since 0.42.0 with whether each adds or takes away, for the dice its effects add. And a roll its
  * player typed in, saying they rerolled at the table, keeps none of the rerolls of the dice they
  * typed (`keepTypedRerolls`): by now dnd5e has expanded its advantage and configured it. Since 0.45.0
- * a later roll of a typed roll's run is evaluated as `laterEvaluate` has it.
+ * a later roll of a typed roll's run is evaluated as `laterEvaluate` has it, and a dice cost of the
+ * module's own check with Foundry's computer dice alone.
  * @this {Roll}
  * @param {Function} wrapped   Foundry's own evaluation.
  * @param {object} [options]
@@ -365,6 +416,8 @@ function plannedRoll(wrapped, ...args) {
  * @returns {Promise<Roll>}
  */
 function taggedEvaluate(wrapped, options={}, ...rest) {
+  // Since 0.45.0, a dice cost of the module's own check is Foundry's computer dice, asked of no one.
+  if ( checkRolls.has(this) ) return wrapped({ ...options, allowInteractive: false }, ...rest);
   const later = laterDice?.stepOf(this) ?? null;
   if ( later ) return laterEvaluate(this, later, wrapped, options, rest);
   const plan = planFor(this.options?.[ROLL_TAG]);
@@ -383,6 +436,29 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
   // Since 0.45.0 an ask for a die of it thrown again answers once it's thrown.
   if ( !laterDice ) return made;
   return Promise.resolve(made).finally(() => laterDice.thrown(this));
+}
+
+/**
+ * Around dnd5e's roll of a dice cost, since 0.45.0, `ConsumptionTargetData#resolveCost`, which is
+ * passed the use's configuration: for the module's own check of what a use would spend
+ * (`costCheck`), or a run's own spending (later-dice.mjs), the roll is built unevaluated, noted, then
+ * evaluated, as dnd5e would have evaluated it; any other, as dnd5e has it.
+ * @this {object}              The consumption target.
+ * @param {Function} wrapped   dnd5e's own.
+ * @param {object} [options]   `{config, evaluate, ...}`, as dnd5e's.
+ * @param {...any} rest
+ * @returns {Promise<Roll>|Roll}
+ */
+function resolveCost(wrapped, options, ...rest) {
+  const config = options?.config;
+  const check = config?.[COST_CHECK] === true;
+  const later = (!check && config && laterDice?.costOf) ? laterDice.costOf(config) : null;
+  if ( !check && !later ) return wrapped(options, ...rest);
+  const roll = wrapped({ ...options, evaluate: false }, ...rest);
+  if ( (options?.evaluate === false) || !(roll instanceof foundry.dice.Roll) ) return roll;
+  if ( check ) checkRolls.add(roll);
+  else later(roll);
+  return roll.evaluate();
 }
 
 /**
@@ -1575,7 +1651,9 @@ let installed = false;
  * Wrapped through libWrapper when it's active, to sit well with other modules that wrap dice.
  * Since 0.32.0 dnd5e's configuration of damage too, where it has damage rolls, as a WRAPPER, which
  * libWrapper runs outside every other kind, so outside Midi-QOL's: a critical hit's damage for the
- * app is then made as dnd5e makes it.
+ * app is then made as dnd5e makes it. Since 0.45.0 dnd5e's roll of a dice cost too, where its
+ * consumption targets have one, as a WRAPPER: the module's own check's are Foundry's computer dice,
+ * and a run's are noted for later-dice.mjs.
  * @returns {void}
  */
 export function installDicePlans() {
@@ -1585,15 +1663,22 @@ export function installDicePlans() {
   const Roll = "foundry.dice.Roll.prototype.evaluate";
   const Damage = "CONFIG.Dice.DamageRoll.prototype.configureDamage";
   const damage = typeof CONFIG.Dice?.DamageRoll?.prototype?.configureDamage === "function";
+  // Since 0.45.0, dnd5e's roll of a dice cost, where its consumption targets have one.
+  const Cost = "dnd5e.dataModels.activity.ConsumptionTargetData.prototype.resolveCost";
+  const target = globalThis.dnd5e?.dataModels?.activity?.ConsumptionTargetData;
+  const cost = typeof target?.prototype?.resolveCost === "function";
   if ( game.modules.get("lib-wrapper")?.active && globalThis.libWrapper ) {
     globalThis.libWrapper.register(MODULE_ID, DiceTerm, plannedRoll, "MIXED");
     globalThis.libWrapper.register(MODULE_ID, Roll, taggedEvaluate, "WRAPPER");
     if ( damage ) globalThis.libWrapper.register(MODULE_ID, Damage, criticalAsDnd5e, "WRAPPER");
+    if ( cost ) globalThis.libWrapper.register(MODULE_ID, Cost, resolveCost, "WRAPPER");
   } else {
     wrap(foundry.dice.terms.DiceTerm.prototype, "_roll", plannedRoll);
     wrap(foundry.dice.Roll.prototype, "evaluate", taggedEvaluate);
     if ( damage ) wrap(CONFIG.Dice.DamageRoll.prototype, "configureDamage", criticalAsDnd5e);
+    if ( cost ) wrap(target.prototype, "resolveCost", resolveCost);
   }
+  if ( cost ) costTarget = target;
   Hooks.on("dnd5e.preRoll", onPreRoll);
   Hooks.on("dnd5e.postBuildRollConfig", onBuildRollConfig);
   Hooks.on("dnd5e.postRollConfiguration", onRollConfiguration);

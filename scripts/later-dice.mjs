@@ -1,10 +1,10 @@
-import { DIE_FACES, EVENTS, MODULE_ID, ROLL_TAG, RUN_KINDS, SETTINGS } from "./constants.mjs";
+import { COST_CHECK, COST_SPENDING, DIE_FACES, EVENTS, MODULE_ID, ROLL_TAG, RUN_KINDS, SETTINGS } from "./constants.mjs";
 import { canSend, registerDiceAsks } from "./bridge.mjs";
 import { getCampaigns, manualDiceOn } from "./campaigns.mjs";
 import { summarizeRoll } from "./chat-data.mjs";
 import { failedResult, isId } from "./command-rolls.mjs";
 import { commandActor } from "./creatures.mjs";
-import { isOwnRoll, planAlive, registerLaterDice, withPlan, wrap } from "./dice-plan.mjs";
+import { costTargetClass, isOwnRoll, planAlive, registerLaterDice, withPlan, wrap } from "./dice-plan.mjs";
 import { isOpen } from "./midi-prompts.mjs";
 import { send } from "./transport.mjs";
 
@@ -19,7 +19,8 @@ import { send } from "./transport.mjs";
  * rolls, each die term answered apart; so are the dice its use spends, and a Midi bonus damage
  * macro's formula. A die of a typed roll thrown again, an explosion or a reroll not kept at the
  * table, is asked one die at a time. Which rolls belong to a run is told from what dnd5e and Midi
- * put on every roll, its subject and its workflow, so no item needs code of its own.
+ * put on every roll, its subject and its workflow, and the dice a use spends from the use's own
+ * spending, which dnd5e passes to each, so no item needs code of its own.
  *
  * An ask waits a minute, only while the character is open in the app; then, or once the Gamemaster
  * chooses Roll it now in the small window their Foundry shows, Foundry's computer dice roll it. A
@@ -150,12 +151,27 @@ const steps = new WeakMap();
 const asksOfRoll = new WeakMap();
 
 /**
- * What's open between two moments of a run: the dice a use spends, between dnd5e's consumption
- * hooks, and a Midi-QOL bonus damage macro's formulas, while Midi rolls them. Each expects rolls of
- * these formulas, each taken once, built as dnd5e or Midi builds them, one at a time.
+ * What's open while Midi-QOL rolls a workflow's bonus damage, after its macros have returned: rolls
+ * of their formulas are expected, each taken once, built as Midi builds them, one at a time.
  * @type {Bracket[]}
  */
 const brackets = [];
+
+/**
+ * The runs whose use dnd5e is spending now, by the key its spending's configuration carries
+ * (`COST_SPENDING`), from `dnd5e.preActivityConsumption` until `dnd5e.activityConsumption`: each dice
+ * cost dnd5e rolls with it is that run's, its ask labelled so.
+ * @type {Map<string, {run: Run, label: string}>}
+ */
+const spending = new Map();
+
+/**
+ * The Midi-QOL workflows of runs inside their check of their other activity's consumption, which
+ * spends what that activity spends: the activity, and whether its spending has begun, which is the
+ * run's, once.
+ * @type {Map<object, {activity: object, taken: boolean}>}
+ */
+const otherSpending = new Map();
 
 /**
  * The workflows whose bonus damage Midi-QOL is rolling, before their macros have returned.
@@ -220,17 +236,16 @@ let testAnswers = null;
  */
 
 /**
- * Between two moments of a run, the rolls of the formulas expected: a dice cost as dnd5e builds it,
- * `new BasicRoll("0 + 1d4", rollData, {delta})`; a bonus damage formula as Midi-QOL builds it, a
- * `DamageRoll` of `{type, flavor}`, its flavor its type where the macro gave none. dnd5e spends, and
- * Midi rolls bonus damage, one roll after another, each awaited: so while one of a bracket's rolls
- * is being thrown, waiting on its ask among it, no other roll is the bracket's. But nothing on such a
- * roll says whose it is: while another run's bracket expects one of its formulas too, neither's
- * rolls are asked from then on (`shared`).
+ * While Midi-QOL rolls a run's workflow's bonus damage, the rolls of the formulas expected: each as
+ * Midi-QOL builds it, a `DamageRoll` of `{type, flavor}`, its flavor its type where the macro gave
+ * none. Midi rolls bonus damage one roll after another, each awaited: so while one of a bracket's
+ * rolls is being thrown, waiting on its ask among it, no other roll is the bracket's. But nothing on
+ * such a roll says whose it is: while another run's bracket expects one of its formulas too,
+ * neither's rolls are asked from then on (`shared`).
  * @typedef {object} Bracket
- * @property {"cost"|"bonus"} purpose
+ * @property {"bonus"} purpose
  * @property {Run} run
- * @property {object} owner       What opened it: the activity spending, or the workflow.
+ * @property {object} owner       What opened it: the workflow.
  * @property {string} label
  * @property {Expected[]} expected
  * @property {Roll|null} busy     The roll of it being thrown now, until it's thrown.
@@ -263,9 +278,9 @@ function dnd5e5() {
 /**
  * Set up asking for later dice, on a Gamemaster's client, once, after the dice plans: dnd5e's roll
  * and consumption hooks; the hello's list of open asks (bridge.mjs, which never imports this file);
- * and where Midi-QOL is active and has them, its bonus damage's macros and rolls, wrapped through
- * libWrapper where it's active. Under any system but dnd5e 5 nothing is set up, and the hello says
- * why.
+ * and where Midi-QOL is active and has them, its bonus damage's macros and rolls, and its check of a
+ * workflow's other activity's consumption, wrapped through libWrapper where it's active. Under any
+ * system but dnd5e 5 nothing is set up, and the hello says why.
  * @returns {void}
  */
 export function installLaterDice() {
@@ -275,21 +290,25 @@ export function installLaterDice() {
     return;
   }
   installed = true;
-  registerLaterDice({ stepOf, again, thrown, selfTest: laterSelfTest });
+  registerLaterDice({ stepOf, again, thrown, costOf, selfTest: laterSelfTest });
   registerDiceAsks(openDiceAsks);
   Hooks.on("dnd5e.postRollConfiguration", onRollConfiguration);
   Hooks.on("dnd5e.preActivityConsumption", openCost);
   Hooks.on("dnd5e.activityConsumption", closeCost);
   const Workflow = globalThis.MidiQOL?.Workflow;
-  const midi = game.modules.get("midi-qol")?.active === true;
   const proto = Workflow?.prototype;
-  if ( !midi || (typeof proto?.rollBonusDamage !== "function") || (typeof proto?.callMacros !== "function") ) return;
-  if ( game.modules.get("lib-wrapper")?.active && globalThis.libWrapper ) {
-    globalThis.libWrapper.register(MODULE_ID, "MidiQOL.Workflow.prototype.rollBonusDamage", rollBonusDamage, "WRAPPER");
-    globalThis.libWrapper.register(MODULE_ID, "MidiQOL.Workflow.prototype.callMacros", callMacros, "WRAPPER");
-  } else {
-    wrap(proto, "rollBonusDamage", rollBonusDamage);
-    wrap(proto, "callMacros", callMacros);
+  if ( (game.modules.get("midi-qol")?.active !== true) || !proto ) return;
+  const libWrapper = game.modules.get("lib-wrapper")?.active ? globalThis.libWrapper : null;
+  const around = (name, wrapper) => {
+    if ( libWrapper ) libWrapper.register(MODULE_ID, `MidiQOL.Workflow.prototype.${name}`, wrapper, "WRAPPER");
+    else wrap(proto, name, wrapper);
+  };
+  if ( (typeof proto.rollBonusDamage === "function") && (typeof proto.callMacros === "function") ) {
+    around("rollBonusDamage", rollBonusDamage);
+    around("callMacros", callMacros);
+  }
+  if ( typeof proto.checkOtherActivityConsumption === "function" ) {
+    around("checkOtherActivityConsumption", checkOtherConsumption);
   }
 }
 
@@ -498,6 +517,9 @@ function closeRun(run, reason) {
   for ( const bracket of Array.from(brackets) ) {
     if ( bracket.run === run ) closeBracket(bracket);
   }
+  for ( const [key, entry] of Array.from(spending) ) {
+    if ( entry.run === run ) spending.delete(key);
+  }
   for ( const ask of asks.values() ) {
     if ( (ask.run === run) && (ask.state === "waiting") ) closeAsk(ask, reason);
   }
@@ -650,8 +672,8 @@ function labelOf(activity, run) {
 
 /**
  * The later step a roll about to be thrown belongs to, for dice-plan.mjs: as noted once configured,
- * or a roll of a formula expected between two moments of a run, a dice cost or a Midi bonus damage
- * formula, taken once.
+ * or as a run's dice cost, or a roll of a formula expected while a run's workflow rolls its Midi
+ * bonus damage, taken once.
  * @param {Roll} roll
  * @returns {Step|null}
  */
@@ -684,22 +706,17 @@ function stepOf(roll) {
 }
 
 /**
- * Is a roll about to be thrown one a bracket expects, built as dnd5e or Midi-QOL builds it: of its
- * formula; for a dice cost, dnd5e's BasicRoll carrying its `delta`, never a damage or d20 roll; for
- * bonus damage, a DamageRoll of the type the macro named, flavored as Midi flavors it?
- * @param {"cost"|"bonus"} purpose
+ * Is a roll about to be thrown one a bracket expects, built as Midi-QOL builds bonus damage: of its
+ * formula, a DamageRoll of the type the macro named, flavored as Midi flavors it, never a d20 roll?
+ * @param {"bonus"} purpose
  * @param {Expected} expected
  * @param {Roll} roll
  * @returns {boolean}
  */
 function fitsBracket(purpose, expected, roll) {
-  const { BasicRoll, DamageRoll, D20Roll } = CONFIG.Dice ?? {};
-  if ( (roll.formula !== expected.formula) || (D20Roll && (roll instanceof D20Roll)) ) return false;
+  const { DamageRoll, D20Roll } = CONFIG.Dice ?? {};
+  if ( (purpose !== "bonus") || (roll.formula !== expected.formula) || (D20Roll && (roll instanceof D20Roll)) ) return false;
   const options = roll.options ?? {};
-  if ( purpose === "cost" ) {
-    if ( !BasicRoll || !(roll instanceof BasicRoll) || (DamageRoll && (roll instanceof DamageRoll)) ) return false;
-    return Object.hasOwn(options, "delta");
-  }
   if ( !DamageRoll || !(roll instanceof DamageRoll) || (typeof options.type !== "string") ) return false;
   if ( (expected.type !== undefined) && (options.type !== expected.type) ) return false;
   return options.flavor === ((expected.flavor === undefined) ? options.type : expected.flavor);
@@ -707,8 +724,9 @@ function fitsBracket(purpose, expected, roll) {
 
 /**
  * Open a bracket: where another run's, of the same purpose, expects a roll of one of its formulas
- * too, as two characters' uses spending 1d4 each at once, which roll is whose can't be told, so
- * neither's rolls are asked from then on; they're still later rolls, Foundry's computer dice.
+ * too, as two characters' workflows rolling a bonus 1d6 each at once, which roll is whose can't be
+ * told, so neither's rolls are asked from then on; they're still later rolls, Foundry's computer
+ * dice.
  * @param {Omit<Bracket, "busy"|"shared">} details
  * @returns {void}
  */
@@ -729,7 +747,7 @@ function openBracket(details) {
  * another run's yet to come, one of whose place its own took: another run's shared bracket of the
  * same purpose, still open, takes it over.
  * @param {Bracket} bracket
- * @param {boolean} [done]   Is what opened it done: has dnd5e spent, or Midi rolled bonus damage?
+ * @param {boolean} [done]   Is what opened it done: has Midi rolled the bonus damage?
  * @returns {void}
  */
 function closeBracket(bracket, done=false) {
@@ -745,112 +763,106 @@ function closeBracket(bracket, done=false) {
 /* -------------------------------------------- */
 
 /**
- * As dnd5e begins spending what an activity uses: where it's the run's activity, while its roll is
- * made, or the other activity of a Midi workflow bound to one, expect a roll of each of its dice
- * costs, which it rolls before `dnd5e.activityConsumption`, each once. Midi's check of the cost
- * beforehand isn't between these hooks.
+ * As dnd5e begins spending what an activity uses: where it's a run's own spending, mark its
+ * configuration as that run's (`COST_SPENDING`), which dnd5e passes on to every dice cost it rolls
+ * for it, a linked activity's among them, until it has spent. Any other's carries no mark: a dice
+ * cost rolled for it is no run's.
  * @param {Activity} activity
  * @param {object} usageConfig
  * @returns {void}
  */
 function openCost(activity, usageConfig) {
+  if ( !usageConfig || (typeof usageConfig !== "object") ) return;
+  delete usageConfig[COST_SPENDING];
   if ( !active() ) return;
   try {
-    const run = runOfCost(activity);
+    const run = runOfSpending(activity, usageConfig);
     if ( !run ) return;
-    for ( const bracket of Array.from(brackets) ) {
-      if ( bracket.owner === activity ) closeBracket(bracket);
-    }
-    const expected = costsOf(activity, usageConfig);
-    if ( expected.length ) {
-      openBracket({ purpose: "cost", run, owner: activity, label: labelOf(activity, run), expected });
-    }
+    const key = `${run.commandId}.${foundry.utils.randomID(8)}`;
+    spending.set(key, { run, label: labelOf(activity, run) });
+    usageConfig[COST_SPENDING] = key;
   } catch (err) {
     warnOnce("cost", "Could not tell whether a use's dice cost is to be asked in the app: Foundry rolls it.", err);
   }
 }
 
 /**
- * dnd5e has spent what an activity uses: its dice costs are no longer expected.
+ * dnd5e has worked out what an activity spends: its dice costs are rolled, and the mark goes.
  * @param {Activity} activity
+ * @param {object} usageConfig
  * @returns {void}
  */
-function closeCost(activity) {
-  for ( const bracket of Array.from(brackets) ) {
-    if ( (bracket.purpose === "cost") && (bracket.owner === activity) ) closeBracket(bracket, true);
-  }
+function closeCost(activity, usageConfig) {
+  const key = usageConfig?.[COST_SPENDING];
+  if ( typeof key !== "string" ) return;
+  spending.delete(key);
+  delete usageConfig[COST_SPENDING];
 }
 
 /**
- * The run whose dice costs an activity's are: the run of its item being made, of its actor; or a
- * run bound to a Midi workflow, not ended, whose other activity it is.
+ * The run whose own spending dnd5e begins, if any: the use the module makes for a run's roll, its
+ * configuration naming that roll (command-uses.mjs, command-alone.mjs), while it's made, of its
+ * actor; or, under Midi-QOL, the other activity of a run's workflow, as that very workflow's check
+ * of its other activity's consumption spends it, the first spending of that activity within it.
+ * Never by the item, nor by a run's being open: the Gamemaster's own use of the item meanwhile is a
+ * use of its own, on a copy dnd5e makes of the item, with no such name.
  * @param {Activity} activity
+ * @param {object} usageConfig
  * @returns {Run|null}
  */
-function runOfCost(activity) {
-  const item = activity?.item;
-  const actor = activity?.actor ?? item?.actor;
-  if ( !item?.id ) return null;
-  for ( const run of Array.from(runs.values()).reverse() ) {
-    if ( run.closed || !run.window || !actorOf(run, actor) ) continue;
-    if ( run.running && (run.itemId === item.id) ) return run;
-    for ( const workflow of run.workflows ) {
-      const other = workflow.otherActivity ?? workflow.activity?.otherActivity;
-      if ( !workflowEnded(workflow) && other && (other.id === activity.id) && (workflow.activity?.item?.id === item.id) ) {
-        return run;
-      }
-    }
+function runOfSpending(activity, usageConfig) {
+  const actor = activity?.actor ?? activity?.item?.actor;
+  const tag = usageConfig[ROLL_TAG];
+  const own = (typeof tag === "string") ? runs.get(tag) : null;
+  if ( own ) return (own.window && own.running && !own.closed && actorOf(own, actor)) ? own : null;
+  for ( const [workflow, entry] of otherSpending ) {
+    if ( entry.taken || (entry.activity !== activity) ) continue;
+    entry.taken = true;
+    const run = runOfWorkflow(workflow);
+    return (run && !workflowEnded(workflow) && actorOf(run, actor)) ? run : null;
   }
   return null;
 }
 
 /**
- * The formulas of an activity's dice costs, as dnd5e will roll them for this use: each consumption
- * target it spends, and its linked activity's, as a spell cast from an item spends the item's,
- * resolved unevaluated, as dnd5e resolves them; those of no dice left out.
- * @param {Activity} activity
- * @param {object} usageConfig
- * @returns {{formula: string}[]}
+ * What notes a dice cost dnd5e rolls with a use's configuration as its run's, for dice-plan.mjs:
+ * one step of its own, asked as it's thrown; none where the configuration isn't a run's spending.
+ * @param {object} config
+ * @returns {((roll: Roll) => void)|null}
  */
-function costsOf(activity, usageConfig) {
-  const expected = [];
-  const add = (target, config) => {
-    try {
-      const roll = target?.resolveCost?.({ config, evaluate: false });
-      if ( roll && (typeof roll.formula === "string") && !roll.isDeterministic ) expected.push({ formula: roll.formula });
-    } catch {
-      // One that can't be resolved is Foundry's.
-    }
+function costOf(config) {
+  if ( !active() ) return null;
+  const entry = spending.get(config?.[COST_SPENDING]);
+  if ( !entry || entry.run.closed ) return null;
+  return roll => {
+    steps.set(roll, new Step(entry.run, [roll], { purpose: "cost", label: entry.label, critical: false }));
   };
-  const targets = activity?.consumption?.targets ?? [];
-  for ( const index of chosenTargets(usageConfig?.consume, usageConfig?.consume?.resources, targets) ) {
-    add(targets[index], usageConfig);
-  }
-  const cause = usageConfig?.cause;
-  const linked = cause?.activity ? activity.getLinkedActivity?.(cause.activity) : null;
-  if ( linked ) {
-    const linkedTargets = linked.consumption?.targets ?? [];
-    for ( const index of chosenTargets(usageConfig.consume, cause.resources, linkedTargets) ) {
-      add(linkedTargets[index], usageConfig);
-    }
-  }
-  return expected;
 }
 
 /**
- * The indexes of the consumption targets a use spends, as dnd5e reads its usage: every one where
- * it spends all, those listed where it lists them, none where it spends nothing.
- * @param {unknown} consume      The usage's `consume`.
- * @param {unknown} resources    Its `resources`, or a cause's.
- * @param {object[]} targets
- * @returns {number[]}
+ * Around Midi-QOL's check of a workflow's other activity's consumption, which spends what that
+ * activity spends before its deferred damage is rolled: for a workflow of a run, the first spending
+ * of that very activity within it is the run's.
+ * @this {object}              The workflow.
+ * @param {Function} wrapped   Midi's own.
+ * @param {...any} args
+ * @returns {Promise<boolean>}
  */
-function chosenTargets(consume, resources, targets) {
-  if ( consume === false ) return [];
-  const all = Array.from(targets.keys());
-  if ( (consume === true) || (resources === true) ) return all;
-  if ( Array.isArray(resources) ) return resources.filter(index => Number.isInteger(index) && (index in targets));
-  return [];
+async function checkOtherConsumption(wrapped, ...args) {
+  let entry = null;
+  try {
+    const run = active() ? runOfWorkflow(this) : null;
+    const activity = (run && !workflowEnded(this)) ? this.otherActivity : null;
+    if ( activity && (typeof activity === "object") ) entry = { activity, taken: false };
+  } catch (err) {
+    warnOnce("other", "Could not tell whether a Midi-QOL other activity's cost is to be asked in the app: Foundry rolls it.", err);
+  }
+  if ( entry ) otherSpending.set(this, entry);
+  try {
+    return await wrapped(...args);
+  } finally {
+    if ( entry && (otherSpending.get(this) === entry) ) otherSpending.delete(this);
+  }
 }
 
 /* -------------------------------------------- */
@@ -1497,10 +1509,12 @@ export function openDiceAsks(campaign) {
  * Check, at start-up, what asking for later dice relies on, printing nothing, its outcome in
  * `laterDiceStatus`: that a later roll waits for its answer, which reaches the dice of the terms
  * it names, among the roll's own, while a term left out is Foundry's; that a roll outside any run,
- * of another actor, or in another Midi workflow, isn't one; that a dice cost and a bonus damage
- * formula keep what a bracket tells them apart by, as Foundry keeps a roll's options; and that a die
- * thrown again, an explosion and a reroll, of a typed roll's own or of a later roll's, waits for the
- * value given, as Foundry awaits a die's `_roll`.
+ * of another actor, or in another Midi workflow, isn't one; that a dice cost dnd5e rolls with a
+ * run's spending takes its answer, while one of the module's own check, or of no run, isn't asked,
+ * through dnd5e's own `resolveCost`, where it's wrapped; that a bonus damage formula keeps what a
+ * bracket tells it apart by, as Foundry keeps a roll's options; and that a die thrown again, an
+ * explosion and a reroll, of a typed roll's own or of a later roll's, waits for the value given, as
+ * Foundry awaits a die's `_roll`.
  * @returns {Promise<void>}
  */
 async function laterSelfTest() {
@@ -1537,13 +1551,12 @@ async function laterSelfTest() {
       "a roll in another workflow was a run's");
     check(runOfStep([new BasicRoll("1d6")], { subject: { item, actor } }) === run, "a roll of the run's item wasn't its");
 
-    // A dice cost as dnd5e builds it, and a bonus damage formula as Midi-QOL builds it, keep what
-    // tells them apart; a plain roll of the same formula is neither.
-    if ( CONFIG.Dice?.BasicRoll ) {
-      check(fitsBracket("cost", { formula: "0 + 1d4" }, new CONFIG.Dice.BasicRoll("0 + 1d4", {}, { delta: undefined })),
-        "a dice cost built as dnd5e builds it wasn't one");
-      check(!fitsBracket("cost", { formula: "0 + 1d4" }, new foundry.dice.Roll("0 + 1d4")), "a plain roll was a dice cost");
-    }
+    // A dice cost dnd5e rolls with a run's spending takes the answer; one it rolls for the module's
+    // own check, or with no run's spending, isn't asked; one wanted unevaluated, as for a label, is.
+    await costSelfTest(run, item);
+
+    // A bonus damage formula as Midi-QOL builds it keeps what tells it apart; one of another flavor,
+    // or a plain roll of the same formula, isn't one.
     if ( CONFIG.Dice?.DamageRoll ) {
       const bonus = new CONFIG.Dice.DamageRoll("1d6", {}, { type: "fire", flavor: "Self-test" });
       check(fitsBracket("bonus", { formula: "1d6", flavor: "Self-test" }, bonus), "a bonus damage built as Midi builds it wasn't one");
@@ -1578,6 +1591,44 @@ async function laterSelfTest() {
     testAnswers = null;
     runs.delete(id);
     run.closed = true;
+  }
+}
+
+/**
+ * The self-test's dice costs, through dnd5e's own `resolveCost`, where dice-plan.mjs wraps it: on a
+ * consumption target of a cost of `1d4`, a stand-in for an activity's own, as dnd5e resolves it.
+ * Nothing where it isn't wrapped, as with a dnd5e that has none: then no dice cost is asked.
+ * @param {Run} run      The self-test's run.
+ * @param {object} item  Its item.
+ * @returns {Promise<void>}
+ */
+async function costSelfTest(run, item) {
+  const Target = costTargetClass();
+  if ( !Target ) return;
+  const target = Object.create(Target.prototype);
+  Object.defineProperties(target, {
+    value: { value: "1d4" },
+    scaling: { value: { mode: "", formula: "" } },
+    activity: { value: { item, actor: item.actor, getRollData: () => ({}) } }
+  });
+  const key = `${run.commandId}.selftest`;
+  spending.set(key, { run, label: item.name });
+  try {
+    testAnswers.push([{ roll: 0, term: 0, results: [3] }]);
+    const cost = await target.resolveCost({ config: { [COST_SPENDING]: key } });
+    check(cost?.total === 3, `a dice cost of 1d4 answered 3 cost ${cost?.total}`);
+    check(testAnswers.length === 0, "a dice cost wasn't asked for its die");
+    testAnswers.push([{ roll: 0, term: 0, results: [3] }]);
+    const thrownAway = await target.resolveCost({ config: { [COST_CHECK]: true, [COST_SPENDING]: key } });
+    const noRun = await target.resolveCost({ config: {} });
+    check([thrownAway, noRun].every(roll => roll?._evaluated === true), "a dice cost not asked wasn't thrown");
+    check(testAnswers.length === 1, "the module's own check of a dice cost, or one of no run, was asked for its die");
+    const unthrown = target.resolveCost({ config: { [COST_SPENDING]: key }, evaluate: false });
+    check((unthrown instanceof foundry.dice.Roll) && !unthrown._evaluated, "a dice cost wanted unevaluated was thrown");
+    check(testAnswers.length === 1, "a dice cost wanted unevaluated was asked for its die");
+  } finally {
+    testAnswers.splice(0);
+    spending.delete(key);
   }
 }
 
