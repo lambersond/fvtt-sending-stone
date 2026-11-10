@@ -255,6 +255,8 @@ const json = body => ({ ok: true, status: 200, statusText: 'OK', headers: new He
 globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body)
   if (String(url).endsWith('/api/events')) {
+    // When it came, by the module's clock (the envelope's own time is Foundry's real clock).
+    body.at = Date.now()
     app.events.push(body)
     const announcing = ['bridge.hello', 'bridge.heartbeat'].includes(body.type)
     return announcing
@@ -303,6 +305,10 @@ const damage = (use, dice, fields = {}) => make(typed({ id: `dmg-${++ids}`, kind
 const asked = () => app.events.filter(e => e.type === 'roll.dice.asked').map(e => ({ ...e.data.ask, campaign: e.campaign.id }))
 const closed = () => app.events.filter(e => e.type === 'roll.dice.closed').map(e => e.data)
 const closeOf = id => closed().find(entry => entry.id === id)
+/** When an ask's close came, by the module's clock. */
+const closedAt = id => app.events.find(e => (e.type === 'roll.dice.closed') && (e.data.id === id))?.at
+/** Did it close well before its own minute was out, half a minute at least: not by its wait? */
+const early = (ask, at) => (typeof at === 'number') && (at <= Date.parse(ask.expiresAt) - 30_000)
 /** The next ask after `count` were made. */
 async function nextAsk(count) {
   await until(() => asked().length > count, 'an ask')
@@ -482,9 +488,11 @@ before = usesOf('charm')
 used = await make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
 ask = asked()[count]
 assert.deepEqual([used.status, closeOf(ask.id), Date.parse(ask.expiresAt) - Date.parse(ask.askedAt), checks()], ['done', { id: ask.id, reason: 'expired' }, 1000, []])
+// By its own wait, a few seconds at most past it: not by its run's five minutes.
+assert.ok(closedAt(ask.id) - Date.parse(ask.expiresAt) <= 5_000, `closed ${closedAt(ask.id) - Date.parse(ask.expiresAt)} ms past its wait`)
 assert.ok(usesOf('charm') > before)
 settings.set('diceAskWait', 60_000)
-ok("left past its wait (a second, by the hidden setting): closed expired, Foundry's computer die spent, the use done, never the Gamemaster's manual dice")
+ok("left past its wait (a second, by the hidden setting): closed expired as its wait ends, Foundry's computer die spent, the use done, never the Gamemaster's manual dice")
 
 // Roll it now: closed rolled, Foundry's die.
 count = asked().length
@@ -505,16 +513,17 @@ used = await make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activi
 assert.deepEqual([used.status, asked().length - count, checks()], ['done', 0, []])
 app.open = new Set(['thorin'])
 await pass(1000)
-// And closed once he's no longer open: expired.
+// And closed once he's no longer open: expired, at the next fetch's list, well before its minute is out.
 count = asked().length
 using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
 ask = await nextAsk(count)
 app.open = new Set()
 used = await using
-assert.deepEqual([used.status, closeOf(ask.id), checks()], ['done', { id: ask.id, reason: 'expired' }, []])
+assert.deepEqual([used.status, closeOf(ask.id), checks(), early(ask, closedAt(ask.id))], ['done', { id: ask.id, reason: 'expired' }, [], true],
+  `closed at ${closedAt(ask.id) - Date.parse(ask.askedAt)} ms of its ${Date.parse(ask.expiresAt) - Date.parse(ask.askedAt)}`)
 app.open = new Set(['thorin'])
 await pass(1000)
-ok("the character not open in the app: nothing asked, the computer's die; closed once he's no longer open, expired, the computer's die")
+ok("the character not open in the app: nothing asked, the computer's die; closed once he's no longer open, expired, well before its minute is out, the computer's die")
 
 // Untyped, and the Gamemaster's own from the app: no run, nothing asked; the cost the Gamemaster's dice, as before.
 count = asked().length
@@ -821,6 +830,108 @@ answer = await make(answerOf(ask, one))
 const [usedNow, checked] = await Promise.all([using, behind])
 assert.deepEqual([answer.status, usedNow.status, checked.status], ['done', 'done', 'done'], JSON.stringify(checked))
 ok("an answer while the character's queue is busy with the use it answers, a check waiting behind: made at once, the use done, then the check")
+
+/* -------------------------------------------- */
+/*  How an ask closes before its minute is out  */
+/* -------------------------------------------- */
+
+// Each way an ask closes before its wait is out, closed well before it: so a way taken out would
+// leave it to its minute, and fail here. (Answered, skipped, rolled, the wait itself and the
+// character no longer open are above; a Midi workflow aborted is below.)
+/** Thorin's typed use of his charm, and its cost's ask. */
+const charmAsk = async () => {
+  const at = asked().length
+  const made = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
+  return [made, await nextAsk(at)]
+}
+/** A hello sent to camp-a again, and answered. */
+const helloAgain = async () => {
+  const before = app.events.filter(e => (e.type === 'bridge.hello') && (e.campaign.id === 'camp-a')).length
+  announce({ campaignId: 'camp-a' })
+  await until(() => app.events.filter(e => (e.type === 'bridge.hello') && (e.campaign.id === 'camp-a')).length > before, 'a hello')
+  await wait(30)
+}
+const reopen = async () => {
+  await helloAgain()
+  await pass(1000)
+}
+/** Wait, by the module's clock, until a command's asks no longer wait, and say when. */
+const unheld = async command => {
+  await until(() => !later.heldFor(command).waiting, 'the ask closing')
+  return Date.now()
+}
+
+// The campaign no longer asks: its players no longer type in their dice (Manual Dice turned off for
+// it): closed expired at the next look, told.
+const campaignsBefore = game.settings.get('sending-stone', 'campaigns')
+let made
+;[made, ask] = await charmAsk()
+settings.set('campaigns', campaignsBefore.map(campaign => (campaign.id === 'camp-a') ? { ...campaign, manualDice: false } : campaign))
+used = await made
+assert.deepEqual([used.status, closeOf(ask.id), early(ask, closedAt(ask.id))], ['done', { id: ask.id, reason: 'expired' }, true], 'Manual Dice off')
+settings.set('campaigns', campaignsBefore)
+await reopen()
+
+// The listener's answer no longer says "diceAsks": 1: closed expired at once, untold, as the
+// listener no longer reads asks; an answer after refused expired.
+;[made, ask] = await charmAsk()
+app.features = { diceAsks: 0 }
+await helloAgain()
+const unread = await unheld(ask.command)
+used = await made
+assert.deepEqual([used.status, closeOf(ask.id), early(ask, unread)], ['done', undefined, true], 'no longer read')
+app.features = {}
+await reopen()
+assert.deepEqual(refusal(await make(answerOf(ask, [{ roll: 0, term: 0, results: [1] }]))), ['failed', 'diceAsk', 'expired'])
+
+// The roll whose run it's in is made without waiting for it: the Gamemaster's own code rolls the
+// charm's damage, no click, while the use's cost waits, so it's asked as the run's (the one way left
+// to ask wrongly); the cost answered, the use is made, and that ask closes gone at once.
+// (Under Midi-QOL the use's run goes on with its workflow, waiting for its damage: no such close.)
+if (!MIDI) {
+  ;[made, ask] = await charmAsk()
+  count = asked().length
+  const codeRoll = thorin.items.get('charm').system.activities.get('charm-zap').rollDamage({}, { configure: false }, { create: false })
+  const stray = await nextAsk(count)
+  assert.deepEqual([stray.purpose, stray.command], ['damage', ask.command])
+  await make(answerOf(ask, [{ roll: 0, term: 0, results: [2] }]))
+  used = await made
+  await until(() => closeOf(stray.id), 'the stray ask closing')
+  assert.deepEqual([used.status, closeOf(stray.id), early(stray, closedAt(stray.id))], ['done', { id: stray.id, reason: 'gone' }, true], 'its run made')
+  assert.ok((await codeRoll)?.[0]?.total >= 1, "the Gamemaster's code's roll thrown by Foundry's computer dice")
+}
+
+// Its run is over, five minutes after its roll: Wild Charm's 1d4x cost answered 4, each die thrown
+// again answered 4 three-quarters of a minute after it's asked, until five minutes are past: the ask
+// then waiting closes expired, well before its own minute is out.
+count = asked().length
+using = wildUse()
+ask = await nextAsk(count)
+for (let k = 1; k <= 6; k++) {
+  await pass(45_000)
+  void make(answerOf(ask, [{ roll: 0, term: 0, results: [4] }]))
+  ask = await nextAsk(count + k)
+}
+assert.deepEqual([ask.purpose, closeOf(ask.id)], ['again', undefined])
+await until(() => closeOf(ask.id), 'the last ask closing', 12_000)
+used = await using
+assert.deepEqual([used.status, closeOf(ask.id), early(ask, closedAt(ask.id)) || (closedAt(ask.id) <= Date.parse(ask.expiresAt) - 20_000)], ['done', { id: ask.id, reason: 'expired' }, true],
+  `closed at ${closedAt(ask.id) - Date.parse(ask.askedAt)} ms of its ${Date.parse(ask.expiresAt) - Date.parse(ask.askedAt)}`)
+
+// This Foundry is no longer the bridge, as with no listener set: closed expired at the next look,
+// untold, as nothing can be sent.
+;[made, ask] = await charmAsk()
+// (Its use's result, made meanwhile, may never come: nothing waits on it.)
+made.catch(() => null)
+settings.set('listenerUrl', '')
+const unbridged = await unheld(ask.command)
+settings.set('listenerUrl', 'https://stone.example')
+assert.equal(early(ask, unbridged), true, `closed at ${unbridged - Date.parse(ask.askedAt)} ms`)
+assert.equal(closeOf(ask.id), undefined, 'untold')
+await until(() => app.polls > 0, 'the fetches')
+await reopen()
+assert.deepEqual(checks(), [], "never the Gamemaster's manual dice")
+ok(`an ask closed well before its minute is out: expired, told, once its campaign's players no longer type in their dice; expired, untold, once the listener's answer no longer says diceAsks 1, an answer after refused expired;${MIDI ? '' : " gone once the roll whose run it's in is made without waiting for it, as for the Gamemaster's own code's roll of the same item;"} expired once its run is over, five minutes after its roll; expired, untold, once this Foundry is no longer the bridge`)
 
 /* -------------------------------------------- */
 /*  Companions and Wild Shape                   */
