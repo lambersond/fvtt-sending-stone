@@ -18,9 +18,10 @@ import { send } from "./transport.mjs";
  * paused as it's about to be thrown, and its player is asked for its dice, one ask for each step of
  * rolls, each die term answered apart; so are the dice its use spends, and a Midi bonus damage
  * macro's formula. A die of a typed roll thrown again, an explosion or a reroll not kept at the
- * table, is asked one die at a time. Which rolls belong to a run is told from what dnd5e and Midi
- * put on every roll, its subject and its workflow, and the dice a use spends from the use's own
- * spending, which dnd5e passes to each, so no item needs code of its own.
+ * table, is asked one die at a time, where the throw it follows took its player's value. Which rolls
+ * belong to a run is told from what dnd5e and Midi put on every roll, its subject and its workflow,
+ * and the dice a use spends from the use's own spending, which dnd5e passes to each, so no item
+ * needs code of its own.
  *
  * An ask waits a minute, only while the character is open in the app; then, or once the Gamemaster
  * chooses Roll it now in the small window their Foundry shows, Foundry's computer dice roll it. A
@@ -1205,7 +1206,7 @@ function thrown(roll) {
 /**
  * A die of a typed roll's thrown again, an explosion or a reroll, for dice-plan.mjs: asked of its
  * player, one die, where they can be asked now. Its value, or none for Foundry's; nothing where it
- * isn't asked at all.
+ * isn't asked at all. dice-plan.mjs asks only where the throw it follows took its player's value.
  * @param {DiceTerm} term
  * @param {"explode"|"reroll"} why
  * @param {object|null} owner   Its roll's plan, or the values given for its term as a later roll's.

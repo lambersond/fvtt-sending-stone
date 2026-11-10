@@ -29,7 +29,8 @@ import { COST_CHECK, CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL
  * Since 0.45.0, a roll later-dice.mjs says belongs to a typed roll's run, as Midi-QOL's other damage
  * after a typed damage, is evaluated once its player has answered, each of its dice taking the
  * values they gave for its own term alone, and a die of a typed roll thrown again, an explosion or a
- * reroll not kept, takes the value its player gives for it, one die at a time. That file registers
+ * reroll not kept, takes the value its player gives for it, one die at a time, where the throw it
+ * follows took its player's value: never after a die Foundry's computer threw. That file registers
  * itself here (`registerLaterDice`), so that this one never imports it. And since 0.45.0 the dice
  * costs dnd5e rolls for the module's own check of what a use would spend, which it throws away, are
  * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6: told by dnd5e's
@@ -197,6 +198,13 @@ let laterDice = null;
  * @type {WeakSet<Roll>}
  */
 const checkRolls = new WeakSet();
+
+/**
+ * Since 0.45.0, for each die term, whether each of its throws took its player's value, by the index
+ * of the result it made: a die thrown again is asked of them only where the throw it follows did.
+ * @type {WeakMap<DiceTerm, boolean[]>}
+ */
+const playerThrows = new WeakMap();
 
 /**
  * Since 0.45.0, dnd5e's consumption target class whose `resolveCost` is wrapped, once it is: none
@@ -378,7 +386,10 @@ export async function costCheck(config, check) {
  * Since 0.45.0 a die of a later roll takes a value given for its own term alone; and a die of a
  * typed roll's, or a later roll's, thrown again, may wait for the value its player gives for it
  * (later-dice.mjs), Foundry's own where none is given: so it returns a Promise, as Foundry's own
- * `_roll` may.
+ * `_roll` may. Only where the throw it follows, the one that exploded or is rerolled, took its
+ * player's value: Foundry adds each result once its `_roll` has given it, so each throw's is noted
+ * by the index its result takes, which the self-test checks [core, unverified]; a die Foundry's
+ * computer threw, and each it throws again, is Foundry's computer dice, never asked.
  * @this {DiceTerm}
  * @param {Function} wrapped   Foundry's own roll of the die.
  * @param {...any} args
@@ -389,16 +400,55 @@ function plannedRoll(wrapped, ...args) {
   const first = !options?.reroll && !options?.explode && !options?.minimize && !options?.maximize;
   // A later roll's dice take what was given for their own terms, never its plan's.
   const plan = termPlans.get(this) ?? (laterRolls.has(this._root) ? undefined : planFor(this._root?.options?.[ROLL_TAG]));
+  // The result this throw makes, once Foundry has it: whether it's its player's is noted by its index.
+  const index = Array.isArray(this.results) ? this.results.length : 0;
   if ( first ) {
     const value = plan?.take(this.faces, termSigns.get(this));
+    notePlayerThrow(this, index, value !== undefined);
     if ( value !== undefined ) return value;
     return wrapped(...args);
   }
-  // Since 0.45.0, a typed roll's die thrown again is asked of its player, where it can be.
-  const again = (!options?.minimize && !options?.maximize && laterDice)
+  // Since 0.45.0, a typed roll's die thrown again is asked of its player, where it can be, and only
+  // where the throw it follows took their value: never a die Foundry's computer threw.
+  const again = (!options?.minimize && !options?.maximize && laterDice && followsPlayerThrow(this, options))
     ? laterDice.again(this, options?.explode ? "explode" : "reroll", plan ?? null) : null;
-  if ( again ) return again.then(value => value ?? wrapped(...args));
+  if ( again ) {
+    return again.then(value => {
+      notePlayerThrow(this, index, value !== undefined);
+      return value ?? wrapped(...args);
+    });
+  }
+  notePlayerThrow(this, index, false);
   return wrapped(...args);
+}
+
+/**
+ * Note, since 0.45.0, whether a die's throw took its player's value, by the index of the result it
+ * makes, as Foundry adds each result once its `_roll` has given it.
+ * @param {DiceTerm} term
+ * @param {number} index
+ * @param {boolean} players
+ * @returns {void}
+ */
+function notePlayerThrow(term, index, players) {
+  const throws = playerThrows.get(term) ?? [];
+  throws[index] = players;
+  playerThrows.set(term, throws);
+}
+
+/**
+ * Does a die thrown again, since 0.45.0, follow a throw that took its player's value: the one that
+ * exploded, or is rerolled, the latest of the term's results Foundry marks so as it throws it again,
+ * as its explode and reroll modifiers do?
+ * @param {DiceTerm} term
+ * @param {object} [options]   `{explode}` or `{reroll}`.
+ * @returns {boolean}
+ */
+function followsPlayerThrow(term, options) {
+  const mark = options?.explode ? "exploded" : "rerolled";
+  const results = Array.isArray(term.results) ? term.results : [];
+  const index = results.findLastIndex(result => result?.[mark] === true);
+  return (index !== -1) && (playerThrows.get(term)?.[index] === true);
 }
 
 /**
