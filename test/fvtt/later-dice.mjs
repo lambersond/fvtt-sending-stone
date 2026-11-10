@@ -1346,9 +1346,10 @@ ok("Midi bonus damage macros' formulas, Sneak Attack's 2d6 piercing and Hunter's
 
 // Two runs' workflows await bonus rolls of one formula at once: Thorin's dagger's and Mira's, each
 // rolling Sneak Attack's 2d6 and Hunter's Mark's 1d6. Thorin's 2d6 is asked; while it waits, Mira's
-// damage is made, her workflow expecting Hunter's Mark's 1d6 too: which of the two is whose can't be
-// told, so from then on neither's bonus roll is asked, her 2d6 among them, nor his 1d6 once his 2d6
-// is answered: Foundry's computer dice, never the Gamemaster's manual dice. Once hers are rolled,
+// damage is made, her workflow expecting Hunter's Mark's 1d6 too: which 1d6 is whose can't be told,
+// so from then on neither's 1d6 is asked, hers nor his once his 2d6 is answered: Foundry's computer
+// dice, never the Gamemaster's manual dice. Her 2d6, which his workflow no longer awaits, his taken,
+// is hers alone: asked of her, her 1d6 after it unasked. Once hers are rolled,
 // while his 2d6 still waits, the Gamemaster's own damage roll of Hunter's Mark's very formula, type
 // and flavor is theirs, their manual dice: his workflow rolls nothing else meanwhile, so it's taken
 // for neither. And one made just so in the instant before his 1d6 is built (the residual PROTOCOL
@@ -1368,12 +1369,18 @@ assert.deepEqual([thorinStab.status, miraStab.status], ['done', 'done'], JSON.st
 const thorinDealing = damage(thorinStab.id, [{ faces: 4, results: [3] }])
 const sneakAsk = await nextAsk(count)
 assert.deepEqual([sneakAsk.actorId, sneakAsk.purpose, sneakAsk.rolls.map(roll => roll.flavor)], ['thorin', 'bonus', ['Sneak Attack']])
-const miraDealt = await make(typed({ id: `dmg-${++ids}`, actorId: 'mira', kind: 'damage', use: miraStab.id, dice: [{ faces: 4, results: [2] }] }))
+const miraDealing = make(typed({ id: `dmg-${++ids}`, actorId: 'mira', kind: 'damage', use: miraStab.id, dice: [{ faces: 4, results: [2] }] }))
+const miraSneak = await nextAsk(count + 1)
+assert.deepEqual([miraSneak.actorId, miraSneak.purpose, miraSneak.rolls.map(roll => [roll.flavor, roll.terms])], ['mira', 'bonus', [['Sneak Attack', [{ faces: 6, number: 2 }]]]],
+  'her own 2d6, a formula his workflow no longer awaits, asked of her')
+await make(answerOf(miraSneak, [{ roll: 0, term: 0, results: [3, 3] }]))
+const miraDealt = await miraDealing
 await until(() => workflowOf(miraStab.id)?.bonusDamageRolls?.length === 2, "Mira's bonus damage")
-assert.deepEqual([miraDealt.status, asked().length - count, checks()], ['done', 1, []], "Mira's bonus rolls never asked, never the Gamemaster's manual dice")
+assert.deepEqual([miraDealt.status, faces(workflowOf(miraStab.id).bonusDamageRolls[0]), asked().length - count, checks()], ['done', [[3, 3]], 2, []],
+  "her 2d6 as she typed it, her 1d6 never asked, never the Gamemaster's manual dice")
 const gmMark = new DamageRoll('1d6', {}, { type: 'force', flavor: "Hunter's Mark" }).evaluate()
 assert.equal(await atOnce([gmMark]), 'thrown', 'never held')
-assert.deepEqual([asked().length - count, checks()], [1, ['1d6']], "the Gamemaster's own Hunter's Mark while his 2d6 waits: theirs, their manual dice")
+assert.deepEqual([asked().length - count, checks()], [2, ['1d6']], "the Gamemaster's own Hunter's Mark while his 2d6 waits: theirs, their manual dice")
 let instantMark = null
 midi.beforeBonusRoll = (index, flow) => {
   if ((index !== 1) || (flow !== workflowOf(thorinStab.id))) return
@@ -1386,12 +1393,12 @@ midi.beforeBonusRoll = null
 assert.ok(instantMark, 'a roll made in the instant before his 1d6')
 assert.equal(await atOnce([instantMark]), 'thrown', 'never held')
 await pass(5000)
-assert.deepEqual([asked().length - count, faces(workflowOf(thorinStab.id).bonusDamageRolls[0]), checks()], [1, [[5, 5]], []],
+assert.deepEqual([asked().length - count, faces(workflowOf(thorinStab.id).bonusDamageRolls[0]), checks()], [2, [[5, 5]], []],
   "his 1d6, and the Gamemaster's in the instant before it, Foundry's computer dice, never their manual dice")
 midi.bonusDamage = null
 app.open = new Set(['thorin'])
 await pass(1000)
-ok("two runs' bonus rolls of one formula at once, Thorin's and Mira's daggers' Sneak Attack 2d6 and Hunter's Mark 1d6: Thorin's 2d6 asked first, typed 5 and 5; once Mira's workflow expects Hunter's Mark's 1d6 beside his, neither's bonus roll is asked, her 2d6 and 1d6 nor his 1d6: Foundry's computer dice, never the Gamemaster's manual dice; the Gamemaster's own Hunter's Mark of that very formula, type and flavor while his 2d6 waits is theirs, their manual dice, taken for neither; one made in the instant before his 1d6, Foundry's computer dice, uses up nothing, his own 1d6 still Foundry's computer dice")
+ok("two runs' bonus rolls of one formula at once, Thorin's and Mira's daggers' Sneak Attack 2d6 and Hunter's Mark 1d6: Thorin's 2d6 asked first, typed 5 and 5; once Mira's workflow expects Hunter's Mark's 1d6 beside his, neither's 1d6 is asked, Foundry's computer dice, never the Gamemaster's manual dice; her 2d6, which his no longer awaits, asked of her alone, typed 3 and 3; the Gamemaster's own Hunter's Mark of that very formula, type and flavor while his 2d6 waits is theirs, their manual dice, taken for neither; one made in the instant before his 1d6, Foundry's computer dice, uses up nothing, his own 1d6 still Foundry's computer dice")
 
 // Deferred: Frost Brand's Rime spends 1d4 charges, so Midi rolls it once saves are checked, after
 // the damage's result: its cost asked once (Midi's check of it beforehand thrown away, Foundry's

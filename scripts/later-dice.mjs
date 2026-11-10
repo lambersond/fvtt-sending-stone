@@ -246,9 +246,9 @@ let testAnswers = null;
  * Midi-QOL builds it, a `DamageRoll` of `{type, flavor}`, its flavor its type where the macro gave
  * none. Midi rolls bonus damage one roll after another, each awaited: so while one of a bracket's
  * rolls is being thrown, waiting on its ask among it, no other roll is the bracket's. But nothing on
- * such a roll says whose it is: while another run's bracket expects one of its formulas too,
- * neither's rolls are asked from then on (`shared`), and a shared one's rolls use up none of what
- * it expects (`bracketStep`).
+ * such a roll says whose it is: while another run's bracket expects a roll of one of its formulas
+ * too, neither's rolls of that formula are asked from then on (`shared`), nor use up any of what
+ * either expects; a formula only one of them expects is still that run's (`bracketStep`).
  * @typedef {object} Bracket
  * @property {"bonus"} purpose
  * @property {Run} run
@@ -256,16 +256,17 @@ let testAnswers = null;
  * @property {string} label
  * @property {Expected[]} expected
  * @property {Roll|null} busy     The roll it took being thrown now, until it's thrown.
- * @property {boolean} shared     Has another run's bracket expected one of its formulas meanwhile?
  */
 
 /**
  * A roll a bracket expects: its formula; for bonus damage, its type where the macro named one of
- * dnd5e's, and its flavor where the macro gave one (`undefined`: its type).
+ * dnd5e's, and its flavor where the macro gave one (`undefined`: its type); and whether another
+ * run's bracket has expected a roll of its formula meanwhile (`shared`).
  * @typedef {object} Expected
  * @property {string} formula
  * @property {string} [type]
  * @property {unknown} [flavor]
+ * @property {boolean} [shared]
  */
 
 /* -------------------------------------------- */
@@ -706,31 +707,30 @@ function stepOf(roll) {
 /**
  * The step of a roll a bracket takes, if any, one at a time for each bracket, as Midi-QOL rolls a
  * workflow's bonus damage one roll after another: while one of its rolls is being thrown, waiting
- * on its ask among it, any other roll is someone else's. A bracket of one run's own takes a roll of
- * a formula it expects where none of its rolls is being thrown, uses that up, and asks its run's
- * player. A shared one takes it where none of its rolls is being thrown, or where the one being
- * thrown is itself asked of no one: two runs' workflows rolling at once, the one's roll may come
- * while the other's is thrown. It uses nothing up, so that a roll taken in another's place never
- * leaves one of its own untaken, and asks no one: Foundry's computer dice, until what opened it is
- * done. Where its roll being thrown waits on an ask made before it was shared, its workflow rolls
- * nothing else meanwhile: it takes nothing, and a roll no other bracket takes is no run's, as the
- * Gamemaster's own.
+ * on its ask among it, any other roll is someone else's. A bracket takes a roll of a formula it
+ * expects where none of its rolls is being thrown. Of a formula only its run expects, it uses that
+ * up and asks its run's player. Of one another run's bracket expects too (`shared`), it uses
+ * nothing up, so that a roll taken in another's place never leaves one of its own untaken, and asks
+ * no one: Foundry's computer dice, until what opened it is done. Where the roll of its being thrown
+ * is itself asked of no one, two runs' workflows rolling at once, the one's roll may come while the
+ * other's is thrown: it takes a roll of a formula it expects then too, asking no one, using up one
+ * only it expects. Where its roll being thrown waits on an ask, its workflow rolls nothing else
+ * meanwhile: it takes nothing, and a roll no other bracket takes is no run's, as the Gamemaster's own.
  * @param {Roll} roll
  * @returns {Step|null}
  */
 function bracketStep(roll) {
-  const indexIn = bracket => bracket.expected.findIndex(each => fitsBracket(bracket.purpose, each, roll));
-  let bracket = brackets.find(each => !each.busy && (indexIn(each) !== -1));
-  if ( bracket && !bracket.shared ) {
-    bracket.expected.splice(indexIn(bracket), 1);
-    if ( bracket.expected.length ) bracket.busy = roll;
-    else closeBracket(bracket);
-    return new Step(bracket.run, [roll], { purpose: bracket.purpose, label: bracket.label, critical: false });
-  }
-  if ( bracket ) bracket.busy = roll;
-  else bracket = brackets.find(each => each.shared && (steps.get(each.busy)?.silent === true) && (indexIn(each) !== -1));
+  const fitting = bracket => bracket.expected.find(each => fitsBracket(bracket.purpose, each, roll));
+  let bracket = brackets.find(each => !each.busy && fitting(each));
+  const meanwhile = !bracket;
+  if ( meanwhile ) bracket = brackets.find(each => (steps.get(each.busy)?.silent === true) && fitting(each));
   if ( !bracket ) return null;
-  return new Step(bracket.run, [roll], { purpose: bracket.purpose, label: bracket.label, critical: false, silent: true });
+  const expected = fitting(bracket);
+  if ( !expected.shared ) bracket.expected.splice(bracket.expected.indexOf(expected), 1);
+  if ( !bracket.expected.length ) closeBracket(bracket);
+  else if ( !meanwhile ) bracket.busy = roll;
+  const silent = meanwhile || expected.shared;
+  return new Step(bracket.run, [roll], { purpose: bracket.purpose, label: bracket.label, critical: false, ...(silent && { silent }) });
 }
 
 /**
@@ -752,20 +752,23 @@ function fitsBracket(purpose, expected, roll) {
 
 /**
  * Open a bracket: where another run's, of the same purpose, expects a roll of one of its formulas
- * too, as two characters' workflows rolling a bonus 1d6 each at once, which roll is whose can't be
- * told, so neither's rolls are asked from then on, until what opened each is done; they're still
- * later rolls, Foundry's computer dice (`bracketStep`).
- * @param {Omit<Bracket, "busy"|"shared">} details
+ * too, as two characters' workflows rolling a bonus 1d6 each at once, which roll of it is whose
+ * can't be told, so neither's rolls of that formula are asked from then on, until what opened each
+ * is done; they're still later rolls, Foundry's computer dice (`bracketStep`). A formula only one of
+ * them expects is still that one's own.
+ * @param {Omit<Bracket, "busy">} details   What it expects, none of it shared yet.
  * @returns {void}
  */
 function openBracket(details) {
-  const bracket = { ...details, busy: null, shared: false };
-  const formulas = new Set(bracket.expected.map(each => each.formula));
+  const bracket = { ...details, expected: details.expected.map(each => ({ ...each, shared: false })), busy: null };
   for ( const other of brackets ) {
     if ( (other.run === bracket.run) || (other.purpose !== bracket.purpose) ) continue;
-    if ( !other.expected.some(each => formulas.has(each.formula)) ) continue;
-    other.shared = true;
-    bracket.shared = true;
+    for ( const mine of bracket.expected ) {
+      const theirs = other.expected.filter(each => each.formula === mine.formula);
+      if ( !theirs.length ) continue;
+      mine.shared = true;
+      for ( const each of theirs ) each.shared = true;
+    }
   }
   brackets.push(bracket);
 }
