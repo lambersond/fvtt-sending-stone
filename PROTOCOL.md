@@ -4062,9 +4062,12 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
 
   Midi rolls bonus damage one roll after another, within the workflow's own roll of it: while one of
   a workflow's bonus formulas is being thrown, waiting on its ask among it, no other roll is taken
-  for the next. Where two runs' workflows await bonus rolls of one formula at once, which roll is
-  whose can't be told: from then on neither run's such roll is asked, and Foundry's computer dice
-  roll them, never the Gamemaster's Manual Dice.
+  for that workflow. Where two runs' workflows await bonus rolls of one formula at once, which roll
+  is whose can't be told: from then on, until each has rolled its bonus damage, neither run's such
+  roll is asked, and Foundry's computer dice roll them, never the Gamemaster's Manual Dice. A roll
+  taken so uses up none of what either awaits; and while one of them waits on an ask made before
+  the other's came, nothing is taken for it, so a roll of that formula meanwhile that no other
+  awaits is the Gamemaster's own, as with one workflow.
 - **What's never asked.** A d20 roll, in the run's workflow or not: the attack is the roll's own,
   and the saves and checks a run asks of the character are asked as
   [prompts](#midi-qols-own-saves) already. The roll's own dice, as the 1d10 of an Ice Knife's
@@ -4080,7 +4083,9 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   seconds, or as long as its asks wait, up to a minute each, five minutes at most with dice thrown
   again; or, with Midi-QOL, in the instant before each of a run's bonus formulas is rolled, within
   its workflow's roll of them, never while one waits, a damage roll made just as Midi would make
-  it, of its formula, type and flavor.
+  it, of its formula, type and flavor: it's asked as the run's, and Midi's own bonus rolls of that
+  workflow while it waits are then the Gamemaster's own; or, where two runs' are awaited at once,
+  it's Foundry's computer dice, and theirs are still.
 - **Checks of a cost.** Before it uses an item from the app, the module works out what the use
   would spend, and throws that away, as it has since before 0.45.0. Since 0.45.0 a dice cost rolled
   for that check, for any use from the app, typed or not, any player's or the Gamemaster's, under
