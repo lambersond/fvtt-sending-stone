@@ -4063,11 +4063,14 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   Midi rolls bonus damage one roll after another, within the workflow's own roll of it: while one of
   a workflow's bonus formulas is being thrown, waiting on its ask among it, no other roll is taken
   for that workflow. Where two runs' workflows await bonus rolls of one formula at once, which roll
-  is whose can't be told: from then on, until each has rolled its bonus damage, neither run's such
-  roll is asked, and Foundry's computer dice roll them, never the Gamemaster's Manual Dice. A roll
-  taken so uses up none of what either awaits; and while one of them waits on an ask made before
-  the other's came, nothing is taken for it, so a roll of that formula meanwhile that no other
-  awaits is the Gamemaster's own, as with one workflow.
+  of that formula is whose can't be told: from then on, until each has rolled its bonus damage,
+  neither run's roll of that formula is asked, and Foundry's computer dice roll them, never the
+  Gamemaster's Manual Dice; a formula only one of them awaits is still asked of its own player. A
+  roll of a formula both await uses up none of what either awaits; and while one of them waits on an
+  ask made before the other's came, nothing is taken for it, so a roll of that formula meanwhile that
+  no other awaits is the Gamemaster's own, as with one workflow. While a roll of a formula both
+  await is being thrown, another roll one of them awaits may be taken for it unasked, Foundry's
+  computer dice, as the two workflows roll at once.
 - **What's never asked.** A d20 roll the game makes later, in the run's workflow or not: the attack
   is the roll's own, and the saves and checks a run asks of the character are asked as
   [prompts](#midi-qols-own-saves) already; a die of a typed d20 roll thrown again is asked as below.
@@ -4088,16 +4091,21 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   Midi-QOL, in the instant before each of a run's bonus formulas is rolled, within its workflow's
   roll of them, never while one waits, a damage roll made just as Midi would make it, of its
   formula, type and flavor: it's asked as the run's, and Midi's own bonus rolls of that workflow
-  while it waits are then the Gamemaster's own; or, where two runs' are awaited at once, it's
-  Foundry's computer dice, and theirs are still.
+  while it waits are then the Gamemaster's own; or, where another run's workflow awaits that
+  formula too, it's Foundry's computer dice, and theirs are still.
 - **Checks of a cost.** Before it uses an item from the app, the module works out what the use
-  would spend, and throws that away, as it has since before 0.45.0. Since 0.45.0 a dice cost rolled
-  for that check, for any use from the app, typed or not, any player's or the Gamemaster's, under
-  dnd5e 5 or 6, is Foundry's computer dice: it's never asked of anyone, neither of a player in the
-  app nor of the Gamemaster by their Manual Dice window, and it's never taken for a run's cost. So,
-  under dnd5e 5, is Midi-QOL's own check of the cost of a run's workflow's other activity, which Midi
-  works out and throws away before it spends it; a Gamemaster's own workflow's check is rolled as
-  Midi rolls it.
+  would spend, and throws that away, as it has since before 0.45.0; and with Midi-QOL, Midi's own
+  use does the same before dnd5e spends it, as it does for a use that spends what it uses without
+  its dialog, as the module's uses from the app do. Since 0.45.0 a dice cost rolled for either
+  check, for any use from the app, typed or not, any player's or the Gamemaster's, under dnd5e 5 or
+  6, is Foundry's computer dice: it's never asked of anyone, neither of a player in the app nor of
+  the Gamemaster by their Manual Dice window, and it's never taken for a run's cost. The module
+  marks the use it hands Midi as a check until dnd5e begins spending it
+  (`dnd5e.preActivityConsumption`), so the cost the use spends is rolled as ever. So, under dnd5e 5,
+  is Midi-QOL's own check of the cost of a run's workflow's other activity, which Midi works out and
+  throws away before it spends it. A Gamemaster's own workflow's check is rolled as Midi rolls it,
+  and so are Midi's checks of what other uses would spend, as the reactions it looks for among a
+  run's targets.
 - **A die thrown again** (`"again"`). A die of a typed roll's own, of any kind, or of a roll asked,
   that Foundry throws again: an explosion (`x`, `xo`), or a reroll (`r`, `rr`) where the roll wasn't
   sent [`rerolls`](#fetching-rolls) `"kept"`, as a Halfling's of a 1. It's asked one die at a time,
@@ -4128,7 +4136,9 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   roll whose run it's in being made without waiting for it, as the Gamemaster's own code's roll of
   the same item may be. While it waits, the bridge Gamemaster's Foundry shows a small window, not in
   their way, saying whose player it waits for, what, and how long is left, with **Roll it now**: the
-  ask closes `"rolled"` and Foundry's computer dice roll it. A reload of the Gamemaster's browser
+  ask closes `"rolled"` and Foundry's computer dice roll it. The window has no default button, and
+  where the Gamemaster was typing as it opened, as in the chat, the keyboard goes back to where they
+  were typing, so that Enter never chooses **Roll it now** for them. A reload of the Gamemaster's browser
   forgets every ask, and the next hello lists none.
 - **What waits.** The roll, and with it its Midi workflow; a dice cost holds its character's
   commands too. With Midi-QOL, a use's dice cost, and an area's damage, hold every Midi use from the
