@@ -131,8 +131,9 @@ const released = new WeakSet();
 const asks = new Map();
 
 /**
- * The time each command's asks waited, and how many wait now, by the command's id.
- * @type {Map<string, {held: number, open: number, at: number}>}
+ * The time each command's asks waited, counted once while two wait together; how many wait now, and
+ * since when one has; and when this last changed; by the command's id.
+ * @type {Map<string, {held: number, open: number, since: number, at: number}>}
  */
 const held = new Map();
 
@@ -223,7 +224,9 @@ let testAnswers = null;
  * `new BasicRoll("0 + 1d4", rollData, {delta})`; a bonus damage formula as Midi-QOL builds it, a
  * `DamageRoll` of `{type, flavor}`, its flavor its type where the macro gave none. dnd5e spends, and
  * Midi rolls bonus damage, one roll after another, each awaited: so while one of a bracket's rolls
- * is being thrown, waiting on its ask among it, no other roll is the bracket's.
+ * is being thrown, waiting on its ask among it, no other roll is the bracket's. But nothing on such a
+ * roll says whose it is: while another run's bracket expects one of its formulas too, neither's
+ * rolls are asked from then on (`shared`).
  * @typedef {object} Bracket
  * @property {"cost"|"bonus"} purpose
  * @property {Run} run
@@ -231,6 +234,7 @@ let testAnswers = null;
  * @property {string} label
  * @property {Expected[]} expected
  * @property {Roll|null} busy     The roll of it being thrown now, until it's thrown.
+ * @property {boolean} shared     Has another run's bracket expected one of its formulas meanwhile?
  */
 
 /**
@@ -657,14 +661,20 @@ function stepOf(roll) {
   if ( noted ) return noted;
   if ( !brackets.length || isOwnRoll(roll) || planAlive(roll.options?.[ROLL_TAG]) ) return null;
   for ( const bracket of brackets ) {
-    // One at a time: while one of its rolls is thrown, any other roll is someone else's.
-    if ( bracket.busy ) continue;
+    // One at a time: while one of its rolls is thrown, any other roll is someone else's. A shared
+    // one's are asked of no one, and wait for nothing.
+    if ( bracket.busy && !bracket.shared ) continue;
     const index = bracket.expected.findIndex(each => fitsBracket(bracket.purpose, each, roll));
     if ( index === -1 ) continue;
     bracket.expected.splice(index, 1);
-    if ( bracket.expected.length ) bracket.busy = roll;
+    // A shared one stays open until what opened it is done: another run's roll may have been taken
+    // in place of one of its own.
+    if ( bracket.shared ) bracket.busy = null;
+    else if ( bracket.expected.length ) bracket.busy = roll;
     else closeBracket(bracket);
-    const step = new Step(bracket.run, [roll], { purpose: bracket.purpose, label: bracket.label, critical: false });
+    const step = new Step(bracket.run, [roll], {
+      purpose: bracket.purpose, label: bracket.label, critical: false, silent: bracket.shared
+    });
     steps.set(roll, step);
     return step;
   }
@@ -694,13 +704,38 @@ function fitsBracket(purpose, expected, roll) {
 }
 
 /**
- * Close a bracket.
- * @param {Bracket} bracket
+ * Open a bracket: where another run's, of the same purpose, expects a roll of one of its formulas
+ * too, as two characters' uses spending 1d4 each at once, which roll is whose can't be told, so
+ * neither's rolls are asked from then on; they're still later rolls, Foundry's computer dice.
+ * @param {Omit<Bracket, "busy"|"shared">} details
  * @returns {void}
  */
-function closeBracket(bracket) {
+function openBracket(details) {
+  const bracket = { ...details, busy: null, shared: false };
+  const formulas = new Set(bracket.expected.map(each => each.formula));
+  for ( const other of brackets ) {
+    if ( (other.run === bracket.run) || (other.purpose !== bracket.purpose) ) continue;
+    if ( !other.expected.some(each => formulas.has(each.formula)) ) continue;
+    other.shared = true;
+    bracket.shared = true;
+  }
+  brackets.push(bracket);
+}
+
+/**
+ * Close a bracket. Once what opened it is done, what a shared one still expects is a roll of
+ * another run's yet to come, one of whose place its own took: another run's shared bracket of the
+ * same purpose, still open, takes it over.
+ * @param {Bracket} bracket
+ * @param {boolean} [done]   Is what opened it done: has dnd5e spent, or Midi rolled bonus damage?
+ * @returns {void}
+ */
+function closeBracket(bracket, done=false) {
   const index = brackets.indexOf(bracket);
   if ( index !== -1 ) brackets.splice(index, 1);
+  if ( !done || !bracket.shared || !bracket.expected.length ) return;
+  const heir = brackets.find(other => other.shared && (other.purpose === bracket.purpose) && (other.run !== bracket.run));
+  heir?.expected.push(...bracket.expected);
 }
 
 /* -------------------------------------------- */
@@ -726,7 +761,7 @@ function openCost(activity, usageConfig) {
     }
     const expected = costsOf(activity, usageConfig);
     if ( expected.length ) {
-      brackets.push({ purpose: "cost", run, owner: activity, label: labelOf(activity, run), expected, busy: null });
+      openBracket({ purpose: "cost", run, owner: activity, label: labelOf(activity, run), expected });
     }
   } catch (err) {
     warnOnce("cost", "Could not tell whether a use's dice cost is to be asked in the app: Foundry rolls it.", err);
@@ -740,7 +775,7 @@ function openCost(activity, usageConfig) {
  */
 function closeCost(activity) {
   for ( const bracket of Array.from(brackets) ) {
-    if ( (bracket.purpose === "cost") && (bracket.owner === activity) ) closeBracket(bracket);
+    if ( (bracket.purpose === "cost") && (bracket.owner === activity) ) closeBracket(bracket, true);
   }
 }
 
@@ -835,7 +870,7 @@ async function rollBonusDamage(wrapped, ...args) {
   } finally {
     rollingBonus.delete(this);
     for ( const bracket of Array.from(brackets) ) {
-      if ( (bracket.purpose === "bonus") && (bracket.owner === this) ) closeBracket(bracket);
+      if ( (bracket.purpose === "bonus") && (bracket.owner === this) ) closeBracket(bracket, true);
     }
   }
 }
@@ -857,7 +892,7 @@ async function callMacros(wrapped, ...args) {
     if ( run && !workflowEnded(this) ) {
       const expected = bonusFormulas(this, args[0], results);
       if ( expected.length ) {
-        brackets.push({ purpose: "bonus", run, owner: this, label: labelOf(this.activity, run), expected, busy: null });
+        openBracket({ purpose: "bonus", run, owner: this, label: labelOf(this.activity, run), expected });
       }
     }
   } catch (err) {
@@ -904,20 +939,22 @@ function bonusFormulas(workflow, item, results) {
 /* -------------------------------------------- */
 
 /**
- * A step of later rolls of a run, asked once, as its first roll is thrown.
+ * A step of later rolls of a run, asked once, as its first roll is thrown; or, `silent`, where
+ * whose it is can't be told for sure, asked of no one, its dice and any thrown again Foundry's.
  */
 class Step {
   /**
    * @param {Run} run
    * @param {Roll[]} rolls
-   * @param {{purpose: string, label: string, critical: boolean}} details
+   * @param {{purpose: string, label: string, critical: boolean, silent?: boolean}} details
    */
-  constructor(run, rolls, { purpose, label, critical }) {
+  constructor(run, rolls, { purpose, label, critical, silent=false }) {
     this.run = run;
     this.rolls = rolls;
     this.purpose = purpose;
     this.label = label;
     this.critical = critical;
+    this.silent = silent === true;
     /** @type {Promise<Map<Roll, Map<DiceTerm, number[]>>|null>|null} */
     this.asking = null;
   }
@@ -938,6 +975,7 @@ class Step {
    * @returns {Promise<Map<Roll, Map<DiceTerm, number[]>>|null>}
    */
   async #ask() {
+    if ( this.silent ) return null;
     const listing = listRolls(this.rolls);
     if ( !listing.length || !asksNow(this.run) ) return null;
     const ask = openAsk(this.run, { purpose: this.purpose, label: this.label, critical: this.critical, listing });
@@ -1039,7 +1077,8 @@ function openAsk(run, { purpose, again: why=null, label, critical, listing }) {
   for ( const { roll } of listing ) {
     if ( roll ) asksOfRoll.set(roll, [...(asksOfRoll.get(roll) ?? []), ask]);
   }
-  const time = held.get(run.commandId) ?? { held: 0, open: 0, at: now };
+  const time = held.get(run.commandId) ?? { held: 0, open: 0, since: now, at: now };
+  if ( !time.open ) time.since = now;
   time.open++;
   time.at = now;
   held.set(run.commandId, time);
@@ -1099,7 +1138,7 @@ function closeAsk(ask, reason, dice=null) {
   const time = held.get(ask.run.commandId);
   if ( time ) {
     time.open = Math.max(time.open - 1, 0);
-    time.held += now - ask.askedAt;
+    if ( !time.open ) time.held += now - time.since;
     time.at = now;
   }
   const campaign = getCampaigns().find(({ id }) => id === ask.run.campaignId);
@@ -1161,6 +1200,7 @@ function thrown(roll) {
 function again(term, why, owner) {
   if ( !active() || !owner || !DIE_FACES.has(term?.faces) ) return null;
   const step = (owner.later instanceof Step) ? owner.later : null;
+  if ( step?.silent ) return null;
   const command = owner.command;
   const run = step?.run
     ?? (((command?.typed === true) && ((command.by === undefined) || (command.by === null))) ? runs.get(command.id) : null);
@@ -1457,8 +1497,8 @@ export function openDiceAsks(campaign) {
  * it names, among the roll's own, while a term left out is Foundry's; that a roll outside any run,
  * of another actor, or in another Midi workflow, isn't one; that a dice cost and a bonus damage
  * formula keep what a bracket tells them apart by, as Foundry keeps a roll's options; and that a die
- * thrown again, an explosion and a reroll, waits for the value given, as Foundry awaits a die's
- * `_roll`.
+ * thrown again, an explosion and a reroll, of a typed roll's own or of a later roll's, waits for the
+ * value given, as Foundry awaits a die's `_roll`.
  * @returns {Promise<void>}
  */
 async function laterSelfTest() {
@@ -1520,6 +1560,15 @@ async function laterSelfTest() {
       check(results === expected, `${formula}, its dice given, threw ${results}, not ${expected}`);
       check(testAnswers.length === 0, `${formula}'s die thrown again wasn't asked for`);
     }
+
+    // So does a later roll's: its explosion asked as its step's.
+    const laterAgain = new BasicRoll("1d4x", {}, {});
+    steps.set(laterAgain, new Step(run, [laterAgain], { purpose: "other", label: item.name, critical: false }));
+    testAnswers.push([{ roll: 0, term: 0, results: [4] }], [{ roll: 0, term: 0, results: [2] }]);
+    await laterAgain.evaluate();
+    const exploded = JSON.stringify(laterAgain.dice[0]?.results.map(({ result }) => result) ?? []);
+    check(exploded === "[4,2]", `a later roll's 1d4x answered 4, then 2, threw ${exploded}`);
+    check(testAnswers.length === 0, "a later roll's die thrown again wasn't asked for");
     Object.assign(laterDiceStatus, { ready: true, reason: null, error: null });
   } catch (err) {
     Object.assign(laterDiceStatus, { ready: false, reason: "self-test", error: err instanceof Error ? err.message : String(err) });
