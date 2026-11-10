@@ -66,6 +66,10 @@ for v in X=1 "X=1 DND5E6=1"; do run removals $v SLIM_CHECK=1; done
 # Module 0.34.0: journal notes, personal and party, chapters, kept in step with Foundry (dnd5e 5.3.3 and
 # 6.0.5 stand-ins), fetched with rolls, moves and removals off.
 for v in X=1 "X=1 DND5E6=1"; do run notes $v; done
+# Module 0.45.0: Tidy 5e Sheets' journal, read only, in journal.tidy: Tidy 13.10.5's flags under
+# dnd5e 5.3.3, Tidy 14.4.1's under 6.0.5, both deletes, the Classic sheet's boxes, secrets, Tidy off
+# and uninstalled, older apps; and Tidy in the settings window's Works with and the hello's modules.
+for v in X=1 "X=1 DND5E6=1"; do run tidy-journal $v; done
 # Module 0.36.0: companions (the creatures a character summons, and the NPCs its player owns),
 # found, sent and commanded on their own tokens (dnd5e 5.3.3 and 6.0.5 stand-ins, and Midi-QOL's);
 # and damage on its own and recharges. Module 0.41.0: damage on its own at the level, in the mode and
