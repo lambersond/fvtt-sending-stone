@@ -1247,13 +1247,13 @@ in the order listed, each in a [`character.updated`](#characterupdated) of its o
 since the hello. Since module 0.30.0, to a listener that reads groups, each of the campaign's groups
 follows its characters in a [`group.updated`](#groupupdated) of its own, in the order listed. Since
 module 0.34.0, to a listener that reads notes, each book whose journal the hello's `features.notes`
-lists follows the groups in a [`journal.updated`](#journalupdated) of its own. Since module 0.45.0,
-to a listener that reads [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal), each character the
-hello's `features.notes.tidy` lists, and each that holds an entry of it by then, follows the books
-in a [`journal.tidy`](#journaltidy) of its own. Since module 0.36.0, to a
+lists follows the groups in a [`journal.updated`](#journalupdated) of its own. Since module 0.36.0, to a
 listener that reads companions, each companion the hello lists that still is one follows them in a
 [`companion.updated`](#companionupdated) of its own, in the order listed, and then, at once, a
-[`companions.listed`](#companionslisted) where the list has changed since the hello was built. A
+[`companions.listed`](#companionslisted) where the list has changed since the hello was built. Since
+module 0.45.0, to a listener that reads [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal), each
+character the hello's `features.notes.tidy` lists, and each that holds an entry of it by then,
+follows the books in a [`journal.tidy`](#journaltidy) of its own. A
 hello refused is followed by nothing: ask for another, as ever. Before 0.22.0 a hello came after the
 `character.texts` with every description its characters' sheets refer to, and carried their sheets
 itself.
