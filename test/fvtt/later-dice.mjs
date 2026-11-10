@@ -616,6 +616,11 @@ const minned = Hooks.on('dnd5e.postBuildDamageRollConfig', (process, config) => 
 const minimized = await charmZap.rollDamage({}, quiet, unposted)
 Hooks.off('dnd5e.postBuildDamageRollConfig', minned)
 const outside = await new DamageRoll('1d6', {}, { type: 'fire' }).evaluate()
+// The Gamemaster's own use of the very charm meanwhile, in Foundry: a use of its own, on dnd5e's copy
+// of the item, whose spending names no run: its 1d4 cost theirs, never the waiting run's.
+const gmUseBefore = usesOf('charm')
+await charmZap.use({}, { configure: false }, { create: false })
+assert.equal(usesOf('charm') - gmUseBefore, 4, "the Gamemaster's own cost, their manual dice, the highest face")
 assert.deepEqual([clicked, dagger, club, maximized, minimized].map(rolls => rolls?.length), [1, 1, 1, 1, 1])
 assert.deepEqual([maximized[0].options.maximize, minimized[0].options.minimize], [true, true])
 assert.ok(outside.total >= 1)
@@ -635,8 +640,8 @@ const { held: waitedFor } = later.heldFor(ask.command)
 assert.ok((waitedFor >= 20_000) && (waitedFor <= Date.now() - Date.parse(ask.askedAt)), `held ${waitedFor}, the use's asks open ${Date.now() - Date.parse(ask.askedAt)}`)
 // The click's, the dagger's, the club's, the roll of no run's: the Gamemaster's dice, as ever; the
 // maximized and minimized ones throw none.
-assert.deepEqual(checks(), [clicked[0].formula, dagger[0].formula, club[0].formula, outside.formula])
-ok("never asked while a typed use waits on its cost: the same item's damage rolled with a click, another item of his, another actor's, one whose dice are maximized or minimized, and a roll of no run; the one way left to ask wrongly, the same item's damage with no click while the use is made, is asked as the run's; the two asks waiting together counted once by the watchdog")
+assert.deepEqual(checks(), [clicked[0].formula, dagger[0].formula, club[0].formula, outside.formula, '0 + 1d4'])
+ok("never asked while a typed use waits on its cost: the same item's damage rolled with a click, another item of his, another actor's, one whose dice are maximized or minimized, a roll of no run, and the Gamemaster's own use of the very item, its cost their manual dice; the one way left to ask wrongly, the same item's damage with no click while the use is made, is asked as the run's; the two asks waiting together counted once by the watchdog")
 
 /* -------------------------------------------- */
 /*  A die thrown again                          */
