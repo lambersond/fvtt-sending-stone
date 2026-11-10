@@ -1342,8 +1342,9 @@ function scheduleCheck() {
 
 /**
  * Show the bridge Gamemaster that a roll waits on a player's dice: a small window, not in their way,
- * saying whose player, what and how long is left, with Roll it now. One that can't be drawn changes
- * nothing of the ask.
+ * saying whose player, what and how long is left, with Roll it now. Not its default button, and
+ * where they were typing as it opened, as in the chat, the keyboard goes back there once it's drawn:
+ * Enter never chooses Roll it now for them. One that can't be drawn changes nothing of the ask.
  * @param {Ask} ask
  * @returns {void}
  */
@@ -1351,6 +1352,7 @@ function showWaiting(ask) {
   const DialogV2 = foundry.applications?.api?.DialogV2;
   if ( typeof DialogV2 !== "function" ) return;
   try {
+    const typing = typingIn(globalThis.document?.activeElement);
     const { i18n } = game;
     const name = game.actors?.get?.(ask.run.of ?? ask.run.actorId)?.name ?? "";
     const text = i18n.format("SENDINGSTONE.DiceAsk.Waiting", {
@@ -1364,12 +1366,12 @@ function showWaiting(ask) {
       modal: false,
       rejectClose: false,
       buttons: [{
-        action: "roll", label: i18n.localize("SENDINGSTONE.DiceAsk.RollNow"), icon: "fa-solid fa-dice", default: true,
+        action: "roll", label: i18n.localize("SENDINGSTONE.DiceAsk.RollNow"), icon: "fa-solid fa-dice",
         callback: () => rollNow(ask.id)
       }]
     });
     ask.dialog = dialog;
-    void Promise.resolve(dialog.render({ force: true })).catch(() => null);
+    void Promise.resolve(dialog.render({ force: true })).then(() => giveBack(typing)).catch(() => null);
     ask.ticker = setInterval(() => {
       const left = dialog.element?.querySelector?.(".sending-stone-dice-ask-left");
       if ( left ) left.textContent = leftText(ask);
@@ -1377,6 +1379,31 @@ function showWaiting(ask) {
   } catch (err) {
     warnOnce("window", "Could not show the wait for a player's dice: Roll it now isn't offered.", err);
   }
+}
+
+/**
+ * The field the Gamemaster is typing in, if any: a text input, a text area or an editable element,
+ * as Foundry's chat message box.
+ * @param {Element|null|undefined} element   What has the keyboard.
+ * @returns {HTMLElement|null}
+ */
+function typingIn(element) {
+  if ( !element || (typeof element.focus !== "function") ) return null;
+  const tag = String(element.tagName ?? "").toUpperCase();
+  if ( (tag === "TEXTAREA") || (element.isContentEditable === true) ) return element;
+  if ( tag !== "INPUT" ) return null;
+  const type = String(element.type || "text").toLowerCase();
+  return ["text", "search", "email", "url", "tel", "password", "number"].includes(type) ? element : null;
+}
+
+/**
+ * Give the keyboard back to the field the Gamemaster was typing in, where a window took it.
+ * @param {HTMLElement|null} typing
+ * @returns {void}
+ */
+function giveBack(typing) {
+  if ( !typing || (typing.isConnected === false) || (globalThis.document?.activeElement === typing) ) return;
+  typing.focus({ preventScroll: true });
 }
 
 /**

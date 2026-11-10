@@ -130,11 +130,17 @@ game.settings.get = (module, key) => (module === 'manual-dice') ? true : storedG
 game.settings.settings = new Map([['manual-dice.enabled', {}]])
 game.modules.set('manual-dice', { id: 'manual-dice', title: 'Manual Dice', active: true, authors: [] })
 
-// The Gamemaster's window: DialogV2, as far as the module draws one [core, unverified].
+// The Gamemaster's window: DialogV2, as far as the module draws one [core, unverified]. While
+// `takesKeyboard`, drawing it takes the keyboard to its button, as a window may as it opens.
 const dialogs = []
+let takesKeyboard = false
 foundry.applications.api.DialogV2 = class {
   constructor(options) { Object.assign(this, { options, rendered: false, closed: false }); dialogs.push(this) }
-  async render() { this.rendered = true; return this }
+  async render() {
+    this.rendered = true
+    if (takesKeyboard) document.activeElement = { tagName: 'BUTTON', isConnected: true, focus() { document.activeElement = this } }
+    return this
+  }
   async close() { this.closed = true; return this }
   get element() { return null }
 }
@@ -451,7 +457,11 @@ if (OLD_APP) {
 /*  Dice a use spends                           */
 /* -------------------------------------------- */
 
-// A typed use of the charm: its 1d4 cost asked once, typed 3, spent so.
+// A typed use of the charm: its 1d4 cost asked once, typed 3, spent so. The Gamemaster is typing in
+// the chat as it's asked.
+const chat = { tagName: 'TEXTAREA', isConnected: true, focus() { document.activeElement = this } }
+document.activeElement = chat
+takesKeyboard = true
 let count = asked().length
 let using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
 let ask = await nextAsk(count)
@@ -466,6 +476,12 @@ assert.equal(window.rendered, true)
 assert.equal(window.options.modal, false, 'not in their way')
 assert.equal(window.options.buttons[0].label, 'SENDINGSTONE.DiceAsk.RollNow')
 assert.match(window.options.content, /SENDINGSTONE\.DiceAsk\.Waiting \{"name":"Thorin","label":"Charm of Sparks: Zap","dice":"1d4"\}/)
+// Never in the way of their typing: Roll it now isn't the default button, and the keyboard the
+// window took as it was drawn goes back to the chat, so Enter never chooses Roll it now.
+await until(() => document.activeElement === chat, 'the keyboard back in the chat')
+assert.deepEqual([window.options.buttons.length, window.options.buttons[0].default ?? false], [1, false], 'Roll it now not the default button')
+takesKeyboard = false
+delete document.activeElement
 // With Midi-QOL, Midi's own use has worked out what it would spend before dnd5e spends it, and thrown
 // that away (its checkAutoConsume): Foundry's computer dice, never the Gamemaster's manual dice, not
 // even while the player's ask waits (ROADMAP item 22).
@@ -480,7 +496,7 @@ assert.deepEqual([answer.status, answer.messageId, answer.visible, answer.rolls.
 let used = await using
 assert.equal(used.status, 'done', JSON.stringify(used))
 assert.deepEqual([usesOf('charm'), closeOf(ask.id), window.closed, asked().length - count, checks()], [3, { id: ask.id, reason: 'answered' }, true, 1, []])
-ok(`a typed use's 1d4 cost: asked once of camp-a alone, purpose cost, label Charm of Sparks: Zap, its terms, a minute to wait; the Gamemaster's window, not modal, with Roll it now; a hello sent meanwhile lists it and closes nothing, another campaign's lists none; answered 3: closed answered, the window closed, the result done with the roll as thrown, 3 charges spent; the Gamemaster's manual dice never asked, not even for the module's own check of the cost beforehand${MIDI ? ", nor Midi-QOL's own as its use began, while the ask waited" : ''} (ROADMAP item 22)`)
+ok(`a typed use's 1d4 cost: asked once of camp-a alone, purpose cost, label Charm of Sparks: Zap, its terms, a minute to wait; the Gamemaster's window, not modal, with Roll it now, not its default button, the keyboard it took given back to the chat they were typing in; a hello sent meanwhile lists it and closes nothing, another campaign's lists none; answered 3: closed answered, the window closed, the result done with the roll as thrown, 3 charges spent; the Gamemaster's manual dice never asked, not even for the module's own check of the cost beforehand${MIDI ? ", nor Midi-QOL's own as its use began, while the ask waited" : ''} (ROADMAP item 22)`)
 
 // A linked activity's: Spark cast from the staff spends the staff's 1d4, asked once.
 count = asked().length
