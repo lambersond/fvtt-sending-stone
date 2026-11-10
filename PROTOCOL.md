@@ -4035,13 +4035,19 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   - with no workflow on its process, a roll whose subject (dnd5e's "Document that initiated this
     roll") is an activity of the run's item, built while the roll is being made, with no click
     event;
-  - the dice a use spends (`"cost"`), as a charge cost of `1d4`: rolled between dnd5e's
+  - the dice a use spends (`"cost"`), as a charge cost of `1d4`: dnd5e's roll of each, of its
+    formula as dnd5e resolves it (`"0 + 1d4"`), carrying what it spends from, rolled between dnd5e's
     `dnd5e.preActivityConsumption` and `dnd5e.activityConsumption` for the run's activity, or for
     the other activity of its Midi workflow, each once: never Midi's check of the cost beforehand,
     whose roll it throws away;
   - with Midi-QOL, a bonus damage macro's formula (`"bonus"`), as Sneak Attack's or Hunter's Mark's,
-    as Midi rolls each formula a `DamageBonus` macro of the run's workflow returned; never a roll a
-    macro made itself, nor any other macro's.
+    as Midi rolls each formula a `DamageBonus` macro of the run's workflow returned: a damage roll of
+    that formula, of the type the macro named where it's one of dnd5e's, flavored as the macro says,
+    else as its type; never a roll a macro made itself, nor any other macro's.
+
+  dnd5e spends, and Midi rolls bonus damage, one roll after another: while one of a use's costs, or
+  of a workflow's bonus formulas, is being thrown, waiting on its ask among it, no other roll is
+  taken for the next.
 - **What's never asked.** A d20 roll: the attack is the roll's own, and the saves and checks a run
   asks of the character are asked as [prompts](#midi-qols-own-saves) already. The roll's own dice,
   as the 1d10 of an Ice Knife's `damage`. A roll in another browser; another player's, a target's,
@@ -4049,7 +4055,10 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   a roll whose dice are all numbers, maximized or minimized; where Midi-QOL averages the actor's
   damage, its damage. The one roll that may be asked wrongly is one the Gamemaster's own code makes,
   of the same item of the same character, with no click and no workflow of its own, during the
-  seconds the player's roll is being made, or a dice cost of that item's rolled then.
+  seconds the player's roll is being made, or a dice cost of that item's rolled then; or, in the
+  instant between two of a run's costs or bonus formulas, never while one waits, a roll made just
+  as dnd5e or Midi would make the next: dnd5e's roll of a cost of its very formula, or a damage roll
+  of its formula, type and flavor.
 - **A die thrown again** (`"again"`). A die of a typed roll's own, of any kind, or of a roll asked,
   that Foundry throws again: an explosion (`x`, `xo`), or a reroll (`r`, `rr`) where the roll wasn't
   sent [`rerolls`](#fetching-rolls) `"kept"`, as a Halfling's of a 1. It's asked one die at a time,
@@ -4058,9 +4067,12 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   thrown: one ask for the step, listing up to 10 of its rolls, in [`roll.dice.asked`](#dice-asks),
   to the campaign the typed roll was fetched for alone; and the step waits for the answer. Only while
   the character, or for a companion's its character, is open in the listener, by the fetch's
-  [`open`](#fetching-rolls) within the last 45 seconds, and the self-test has passed: otherwise, and
-  for a listener that doesn't answer `"diceAsks": 1`, Foundry's computer dice roll it at once, as
-  they roll a typed roll's, never the Gamemaster's Manual Dice window.
+  [`open`](#fetching-rolls) within the last 45 seconds: otherwise, and for a listener that doesn't
+  answer `"diceAsks": 1`, Foundry's computer dice roll it at once, as they roll a typed roll's,
+  never the Gamemaster's Manual Dice window. Where the module's self-test failed
+  (`features.rolls.diceAsks` `false`, `diceAsksReason` `"self-test"`), no run is opened and nothing
+  is asked: the game's later dice are rolled as before 0.45.0, a dice cost, say, with the
+  Gamemaster's own dice settings, their Manual Dice window among them.
 - **The wait** is a minute. Then the ask closes `"expired"` and Foundry's computer dice roll it; and
   so it does, looked at after each fetch and every 5 seconds, once the character is no longer open,
   or the campaign no longer asks, as with its rolls or Manual Dice turned off. A Midi workflow aborted
@@ -4068,10 +4080,13 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   not in their way, saying whose player it waits for, what, and how long is left, with **Roll it
   now**: the ask closes `"rolled"` and Foundry's computer dice roll it. A reload of the Gamemaster's
   browser forgets every ask, and the next hello lists none.
-- **What waits.** The roll, and with it its Midi workflow, and where its damage is an area's, every
-  Midi use from the app after it; a dice cost holds its character's commands too. A roll whose run
-  waits on an ask isn't [timed out](#making-a-roll) meanwhile: its minute doesn't count the time
-  its asks waited.
+- **What waits.** The roll, and with it its Midi workflow; a dice cost holds its character's
+  commands too. With Midi-QOL, a use's dice cost, and an area's damage, hold every Midi use from the
+  app after it, any player's, as the module makes them one at a time. A roll whose run waits on an
+  ask isn't [timed out](#making-a-roll) meanwhile: its minute doesn't count the time its asks
+  waited. A Midi use held behind it keeps its own minute: past it, it's told `"timeout"`, and a use
+  that hadn't begun is then not made, while a damage is still made once its turn comes, its result
+  following.
 - **The hello** lists every open ask, in `diceAsks`, so a hello sent again, as when the settings
   change, closes none; a listener closes `"gone"` any it holds that a hello doesn't list.
 
@@ -4096,8 +4111,8 @@ are. The first answer taken is the one used: another, as from a second device, i
 - `"invalid"`, `error` `"by"`, with `by`;
 - `"invalid"`, `error` `"diceAsk"`: a `diceAsk` that isn't an id; `dice` that isn't such a list; a
   roll or term the ask doesn't list; a term twice; a term with more or fewer values than its
-  `number`; a value its die doesn't have; `mode` other than `0`, `explicit` other than `false`,
-  `extras` other than `[]`; or any `effectDice` or `rerolls`;
+  `number`; a value its die doesn't have; `typed` other than `true`, `mode` other than `0`,
+  `explicit` other than `false`, `extras` other than `[]`; or any `effectDice` or `rerolls`;
 - `"diceAsk"`, with `error`: `"gone"` (no such ask, as after the Gamemaster reloads, or its roll was
   called off), `"character"` (another character's or companion's, or fetched for another campaign),
   `"answered"` (answered, skipped or rolled already) or `"expired"` (its wait ended, or its
