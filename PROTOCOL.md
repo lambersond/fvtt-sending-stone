@@ -4126,7 +4126,7 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   module's self-test failed (`features.rolls.diceAsks` `false`, `diceAsksReason` `"self-test"`), no
   run is opened and nothing is asked: the game's later dice are rolled as before 0.45.0, a dice
   cost, say, with the Gamemaster's own dice settings, their Manual Dice window among them, though
-  never the module's own check of it beforehand.
+  never the module's own check of it beforehand, nor Midi-QOL's as its use begins.
 - **The wait** is a minute. Then the ask closes `"expired"` and Foundry's computer dice roll it; and
   so it does, looked at after each fetch and every 5 seconds, before its minute is out, once the
   character is no longer open, the campaign no longer asks, as with its rolls or Manual Dice turned
@@ -4197,11 +4197,12 @@ leaves that activity's dice costs to Foundry too.
 
 dnd5e passes a use's spending to each cost it rolls through its consumption targets'
 `resolveCost`: where a dnd5e has none the module can follow, dice costs aren't asked, and they, and
-the module's own check of them, are rolled as before 0.45.0.
+the module's own check of them and Midi-QOL's, are rolled as before 0.45.0.
 
 **Under dnd5e 6**, `features.rolls.diceAsks` is `false`, `diceAsksReason` `"system"`, and nothing
 is asked, nor any run opened: the game's later dice are Foundry's, as before 0.45.0, but for the
-module's own check of a cost, Foundry's computer dice there too. dnd5e 6 and Midi-QOL's line for it
+module's own check of a cost, and Midi-QOL's as its use from the app begins, Foundry's computer dice
+there too. dnd5e 6 and Midi-QOL's line for it
 are to be supported apart.
 
 **Older.** A listener before 0.45.0 never answers `"diceAsks": 1`: it's asked nothing, and the
