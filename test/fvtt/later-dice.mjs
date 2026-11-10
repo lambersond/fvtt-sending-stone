@@ -332,6 +332,8 @@ settings.set('campaigns', [
   { id: 'camp-a', title: 'Ashlands', characters: ['thorin', 'mira'], rolls: true, attacks: true, manualDice: true },
   { id: 'camp-b', title: 'Mirkwood', characters: ['thorin'], rolls: true, attacks: true, manualDice: true },
 ])
+// The Gamemaster rolls their own dice with Manual Dice from the start: the self-tests ask them nothing.
+core.interactive = true
 await Hooks.callAll('ready')
 const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)
 const later = await import(`${MODULE}/scripts/later-dice.mjs`)
@@ -390,6 +392,9 @@ if (BREAK_ASK) {
 }
 
 assert.deepEqual([later.laterDiceStatus.ready, later.laterDiceStatus.error], [true, null], 'the self-test passed')
+// (dice-plan.mjs's own self-test, since 0.32.0, evaluates one roll with no options: its d20 and d4
+// asked of the Gamemaster's manual dice at every start-up; bugs-found.md, 049-typed-mod fix 3.)
+assert.deepEqual(prompts.splice(0).filter(formula => formula !== '1d20adv + 1d4'), [], "the later dice's self-test never asks the Gamemaster's manual dice")
 const keys = Object.keys(rollsOf('camp-a'))
 assert.deepEqual(keys.slice(keys.indexOf('keptRerolls')), ['keptRerolls', 'diceAsks', 'diceAsksReason'])
 assert.deepEqual([rollsOf('camp-a').diceAsks, rollsOf('camp-a').diceAsksReason, rollsOf('camp-a').kinds.at(-1)], [true, null, 'dice'])
@@ -692,9 +697,8 @@ ok("a die thrown again: a typed 1d6x's 6 explodes and each die after is asked on
 
 // A die thrown again in a roll asked: Wild Charm's 1d4x cost, answered 4, explodes; its next die is
 // asked as the cost's, purpose again, under the use's command, answered 2: 6 charges spent. (The
-// Gamemaster's manual dice off: the module's own check of the cost, with them, would explode for ever
-// at the stand-in's highest face; bugs-found.md, 049-typed-mod.)
-core.interactive = false
+// module's own check of the cost beforehand is Foundry's computer dice, which the Gamemaster's manual
+// dice, answering the stand-in's highest face, would have exploded for ever before 0.45.0.)
 count = asked().length
 using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'wild-charm', activity: 'wild-zap', targets: [], slot: null }))
 ask = await nextAsk(count)
@@ -706,7 +710,6 @@ assert.deepEqual([boom.purpose, boom.again, boom.label, boom.command, boom.rolls
 await make(answerOf(boom, [{ roll: 0, term: 0, results: [2] }]))
 used = await using
 assert.deepEqual([used.status, usesOf('wild-charm'), asked().length - count, closeOf(boom.id), checks()], ['done', 6, 2, { id: boom.id, reason: 'answered' }, []])
-core.interactive = true
 ok("a die thrown again in a roll asked: Wild Charm's 1d4x cost answered 4 explodes, the next die asked as the cost's, purpose again, explode, label Wild Charm: Zap, its command the use's; answered 2, 6 charges spent; never the Gamemaster's manual dice")
 
 // A die Foundry's computer threw is never asked again: Wild Charm's 1d4x cost, its ask closed by the

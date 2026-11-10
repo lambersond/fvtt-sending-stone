@@ -1621,7 +1621,8 @@ async function costSelfTest(run, item) {
     check(testAnswers.length === 0, "a dice cost wasn't asked for its die");
     testAnswers.push([{ roll: 0, term: 0, results: [3] }]);
     const thrownAway = await target.resolveCost({ config: { [COST_CHECK]: true, [COST_SPENDING]: key } });
-    const noRun = await target.resolveCost({ config: {} });
+    // One of no run's spending is dnd5e's own: thrown here, as nothing else is, without asking anyone.
+    const noRun = await target.resolveCost({ config: {}, evaluate: false })?.evaluate({ allowInteractive: false });
     check([thrownAway, noRun].every(roll => roll?._evaluated === true), "a dice cost not asked wasn't thrown");
     check(testAnswers.length === 1, "the module's own check of a dice cost, or one of no run, was asked for its die");
     const unthrown = target.resolveCost({ config: { [COST_SPENDING]: key }, evaluate: false });
