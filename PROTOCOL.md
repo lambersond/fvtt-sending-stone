@@ -4018,13 +4018,15 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   `by` `"gm"`, of `kind` `attack`, `use`, `damage`, `itemDamage`, `formula`, `textRoll`,
   `textDamage` or `recharge`, opens its item's **run**. A roll whose dice the player threw in the
   app, untyped, opens none, nor does the Gamemaster's from the app: their later dice are Foundry's,
-  as before 0.45.0.
+  as before 0.45.0. With Midi-QOL, such a roll fed into a workflow, as the Gamemaster's `damage`
+  from the app after a player's typed `attack`, or the player's own untyped one, takes the workflow
+  out of the run it was in: what Midi rolls with that damage, and after it, is Foundry's too.
 - **How long a run lasts.** Without Midi-QOL, while the roll is being made: a character's rolls are
   made one at a time, so its runs never overlap. With Midi-QOL, from the roll until the Midi workflow
   it started (an `attack` or a `use`) or fed (its `damage`) completes or is aborted, five minutes at
   most; a target's save asked meanwhile doesn't end it. A workflow fed by a later roll is that roll's
-  run from then on. Each use is a workflow of its own, so two runs, or the Gamemaster's own use of
-  the same item, never mix.
+  run from then on, or no run's where that roll opens none. Each use is a workflow of its own, so two
+  runs, or the Gamemaster's own use of the same item, never mix.
 - **What's asked.** A roll dnd5e builds in a run, after the roll's own, of the run's character, its
   Wild Shape form or the companion named, with dice to throw:
   - with Midi-QOL, a roll whose roll process names the run's workflow: another activity's damage or
@@ -4047,18 +4049,24 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
 
   dnd5e spends, and Midi rolls bonus damage, one roll after another: while one of a use's costs, or
   of a workflow's bonus formulas, is being thrown, waiting on its ask among it, no other roll is
-  taken for the next.
+  taken for the next. Where two runs await rolls of one formula at once, as two characters' typed
+  uses each spending `1d4` from the same fetch, which roll is whose can't be told: from then on
+  neither run's such roll is asked, and Foundry's computer dice roll them, never the Gamemaster's
+  Manual Dice.
 - **What's never asked.** A d20 roll: the attack is the roll's own, and the saves and checks a run
   asks of the character are asked as [prompts](#midi-qols-own-saves) already. The roll's own dice,
   as the 1d10 of an Ice Knife's `damage`. A roll in another browser; another player's, a target's,
   an NPC's or the Gamemaster's own, made outside the run, of another actor, or in another workflow;
+  a roll made with a click, as the Gamemaster's from a Midi card's damage button for the player's
+  workflow, which also takes that workflow out of the run, as their `damage` from the app does;
   a roll whose dice are all numbers, maximized or minimized; where Midi-QOL averages the actor's
   damage, its damage. The one roll that may be asked wrongly is one the Gamemaster's own code makes,
   of the same item of the same character, with no click and no workflow of its own, during the
   seconds the player's roll is being made, or a dice cost of that item's rolled then; or, in the
-  instant between two of a run's costs or bonus formulas, never while one waits, a roll made just
-  as dnd5e or Midi would make the next: dnd5e's roll of a cost of its very formula, or a damage roll
-  of its formula, type and flavor.
+  instant before each of a run's costs or bonus formulas is rolled, never while one waits, a roll
+  made just as dnd5e or Midi would make it: dnd5e's roll of a cost of its very formula, as the check
+  the module or Midi makes beforehand of what another use spends, or a damage roll of its formula,
+  type and flavor.
 - **A die thrown again** (`"again"`). A die of a typed roll's own, of any kind, or of a roll asked,
   that Foundry throws again: an explosion (`x`, `xo`), or a reroll (`r`, `rr`) where the roll wasn't
   sent [`rerolls`](#fetching-rolls) `"kept"`, as a Halfling's of a 1. It's asked one die at a time,
@@ -4084,9 +4092,9 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   commands too. With Midi-QOL, a use's dice cost, and an area's damage, hold every Midi use from the
   app after it, any player's, as the module makes them one at a time. A roll whose run waits on an
   ask isn't [timed out](#making-a-roll) meanwhile: its minute doesn't count the time its asks
-  waited. A Midi use held behind it keeps its own minute: past it, it's told `"timeout"`, and a use
-  that hadn't begun is then not made, while a damage is still made once its turn comes, its result
-  following.
+  waited, counted once while two wait together. A Midi use held behind it keeps its own minute: past
+  it, it's told `"timeout"`, and a use that hadn't begun is then not made, while a damage is still
+  made once its turn comes, its result following.
 - **The hello** lists every open ask, in `diceAsks`, so a hello sent again, as when the settings
   change, closes none; a listener closes `"gone"` any it holds that a hello doesn't list.
 
@@ -4119,9 +4127,10 @@ are. The first answer taken is the one used: another, as from a second device, i
   character was closed).
 
 **Midi-QOL.** Its other damage keeps the `damage` command's run, so dnd5e's Ice Knife's 2d6 is asked
-within the `damage`, after its 1d10, its critical hit's 4d6 counted as dnd5e counts them, and its
-higher levels' dice with it; one Midi rolls once hits and saves are checked is asked after the
-`damage`'s result, its cost once. Midi pairs an attack with its item's one other activity only where
+within a typed `damage`, after its 1d10, its critical hit's 4d6 counted as dnd5e counts them, and its
+higher levels' dice with it, while within the Gamemaster's `damage`, or an untyped one, it's
+Foundry's; one Midi rolls once hits and saves are checked is asked after the `damage`'s result, its
+cost once. Midi pairs an attack with its item's one other activity only where
 that activity's own pairing is unset and its *Default other activity* is "auto", as for a
 compendium's Ice Knife; an activity a Gamemaster adds by hand is stamped "none" and so isn't
 paired: it's a use of its own from the app, typed already. The optional bonuses Midi offers the Gamemaster on their screen

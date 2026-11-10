@@ -184,8 +184,10 @@ while the roll is being made.
   the device the player rolled from; while it waits, a small window on your screen says whose dice
   and how long is left, with **Roll it now**. After a minute, or once the character is closed in the
   app, Foundry's computer dice roll it, never your own Manual Dice. Rolls of other players, of
-  targets, NPCs and your own are never asked, nor d20s: the saves a spell asks come as prompts.
-  Not yet under dnd5e 6, whose campaigns' hellos say so. See
+  targets, NPCs and your own are never asked, a damage you roll for a player's attack among them,
+  from the app or on Midi's card, nor d20s: the saves a spell asks come as prompts. Two players'
+  uses spending dice of one formula at the same moment are both Foundry's, as which is whose can't
+  be told. Not yet under dnd5e 6, whose campaigns' hellos say so. See
   [PROTOCOL.md](PROTOCOL.md#dice-the-game-rolls-later).
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
