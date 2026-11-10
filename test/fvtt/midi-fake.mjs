@@ -208,6 +208,16 @@ function setTargets(ids) {
 const hasArea = activity => !!activity.target?.template?.type
 
 /**
+ * Since module 0.45.0, utils.ts:28-40, labels aside: a damage type as Midi reads it, no type at all
+ * being "none", one of dnd5e's damage or healing types itself, any other none.
+ */
+function damageTypeOf(name) {
+  if ((name ?? '') === '') return 'none'
+  const { damageTypes = {}, healingTypes = {} } = CONFIG.DND5E ?? {}
+  return (Object.hasOwn(damageTypes, name) || Object.hasOwn(healingTypes, name)) ? name : undefined
+}
+
+/**
  * Since module 0.45.0, utils.ts:4421-4424 and MidiActivityMixin.ts:920-947, activity overrides
  * aside: does a use spend what it uses without its dialog, by its workflow's own option, else the
  * Gamemaster's setting?
@@ -351,7 +361,11 @@ class Workflow {
       midi.beforeBonusRoll?.(index, this)
       const { damageRoll, damageType, flavor } = entry
       if (!damageRoll) continue
-      const options = { type: damageType, flavor: flavor ?? damageType }
+      // 4090-4094, and utils.ts:28-40 (labels aside): a macro naming no type has "none"; one naming
+      // another than dnd5e's has its flavor's, where that's one, else the workflow's damage's.
+      const type = damageTypeOf(damageType) ?? (flavor ? damageTypeOf(flavor) : undefined)
+        ?? this.damageRolls?.[0]?.options?.type ?? 'none'
+      const options = { type, flavor: flavor ?? type }
       rolls.push(await new CONFIG.Dice.DamageRoll(damageRoll, item?.getRollData() ?? this.actor.getRollData(), options).evaluate())
     }
     return rolls

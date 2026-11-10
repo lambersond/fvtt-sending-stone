@@ -1360,6 +1360,34 @@ midi.bonusDamage = null
 midi.beforeBonusRoll = null
 ok("Midi bonus damage macros' formulas, Sneak Attack's 2d6 piercing and Hunter's Mark's 1d6 force: each asked in turn once the macros returned, purpose bonus, label Dagger: Attack, typed 4 and 4, then 1; while the first waits, the Gamemaster's own 1d6, plain and of Hunter's Mark's very type and flavor, theirs at once; in the instant before Hunter's Mark's is built, a plain 1d6, a 1d6 force of another flavor and a 1d6 fire of its very flavor, theirs, and another player's own typed 1d6 force of Hunter's Mark's very flavor, made with its plan, its own 5; a macro's own Roll never asked")
 
+// A bonus damage macro returning a formula alone, `{ damageRoll: '1d8' }`, no type and no flavor:
+// Midi builds it a damage roll of type "none", flavored so (Workflow.ts:4090-4098), asked as the
+// run's. Made in the instant before Midi builds it, a plain Roll of that formula, a plain Roll
+// carrying that very type and flavor, and a damage roll of it with no type are never it, nothing on
+// them as Midi builds its own: the Gamemaster's at once, their manual dice.
+checks()
+midi.bonusDamage = [{ formula: '1d8' }]
+const bare = []
+midi.beforeBonusRoll = index => {
+  if (index !== 0) return
+  bare.push(new foundry.dice.Roll('1d8').evaluate(), new foundry.dice.Roll('1d8', {}, { type: 'none', flavor: 'none' }).evaluate(),
+    new DamageRoll('1d8').evaluate())
+}
+count = asked().length
+const bareStab = await attack('dagger', 'dagger-stab', 16)
+dealing = damage(bareStab.id, [{ faces: 4, results: [3] }])
+ask = await nextAsk(count)
+assert.equal(await atOnce(bare), 'thrown', 'never held')
+assert.deepEqual([ask.purpose, ask.rolls.map(roll => [roll.type, roll.flavor, roll.terms]), asked().length - count, checks()],
+  ['bonus', [['none', 'none', [{ faces: 8, number: 1 }]]], 1, ['1d8', '1d8', '1d8']], "Midi's own asked; the instant's three the Gamemaster's")
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [7] }]))
+dealt = await dealing
+await until(() => workflowOf(bareStab.id).bonusDamageRolls?.length === 1, 'the bonus damage')
+assert.deepEqual([dealt.status, faces(workflowOf(bareStab.id).bonusDamageRolls[0]), asked().length - count, checks()], ['done', [[7]], 1, []])
+midi.bonusDamage = null
+midi.beforeBonusRoll = null
+ok("a bonus macro's bare formula, 1d8 with no type nor flavor: Midi's damage roll of it, type and flavor \"none\", asked and typed 7; in the instant before, a plain 1d8, a plain 1d8 carrying that very type and flavor, and a damage roll of it with no type, the Gamemaster's at once, their manual dice")
+
 // Two runs' workflows await bonus rolls of one formula at once: Thorin's dagger's and Mira's, each
 // rolling Sneak Attack's 2d6 and Hunter's Mark's 1d6. Thorin's 2d6 is asked; while it waits, Mira's
 // damage is made, her workflow expecting Hunter's Mark's 1d6 too: which 1d6 is whose can't be told,
