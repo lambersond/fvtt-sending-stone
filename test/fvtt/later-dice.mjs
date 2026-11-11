@@ -201,6 +201,9 @@ equip(thorin, {
       activities: [{ id: 'spark-bolt', attack: { ability: 'spellcasting' }, damage: [{ number: 1, denomination: 6, types: ['lightning'] }] }] },
     // A wand whose roll explodes, for a die thrown again.
     { id: 'wand', name: 'Wand of Luck', type: 'equipment', system: { properties: [], quantity: 1 }, activities: [{ id: 'wand-roll', type: 'utility', formula: '1d6x' }] },
+    // A spell whose roll explodes and has a name of its own, as its card's button says it.
+    { id: 'sparks', name: 'Wild Sparks', type: 'spell', system: { level: 0, method: 'spell', properties: [] },
+      activities: [{ id: 'sparks-burst', type: 'utility', formula: '1d6x', rollName: 'Burst' }] },
     // Another of his items.
     { id: 'dagger', name: 'Dagger', type: 'weapon', system: { properties: [], quantity: 1, attackType: 'melee' }, activities: [
       { id: 'dagger-stab', attack: { ability: 'dex' }, damage: [{ number: 1, denomination: 4, types: ['piercing'] }] },
@@ -834,6 +837,19 @@ await pass(1000)
 thorin.flags.dnd5e.halflingLucky = false
 assert.deepEqual(checks(), [], "never the Gamemaster's manual dice")
 ok("a die thrown again: a typed 1d6x's 6 explodes and each die after is asked one at a time, purpose again, label Wand of Luck: Use, 6 then 2, answered at 40 seconds each, the roll 14 and done, never timed out; a typed save's Halfling 1 rerolled is asked, 15 kept; kept at the table, nothing asked; with Thorin not open in the app, the reroll Foundry's computer die at once, nothing asked, never the Gamemaster's manual dice")
+
+// Since 0.45.0, a typed formula's own die thrown again is named by its roll where the roll has a name
+// of its own, as dnd5e's card's button and the app's chip name it: Wild Sparks' Burst, in the ask and
+// the Gamemaster's window alike; the wand's, whose roll has none, by its item and activity, as before.
+count = asked().length
+const sparking = make(typed({ id: `fml-${++ids}`, kind: 'formula', item: 'sparks', activity: 'sparks-burst', dice: [{ faces: 6, results: [6] }] }))
+ask = await nextAsk(count)
+assert.deepEqual([ask.purpose, ask.again, ask.label, ask.rolls.map(roll => roll.terms)], ['again', 'explode', 'Wild Sparks: Burst', [[{ faces: 6, number: 1 }]]])
+assert.match(dialogs.at(-1).options.content, /SENDINGSTONE\.DiceAsk\.Waiting \{"name":"Thorin","label":"Wild Sparks: Burst","dice":"1d6"\}/)
+await make(answerOf(ask, [{ roll: 0, term: 0, results: [3] }]))
+const sparked = await sparking
+assert.deepEqual([sparked.status, sparked.rolls[0].total, asked().length - count, checks()], ['done', 9, 1, []], JSON.stringify(sparked))
+ok("since 0.45.0, a typed formula's die thrown again named by its roll's own name: Wild Sparks' 1d6x, typed 6, its die more asked as Wild Sparks: Burst, in the Gamemaster's window too, answered 3, the roll 9; the wand's, whose roll has no name, still Wand of Luck: Use")
 
 // A die thrown again in a roll asked: Wild Charm's 1d4x cost, answered 4, explodes; its next die is
 // asked as the cost's, purpose again, under the use's command, answered 2: 6 charges spent. (The

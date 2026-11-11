@@ -1708,7 +1708,7 @@ An ask:
 | `actorId` | The character it's asked of, its form's rolls among them, or a [companion](#companions)'s key. |
 | `of` | For a companion's, its character, as the typed roll's `of`; absent otherwise. |
 | `command` | The `id` of the typed roll it's asked for: the roll whose item's run makes it, or, for `"again"`, the roll whose die is thrown again. |
-| `label` | At most 200 characters, what rolls: the item's name, and its activity's after a colon where that's another, such as `"Ice Knife: Shard Explosion"`, or for `"again"` of a typed roll's own die, that roll's, such as `"Wand of Luck: Use"`; where there's no item, as for a check's die thrown again, the roll's flavor, or else its formula. |
+| `label` | At most 200 characters, what rolls: the item's name, and its activity's after a colon where that's another, such as `"Ice Knife: Shard Explosion"`, or for `"again"` of a typed roll's own die, that roll's, such as `"Wand of Luck: Use"`, and since module 0.45.0, of a typed `formula`'s own die where its utility's roll has a name of its own, the item's name and the roll's after a colon, such as `"Wild Sparks: Burst"`, as dnd5e's card's button names the roll; where there's no item, as for a check's die thrown again, the roll's flavor, or else its formula. |
 | `purpose` | `"damage"`, `"healing"`, `"formula"` (a utility's roll), `"cost"` (dice its use spends, such as `1d4` charges), `"bonus"` (a Midi-QOL bonus damage macro's formula), `"again"` (one die of a roll, thrown again) or `"other"`. |
 | `again` | For `"again"` only: `"explode"` or `"reroll"`, why the die is thrown again. Absent otherwise. |
 | `critical` | `true` for a critical hit's damage, its dice already counted as dnd5e throws them, twice over; else `false`. |
@@ -2385,6 +2385,12 @@ An ask:
   the flags and the hello's list, and its players' later dice are Foundry's computer dice in their
   item's run. A module before 0.44.0 says no `diceAsks`, so a listener sends no `dice` to it, and
   one handed it anyway is refused as a kind it doesn't know.
+- Module 0.45.0 names a typed `formula`'s own die thrown again by its roll, where the utility's roll
+  has a name of its own: the [dice ask](#dice-asks)'s `label`, and the Gamemaster's window with it,
+  is the item's name and the roll's, such as `"Wild Sparks: Burst"`, as dnd5e's card's button names
+  the roll, where before it was the item's and its activity's, `"Wild Sparks: Use"`. A roll with no
+  name, and every other ask, is labelled as before. Nothing else changes: a listener shows the
+  `label` as it did, and a module before 0.45.0 labels it as before.
 
 ## Changes from protocol 1
 

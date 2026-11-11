@@ -2,7 +2,7 @@ import { COST_CHECK, COST_SPENDING, DIE_FACES, EVENTS, MODULE_ID, ROLL_TAG, RUN_
 import { canSend, registerDiceAsks } from "./bridge.mjs";
 import { getCampaigns, manualDiceOn } from "./campaigns.mjs";
 import { summarizeRoll } from "./chat-data.mjs";
-import { failedResult, isId } from "./command-rolls.mjs";
+import { activityNamed, failedResult, isId } from "./command-rolls.mjs";
 import { commandActor } from "./creatures.mjs";
 import { costTargetClass, isOwnRoll, planAlive, registerLaterDice, withPlan, wrap } from "./dice-plan.mjs";
 import { isOpen } from "./midi-prompts.mjs";
@@ -214,7 +214,8 @@ let testAnswers = null;
  *                                    form or a companion, and the character.
  * @property {string|null} itemId     Its item's id, on that actor.
  * @property {string|null} itemName
- * @property {string} label           What its own roll rolls: its item's name, and its activity's.
+ * @property {string} label           What its own roll rolls: its item's name, and its activity's, or
+ *                                    since 0.45.0 a formula's roll's own name (`ownLabelOf`).
  * @property {boolean} window        Is it a kind whose item's later rolls are asked?
  * @property {boolean} running        Is the roll being made now?
  * @property {Set<object>} workflows  The Midi-QOL workflows it started or fed.
@@ -417,9 +418,30 @@ export function beginRun(command, campaign) {
     itemId: item?.id ?? null, itemName: (typeof item?.name === "string") ? item.name : null, label: "",
     window: RUN_KINDS.includes(command.kind), running: true, workflows: new Set(), openedAt: Date.now(), closed: false
   };
-  run.label = labelOf(activity, run);
+  run.label = ownLabelOf(command, item) || labelOf(activity, run);
   runs.set(run.commandId, run);
   return run;
+}
+
+/**
+ * What a typed formula's own roll is called, since 0.45.0, for its dice thrown again: its item's
+ * name and its roll's, such as "Wild Sparks: Burst", as dnd5e's card's button and the app's chip
+ * name it, where the utility's roll has a name of its own. Nothing for any other kind of roll, a
+ * roll with no name, or an activity that can't be found: `labelOf` names those, as before 0.45.0.
+ * @param {object} command
+ * @param {Item|null} item
+ * @returns {string}
+ */
+function ownLabelOf(command, item) {
+  if ( (command.kind !== "formula") || !item || (typeof item.name !== "string") ) return "";
+  let activity = null;
+  try {
+    activity = activityNamed(command, item);
+  } catch {
+    activity = null;
+  }
+  const name = (activity?.type === "utility") && (typeof activity.roll?.name === "string") ? activity.roll.name.trim() : "";
+  return (item.name && name) ? `${item.name}: ${name}`.slice(0, LONGEST.label) : "";
 }
 
 /**

@@ -180,7 +180,9 @@ while the roll is being made.
   with dnd5e's own Ice Knife's 1d10, another activity's damage Midi rolls once saves are checked,
   the dice a use spends (a cost of `1d4` charges), a Midi bonus damage macro's formula, such as
   Sneak Attack's, and a die of theirs Foundry throws again, an explosion or a reroll they didn't
-  keep at the table, one die at a time, where the die before it was theirs. It follows whatever the
+  keep at the table, one die at a time, where the die before it was theirs; since 0.45.0 a
+  utility's die thrown again is called by its roll's own name where it has one, as its card's button
+  calls it, such as "Wild Sparks: Burst", in the app and your window alike. It follows whatever the
   item's workflow rolls, homebrew included, from what dnd5e and Midi put on each roll, and a use's
   cost from the use's own spending, with no code for any item. The app asks on the device the
   player rolled from; while it waits, a small window on your screen says whose dice and how long is
