@@ -2422,12 +2422,13 @@ An ask:
   `label` as it did, and a module before 0.45.0 labels it as before. And where a world runs more than
   one campaign, it sends a campaign less of the others', with no new event, field or format: under
   `chatScope` `"all"`, a public message that [belongs only to other campaigns](#a-public-message-another-campaigns-alone)
-  as it's made is left out, and so are its edits; and a character's players `U`, whose NPCs are its [companions](#companions) and whose
-  ownership of one gives its sheet the Gamemaster's secrets, are the users who own it by their own
-  id, never through `default`, or where none does, the users it's assigned to as their character. A
-  listener reads both as before: a companion no longer listed leaves in `companions.listed`, as any
-  does, and a fight only it brought ends for the campaign, as when its last character leaves; the
-  first hello lists only the fights the campaign is in. A module before 0.45.0 sends as before.
+  as it's made is left out, and so are its edits; and a character's players `U`, whose NPCs are its
+  [companions](#companions) and whose ownership of one gives its sheet the Gamemaster's secrets, are
+  the users who own it by their own id, never through `default`, or where none does, the users it's
+  assigned to as their character. A listener reads both as before: a companion no longer listed
+  leaves in `companions.listed`, as any does, and a fight only it brought ends for the campaign, as
+  when its last character leaves; the first hello lists only the fights the campaign is in. A module
+  before 0.45.0 sends as before.
 
 ## Changes from protocol 1
 
