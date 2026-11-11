@@ -170,7 +170,7 @@ characters.
 
 | Event | Sent to |
 | --- | --- |
-| A chat message | Each campaign one of whose characters said it, or whose characters' players can read it. A public message reaches every campaign with characters. |
+| A chat message | Each campaign one of whose characters said it, or whose characters' players can read it. A public message reaches every campaign with characters, but since module 0.45.0 not one that [belongs only to other campaigns](#a-public-message-another-campaigns-alone). |
 | `chat.cleared` | Every campaign. |
 | A combat event | Each campaign with a character in the combat. |
 | `character.updated` | Each campaign the character is in. |
@@ -179,6 +179,25 @@ A campaign hears about a combat while any of its characters are in it. When the 
 joins, the combat arrives as **`combat.created` with its full snapshot**, which may already be
 under way. When the last of them leaves, the campaign is sent **`combat.ended`**: for that
 campaign, the fight is over.
+
+### A public message another campaign's alone
+
+Since module 0.45.0, under the chat scope *All its players can read* (`"all"`), a public message
+that belongs only to other campaigns is left out of a campaign. Such a message is one that none of
+the campaign's characters or [companions](#companions) said, and that:
+
+- was said by another campaign's character or companion, even in a fight both campaigns are in; or
+- was said by a combatant, matched by its speaker's token and scene, or for a linked actor by its
+  actor, that is in a fight another campaign is in and in no fight this campaign is in.
+
+A campaign is in a fight as it's told of one: one of its characters, or a companion of theirs it
+was listed, is among the combatants it may be told of ([Combatant](#combatant)). Every other public
+message still reaches every campaign with characters, such as the Gamemaster's narration, an NPC in
+no fight, or a card from a fight both campaigns are in, and a world with one campaign sees no change.
+An edit or deletion of such a message isn't sent to the campaign either, as for any message it may
+not see; one it was sent before is kept until the chat is cleared. Under *Its characters' messages
+only* (`"connected"`) nothing changes. Before 0.45.0 every public message reached every campaign with
+characters.
 
 ## Visibility
 
@@ -861,9 +880,12 @@ Its sheet: what any of its players may see of it, and nothing more, observers an
 
 Since module 0.36.0 a campaign's characters' companions are listed beside them, to a listener that
 reads them: the creatures each character summons, and the NPCs its player owns. For each campaign
-character `C` and its players `U` (its non-Gamemaster users with Owner), each condition read on the
-creature's **live actor**: a token's synthetic actor for an unlinked token, the world actor for a
-linked one or one with no token.
+character `C` and its players `U`, each condition read on the creature's **live actor**: a token's
+synthetic actor for an unlinked token, the world actor for a linked one or one with no token. Since
+module 0.45.0 `U` are the non-Gamemaster users whose own id has Owner in `C`'s `ownership`, never
+through `default`, and for a character no such user owns, the non-Gamemaster users it's assigned to
+as their character (User Configuration). Before 0.45.0 `U` were its non-Gamemaster users with Owner,
+through `default` too, so a character shared with *All Players: Owner* had every player's NPCs.
 
 1. **Summoned:** a token on the **active scene**, not hidden, whose live actor is an NPC, isn't
    transformed (`flags.dnd5e.isPolymorphed`), and has `flags.dnd5e.summon.origin` beginning
@@ -2390,7 +2412,15 @@ An ask:
   is the item's name and the roll's, such as `"Wild Sparks: Burst"`, as dnd5e's card's button names
   the roll, where before it was the item's and its activity's, `"Wild Sparks: Use"`. A roll with no
   name, and every other ask, is labelled as before. Nothing else changes: a listener shows the
-  `label` as it did, and a module before 0.45.0 labels it as before.
+  `label` as it did, and a module before 0.45.0 labels it as before. And where a world runs more than
+  one campaign, it sends a campaign less of the others', with no new event, field or format: under
+  `chatScope` `"all"`, a public message that [belongs only to other campaigns](#a-public-message-another-campaigns-alone)
+  is left out; and a character's players `U`, whose NPCs are its [companions](#companions) and whose
+  ownership of one gives its sheet the Gamemaster's secrets, are the users who own it by their own
+  id, never through `default`, or where none does, the users it's assigned to as their character. A
+  listener reads both as before: a companion no longer listed leaves in `companions.listed`, as any
+  does, and a fight only it brought ends for the campaign, as when its last character leaves; the
+  first hello lists only the fights the campaign is in. A module before 0.45.0 sends as before.
 
 ## Changes from protocol 1
 
