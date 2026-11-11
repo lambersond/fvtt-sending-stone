@@ -119,6 +119,9 @@ Edition, and an app that reads them.
 as a familiar from Find Familiar, while their tokens are on the active scene, whoever cast the
 spell; and the NPCs its player owns in Foundry (give the player Owner on the NPC by name, or on one
 placed token). A linked NPC shows always; an unlinked one while its token is on the active scene.
+Its player is a player you gave Owner on the character by name; since 0.45.0 a character shared with
+All Players as Owner isn't everyone's for this, so another campaign's sidekicks never show beside it,
+and where no player owns it by name, its player is the one it's assigned to in User Configuration.
 Players roll for them, attack and cast with them from the app, as for their character; summoning,
 dismissing and changing them stay in Foundry. A creature its player doesn't own in Foundry goes
 without its secrets, with its public biography. To take one from a player in the app, take their
@@ -1143,7 +1146,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-group.mjs` | A group's sheet: its members' names and portraits, its description, and its inventory without what items roll or are used through |
 | `scripts/sheet-slim.mjs` | A sheet in the smaller shape the app expands: actions by reference, defaults left out, and since 0.41.0 damage on its own's choices with only what isn't their row's own |
 | `scripts/character-sync.mjs` | Sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes, then each of the campaign's groups, again when it, its members' names or portraits, or its characters' ownership change, or one of its characters is deleted, and its removal when deleted, after the hello if one was on its way; withholding a sheet too large to post or a group's no player sees; sending again what was lost |
-| `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene, and the NPCs its players own by name, each read as its live actor, a token's synthetic actor for an unlinked token; their keys, the characters each is a companion of, and the creature a command names |
+| `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene, and the NPCs its players own by name, its players from 0.45.0 those who own it by name, else those it's assigned to, each read as its live actor, a token's synthetic actor for an unlinked token; their keys, the characters each is a companion of, and the creature a command names |
 | `scripts/creature-sync.mjs` | Sending each campaign's companions to an app that reads them: the list in its hello and in `companions.listed` when it changes, each companion's sheet in `companion.updated` after the hello and when it changes, without secrets where its players don't own it in Foundry; from 0.41.0, whether the app reads what the game asks of companions, and who left the list, for the prompts |
 | `scripts/chat.mjs` | Chat hooks |
 | `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack; whether an attack hit each target, who saved and whether a save or check succeeded, by the rules of `results.mjs`; dnd5e 6's typed messages, and their data without what players don't see; its content without what cards keep from players; the Gamemaster's rolls on Midi-QOL's cards trimmed as Midi shows them to players |

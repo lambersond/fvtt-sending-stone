@@ -213,6 +213,22 @@ export function playerOwners(actor) {
 }
 
 /**
+ * A character's players for its companions, since 0.45.0: the non-Gamemaster users whose own id has
+ * Owner in its ownership, never through `default`; for a character none owns so, the non-Gamemaster
+ * users it's assigned to as their character. A character shared with every player through its
+ * default, as a Gamemaster may share a party's sheets, is then no one's but its own player's, so
+ * another campaign's players' NPCs never become its companions.
+ * @param {Actor} actor
+ * @returns {User[]}
+ */
+export function companionPlayers(actor) {
+  const owner = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+  const players = game.users.filter(user => !user.isGM);
+  const named = players.filter(user => actor?.ownership?.[user.id] === owner);
+  return named.length ? named : players.filter(user => Boolean(actor?.id) && (user.character?.id === actor.id));
+}
+
+/**
  * A campaign's characters owned by any of the given users.
  * @param {Iterable<string>} userIds   Ids of the users who can see something.
  * @param {Campaign} campaign
