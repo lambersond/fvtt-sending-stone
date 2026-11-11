@@ -195,10 +195,16 @@ campaign is in a fight as it's told of one: one of its characters, or a companio
 listed, is among the combatants it may be told of ([Combatant](#combatant)). Every other public
 message still reaches every campaign with characters, such as the Gamemaster's narration, an NPC in
 no fight, or any card of a fight both campaigns are in, and a world with one campaign sees no change.
-An edit or deletion of such a message isn't sent to the campaign either, as for any message it may
-not see; one it was sent before is kept until the chat is cleared. Under *Its characters' messages
-only* (`"connected"`) nothing changes. Before 0.45.0 every public message reached every campaign with
-characters.
+
+Whether a message belongs only to other campaigns is decided as it's made, by the fights as they
+stand then, and its edits follow that, whatever fight has begun or ended since: an edit of such a
+message isn't sent to the campaign, as `chat.message.updated` is an upsert, and an edit of one it was
+sent is. Only for a campaign added since, or for a message made before the Gamemaster's browser
+began sending, is an edit read by the fights as they stand at the edit. A deletion is sent as before
+0.45.0, wherever the message may have gone: a public message's id tells nothing, and a listener
+deletes nothing it never held. A card a campaign was sent before 0.45.0 is kept until the chat is
+cleared. Under *Its characters' messages only* (`"connected"`) nothing changes. Before 0.45.0 every
+public message reached every campaign with characters.
 
 ## Visibility
 
@@ -2416,7 +2422,7 @@ An ask:
   `label` as it did, and a module before 0.45.0 labels it as before. And where a world runs more than
   one campaign, it sends a campaign less of the others', with no new event, field or format: under
   `chatScope` `"all"`, a public message that [belongs only to other campaigns](#a-public-message-another-campaigns-alone)
-  is left out; and a character's players `U`, whose NPCs are its [companions](#companions) and whose
+  as it's made is left out, and so are its edits; and a character's players `U`, whose NPCs are its [companions](#companions) and whose
   ownership of one gives its sheet the Gamemaster's secrets, are the users who own it by their own
   id, never through `default`, or where none does, the users it's assigned to as their character. A
   listener reads both as before: a companion no longer listed leaves in `companions.listed`, as any

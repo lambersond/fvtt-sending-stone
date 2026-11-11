@@ -1499,27 +1499,72 @@ if (MIDI) {
 
   // Public cards, under "All its players can read": Ashlands' alone, or every campaign's.
   const everyone = getCampaigns().map(campaign => campaign.id).sort()
-  const reach = async (speaker, fields = {}) => {
+  // The events of a type a message was sent in since `at`, and the campaigns they're for.
+  const copiesOf = (at, type, made) => since(at).filter(e => (e.type === type) && ((e.data.message?.id ?? e.data.id) === made.id))
+  const campaignsOf = copies => copies.map(e => e.campaign.id).sort()
+  const say = async (speaker, fields = {}) => {
     const at = app.events.length
     const made = await ChatMessage.create({ speaker, content: '<p>Cards.</p>', ...fields })
     await settle()
-    return since(at).filter(e => (e.type === 'chat.message.created') && (e.data.message.id === made.id)).map(e => e.campaign.id).sort()
+    return { made, copies: copiesOf(at, 'chat.message.created', made) }
   }
+  const reach = async (speaker, fields) => campaignsOf((await say(speaker, fields)).copies)
   assert.equal(settings.get('chatScope') ?? 'all', 'all')
   assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: orcToken.actor }), { flavor: 'Orc rolls for Initiative!' }), ['camp-a'], "the orc's initiative in Ashlands' fight")
   assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: thorin }), { author: 'alice' }), ['camp-a'], "Thorin's attack")
   assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: brakka }), { author: 'alice' }), ['camp-a'], "Brakka's, Ashlands' companion")
   assert.deepEqual(await reach({}, { content: '<p>Roll initiative!</p>' }), everyone, "the Gamemaster's narration")
-  assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: innkeeper })), everyone, 'an innkeeper in no fight')
+  const innkeepers = await say(ChatMessage.getSpeaker({ actor: innkeeper }))
+  assert.deepEqual(campaignsOf(innkeepers.copies), everyone, 'an innkeeper in no fight')
   // A fight both are in: Thorin, Orla and the ogre.
   from = app.events.length
   const sharedfight = combatOf('sharedfight', [{ id: 'cb-sf-thorin', actor: thorin }, { id: 'cb-sf-orla', actor: orla }, { id: 'cb-sf-ogre', actor: ogre }])
   await Hooks.callAll('createCombat', sharedfight, {}, 'gm')
   await settle()
   assert.deepEqual(['camp-a', 'camp-b'].map(id => ofType(since(from), 'combat.created', id).some(e => e.data.combat.id === 'sharedfight')), [true, true], 'both told of it')
-  assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: ogre })), ['camp-a', 'camp-b'], "the ogre's, in a fight both are in")
-  assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: orla })), ['camp-a', 'camp-b'], "Orla's, in a fight both are in")
-  ok("a public card that's another campaign's alone is left out: the orc's in Ashlands' fight, by its token, Thorin's and Brakka's reach Ashlands only; the Gamemaster's narration and an innkeeper in no fight reach every campaign; in a fight both are in, the ogre's, by its actor, and Orla's reach both, and no other")
+  const ogres = await say(ChatMessage.getSpeaker({ actor: ogre }))
+  assert.deepEqual(campaignsOf(ogres.copies), ['camp-a', 'camp-b'], "the ogre's, in a fight both are in")
+  const orlas = await say(ChatMessage.getSpeaker({ actor: orla }))
+  assert.deepEqual(orlas.copies.map(e => [e.campaign.id, e.data.message.character]).sort(), [['camp-a', null], ['camp-b', 'orla']], "Orla's, in a fight both are in, hers in Brightwater's copy alone")
+  ok("a public card that's another campaign's alone is left out: the orc's in Ashlands' fight, by its token, Thorin's and Brakka's reach Ashlands only; the Gamemaster's narration and an innkeeper in no fight reach every campaign; in a fight both are in, the ogre's, by its actor, and Orla's reach both, and no other, Orla named its speaker in Brightwater's alone")
+
+  // Whose a card is is read as it's made: its edits go where it went, whatever fight has begun or
+  // ended since, and a deletion goes to every campaign, as one never held deletes nothing; one made
+  // while this browser didn't send chat, as before it began sending, is read as the fights stand at
+  // its edit. A tavern brawl, Ashlands' alone: Thorin and the innkeeper.
+  const editTo = async ({ made }) => {
+    const at = app.events.length
+    await made.update({ content: '<p>Edited.</p>' })
+    await settle()
+    return campaignsOf(copiesOf(at, 'chat.message.updated', made))
+  }
+  const deleteTo = async ({ made }) => {
+    const at = app.events.length
+    await made.delete()
+    await Hooks.callAll('deleteChatMessage', made, {}, 'gm')
+    await settle()
+    return campaignsOf(copiesOf(at, 'chat.message.deleted', made))
+  }
+  const brawl = combatOf('brawl', [{ id: 'cb-br-thorin', actor: thorin }, { id: 'cb-br-innkeeper', actor: innkeeper }])
+  await Hooks.callAll('createCombat', brawl, {}, 'gm')
+  await settle()
+  const brawls = await say(ChatMessage.getSpeaker({ actor: innkeeper }))
+  assert.deepEqual(campaignsOf(brawls.copies), ['camp-a'], "the innkeeper's in the brawl")
+  assert.deepEqual(await editTo(innkeepers), everyone, "the innkeeper's from before the brawl, edited in it")
+  settings.set('chatEvents', false)
+  const unsent = await say(ChatMessage.getSpeaker({ actor: innkeeper }))
+  settings.set('chatEvents', true)
+  assert.deepEqual(await editTo(unsent), ['camp-a'], "the innkeeper's in the brawl, made while chat wasn't sent, edited in it")
+  for (const fight of [brawl, sharedfight]) {
+    game.combats.delete(fight.id)
+    await Hooks.callAll('deleteCombat', fight, {}, 'gm')
+  }
+  await settle()
+  assert.deepEqual(await editTo(brawls), ['camp-a'], "the innkeeper's from the brawl, edited once it's over")
+  assert.deepEqual(await editTo(ogres), ['camp-a', 'camp-b'], "the ogre's from the fight both were in, edited once it's over")
+  assert.deepEqual(await deleteTo(brawls), everyone, "the innkeeper's from the brawl, deleted")
+  assert.deepEqual(await deleteTo(orlas), everyone, "Orla's from the fight both were in, deleted once it's over")
+  ok("a card's edits go where it went as it was made: the innkeeper's from before Ashlands' brawl, edited in it, to every campaign; one made in the brawl while chat wasn't sent, edited in it, to Ashlands alone, as the fights stand; once the brawl and the fight both were in are over, the innkeeper's from the brawl edited to Ashlands alone, the ogre's to both; and a card's deletion to every campaign, the brawl's and Orla's alike")
 
   // Orla assigned to Carol in User Configuration: Carol's own sidekick is hers.
   from = app.events.length
@@ -1543,7 +1588,7 @@ if (MIDI) {
   assert.equal(ownedByPlayers(brakka, ['orla']), true, 'with her secrets')
   const taken = await send(skill({ actorId: 'brakka', of: 'orla' }), 'camp-b')
   assert.equal(taken.status, 'done', JSON.stringify(taken))
-  for (const fight of [ashfight, sharedfight]) game.combats.delete(fight.id)
+  game.combats.delete(ashfight.id)
   ok("Carol and Alice given Owner on Orla by their own ids: Alice's NPCs are Orla's too, beside Kestrel, Brakka with its secrets, taken as Orla's from Brightwater, and Ashlands' fight with Brakka in it reaches Brightwater")
 }
 

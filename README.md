@@ -104,8 +104,10 @@ involves its characters, described for it alone:
   messages: All its players can read**, not one that's another campaign's alone: said by another
   campaign's character or companion, or by a combatant in another campaign's fight, where none of
   this campaign's said it and its speaker is in none of this campaign's fights. Your narration, an
-  NPC in no fight, and every card of a fight both campaigns are in still reach both. A card a
-  campaign was sent before stays in its chat until you clear the chat.
+  NPC in no fight, and every card of a fight both campaigns are in still reach both. Whose a card
+  is is decided as it's made: its edits go where it went, even once its fight is over, and its
+  deletion to every campaign that may hold it. A card a campaign was sent before 0.45.0 stays in its
+  chat until you clear the chat.
 - **Combat:** encounters while any of its characters are in them. A fight reaches the campaign
   when its first character joins and ends for it when its last one leaves.
 - **Hit points and audiences** cover only its own characters.
@@ -1153,7 +1155,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/character-sync.mjs` | Sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes, then each of the campaign's groups, again when it, its members' names or portraits, or its characters' ownership change, or one of its characters is deleted, and its removal when deleted, after the hello if one was on its way; withholding a sheet too large to post or a group's no player sees; sending again what was lost |
 | `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene, and the NPCs its players own by name, its players from 0.45.0 those who own it by name, else those it's assigned to, each read as its live actor, a token's synthetic actor for an unlinked token; their keys, the characters each is a companion of, and the creature a command names |
 | `scripts/creature-sync.mjs` | Sending each campaign's companions to an app that reads them: the list in its hello and in `companions.listed` when it changes, each companion's sheet in `companion.updated` after the hello and when it changes, without secrets where its players don't own it in Foundry; from 0.41.0, whether the app reads what the game asks of companions, and who left the list, for the prompts |
-| `scripts/chat.mjs` | Chat hooks, and which campaigns a message belongs to: from 0.45.0, not a public one that's another campaign's alone |
+| `scripts/chat.mjs` | Chat hooks, and which campaigns a message belongs to: from 0.45.0, not a public one that's another campaign's alone as it's made, nor its edits |
 | `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack; whether an attack hit each target, who saved and whether a save or check succeeded, by the rules of `results.mjs`; dnd5e 6's typed messages, and their data without what players don't see; its content without what cards keep from players; the Gamemaster's rolls on Midi-QOL's cards trimmed as Midi shows them to players |
 | `scripts/results.mjs` | The rules of what players see of chat results, as dnd5e and Midi-QOL show them, or always where the Gamemaster has players told so, read once per message, and the verdict on them that Manage Campaigns and the app show |
 | `scripts/foundry-settings.mjs` | A campaign's Foundry settings for its Gamemaster in the app: versions, its switches, the visibility settings that decide chat results and the verdict; sent again when one changes or a listed group is renamed or deleted, and after a hello if they changed while it was on its way |
