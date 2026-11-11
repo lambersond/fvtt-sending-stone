@@ -729,7 +729,7 @@ function holdsSecret(html) {
 
 /**
  * HTML without its secret sections, and what they hold; the same string where it holds none. Since
- * 0.45.0 Tidy 5e Sheets' journal is sent without them by the same rule (tidy-journal.mjs).
+ * 0.44.0 Tidy 5e Sheets' journal is sent without them by the same rule (tidy-journal.mjs).
  * @param {string} html
  * @returns {string}
  */
@@ -1190,7 +1190,7 @@ function changedFlag(entry) {
 
 /**
  * Text cut to at most this many characters, never through a character written as two, and whether
- * it was cut. Since 0.45.0 Tidy 5e Sheets' journal is cut by it too (tidy-journal.mjs).
+ * it was cut. Since 0.44.0 Tidy 5e Sheets' journal is cut by it too (tidy-journal.mjs).
  * @param {string} text
  * @param {number} most
  * @returns {[string, boolean]}

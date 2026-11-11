@@ -234,7 +234,7 @@ export async function runItemDamageCommand(command, campaign) {
 
   // What using it would spend, worked out without spending it, as dnd5e's use works it out: never
   // the action itself; its other consumption as dnd5e fills it in, a target spent only in a fight
-  // left out of one; and concentration begun, at the limit the one dnd5e names ended. Since 0.45.0
+  // left out of one; and concentration begun, at the limit the one dnd5e names ended. Since 0.44.0
   // its spending names the roll it's made for, so that a typed roll's run's dice costs are told by
   // it (later-dice.mjs), and a dice cost rolled for this check, thrown away, is Foundry's computer
   // dice, asked of no one.
@@ -397,7 +397,7 @@ async function spend({ actor, character, item, activity, usage, ammunition, thro
   let concentrating = false;
   let again = null;
   try {
-    // Since 0.45.0 a dice cost rolled for this, thrown away, is Foundry's computer dice, asked of no one.
+    // Since 0.44.0 a dice cost rolled for this, thrown away, is Foundry's computer dice, asked of no one.
     again = await costCheck(usage, () => activity._prepareUsageUpdates(usage, { returnErrors: true }));
   } catch {
     again = null;

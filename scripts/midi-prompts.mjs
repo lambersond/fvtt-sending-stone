@@ -283,7 +283,7 @@ export function noteOpen(campaignId, open) {
 
 /**
  * Is a character open in a campaign's app: listed by a fetch answered within the last 45 seconds?
- * Since 0.45.0 the dice asked of a player typing theirs wait on it too (later-dice.mjs).
+ * Since 0.44.0 the dice asked of a player typing theirs wait on it too (later-dice.mjs).
  * @param {string} campaignId
  * @param {string} actorId
  * @returns {boolean}

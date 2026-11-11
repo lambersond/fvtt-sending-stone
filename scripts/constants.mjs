@@ -82,7 +82,7 @@ export const SETTINGS = Object.freeze({
    *  the app (see midi-prompts.mjs). Never shown: only tests shorten it. */
   MIDI_PROMPT_WAIT: "midiPromptWait",
 
-  /** World-scope wait, in milliseconds, since 0.45.0, before Foundry's computer dice roll the dice
+  /** World-scope wait, in milliseconds, since 0.44.0, before Foundry's computer dice roll the dice
    *  asked of a player typing theirs (see later-dice.mjs). Never shown: only tests shorten it. */
   DICE_ASK_WAIT: "diceAskWait",
 
@@ -170,7 +170,7 @@ export const EVENTS = Object.freeze({
   JOURNAL_UPDATED: "journal.updated",
 
   /** The journal Tidy 5e Sheets keeps on one of a campaign's characters, whole, read only, since
-   *  0.45.0: sent only to an app that says it reads it, `features.notes` 3 or more. */
+   *  0.44.0: sent only to an app that says it reads it, `features.notes` 3 or more. */
   JOURNAL_TIDY: "journal.tidy",
 
   /** The campaign's characters' companions, whole, since 0.36.0: sent only to an app that says it
@@ -209,11 +209,11 @@ export const EVENTS = Object.freeze({
    *  the app, its card was deleted, or it was left too long. */
   PROMPT_CLOSED: "roll.prompt.closed",
 
-  /** Since 0.45.0, a roll in the run of a player's typed roll waits for its dice, or a die of it
+  /** Since 0.44.0, a roll in the run of a player's typed roll waits for its dice, or a die of it
    *  thrown again for its value: asked of an app that reads them (later-dice.mjs). */
   DICE_ASKED: "roll.dice.asked",
 
-  /** Since 0.45.0, such an ask no longer waits: answered or skipped from the app, rolled by the
+  /** Since 0.44.0, such an ask no longer waits: answered or skipped from the app, rolled by the
    *  Gamemaster, left past its wait, or called off. */
   DICE_CLOSED: "roll.dice.closed",
 
@@ -499,7 +499,7 @@ export const COMPANION_UNTAKEN = Object.freeze([
 export const ALONE_KINDS = Object.freeze(["itemDamage", "recharge"]);
 
 /**
- * The kinds of a player's typed roll whose item's later rolls are asked of them, since 0.45.0: its
+ * The kinds of a player's typed roll whose item's later rolls are asked of them, since 0.44.0: its
  * run (later-dice.mjs). A die of any typed roll's thrown again is asked too.
  * @type {readonly string[]}
  */
@@ -508,7 +508,7 @@ export const RUN_KINDS = Object.freeze([
 ]);
 
 /**
- * The answer to a dice ask, since 0.45.0, last among the kinds wherever its players are asked for
+ * The answer to a dice ask, since 0.44.0, last among the kinds wherever its players are asked for
  * their later dice: not a roll of its own.
  * @type {readonly string[]}
  */
@@ -567,28 +567,28 @@ export const NOTE_ID = /^[A-Za-z0-9]{16}$/;
 /** The listener's notes format, `features.notes`, from which it's told who changed a journal in Foundry (`journal.changed`), since 0.35.0. */
 export const NOTES_CHANGES = 2;
 
-/** The listener's notes format from which it's sent Tidy 5e Sheets' journal (`journal.tidy`), since 0.45.0. */
+/** The listener's notes format from which it's sent Tidy 5e Sheets' journal (`journal.tidy`), since 0.44.0. */
 export const NOTES_TIDY = 3;
 
 /**
- * Tidy 5e Sheets' id, the scope of its flags: its Actions tab's sections, and since 0.45.0 the
+ * Tidy 5e Sheets' id, the scope of its flags: its Actions tab's sections, and since 0.44.0 the
  * journal it keeps on a character.
  * @type {string}
  */
 export const TIDY = "tidy5e-sheet";
 
-/** A Tidy journal entry's key in its flag, as the app takes one, since 0.45.0: Tidy makes 16 letters and digits. */
+/** A Tidy journal entry's key in its flag, as the app takes one, since 0.44.0: Tidy makes 16 letters and digits. */
 export const TIDY_ID = /^[A-Za-z0-9]{1,64}$/;
 
 /**
- * The boxes of Tidy's Classic sheet's Journal tab, in its order, since 0.45.0: Persons of Interest,
+ * The boxes of Tidy's Classic sheet's Journal tab, in its order, since 0.44.0: Persons of Interest,
  * Locations of Interest, Quests and Miscellaneous, each `{name, value}`, then Journal Entries,
  * `{value}`.
  * @type {readonly string[]}
  */
 export const TIDY_CLASSIC = Object.freeze(["notes1", "notes2", "notes3", "notes4", "notes"]);
 
-/** The most entries a character's Tidy journal is sent with, since 0.45.0: past it, it's withheld. */
+/** The most entries a character's Tidy journal is sent with, since 0.44.0: past it, it's withheld. */
 export const MOST_TIDY_ENTRIES = 400;
 
 /**
@@ -645,7 +645,7 @@ export const ROLL_TAG = "sendingStone";
 export const CRITICAL_AS_DND5E = "sendingStoneCritical";
 
 /**
- * The key of a use's configuration marking, since 0.45.0, a check of what the use would spend,
+ * The key of a use's configuration marking, since 0.44.0, a check of what the use would spend,
  * worked out and thrown away, the module's own or Midi-QOL's of a use the module hands it until
  * dnd5e begins spending it: a dice cost dnd5e rolls for it is Foundry's computer dice, never asked
  * of anyone (dice-plan.mjs's `costCheck` and `checkedUntilSpent`).
@@ -654,7 +654,7 @@ export const CRITICAL_AS_DND5E = "sendingStoneCritical";
 export const COST_CHECK = "sendingStoneCheck";
 
 /**
- * The key of a use's configuration naming, since 0.45.0, the run whose spending dnd5e is working
+ * The key of a use's configuration naming, since 0.44.0, the run whose spending dnd5e is working
  * out, from `dnd5e.preActivityConsumption` until `dnd5e.activityConsumption`: a dice cost it rolls
  * is asked as that run's (later-dice.mjs). dnd5e passes it on to a linked activity's spending.
  * @type {string}

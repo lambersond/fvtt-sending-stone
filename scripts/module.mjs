@@ -55,7 +55,7 @@ Hooks.once("ready", async () => {
     if ( game.system.id === "dnd5e" ) {
       installDicePlans();
       installMidiPrompts();
-      // Since 0.45.0, after the dice plans, whose hooks it follows: under dnd5e 5 alone.
+      // Since 0.44.0, after the dice plans, whose hooks it follows: under dnd5e 5 alone.
       installLaterDice();
     }
     await selfTest();

@@ -516,7 +516,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   }
 
   /**
-   * The Modules section: the author's own modules, those Sending Stone works with, since 0.45.0 Tidy
+   * The Modules section: the author's own modules, those Sending Stone works with, since 0.44.0 Tidy
    * 5e Sheets among them, and the system it needs.
    * @returns {object}
    */
@@ -543,7 +543,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     const wrapper = module("lib-wrapper", "LibWrapper", "fa-solid fa-link");
     // libWrapper is only recommended, so not having it isn't a fault.
     if ( wrapper.state !== "active" ) Object.assign(wrapper, { stateLabel: label("recommended"), tone: "warning" });
-    // Since 0.45.0 players read their characters' Tidy journals in the app; not having Tidy is no
+    // Since 0.44.0 players read their characters' Tidy journals in the app; not having Tidy is no
     // fault either, so it's never more than the neutral tone.
     const tidy = module(TIDY, "Tidy", "fa-solid fa-book-open");
     const dnd5e = game.system.id === "dnd5e";

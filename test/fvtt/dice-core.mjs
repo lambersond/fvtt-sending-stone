@@ -7,7 +7,7 @@
 // have the min modifier do nothing, or roll rerolls and explosions as first throws; and since module
 // 0.42.0 have a die keep applying modifiers it was given and has had taken off, a parser make a
 // lone negative die after `+` a die within parentheses, or a roll throw copies of the dice it adds;
-// and since module 0.45.0 have a die not wait for a value its fulfillment promises.
+// and since module 0.44.0 have a die not wait for a value its fulfillment promises.
 
 export const core = {
   /** Leave `_root` off a roll's own dice, as Foundry might. */
@@ -39,7 +39,7 @@ export const core = {
    */
   freshTerms: false,
   /**
-   * Since module 0.45.0: a die doesn't wait for a value its `_roll` promises, taking the promise as
+   * Since module 0.44.0: a die doesn't wait for a value its `_roll` promises, taking the promise as
    * no value and throwing a random face, as a core whose `roll` didn't await it would [core,
    * unverified: Foundry v14's DiceTerm#_roll is documented to return a Promise].
    */

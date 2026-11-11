@@ -316,7 +316,7 @@ function sendGroups(campaign) {
  * one that was answered. Then its groups, and since the hello was built when it was queued, the
  * removal of any group it listed that has been deleted since; since 0.36.0 its companions, to an
  * app that reads them, as creature-sync.mjs sends them; and since 0.34.0, every journal of notes the
- * campaign has, to an app that reads them; since 0.45.0, after them, its characters' Tidy 5e Sheets
+ * campaign has, to an app that reads them; since 0.44.0, after them, its characters' Tidy 5e Sheets
  * journals, to an app that reads them (tidy-journal.mjs); and since 0.38.0, every decided dish of the
  * last 30 days, to an app that takes them (dish-card.mjs).
  * @param {string} campaignId
@@ -362,7 +362,7 @@ function removedSince(campaign, hello) {
  * slim sheets, says so no longer, or takes larger posts than before, which a sheet withheld as too
  * large may now fit in. Not while a hello is on its way, which they follow anyway. Since 0.34.0 its
  * journals of notes too, which a larger post may now take; since 0.36.0 its companions' sheets; and
- * since 0.45.0 its characters' Tidy 5e Sheets journals, as its books.
+ * since 0.44.0 its characters' Tidy 5e Sheets journals, as its books.
  * @param {string} campaignId
  * @returns {void}
  */
@@ -578,7 +578,7 @@ function warnTooLarge(campaign, { id, name }, bytes, limit) {
  * descriptions, which go again with the next sheet that refers to them. Since 0.30.0 a group as a
  * character; and a group's removal, or what the world's settings are, as the hello, which says both
  * again; and since 0.34.0 a journal of notes, as the hello, which every journal follows, and since
- * 0.45.0 a Tidy 5e Sheets journal likewise. Since
+ * 0.44.0 a Tidy 5e Sheets journal likewise. Since
  * 0.36.0 a campaign's companions' list, which is taken as untold and compared again; and a
  * companion's sheet, as a character's. Since 0.38.0 a dish's decision, by its card, which it's built
  * from again when due; a deleted card's with the event itself, its card being gone. What the app

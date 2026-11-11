@@ -1,4 +1,4 @@
-// A stand-in for what Tidy 5e Sheets keeps on a character and how it writes it (module 0.45.0), and
+// A stand-in for what Tidy 5e Sheets keeps on a character and how it writes it (module 0.44.0), and
 // for as much of Foundry 14's actor update as those writes need. Tidy's side is from its source, read
 // and never run (v13.10.5 and v14.4.1, src/features/journal/JournalQuadrone.svelte.ts and
 // src/foundry/TidyFlags.ts, TidyFlags.types.ts): the current sheet's journal in

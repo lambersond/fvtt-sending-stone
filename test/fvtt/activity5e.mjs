@@ -1455,7 +1455,7 @@ export class ConsumptionError extends Error {}
  * An activity's consumption target, as dnd5e's ConsumptionTargetData, for item uses and the
  * activity's own only (consumption-targets-field.mjs, consumeItemUses and consumeActivityUses): its
  * value of the uses per use, more for each level of scaling where it scales by amount. Since module
- * 0.45.0 exported, as a harness may hand it to the module as dnd5e's
+ * 0.44.0 exported, as a harness may hand it to the module as dnd5e's
  * (`dnd5e.dataModels.activity.ConsumptionTargetData`), whose `resolveCost` it wraps; and its cost
  * rolled as dnd5e rolls it, by `resolveCost` itself unless told not to evaluate it.
  */
@@ -1473,7 +1473,7 @@ export class ConsumptionTarget {
 
   /**
    * consumption-targets-field.mjs:743-773: its formula's dice and numbers grown by the scaling, or
-   * the scaling formula, multiplied by it, added; since module 0.45.0 a BasicRoll, where dnd5e's
+   * the scaling formula, multiplied by it, added; since module 0.44.0 a BasicRoll, where dnd5e's
    * is loaded, carrying what it spends from in its options, `delta`, as dnd5e's does; evaluated,
    * a Promise of it, unless `evaluate` is false, and kept among the use's `rolls` where it throws dice.
    */

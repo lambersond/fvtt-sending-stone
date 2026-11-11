@@ -153,7 +153,7 @@ export async function midiEnchantNow(command, campaign, actor, use) {
       ...(prepared.concentration ? { concentration: { begin: true, end: prepared.concentration.end ?? null } } : {}),
       midiOptions: { targetsToUse: new Set(), configureDialog: false, workflowOptions }
     };
-    // Since 0.45.0 Midi's own check of what it would spend, worked out from it and thrown away
+    // Since 0.44.0 Midi's own check of what it would spend, worked out from it and thrown away
     // before dnd5e spends it, is Foundry's computer dice, as the module's own check is (dice-plan.mjs).
     const results = await activity.use(checkedUntilSpent(midiUsage), { configure: false }, {
       rollMode: PUBLIC,

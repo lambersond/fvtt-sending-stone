@@ -1,4 +1,4 @@
-// The dice the game rolls later, asked of a player typing in theirs (module 0.45.0, PROTOCOL.md's
+// The dice the game rolls later, asked of a player typing in theirs (module 0.44.0, PROTOCOL.md's
 // "Dice the game rolls later"): the real module; dnd5e 5.3.3's real dice classes, or 6.0.5's with
 // DND5E6=1; dnd5e's items, activities and consumption ported (activity5e.mjs), its consumption
 // targets handed to the module as dnd5e's ConsumptionTargetData, whose resolveCost it wraps; with MIDI=1,
@@ -98,7 +98,7 @@ globalThis.dnd5e = {
   settings: { rulesVersion: 'modern' },
   dice: { DamageRoll },
   documents: { activity: { AttackActivity, SaveActivity, DamageActivity, HealActivity } },
-  // dnd5e's consumption targets, whose resolveCost the module wraps (module 0.45.0).
+  // dnd5e's consumption targets, whose resolveCost the module wraps (module 0.44.0).
   dataModels: { activity: { ConsumptionTargetData: ConsumptionTarget } },
   registry: {
     messages: {
@@ -374,7 +374,7 @@ assert.equal(diceStatus.ready, true, `self-test: ${diceStatus.error}`)
 assert.equal(diceStatus.attacks, true, `attack self-test: ${diceStatus.attacksError}`)
 const helloOf = id => app.events.filter(e => (e.type === 'bridge.hello') && (e.campaign.id === id)).at(-1)
 const rollsOf = id => helloOf(id).data.features.rolls
-// Neither self-test asks the Gamemaster's manual dice at start-up: since module 0.45.0 not even
+// Neither self-test asks the Gamemaster's manual dice at start-up: since module 0.44.0 not even
 // dice-plan.mjs's roll made earlier, which it throws away (bugs-found.md, 049-typed-mod fix 3).
 assert.deepEqual(prompts.splice(0), [], "the self-tests never ask the Gamemaster's manual dice")
 
@@ -398,7 +398,7 @@ if (DND5E6) {
     assert.equal(workflow.otherDamageRolls?.length, 1, 'the 2d6 rolled with it')
     assert.equal(workflow.otherDamageRolls[0].dice[0].number, 2)
   }
-  // The Gamemaster configured manual dice for their own rolls: the cost is theirs, as before 0.45.0,
+  // The Gamemaster configured manual dice for their own rolls: the cost is theirs, as before 0.44.0,
   // but the module's own check of it beforehand, thrown away, is Foundry's computer dice.
   core.interactive = true
   prompts.splice(0)
@@ -415,15 +415,15 @@ if (BREAK_ASK) {
   assert.deepEqual([later.laterDiceStatus.ready, later.laterDiceStatus.reason], [false, 'self-test'])
   assert.match(later.laterDiceStatus.error, /1d6x, its dice given, threw/)
   assert.deepEqual([rollsOf('camp-a').diceAsks, rollsOf('camp-a').diceAsksReason, rollsOf('camp-a').kinds.includes('dice')], [false, 'self-test', false])
-  // The Gamemaster configured manual dice for their own rolls: the cost is rolled as before 0.45.0,
+  // The Gamemaster configured manual dice for their own rolls: the cost is rolled as before 0.44.0,
   // with their dice; the module's own check of it beforehand, thrown away, Foundry's computer dice.
   core.interactive = true
   prompts.splice(0)
   const charm = await make(typed({ id: `use-${++ids}`, kind: 'use', item: 'charm', activity: 'charm-zap', targets: [], slot: null }))
   assert.equal(charm.status, 'done', JSON.stringify(charm))
   assert.deepEqual([asked(), prompts.splice(0), dialogs.length, MIDI && (midi.consumeChecks.at(-1) === 'charm-zap')], [[], ['0 + 1d4'], 0, MIDI],
-    "nothing asked; the cost the Gamemaster's manual dice, as before 0.45.0, never its checks")
-  ok(`a core whose die doesn't wait for its fulfillment${MIDI ? ', with Midi-QOL' : ''}: the self-test fails (${later.laterDiceStatus.error}), features.rolls.diceAsks false, diceAsksReason "self-test", no "dice" kind; a typed use's dice cost rolled as before 0.45.0, with the Gamemaster's own manual dice, its check beforehand${MIDI ? ", and Midi-QOL's own as its use began," : ''} Foundry's computer dice, nothing asked, no window`)
+    "nothing asked; the cost the Gamemaster's manual dice, as before 0.44.0, never its checks")
+  ok(`a core whose die doesn't wait for its fulfillment${MIDI ? ', with Midi-QOL' : ''}: the self-test fails (${later.laterDiceStatus.error}), features.rolls.diceAsks false, diceAsksReason "self-test", no "dice" kind; a typed use's dice cost rolled as before 0.44.0, with the Gamemaster's own manual dice, its check beforehand${MIDI ? ", and Midi-QOL's own as its use began," : ''} Foundry's computer dice, nothing asked, no window`)
   process.exit(0)
 }
 
@@ -436,7 +436,7 @@ assert.deepEqual(helloOf('camp-a').data.diceAsks, [], 'none open')
 ok(`the hello: features.rolls.diceAsks true and diceAsksReason null, last after keptRerolls; "dice" last among the rolls' and companions' kinds; diceAsks [] while none is open; the self-test passed${process.env.LIBWRAPPER ? ', wrapping through libWrapper' : ''}; neither self-test asked the Gamemaster's manual dice at start-up`)
 
 // The Gamemaster configured manual dice for their own rolls: none of the player's is ever asked of them,
-// nor, since module 0.45.0, the module's own check of what a use spends, beforehand, which it throws
+// nor, since module 0.44.0, the module's own check of what a use spends, beforehand, which it throws
 // away (ROADMAP item 22): Foundry's computer dice.
 core.interactive = true
 /** The Gamemaster's manual dice asked since last looked at: none of a typed use's. */
@@ -666,7 +666,7 @@ for (const fields of [{ typed: false }, { by: 'gm' }]) {
     `${JSON.stringify(fields)}: the cost the Gamemaster's manual dice, as before; its checks beforehand Foundry's computer dice`)
 }
 assert.equal(asked().length, count, 'nothing asked')
-ok(`an untyped use, and the Gamemaster's own from the app: no run, nothing asked, the cost rolled by the Gamemaster's own manual dice once, as before 0.45.0; the module's own check of it beforehand${MIDI ? ", and Midi-QOL's own as its use began," : ''} Foundry's computer dice`)
+ok(`an untyped use, and the Gamemaster's own from the app: no run, nothing asked, the cost rolled by the Gamemaster's own manual dice once, as before 0.44.0; the module's own check of it beforehand${MIDI ? ", and Midi-QOL's own as its use began," : ''} Foundry's computer dice`)
 
 // Rolls of the cost's formula made as dnd5e begins spending, which aren't the use's own spending: a
 // plain roll, a BasicRoll without its delta, and one built just as dnd5e builds a cost, delta and
@@ -838,7 +838,7 @@ ok("a die thrown again: a typed 1d6x's 6 explodes and each die after is asked on
 // A die thrown again in a roll asked: Wild Charm's 1d4x cost, answered 4, explodes; its next die is
 // asked as the cost's, purpose again, under the use's command, answered 2: 6 charges spent. (The
 // module's own check of the cost beforehand is Foundry's computer dice, which the Gamemaster's manual
-// dice, answering the stand-in's highest face, would have exploded for ever before 0.45.0.)
+// dice, answering the stand-in's highest face, would have exploded for ever before 0.44.0.)
 count = asked().length
 using = make(typed({ id: `use-${++ids}`, kind: 'use', item: 'wild-charm', activity: 'wild-zap', targets: [], slot: null }))
 ask = await nextAsk(count)
@@ -1216,7 +1216,7 @@ ok("damage Midi-QOL averages for characters: a typed Ice Knife attack's workflow
 
 // A typed attack's damage that opens no run, the Gamemaster's from the app or the player's own
 // untyped one, thrown with the app's 3D dice: the workflow leaves the attack's run, so Shard
-// Explosion's 2d6, rolled within that damage, is Foundry's computer dice, as before 0.45.0: never
+// Explosion's 2d6, rolled within that damage, is Foundry's computer dice, as before 0.44.0: never
 // asked, nor the Gamemaster's manual dice.
 for (const fields of [{ by: 'gm', typed: false }, { typed: false }]) {
   checks()
@@ -1229,7 +1229,7 @@ for (const fields of [{ by: 'gm', typed: false }, { typed: false }]) {
     ['done', 'done', 0, [[7]], 2], JSON.stringify(fields))
   assert.deepEqual(checks(), [], `${JSON.stringify(fields)}: never the Gamemaster's manual dice`)
 }
-ok("a typed Ice Knife attack's damage that opens no run, the Gamemaster's from the app (by gm) or the player's own untyped one: its 1d10 the app's 7, Shard Explosion's 2d6 Foundry's computer dice within it, as before 0.45.0, never asked")
+ok("a typed Ice Knife attack's damage that opens no run, the Gamemaster's from the app (by gm) or the player's own untyped one: its 1d10 the app's 7, Shard Explosion's 2d6 Foundry's computer dice within it, as before 0.44.0, never asked")
 
 // The Gamemaster rolls a typed attack's damage in Foundry, from Midi's card, with a click: theirs,
 // the 1d10 and Shard Explosion's 2d6 their own dice, never asked; the workflow leaves the run.

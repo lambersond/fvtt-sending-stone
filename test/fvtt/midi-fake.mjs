@@ -10,7 +10,7 @@
 // rolls written late, getDamageConfig's side effects, the damage dialog forced for a choice of
 // types, deferred concentration and placeable hit targets. Its rolls are tagged as Midi tags them
 // (Workflow.ts:7590-7760) and written on its card as displayDamageRolls writes them, every roll in
-// chatRolls' order, through an update of the card (module 0.28.0). Since module 0.45.0, modelled on
+// chatRolls' order, through an update of the card (module 0.28.0). Since module 0.44.0, modelled on
 // Midi's v14 source (GitLab 2ac2f66) for the module's later dice: an attack activity paired with its
 // item's one other activity (MidiActivityMixin.ts:2264-2294), whose damage is rolled with the item's
 // through dnd5e's rollDamage with a copy of the damage call's settings, its workflow and tag among
@@ -49,11 +49,11 @@ export const midi = {
     // Workflow.ts:2308-2315: whether a workflow waits, its damage rolled, for the Gamemaster to
     // confirm it, at Midi's own default, which waits for none.
     confirmAttackDamage: 'none',
-    // Since module 0.45.0: whether an attack activity whose own pairing is unset is paired with its
+    // Since module 0.44.0: whether an attack activity whose own pairing is unset is paired with its
     // item's one other activity. Midi's own default is "auto" (settings.ts:150); the stand-in's is
-    // "none", so that the harnesses before 0.45.0 roll as they did; later-dice.mjs sets "auto".
+    // "none", so that the harnesses before the later dice roll as they did; later-dice.mjs sets "auto".
     defaultOtherActivity: 'none',
-    // Since module 0.45.0: whether a Gamemaster's use spends what it uses without its dialog, where
+    // Since module 0.44.0: whether a Gamemaster's use spends what it uses without its dialog, where
     // the workflow's options don't say (utils.ts:4421-4424), at Midi's own default (settings.ts:191).
     gmConsumeResource: 'none',
   },
@@ -108,30 +108,30 @@ export const midi = {
   bonusDamage: null,
   /** Other damage each workflow rolls with its damage, as a poisoned blade's on a failed save: [{ formula, type }], or none. */
   otherDamage: null,
-  /** Since module 0.45.0, each other activity whose deferred cost was spent, by its id, in order. */
+  /** Since module 0.44.0, each other activity whose deferred cost was spent, by its id, in order. */
   otherConsumed: [],
   /**
-   * Since module 0.45.0, each activity whose use Midi checked before dnd5e spent it, as its
+   * Since module 0.44.0, each activity whose use Midi checked before dnd5e spent it, as its
    * checkAutoConsume does, working out what it would spend and throwing that away, by its id, in order.
    */
   consumeChecks: [],
   /**
-   * Since module 0.45.0: called with each bonus damage entry's index, and the workflow, just before
+   * Since module 0.44.0: called with each bonus damage entry's index, and the workflow, just before
    * rollBonusDamage builds its roll, where nothing of Midi's own runs: a roll a test makes then stands
    * for another client's or module's, made in that instant. None by default.
    */
   beforeBonusRoll: null,
   /**
-   * Since module 0.45.0: called with the workflow, and awaited, as it finishes its roll
+   * Since module 0.44.0: called with the workflow, and awaited, as it finishes its roll
    * (Workflow.ts:3202, WorkflowState_RollFinished), where Midi calls the item's postActiveEffects
    * macros (3416-3420): a homebrew macro may roll more of the item's dice in the workflow then. None
    * by default.
    */
   postActiveEffects: null,
   /**
-   * Since module 0.45.0: whether an attack's loaded ammunition's own activity is rolled with its
+   * Since module 0.44.0: whether an attack's loaded ammunition's own activity is rolled with its
    * damage, as Midi's other damage is (MidiActivityMixin.ts:170-177, 1085, 1157-1158, 2258-2262).
-   * Midi always does; off by default, so that the harnesses before 0.45.0, whose arrows carry
+   * Midi always does; off by default, so that the harnesses before the later dice, whose arrows carry
    * activities of their own, roll as they did; later-dice.mjs turns it on.
    */
   ammunitionActivities: false,
@@ -208,7 +208,7 @@ function setTargets(ids) {
 const hasArea = activity => !!activity.target?.template?.type
 
 /**
- * Since module 0.45.0, utils.ts:28-40, labels aside: a damage type as Midi reads it, no type at all
+ * Since module 0.44.0, utils.ts:28-40, labels aside: a damage type as Midi reads it, no type at all
  * being "none", one of dnd5e's damage or healing types itself, any other none.
  */
 function damageTypeOf(name) {
@@ -218,7 +218,7 @@ function damageTypeOf(name) {
 }
 
 /**
- * Since module 0.45.0, utils.ts:4421-4424 and MidiActivityMixin.ts:920-947, activity overrides
+ * Since module 0.44.0, utils.ts:4421-4424 and MidiActivityMixin.ts:920-947, activity overrides
  * aside: does a use spend what it uses without its dialog, by its workflow's own option, else the
  * Gamemaster's setting?
  */
@@ -236,7 +236,7 @@ class Workflow {
 
   constructor(actor, activity, { workflowOptions = {} } = {}) {
     Object.assign(this, { actor, activity, id: activity.uuid })
-    // Workflow.ts: the other damage put off until consumption is checked (module 0.45.0).
+    // Workflow.ts: the other damage put off until consumption is checked (module 0.44.0).
     this.otherDamageConfig = undefined
     this.otherDamageDialog = undefined
     this.rollOptions = {}
@@ -278,7 +278,7 @@ class Workflow {
   /** The workflow's item, as Midi keeps it. */
   get item() { return this.activity?.item }
 
-  /** Workflow.ts: its activity's other activity (module 0.45.0). */
+  /** Workflow.ts: its activity's other activity (module 0.44.0). */
   get otherActivity() { return this.activity?.otherActivity ?? undefined }
 
   /** Workflow.ts:7590-7596 */
@@ -334,7 +334,7 @@ class Workflow {
 
   /**
    * Workflow.ts's callMacros, as far as bonus damage: the DamageBonus macros, here midi.bonusDamage,
-   * each returning `{ damageRoll, damageType, flavor }`, or a Roll of its own (module 0.45.0).
+   * each returning `{ damageRoll, damageType, flavor }`, or a Roll of its own (module 0.44.0).
    */
   async callMacros(item, macros, tag, macroPass) {
     if ((tag !== 'DamageBonus') || !midi.bonusDamage?.length) return []
@@ -380,7 +380,7 @@ class Workflow {
   }
 
   /**
-   * Workflow.ts:2494-2575 (module 0.45.0): an other activity that spends something, its damage put
+   * Workflow.ts:2494-2575 (module 0.44.0): an other activity that spends something, its damage put
    * off, has its consumption checked first, which rolls its dice cost and throws the roll away, then
    * spent; then its damage is rolled (2592-2610).
    */
@@ -630,7 +630,7 @@ class Workflow {
 
   /**
    * The damage applied, halved on a saving throw made, as Midi's damage calculations do; since
-   * module 0.45.0, after an other activity's deferred damage and its cost (Workflow.ts:2479-2481).
+   * module 0.44.0, after an other activity's deferred damage and its cost (Workflow.ts:2479-2481).
    */
   async WorkflowState_AllRollsComplete() {
     if (this.otherDamageConfig) await this.checkOtherActivityConsumption()
@@ -687,14 +687,14 @@ export const MidiActivity = Base => class extends Base {
   get hasHealing() { return !!this.healing?.formula }
   get hasSave() { return !!this.save }
 
-  /** MidiActivityMixin.ts:911-913 (module 0.45.0). */
+  /** MidiActivityMixin.ts:911-913 (module 0.44.0). */
   hasConsumption() { return (this.consumption?.targets?.length ?? 0) > 0 }
 
   /** MidiActivityMixin.ts:225-226: unset (null) follows Midi's default; a hand-made one is "none". */
   get otherActivityId() { return this._data.otherActivityId ?? null }
 
   /**
-   * MidiActivityMixin.ts:2264-2294 (module 0.45.0): the activity named, or, unset, for an attack
+   * MidiActivityMixin.ts:2264-2294 (module 0.44.0): the activity named, or, unset, for an attack
    * activity alone and where Midi's default is "auto", the item's one other activity; none where
    * there are several.
    */
@@ -707,7 +707,7 @@ export const MidiActivity = Base => class extends Base {
   }
 
   /**
-   * MidiActivityMixin.ts:170-177, 2258-2262 (module 0.45.0), where midi.ammunitionActivities is on:
+   * MidiActivityMixin.ts:170-177, 2258-2262 (module 0.44.0), where midi.ammunitionActivities is on:
    * an attack's loaded ammunition's activity, its first that isn't an attack, with damage or healing
    * of its own; the ammunition the activity last fired, as Midi keeps it on the activity.
    */
@@ -719,7 +719,7 @@ export const MidiActivity = Base => class extends Base {
   }
 
   /**
-   * MidiActivityMixin.ts:1119-1137 (module 0.45.0): an other activity's damage put off where it
+   * MidiActivityMixin.ts:1119-1137 (module 0.44.0): an other activity's damage put off where it
    * spends something and hits are checked, its settings kept on the workflow.
    */
   deferOtherDamage(config, dialog) {
@@ -732,7 +732,7 @@ export const MidiActivity = Base => class extends Base {
   }
 
   /**
-   * MidiActivityMixin.ts:1146-1236 (module 0.45.0): the other activity's damage rolled through its
+   * MidiActivityMixin.ts:1146-1236 (module 0.44.0): the other activity's damage rolled through its
    * own rollDamage with a copy of the damage call's settings, its workflow and tag among them,
    * telling it not to update the workflow, which keeps its rolls as its other damage.
    */
@@ -796,7 +796,7 @@ export const MidiActivity = Base => class extends Base {
     const defer = this.requiresConcentration
     if (defer) usage.concentration = { begin: false, end: usage.concentration?.end ?? null }
 
-    // Since module 0.45.0, Midi-QOL v14 (GitLab 2ac2f66) MidiActivityMixin.ts:776-779, 949-966: unless
+    // Since module 0.44.0, Midi-QOL v14 (GitLab 2ac2f66) MidiActivityMixin.ts:776-779, 949-966: unless
     // its dialog is to be shown, a use that spends what it uses without one (shouldAutoConsume) has
     // what it would spend worked out from the usage it's given, and thrown away, before dnd5e's use
     // spends it; one that couldn't spend it has its dialog shown.
@@ -875,7 +875,7 @@ export const MidiActivity = Base => class extends Base {
     if (!workflow) return super.rollDamage(config, dialog, message)
     config.midiOptions ??= workflow.workflowOptions
     config.isCritical ??= config.midiOptions.isCritical
-    // 1004 (module 0.45.0): fast-forwarded as the workflow is, where the call doesn't say.
+    // 1004 (module 0.44.0): fast-forwarded as the workflow is, where the call doesn't say.
     config.midiOptions.fastForwardDamage ??= workflow.workflowOptions?.fastForwardDamage
     if (dialog.configure === undefined) dialog.configure = !config.midiOptions.fastForwardDamage
     // 1040-1063: a choice of damage types always opens the damage dialog.
@@ -897,10 +897,10 @@ export const MidiActivity = Base => class extends Base {
       if (config.midiOptions?.updateWorkflow !== false) workflow.currentAction = workflow.WorkflowState_WaitForDamageRoll
       return
     }
-    // 1076 (module 0.45.0): an other activity's roll doesn't update the workflow.
+    // 1076 (module 0.44.0): an other activity's roll doesn't update the workflow.
     if (config.midiOptions?.updateWorkflow === false) return result
     workflow.setDamageRolls(result)
-    // 1084-1090 (module 0.45.0): the item's other activity's damage, at once or put off.
+    // 1084-1090 (module 0.44.0): the item's other activity's damage, at once or put off.
     if ((this.otherActivity ?? this.ammunitionActivity) && (workflow.otherActivity !== this) && !this.deferOtherDamage(config, dialog)) {
       await this.rollOtherDamage(config, dialog)
     }

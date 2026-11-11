@@ -79,7 +79,7 @@ const {
 globalThis.dnd5e = {
   settings: { rulesVersion: 'modern' },
   documents: { activity: { EnchantActivity, CastActivity: { ENCHANTMENT_ID: staticID('dnd5espellchanges') } } },
-  // Since module 0.45.0 its consumption targets, as dnd5e's, whose roll of a dice cost the module wraps.
+  // Since module 0.44.0 its consumption targets, as dnd5e's, whose roll of a dice cost the module wraps.
   dataModels: { activity: { ConsumptionTargetData: ConsumptionTarget } },
   utils: { staticID },
   registry: {
@@ -1124,7 +1124,7 @@ assert.equal(madeEnchantments(), madeBefore, 'no enchantment was made')
 assert.equal(messages.size, cardsBefore, 'no card was posted')
 ok('a magic item\'s template or a choice made once, left to Foundry, is refused if named anyway, applying nothing')
 
-// Since module 0.45.0 (ROADMAP item 22): an enchantment from the app that spends dice, a Spark
+// Since module 0.44.0 (ROADMAP item 22): an enchantment from the app that spends dice, a Spark
 // Dagger's Charge Blade, 1d4 of its charges, with the Gamemaster rolling their own dice by hand: the
 // module's own check of what it spends, and with MIDI=1 Midi-QOL's own (its use's checkAutoConsume),
 // each thrown away, are Foundry's computer dice; only the cost dnd5e spends is the Gamemaster's.

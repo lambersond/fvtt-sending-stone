@@ -9,7 +9,7 @@ import { textHash } from "./sheet-texts.mjs";
 import { buildEnvelope, helloPending, inMegabytes, post, termsOf } from "./transport.mjs";
 
 /**
- * Tidy 5e Sheets' journal, since 0.45.0: what a character's players keep on its Journal tab in Tidy,
+ * Tidy 5e Sheets' journal, since 0.44.0: what a character's players keep on its Journal tab in Tidy,
  * sent to the app read only, beside the character's own journal of notes (journals.mjs), never mixed
  * with it.
  *
@@ -197,7 +197,7 @@ function sentAs({ from, id, title, value, sort }, hidden) {
 /* -------------------------------------------- */
 
 /**
- * What a campaign's hello says of Tidy's journal, in `features.notes`, since 0.45.0: under D&D Fifth
+ * What a campaign's hello says of Tidy's journal, in `features.notes`, since 0.44.0: under D&D Fifth
  * Edition, where Tidy is installed or one of its characters holds entries, whether Tidy is active,
  * its version, null where it isn't installed, and which of the campaign's characters hold entries;
  * nothing otherwise.

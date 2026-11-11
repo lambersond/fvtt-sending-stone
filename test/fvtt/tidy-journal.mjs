@@ -1,4 +1,4 @@
-// Tidy 5e Sheets' journal (module 0.45.0; PROTOCOL.md's `journal.tidy` and "Tidy 5e Sheets'
+// Tidy 5e Sheets' journal (module 0.44.0; PROTOCOL.md's `journal.tidy` and "Tidy 5e Sheets'
 // journal", the owner's T1 A, T3 B, T4 B, T5 A, T6 A): the hello's `features.notes.tidy`; nothing
 // sent to an app answering `notes` below 3, and each character's entries once it answers 3, after a
 // hello's books and in a heartbeat's answer; Tidy's order, ties in the flag's order, then the Classic

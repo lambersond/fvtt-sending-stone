@@ -879,7 +879,7 @@ if (!DND5E6) {
 assert.deepEqual([diceStatus.keptRerolls, diceStatus.effectDice, diceStatus.negativeDice, diceStatus.typedError], [true, true, true, null], 'the self-tests passed')
 let flags = await hello('camp-a')
 assert.deepEqual([flags.effectDice, flags.keptRerolls], [!DND5E6, true], 'camp-a, manual dice on')
-// Changed on purpose (module 0.45.0): `diceAsks` and `diceAsksReason` after them, true in camp-a but
+// Changed on purpose (module 0.44.0): `diceAsks` and `diceAsksReason` after them, true in camp-a but
 // under dnd5e 6, whose support is to come, and off in camp-b, where no one types in their dice.
 assert.deepEqual(Object.keys(flags).slice(-5), ['companionPrompts', 'effectDice', 'keptRerolls', 'diceAsks', 'diceAsksReason'], 'last, after companionPrompts')
 assert.deepEqual([flags.diceAsks, flags.diceAsksReason, flags.kinds.at(-1) === 'dice'], DND5E6 ? [false, 'system', false] : [true, null, true], 'camp-a: dice asks')

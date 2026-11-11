@@ -218,7 +218,7 @@ export function registerSettings() {
     default: 60_000
   });
 
-  // Since 0.45.0, how long a roll waits on the dice it asks of a player typing theirs before
+  // Since 0.44.0, how long a roll waits on the dice it asks of a player typing theirs before
   // Foundry's computer dice roll it. Never shown in the settings window, as Midi's wait isn't.
   game.settings.register(MODULE_ID, SETTINGS.DICE_ASK_WAIT, {
     scope: "world",

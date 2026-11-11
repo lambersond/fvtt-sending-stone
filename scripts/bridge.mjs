@@ -73,7 +73,7 @@ const RESEND_AFTER = 30_000;
 const resent = new Map();
 
 /**
- * Since 0.45.0, what lists a campaign's open dice asks for its hello, once later-dice.mjs registers
+ * Since 0.44.0, what lists a campaign's open dice asks for its hello, once later-dice.mjs registers
  * it as it's set up (`registerDiceAsks`), so that this file never imports it: none until then, as
  * under dnd5e 6, where none is ever asked.
  * @type {(campaign: Campaign) => object[]}
@@ -81,7 +81,7 @@ const resent = new Map();
 let diceAsksOf = () => [];
 
 /**
- * Let later-dice.mjs list a campaign's open dice asks in its hello, since 0.45.0: registered once,
+ * Let later-dice.mjs list a campaign's open dice asks in its hello, since 0.44.0: registered once,
  * as it's set up.
  * @param {(campaign: Campaign) => object[]} reader
  * @returns {void}
@@ -116,10 +116,11 @@ export function registerDiceAsks(reader) {
  * effects from the app, `features.effects`, by its own switch under D&D Fifth Edition. Since 0.40.0,
  * whether its players may use Wild Shape from the app, `features.wildShape`, by its own switch under
  * D&D Fifth Edition. Since 0.44.0, whether its players may set their hit points from the app,
- * `features.hitPoints`, by its own switch, on until turned off, under D&D Fifth Edition. Since 0.45.0,
- * under D&D Fifth Edition, what of Tidy 5e Sheets' journal its characters hold, and whether Tidy is
- * active, `features.notes.tidy` (tidy-journal.mjs); and it lists the dice asks waiting on its
- * players, `diceAsks`, so that a hello sent again, as when the settings change, closes none.
+ * `features.hitPoints`, by its own switch, on until turned off, under D&D Fifth Edition. Since
+ * 0.44.0 too, under D&D Fifth Edition, what of Tidy 5e Sheets' journal its characters hold, and
+ * whether Tidy is active, `features.notes.tidy` (tidy-journal.mjs); and it lists the dice asks
+ * waiting on its players, `diceAsks`, so that a hello sent again, as when the settings change,
+ * closes none.
  * @param {object} [options]
  * @param {string} [options.campaignId]   Send only this campaign its state.
  * @returns {void}

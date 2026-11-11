@@ -31,7 +31,7 @@ import { helloPending, send } from "./transport.mjs";
 const FORMAT = 1;
 
 /**
- * The modules listed, where installed, in this order: since 0.45.0 Tidy 5e Sheets last, whose
+ * The modules listed, where installed, in this order: since 0.44.0 Tidy 5e Sheets last, whose
  * journal the app reads.
  * @type {readonly string[]}
  */

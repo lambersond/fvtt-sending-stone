@@ -87,7 +87,7 @@ const WATCHDOG = 60_000;
 
 /**
  * How often a roll whose run waits on a dice ask looks again whether it still waits, in
- * milliseconds, since 0.45.0: its watchdog doesn't count the time its asks waited.
+ * milliseconds, since 0.44.0: its watchdog doesn't count the time its asks waited.
  * @type {number}
  */
 const HELD_CHECK = 1_000;
@@ -188,7 +188,7 @@ const made = new Map();
  * may be (`keptRerolls`): each wherever its players may type in their dice and its self-test passed.
  * And since 0.42.1, among the kinds right after the charges and wherever they are, one of their
  * spells prepared or unprepared, which throws no dice either. And since 0.44.0, right after a
- * utility's roll and wherever it is, a plain roll of the app's dice tray. And since 0.45.0, last,
+ * utility's roll and wherever it is, a plain roll of the app's dice tray; and, last,
  * whether its players typing in their dice are asked for the dice the game rolls later
  * (`diceAsks`), under dnd5e 5 wherever they type them and the self-test passed, and if not, why not
  * (`diceAsksReason`); with it, the answer to such an ask, `"dice"`, last among the kinds.
@@ -281,7 +281,7 @@ export function registerCommandHooks() {
  * game asks of companions, `companions` 2, to which their open prompts are sent again where it first
  * says so (creature-sync.mjs); and since 0.44.0, whether it takes hit points set, for which it's
  * fetched from where the campaign's Gamemaster lets its players, under dnd5e, with everything else
- * off; and since 0.45.0, whether it reads Tidy 5e Sheets' journal, `notes` 3, which is sent at once
+ * off; and whether it reads Tidy 5e Sheets' journal, `notes` 3, which is sent at once
  * where it starts to in a heartbeat's answer (tidy-journal.mjs), and whether it reads dice asks,
  * `diceAsks`, the dice the game rolls later asked of a player typing theirs. A hello's answer wakes
  * the campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
@@ -469,7 +469,7 @@ class Poller {
       }
       // Which of its characters the app has open decides whether Midi-QOL's saves wait on it.
       noteOpen(this.campaignId, answer.open);
-      // Since 0.45.0, so do the dice asked of a player typing theirs.
+      // Since 0.44.0, so do the dice asked of a player typing theirs.
       checkAsks();
       // The Gamemaster may have changed the campaign while the fetch was held open: its commands are
       // made as it now is.
@@ -589,7 +589,7 @@ class Poller {
  * queue settling checks whether a Wild Shape of that character's is due to end (wild-shape.mjs).
  * Since 0.44.0 hit points set, and a plain roll of the dice tray, wait for their character's earlier
  * commands, as a roll does, a companion's hit points its character's too, and their next ones for
- * them: so a form set to 0 hit points ends once the setting is done. Since 0.45.0 an answer to a
+ * them: so a form set to 0 hit points ends once the setting is done. Since 0.44.0 an answer to a
  * dice ask is made at once, as a Midi prompt's answer is: the roll it answers is waiting on it.
  * @param {object} command
  * @param {Campaign} campaign
@@ -678,7 +678,7 @@ export function queueBusy(key) {
  * and the character's next roll goes ahead; if it's made after all, as once the Gamemaster has
  * answered what a module asked them, the app is told so too; and so it is of hit dice spent at
  * once, some of which were spent before they stopped for it. A Gamemaster's roll's result lists
- * the chat messages it has made, by then. Since 0.45.0 a player's typed roll opens its run
+ * the chat messages it has made, by then. Since 0.44.0 a player's typed roll opens its run
  * (later-dice.mjs), and its minute doesn't count the time its dice asks waited: while one waits,
  * it isn't timed out.
  * @param {object} command
@@ -697,7 +697,7 @@ async function make(command, campaign) {
         timer = setTimeout(fire, HELD_CHECK);
         return;
       }
-      // A command none of whose asks waited times out now, as before 0.45.0.
+      // A command none of whose asks waited times out now, as before 0.44.0.
       const left = held ? (started + WATCHDOG + held - Date.now()) : 0;
       if ( left > 0 ) {
         timer = setTimeout(fire, left);

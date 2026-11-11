@@ -201,7 +201,7 @@ if (process.env.BREAK_ROLL) {
   // Changed on purpose (round 0.41.0 §8.2.4): with `aloneChoices`, off, after midiPrompts, and
   // `companionPrompts`, off, after it.
   // Changed on purpose (round 0.42.0 §8.2): with `effectDice` and `keptRerolls`, off, last; and since
-  // 0.45.0 `diceAsks`, off, and `diceAsksReason`, after them, "manualDice" here.
+  // 0.44.0 `diceAsks`, off, and `diceAsksReason`, after them, "manualDice" here.
   assert.deepEqual(said[0], { enabled: false, kinds: [], reason: 'self-test', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false, diceAsks: false, diceAsksReason: 'manualDice' })
   assert.equal(app.polls.length, 0)
   // The settings window says why on each campaign's Player actions tab.
@@ -280,7 +280,7 @@ assert.equal(diceStatus.hitDice, true, `hit die self-test: ${diceStatus.hitDiceE
 // reads them, `companionPrompts`, after it: off in both, as neither asks its players for their saves.
 // Changed on purpose (round 0.42.0 §8.2): and whether a typed roll's effects' dice and kept rerolls
 // are its player's, `effectDice` and `keptRerolls`, last: off in both, as neither lets its players
-// type in their dice. Changed on purpose (module 0.45.0): and after them `diceAsks`, off, and
+// type in their dice. Changed on purpose (module 0.44.0): and after them `diceAsks`, off, and
 // `diceAsksReason`, "manualDice", for the same reason.
 // Changed on purpose (module 0.44.0, the v0.44 plan's items 4 and 7): never a companion's plain roll;
 // and `features.hitPoints` says its players set their hit points from the app, on for a campaign saved
@@ -1191,7 +1191,7 @@ const off = app.events.filter(e => e.type === 'bridge.hello' && e.campaign.id ==
 // Changed on purpose (round 0.41.0 §8.2.4): with `aloneChoices`, off, after midiPrompts, and
 // `companionPrompts`, off, after it.
 // Changed on purpose (round 0.42.0 §8.2): with `effectDice` and `keptRerolls`, off, last; and since
-// 0.45.0 `diceAsks` and `diceAsksReason` after them, off, as no player types in their dice here.
+// 0.44.0 `diceAsks` and `diceAsksReason` after them, off, as no player types in their dice here.
 assert.deepEqual(off.data.features, { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false, diceAsks: false, diceAsksReason: 'manualDice' }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [], initiative: 'own' }, favorites: { enabled: true, kinds: ['favorite'], reason: null }, dishes: { enabled: false, kinds: [], reason: 'off', versions: [] }, effects: { enabled: false, kinds: [], reason: 'off' }, wildShape: { enabled: false, kinds: [], reason: 'off' }, hitPoints: HIT_POINTS })
 const offAt = app.polls.length
 await settle(); await settle()

@@ -9,7 +9,7 @@ import { isOpen } from "./midi-prompts.mjs";
 import { send } from "./transport.mjs";
 
 /**
- * The dice the game rolls later, asked of a player typing in theirs (module 0.45.0, PROTOCOL.md's
+ * The dice the game rolls later, asked of a player typing in theirs (module 0.44.0, PROTOCOL.md's
  * "Dice the game rolls later").
  *
  * A player's typed roll of an item opens its **run**: while it's made, and under Midi-QOL until the
@@ -393,7 +393,7 @@ function warnOnce(kind, text, err) {
  * Open the run of a typed roll as it's about to be made: a player's own, `typed` and never the
  * Gamemaster's, of a kind whose item's later rolls are asked, or of any other, whose own dice may
  * be thrown again. Nothing where later dice aren't asked here at all: under another system than
- * dnd5e 5, or where the self-test failed, the game's later dice are rolled as before 0.45.0.
+ * dnd5e 5, or where the self-test failed, the game's later dice are rolled as before 0.44.0.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {Run|null}
@@ -458,7 +458,7 @@ export function endRun(run) {
  * Bind a Midi-QOL workflow to the run of the roll that started or fed it, as soon as it's known: its
  * rolls are that run's from then on, its later ones among them, until it ends. Fed by a roll that
  * opens no run, as the Gamemaster's damage from the app or a player's untyped one, it's no run's
- * from then on: what Midi rolls with that damage, and after it, is Foundry's, as before 0.45.0.
+ * from then on: what Midi rolls with that damage, and after it, is Foundry's, as before 0.44.0.
  * @param {string} commandId
  * @param {object} workflow
  * @returns {void}

@@ -26,12 +26,12 @@ import { COST_CHECK, CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MODULE_ID, ROLL
  * them, by faces and sign; and where they say they rerolled at the table, `rerolls: "kept"`, each die
  * term they typed every die of keeps no reroll: the die typed is the die kept.
  *
- * Since 0.45.0, a roll later-dice.mjs says belongs to a typed roll's run, as Midi-QOL's other damage
+ * Since 0.44.0, a roll later-dice.mjs says belongs to a typed roll's run, as Midi-QOL's other damage
  * after a typed damage, is evaluated once its player has answered, each of its dice taking the
  * values they gave for its own term alone, and a die of a typed roll thrown again, an explosion or a
  * reroll not kept, takes the value its player gives for it, one die at a time, where the throw it
  * follows took its player's value: never after a die Foundry's computer threw. That file registers
- * itself here (`registerLaterDice`), so that this one never imports it. And since 0.45.0 the dice
+ * itself here (`registerLaterDice`), so that this one never imports it. And since 0.44.0 the dice
  * costs dnd5e rolls for the module's own check of what a use would spend, which it throws away, are
  * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6, as are those of
  * Midi-QOL's own check of a use the module hands it (`checkedUntilSpent`), and, under dnd5e 5, of
@@ -104,7 +104,7 @@ class DicePlan {
     this.d20Fitted = false;
 
     /**
-     * Since 0.45.0: has the roll's own step, the first rolls dnd5e built for it, been configured?
+     * Since 0.44.0: has the roll's own step, the first rolls dnd5e built for it, been configured?
      * A later step tagged for it, as Midi-QOL's other damage, is a later roll of its run.
      * @type {boolean}
      */
@@ -184,7 +184,7 @@ const termPlans = new WeakMap();
 const termSigns = new WeakMap();
 
 /**
- * What later-dice.mjs gives, since 0.45.0, once it registers itself: the later step a roll belongs
+ * What later-dice.mjs gives, since 0.44.0, once it registers itself: the later step a roll belongs
  * to, if any; a die thrown again's value, asked of its player; who's told of a roll thrown; what
  * notes a dice cost of a run's spending as that run's, for a use's configuration, if any; whether a
  * dice cost of an activity is Midi-QOL's check of a run's other activity's consumption, thrown away;
@@ -197,41 +197,41 @@ const termSigns = new WeakMap();
 let laterDice = null;
 
 /**
- * Since 0.45.0, the dice costs rolled for the module's own check of what a use would spend, which it
+ * Since 0.44.0, the dice costs rolled for the module's own check of what a use would spend, which it
  * throws away: Foundry's computer dice, never asked of anyone.
  * @type {WeakSet<Roll>}
  */
 const checkRolls = new WeakSet();
 
 /**
- * Since 0.45.0, for each die term, whether each of its throws took its player's value, by the index
+ * Since 0.44.0, for each die term, whether each of its throws took its player's value, by the index
  * of the result it made: a die thrown again is asked of them only where the throw it follows did.
  * @type {WeakMap<DiceTerm, boolean[]>}
  */
 const playerThrows = new WeakMap();
 
 /**
- * Since 0.45.0, dnd5e's consumption target class whose `resolveCost` is wrapped, once it is: none
+ * Since 0.44.0, dnd5e's consumption target class whose `resolveCost` is wrapped, once it is: none
  * where this dnd5e has none to wrap.
  * @type {Function|null}
  */
 let costTarget = null;
 
 /**
- * Since 0.45.0, the rolls of each plan's own step: never a later roll of its run.
+ * Since 0.44.0, the rolls of each plan's own step: never a later roll of its run.
  * @type {WeakSet<Roll>}
  */
 const ownRolls = new WeakSet();
 
 /**
- * Since 0.45.0, the rolls being evaluated as a later step's: a die of theirs takes only the values
+ * Since 0.44.0, the rolls being evaluated as a later step's: a die of theirs takes only the values
  * given for its own term, never its plan's, should it be tagged with one.
  * @type {WeakSet<Roll>}
  */
 const laterRolls = new WeakSet();
 
 /**
- * The values a player gave for one term of a later roll, since 0.45.0, in the order typed: a die of
+ * The values a player gave for one term of a later roll, since 0.44.0, in the order typed: a die of
  * the term takes the next, its own faces only; one left with none is Foundry's.
  */
 class TermValues {
@@ -320,7 +320,7 @@ function planFor(tag) {
 }
 
 /**
- * Since 0.45.0, let later-dice.mjs say which rolls are later ones of a typed roll's run, and ask
+ * Since 0.44.0, let later-dice.mjs say which rolls are later ones of a typed roll's run, and ask
  * for a die thrown again: registered once, as the dice are set up.
  * @param {object} later   `{stepOf, again, thrown, costOf, checking, selfTest}`.
  * @returns {void}
@@ -330,7 +330,7 @@ export function registerLaterDice(later) {
 }
 
 /**
- * Is a roll one of its plan's own step, since 0.45.0: the first rolls dnd5e built for a player's
+ * Is a roll one of its plan's own step, since 0.44.0: the first rolls dnd5e built for a player's
  * roll, as a damage's own, never a later roll of its run?
  * @param {Roll} roll
  * @returns {boolean}
@@ -340,7 +340,7 @@ export function isOwnRoll(roll) {
 }
 
 /**
- * Is a player's roll being made now, its plan alive, since 0.45.0?
+ * Is a player's roll being made now, its plan alive, since 0.44.0?
  * @param {string} id   The roll's id.
  * @returns {boolean}
  */
@@ -349,7 +349,7 @@ export function planAlive(id) {
 }
 
 /**
- * Since 0.45.0, dnd5e's consumption target class whose `resolveCost` this file wraps, once it does:
+ * Since 0.44.0, dnd5e's consumption target class whose `resolveCost` this file wraps, once it does:
  * null where this dnd5e has none to wrap, and the dice a use spends can't be told apart.
  * @returns {Function|null}
  */
@@ -358,7 +358,7 @@ export function costTargetClass() {
 }
 
 /**
- * Work out, since 0.45.0, what a use would spend, with its configuration marked as the module's own
+ * Work out, since 0.44.0, what a use would spend, with its configuration marked as the module's own
  * check, thrown away: a dice cost dnd5e rolls for it is Foundry's computer dice, never the
  * Gamemaster's Manual Dice nor a player's ask, nor taken for a run's cost. The mark is gone once
  * it's worked out, so that the use itself, spending with the same configuration, spends as ever.
@@ -378,7 +378,7 @@ export async function costCheck(config, check) {
 }
 
 /**
- * Mark, since 0.45.0, a use the module hands to Midi-QOL as a check until dnd5e begins spending it:
+ * Mark, since 0.44.0, a use the module hands to Midi-QOL as a check until dnd5e begins spending it:
  * Midi's own use works out what the use would spend, from the very usage it's given, and throws that
  * away (its `checkAutoConsume`, as the module's uses from the app consume without a dialog), before
  * dnd5e's use spends it. A dice cost rolled for that is Foundry's computer dice, never asked of
@@ -396,7 +396,7 @@ export function checkedUntilSpent(usage) {
 }
 
 /**
- * dnd5e begins spending what a use spends, since 0.45.0: its configuration is no longer a check
+ * dnd5e begins spending what a use spends, since 0.44.0: its configuration is no longer a check
  * (`checkedUntilSpent`), so that a dice cost dnd5e rolls for it is rolled as ever.
  * @param {Activity} activity
  * @param {object} usageConfig
@@ -416,7 +416,7 @@ function spendingBegins(activity, usageConfig) {
  * Foundry rolls one with `reroll` or `explode`, as its `r`, `rr`, `x` and `xo` modifiers do, which
  * the self-test checks. Since 0.42.0 one of the roll's own dice, once the player's own of its faces
  * are used, takes a value they typed for an effect's die of its faces and sign, such as Bless's.
- * Since 0.45.0 a die of a later roll takes a value given for its own term alone; and a die of a
+ * Since 0.44.0 a die of a later roll takes a value given for its own term alone; and a die of a
  * typed roll's, or a later roll's, thrown again, may wait for the value its player gives for it
  * (later-dice.mjs), Foundry's own where none is given: so it returns a Promise, as Foundry's own
  * `_roll` may. Only where the throw it follows, the one that exploded or is rerolled, took its
@@ -441,7 +441,7 @@ function plannedRoll(wrapped, ...args) {
     if ( value !== undefined ) return value;
     return wrapped(...args);
   }
-  // Since 0.45.0, a typed roll's die thrown again is asked of its player, where it can be, and only
+  // Since 0.44.0, a typed roll's die thrown again is asked of its player, where it can be, and only
   // where the throw it follows took their value: never a die Foundry's computer threw.
   const again = (!options?.minimize && !options?.maximize && laterDice && followsPlayerThrow(this, options))
     ? laterDice.again(this, options?.explode ? "explode" : "reroll", plan ?? null) : null;
@@ -456,7 +456,7 @@ function plannedRoll(wrapped, ...args) {
 }
 
 /**
- * Note, since 0.45.0, whether a die's throw took its player's value, by the index of the result it
+ * Note, since 0.44.0, whether a die's throw took its player's value, by the index of the result it
  * makes, as Foundry adds each result once its `_roll` has given it.
  * @param {DiceTerm} term
  * @param {number} index
@@ -470,7 +470,7 @@ function notePlayerThrow(term, index, players) {
 }
 
 /**
- * Does a die thrown again, since 0.45.0, follow a throw that took its player's value: the one that
+ * Does a die thrown again, since 0.44.0, follow a throw that took its player's value: the one that
  * exploded, or is rerolled, the latest of the term's results Foundry marks so as it throws it again,
  * as its explode and reroll modifiers do?
  * @param {DiceTerm} term
@@ -489,7 +489,7 @@ function followsPlayerThrow(term, options) {
  * they are the player's. Its dice are noted with its plan, in case they don't know their roll, and
  * since 0.42.0 with whether each adds or takes away, for the dice its effects add. And a roll its
  * player typed in, saying they rerolled at the table, keeps none of the rerolls of the dice they
- * typed (`keepTypedRerolls`): by now dnd5e has expanded its advantage and configured it. Since 0.45.0
+ * typed (`keepTypedRerolls`): by now dnd5e has expanded its advantage and configured it. Since 0.44.0
  * a later roll of a typed roll's run is evaluated as `laterEvaluate` has it, and a dice cost of the
  * module's own check with Foundry's computer dice alone.
  * @this {Roll}
@@ -499,7 +499,7 @@ function followsPlayerThrow(term, options) {
  * @returns {Promise<Roll>}
  */
 function taggedEvaluate(wrapped, options={}, ...rest) {
-  // Since 0.45.0, a dice cost of the module's own check is Foundry's computer dice, asked of no one.
+  // Since 0.44.0, a dice cost of the module's own check is Foundry's computer dice, asked of no one.
   if ( checkRolls.has(this) ) return wrapped({ ...options, allowInteractive: false }, ...rest);
   const later = laterDice?.stepOf(this) ?? null;
   if ( later ) return laterEvaluate(this, later, wrapped, options, rest);
@@ -516,13 +516,13 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
   // Damage the player chose at its highest has every die at its highest, Foundry's own too.
   const maximize = DAMAGE_COMMANDS.has(plan.command.kind) && (plan.command.modifiers?.maximize === true);
   const made = wrapped({ ...options, allowInteractive: false, ...(maximize && { maximize: true }) }, ...rest);
-  // Since 0.45.0 an ask for a die of it thrown again answers once it's thrown.
+  // Since 0.44.0 an ask for a die of it thrown again answers once it's thrown.
   if ( !laterDice ) return made;
   return Promise.resolve(made).finally(() => laterDice.thrown(this));
 }
 
 /**
- * Around dnd5e's roll of a dice cost, since 0.45.0, `ConsumptionTargetData#resolveCost`, which is
+ * Around dnd5e's roll of a dice cost, since 0.44.0, `ConsumptionTargetData#resolveCost`, which is
  * passed the use's configuration: for the module's own check of what a use would spend
  * (`costCheck`), Midi-QOL's of a use the module hands it (`checkedUntilSpent`), or Midi's of a typed
  * roll's run's other activity, each thrown away, or a run's
@@ -547,7 +547,7 @@ function resolveCost(wrapped, options, ...rest) {
 }
 
 /**
- * Evaluate a later roll of a typed roll's run, since 0.45.0, once its player has answered, or the
+ * Evaluate a later roll of a typed roll's run, since 0.44.0, once its player has answered, or the
  * wait is over: each of its own dice terms takes the values given for it, die by die, and every other
  * die, as one left out, is Foundry's computer dice, never the Gamemaster's manual dice. What it's
  * given is never its plan's, should it be tagged with one.
@@ -739,7 +739,7 @@ function tagOf(process, config, index) {
  * healed, and nothing posted; so is damage that, built and changed, can't take every die the player
  * rolled for it, as where a module added dice to it afterwards otherwise than planned, or a die more
  * was chosen of a part with none of its own. Since 0.32.0 a d20 roll then takes no more of the
- * player's d20s than it throws first (`fitD20s`). Since 0.45.0 the first step tagged for a plan is
+ * player's d20s than it throws first (`fitD20s`). Since 0.44.0 the first step tagged for a plan is
  * its own (`isOwnRoll`): a later one, as Midi-QOL's other damage, is its run's.
  * @param {Roll[]} rolls
  * @returns {boolean|void}   False to call the roll off.
@@ -1736,7 +1736,7 @@ let installed = false;
  * Wrapped through libWrapper when it's active, to sit well with other modules that wrap dice.
  * Since 0.32.0 dnd5e's configuration of damage too, where it has damage rolls, as a WRAPPER, which
  * libWrapper runs outside every other kind, so outside Midi-QOL's: a critical hit's damage for the
- * app is then made as dnd5e makes it. Since 0.45.0 dnd5e's roll of a dice cost too, where its
+ * app is then made as dnd5e makes it. Since 0.44.0 dnd5e's roll of a dice cost too, where its
  * consumption targets have one, as a WRAPPER: the module's own check's, and Midi-QOL's of a use the
  * module hands it, are Foundry's computer dice, and a run's are noted for later-dice.mjs.
  * @returns {void}
@@ -1748,7 +1748,7 @@ export function installDicePlans() {
   const Roll = "foundry.dice.Roll.prototype.evaluate";
   const Damage = "CONFIG.Dice.DamageRoll.prototype.configureDamage";
   const damage = typeof CONFIG.Dice?.DamageRoll?.prototype?.configureDamage === "function";
-  // Since 0.45.0, dnd5e's roll of a dice cost, where its consumption targets have one.
+  // Since 0.44.0, dnd5e's roll of a dice cost, where its consumption targets have one.
   const Cost = "dnd5e.dataModels.activity.ConsumptionTargetData.prototype.resolveCost";
   const target = globalThis.dnd5e?.dataModels?.activity?.ConsumptionTargetData;
   const cost = typeof target?.prototype?.resolveCost === "function";
@@ -1824,7 +1824,7 @@ export async function selfTest() {
     await withPlan({ id, dice }, () => copy.evaluate());
     check(JSON.stringify(results(copy)) === expected, `a copy's dice were ${JSON.stringify(results(copy))}`);
 
-    // Once made, the roll's tag matches nothing. Since 0.45.0 it's thrown without asking anyone, as
+    // Once made, the roll's tag matches nothing. Since 0.44.0 it's thrown without asking anyone, as
     // the Gamemaster's Manual Dice would ask them for it at every start-up.
     const before = served;
     await later.evaluate({ allowInteractive: false });
@@ -1844,7 +1844,7 @@ export async function selfTest() {
   // Since 0.42.0, typed dice: right after the core's, so that no other part's failure skips them.
   await typedSelfTests();
 
-  // Since 0.45.0, the dice asked of a player typing theirs: silent, its outcome in later-dice.mjs.
+  // Since 0.44.0, the dice asked of a player typing theirs: silent, its outcome in later-dice.mjs.
   try {
     await laterDice?.selfTest?.();
   } catch {
