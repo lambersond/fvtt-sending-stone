@@ -3,8 +3,8 @@
 // them, linked to their world actor or not; and for an unlinked token its synthetic actor, an
 // Actor5e of its own with its base actor's id, whose flags, hit points, ownership and items are its
 // ActorDelta's over its base's, and whose uuid names its scene and token. A companion's world actor
-// is made by `companionActor`, the only maker of an actor's `ownership` in the harness, so no world
-// before 0.36.0 lists one. Hooks fire as a fault picks them, so that each way core tells of a token's
+// is made by `companionActor`, with its `ownership` by user id, as actor5e.mjs's actors have theirs
+// since module 0.45.0. Hooks fire as a fault picks them, so that each way core tells of a token's
 // creature changing is proved alone: `updateToken` with its delta, `updateActorDelta`, `updateActor`
 // with the synthetic actor; its items' hooks with the synthetic actor as their parent, its delta, or
 // none at all. And a combat whose combatants' initiative the module writes as core does, each write
