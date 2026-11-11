@@ -10,7 +10,8 @@
 // midi-fake.mjs's workflow; a stand-in Foundry core and app. Run with --import ./unref-timers.mjs
 // --import ./dnd5e-register.mjs, and SLIM_CHECK=1 (every full sheet posted, a companion's among
 // them, slims and expands back). Since module 0.45.0, two campaigns in one world: a character's
-// players by their own ids, never through `default`, else whom it's assigned to.
+// players by their own ids, never through `default`, else whom it's assigned to; and a public card
+// another campaign's alone kept from a campaign's chat.
 import assert from 'node:assert/strict'
 import { isDeepStrictEqual } from 'node:util'
 import { settings, user, users, actors } from './stub.mjs'
@@ -1457,18 +1458,21 @@ if (MIDI) {
 /*  Two campaigns in one world (module 0.45.0)  */
 /* -------------------------------------------- */
 
-// The app's ROADMAP item 19, the owner's answer Q2 A: Brightwater beside Ashlands, its
+// The app's ROADMAP item 19, the owner's answers Q1 A and Q2 A: Brightwater beside Ashlands, its
 // character Orla shared with every player as Owner through her default and owned by no one by id, as
 // a Gamemaster may share a party's sheets. Alice's sidekick, Brakka, is never Orla's companion, so
-// Ashlands' fight with Brakka in it doesn't reach Brightwater.
+// Ashlands' fight with Brakka in it doesn't reach Brightwater; and a public card that's Ashlands'
+// alone stays out of every other campaign's chat.
 {
   const carol = user('carol', 'Carol')
   const orla = add(new Actor5e({ id: 'orla', name: 'Orla', mods: { dex: 1 }, skills: { prc: { ability: 'wis' } } }))
   equip(orla, { items: [] })
   orla.ownership = { default: 3 }
-  // Carol's own sidekick, by id; an orc no one owns, unlinked.
+  // Carol's own sidekick, by id; an orc no one owns, unlinked, and an ogre and an innkeeper, linked.
   companionActor('kestrel', 'Kestrel', { owners: ['carol'], linked: true, spec: creature({ dex: 2 }) })
   const orcToken = placeToken(arena, companionActor('orc', 'Orc', { linked: false, spec: creature({ str: 3 }) }), { id: 'orc1', name: 'Orc' })
+  const ogre = companionActor('ogre', 'Ogre', { linked: true, spec: creature({ str: 4 }) })
+  const innkeeper = companionActor('innkeeper', 'Innkeeper', { linked: true, spec: creature() })
   const { ownedByPlayers } = await import(`${MODULE}/scripts/creatures.mjs`)
   settings.set('campaignSecrets', { ...settings.get('campaignSecrets'), 'camp-b': 'b-secret' })
   from = app.events.length
@@ -1493,6 +1497,30 @@ if (MIDI) {
   assert.deepEqual([refused.status, refused.reason], ['failed', 'unknown'], "Brakka as Orla's, from Brightwater")
   ok("a character shared with every player through its default, Orla, is no one's for companions: Brightwater lists none of Ashlands' players' NPCs, isn't told of Ashlands' fight with Alice's sidekick in it, nor in its hello, gets no sheet of Brakka's, nor its secrets, and a command for Brakka as Orla's is refused unknown")
 
+  // Public cards, under "All its players can read": Ashlands' alone, or every campaign's.
+  const everyone = getCampaigns().map(campaign => campaign.id).sort()
+  const reach = async (speaker, fields = {}) => {
+    const at = app.events.length
+    const made = await ChatMessage.create({ speaker, content: '<p>Cards.</p>', ...fields })
+    await settle()
+    return since(at).filter(e => (e.type === 'chat.message.created') && (e.data.message.id === made.id)).map(e => e.campaign.id).sort()
+  }
+  assert.equal(settings.get('chatScope') ?? 'all', 'all')
+  assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: orcToken.actor }), { flavor: 'Orc rolls for Initiative!' }), ['camp-a'], "the orc's initiative in Ashlands' fight")
+  assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: thorin }), { author: 'alice' }), ['camp-a'], "Thorin's attack")
+  assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: brakka }), { author: 'alice' }), ['camp-a'], "Brakka's, Ashlands' companion")
+  assert.deepEqual(await reach({}, { content: '<p>Roll initiative!</p>' }), everyone, "the Gamemaster's narration")
+  assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: innkeeper })), everyone, 'an innkeeper in no fight')
+  // A fight both are in: Thorin, Orla and the ogre.
+  from = app.events.length
+  const sharedfight = combatOf('sharedfight', [{ id: 'cb-sf-thorin', actor: thorin }, { id: 'cb-sf-orla', actor: orla }, { id: 'cb-sf-ogre', actor: ogre }])
+  await Hooks.callAll('createCombat', sharedfight, {}, 'gm')
+  await settle()
+  assert.deepEqual(['camp-a', 'camp-b'].map(id => ofType(since(from), 'combat.created', id).some(e => e.data.combat.id === 'sharedfight')), [true, true], 'both told of it')
+  assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: ogre })), ['camp-a', 'camp-b'], "the ogre's, in a fight both are in")
+  assert.deepEqual(await reach(ChatMessage.getSpeaker({ actor: orla })), ['camp-a', 'camp-b'], "Orla's, in a fight both are in")
+  ok("a public card that's another campaign's alone is left out: the orc's in Ashlands' fight, by its token, Thorin's and Brakka's reach Ashlands only; the Gamemaster's narration and an innkeeper in no fight reach every campaign; in a fight both are in, the ogre's, by its actor, and Orla's reach both, and no other")
+
   // Orla assigned to Carol in User Configuration: Carol's own sidekick is hers.
   from = app.events.length
   carol.character = orla
@@ -1515,7 +1543,7 @@ if (MIDI) {
   assert.equal(ownedByPlayers(brakka, ['orla']), true, 'with her secrets')
   const taken = await send(skill({ actorId: 'brakka', of: 'orla' }), 'camp-b')
   assert.equal(taken.status, 'done', JSON.stringify(taken))
-  game.combats.delete(ashfight.id)
+  for (const fight of [ashfight, sharedfight]) game.combats.delete(fight.id)
   ok("Carol and Alice given Owner on Orla by their own ids: Alice's NPCs are Orla's too, beside Kestrel, Brakka with its secrets, taken as Orla's from Brightwater, and Ashlands' fight with Brakka in it reaches Brightwater")
 }
 

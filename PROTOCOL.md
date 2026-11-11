@@ -184,16 +184,17 @@ campaign, the fight is over.
 
 Since module 0.45.0, under the chat scope *All its players can read* (`"all"`), a public message
 that belongs only to other campaigns is left out of a campaign. Such a message is one that none of
-the campaign's characters or [companions](#companions) said, and that:
+the campaign's characters or [companions](#companions) said, whose speaker is a combatant of no
+fight the campaign is in, and that:
 
-- was said by another campaign's character or companion, even in a fight both campaigns are in; or
-- was said by a combatant, matched by its speaker's token and scene, or for a linked actor by its
-  actor, that is in a fight another campaign is in and in no fight this campaign is in.
+- was said by another campaign's character or companion; or
+- was said by a combatant of a fight another campaign is in.
 
-A campaign is in a fight as it's told of one: one of its characters, or a companion of theirs it
-was listed, is among the combatants it may be told of ([Combatant](#combatant)). Every other public
+A speaker is matched to a combatant by its token and scene, or for a linked actor by its actor. A
+campaign is in a fight as it's told of one: one of its characters, or a companion of theirs it was
+listed, is among the combatants it may be told of ([Combatant](#combatant)). Every other public
 message still reaches every campaign with characters, such as the Gamemaster's narration, an NPC in
-no fight, or a card from a fight both campaigns are in, and a world with one campaign sees no change.
+no fight, or any card of a fight both campaigns are in, and a world with one campaign sees no change.
 An edit or deletion of such a message isn't sent to the campaign either, as for any message it may
 not see; one it was sent before is kept until the chat is cleared. Under *Its characters' messages
 only* (`"connected"`) nothing changes. Before 0.45.0 every public message reached every campaign with
