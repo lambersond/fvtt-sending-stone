@@ -4,11 +4,12 @@ import {
   appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC
 } from "./command-rolls.mjs";
 import {
-  diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable, withPlan
+  checkedUntilSpent, costCheck, diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable, withPlan
 } from "./dice-plan.mjs";
 import { dnd5eEnchant, enchantChoice, midiEnchantNow } from "./command-enchant.mjs";
 import { resultsAlways } from "./config.mjs";
 import { commandActor } from "./creatures.mjs";
+import { bindWorkflow } from "./later-dice.mjs";
 import { midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
 import { midiPromptWaits } from "./midi-prompts.mjs";
 import { DND5E_ACTIVITIES, eligibleSlots, ownDamageConfig, previewDamage, slotChoice } from "./sheet-links.mjs";
@@ -279,17 +280,21 @@ async function prepareUse(command, actor) {
     create: { ...usage.create, measuredTemplate: false },
     subsequentActions: false,
     ...((slot && !forward) ? { spell: { ...usage.spell, slot } } : {}),
-    ...(unslotted ? { consume: { ...usage.consume, spellSlot: false } } : {})
+    ...(unslotted ? { consume: { ...usage.consume, spellSlot: false } } : {}),
+    // Since 0.44.0 dnd5e's spending for it names the roll it's made for: a typed roll's run's
+    // dice costs are told by it (later-dice.mjs).
+    [ROLL_TAG]: command.id
   });
   // What using it would spend, worked out without spending it, at the level dnd5e will scale it to
   // once it's used: anything it can't spend is said here, rather than on the Gamemaster's screen. A
-  // forward's is what the forward spends, as dnd5e works it out with the forward as its cause.
+  // forward's is what the forward spends, as dnd5e works it out with the forward as its cause. Since
+  // 0.44.0 a dice cost rolled for it is Foundry's computer dice, asked of no one, as it's thrown away.
   const prepared = activity._prepareUsageConfig(forward
     ? foundry.utils.mergeObject(freeOf, usage, { inplace: false })
     : usage);
   scaleAsUsed(prepared, activity);
   try {
-    const updates = await activity._prepareUsageUpdates(prepared, { returnErrors: true });
+    const updates = await costCheck(prepared, () => activity._prepareUsageUpdates(prepared, { returnErrors: true }));
     if ( Array.isArray(updates) && updates.length ) return { refusal: "consume", error: updates[0]?.message ?? null };
   } catch (err) {
     return { refusal: "consume", error: err instanceof Error ? err.message : String(err) };
@@ -963,7 +968,8 @@ function rollsDamage(activity) {
  * Use the item through Midi-QOL, at the targets the player picked, and wait for its workflow: for an
  * attack, until the attack it rolls with the player's dice is rolled; then until it waits for the
  * damage or healing, or ends; or, with no attack, damage or healing, until it waits on the app for
- * a target's save asked there, since 0.27.0.
+ * a target's save asked there, since 0.27.0. Since 0.44.0 the workflow is the use's run
+ * (later-dice.mjs), as soon as Midi puts it on the usage.
  * @param {object} command
  * @param {Campaign} campaign
  * @param {Actor} actor
@@ -1014,9 +1020,11 @@ async function midiUseNow(command, campaign, actor, use) {
     // A forward has the activity it names used as dnd5e's forward has it used, made here rather than
     // through Midi-QOL's own forward, whose source isn't to be had: so that what Midi writes the
     // workflow on is what's given.
-    const midiCall = use.forward
+    // Since 0.44.0 Midi's own check of what it would spend, worked out from it and thrown away
+    // before dnd5e spends it, is Foundry's computer dice, as the module's own check is (dice-plan.mjs).
+    const midiCall = checkedUntilSpent(use.forward
       ? foundry.utils.mergeObject(forwardUsage(use.forward), midiUsage, { inplace: false })
-      : midiUsage;
+      : midiUsage);
 
     let card = null;
     let workflow = null;
@@ -1032,6 +1040,8 @@ async function midiUseNow(command, campaign, actor, use) {
         rollMode: PUBLIC,
         data: { flags: { [MODULE_ID]: appFlags(command, "use") } }
       }).finally(() => Hooks.off("dnd5e.preCreateUsageMessage", nameAll));
+      // Since 0.44.0 its rolls are its run's: the dice they throw later are asked of a typing player.
+      bindWorkflow(command.id, midiCall.workflow);
       // A use with nothing more of the player's to roll that has its workflow wait on a save asked in
       // the app is made: the rest goes on without holding the uses after it.
       const asking = (!attack && !rollsDamage(activity)) ? await askingSaves(using, midiCall) : null;
@@ -1040,6 +1050,7 @@ async function midiUseNow(command, campaign, actor, use) {
           console.error(`${MODULE_ID} | Midi-QOL's use of ${activity.item?.name} from Sending Stone failed`, err);
         });
         workflow = asking;
+        bindWorkflow(command.id, workflow);
         card = workflow.chatCard ?? null;
         return card ? "saves" : "aborted";
       }
@@ -1049,6 +1060,7 @@ async function midiUseNow(command, campaign, actor, use) {
       if ( !card ) return "aborted";
       workflow = midiCall.workflow ?? globalThis.MidiQOL.Workflow.getWorkflow(card.uuid);
       if ( !workflow ) return "aborted";
+      bindWorkflow(command.id, workflow);
       return workflowSettled(workflow);
     });
 
@@ -1301,6 +1313,8 @@ async function dnd5eDamage(command, card, stored, actor, made, character=actor) 
  * Roll damage into the Midi-QOL workflow waiting for it, as Midi rolls it itself, so that the
  * workflow goes on to apply it. The targets go in the roll's message rather than as the
  * Gamemaster's; but an area's are the Gamemaster's again while Midi may take them from theirs.
+ * Since 0.44.0 the workflow is the damage's run from then on (later-dice.mjs), so that Midi's other
+ * damage, rolled with it or once saves are checked, is asked of a typing player.
  * @param {object} command
  * @param {ChatMessage} card
  * @param {object} stored   What the use kept on the card.
@@ -1311,6 +1325,8 @@ async function midiDamage(command, card, stored, made) {
   const workflow = globalThis.MidiQOL?.Workflow?.getWorkflow(card.uuid);
   if ( !workflow ) return "gone";
   if ( !waitingForDamage(workflow) ) return "not-waiting";
+  // Since 0.44.0 the workflow is this damage's run from now on: Midi's other damage among its rolls.
+  bindWorkflow(command.id, workflow);
   const roll = () => {
     workflow.workflowOptions.damageRollDSN = !document.hidden;
     return withPlan(command, plan => {

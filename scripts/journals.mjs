@@ -728,11 +728,12 @@ function holdsSecret(html) {
 }
 
 /**
- * HTML without its secret sections, and what they hold.
+ * HTML without its secret sections, and what they hold; the same string where it holds none. Since
+ * 0.44.0 Tidy 5e Sheets' journal is sent without them by the same rule (tidy-journal.mjs).
  * @param {string} html
  * @returns {string}
  */
-function withoutSecrets(html) {
+export function withoutSecrets(html) {
   if ( !holdsSecret(html) ) return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
   for ( const section of doc.body.querySelectorAll("section.secret") ) section.remove();
@@ -1189,12 +1190,12 @@ function changedFlag(entry) {
 
 /**
  * Text cut to at most this many characters, never through a character written as two, and whether
- * it was cut.
+ * it was cut. Since 0.44.0 Tidy 5e Sheets' journal is cut by it too (tidy-journal.mjs).
  * @param {string} text
  * @param {number} most
  * @returns {[string, boolean]}
  */
-function cutText(text, most) {
+export function cutText(text, most) {
   if ( text.length <= most ) return [text, false];
   const end = /[\uD800-\uDBFF]/.test(text[most - 1]) ? most - 1 : most;
   return [text.slice(0, end), true];

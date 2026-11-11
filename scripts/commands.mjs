@@ -1,6 +1,6 @@
 import {
-  ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID, PREPARE_KINDS,
-  PROTOCOL_VERSION, ROLL_KINDS, TURN_KINDS
+  ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, DICE_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID,
+  PREPARE_KINDS, PROTOCOL_VERSION, ROLL_KINDS, TURN_KINDS
 } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
@@ -31,11 +31,15 @@ import { noteCompanionReader } from "./creature-sync.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { noteSettingsReader } from "./foundry-settings.mjs";
 import { noteGroupReader } from "./groups.mjs";
+import {
+  answersDiceAsk, beginRun, checkAsks, diceAskFeatures, endRun, heldFor, noteDiceAskReader, runDiceAnswer
+} from "./later-dice.mjs";
 import { noteNotesReader, notesOn, notesReader } from "./journals.mjs";
 import { answersMidiPrompt, midiPromptsOffered, noteMidiReader, noteOpen } from "./midi-prompts.mjs";
 import { prompting } from "./prompts.mjs";
 import { effectDiceSystem } from "./sheet-effect-dice.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
+import { noteTidyReader } from "./tidy-journal.mjs";
 import { currentSession, DeliveryError, refusalError, send } from "./transport.mjs";
 
 /**
@@ -80,6 +84,13 @@ const MAX_WAIT = 300_000;
  * @type {number}
  */
 const WATCHDOG = 60_000;
+
+/**
+ * How often a roll whose run waits on a dice ask looks again whether it still waits, in
+ * milliseconds, since 0.44.0: its watchdog doesn't count the time its asks waited.
+ * @type {number}
+ */
+const HELD_CHECK = 1_000;
 
 /**
  * How many of the latest commands are remembered, so that one fetched twice is made once.
@@ -177,19 +188,24 @@ const made = new Map();
  * may be (`keptRerolls`): each wherever its players may type in their dice and its self-test passed.
  * And since 0.42.1, among the kinds right after the charges and wherever they are, one of their
  * spells prepared or unprepared, which throws no dice either. And since 0.44.0, right after a
- * utility's roll and wherever it is, a plain roll of the app's dice tray.
+ * utility's roll and wherever it is, a plain roll of the app's dice tray; and, last,
+ * whether its players typing in their dice are asked for the dice the game rolls later
+ * (`diceAsks`), under dnd5e 5 wherever they type them and the self-test passed, and if not, why not
+ * (`diceAsksReason`); with it, the answer to such an ask, `"dice"`, last among the kinds.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
  *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean, manualDice: boolean,
  *   midiPrompts: boolean, aloneChoices: boolean, companionPrompts: boolean, effectDice: boolean,
- *   keptRerolls: boolean}}
+ *   keptRerolls: boolean, diceAsks: boolean, diceAsksReason: string|null}}
  */
 export function rollFeatures(campaign) {
+  const asks = diceAskFeatures(campaign);
   const off = {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
     signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false,
-    midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false
+    midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false,
+    diceAsks: false, diceAsksReason: asks.diceAsksReason
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -205,7 +221,8 @@ export function rollFeatures(campaign) {
       ...(attacks ? [...ATTACK_KINDS, ...ENCHANT_KINDS] : []),
       ...(campaign.attacks ? [...CHARGE_KINDS, ...PREPARE_KINDS] : []),
       ...texts,
-      ...(alone ? ALONE_KINDS : [])
+      ...(alone ? ALONE_KINDS : []),
+      ...(asks.diceAsks ? DICE_KINDS : [])
     ],
     reason: null,
     modifiers: (attacks || texts.includes("textDamage") || alone) && diceStatus.modifiers,
@@ -221,7 +238,9 @@ export function rollFeatures(campaign) {
     aloneChoices: alone === true,
     companionPrompts: prompting(campaign),
     effectDice: manualDiceOn(campaign) && diceStatus.effectDice && effectDiceSystem(),
-    keptRerolls: manualDiceOn(campaign) && diceStatus.keptRerolls
+    keptRerolls: manualDiceOn(campaign) && diceStatus.keptRerolls,
+    diceAsks: asks.diceAsks,
+    diceAsksReason: asks.diceAsksReason
   };
 }
 
@@ -262,8 +281,10 @@ export function registerCommandHooks() {
  * game asks of companions, `companions` 2, to which their open prompts are sent again where it first
  * says so (creature-sync.mjs); and since 0.44.0, whether it takes hit points set, for which it's
  * fetched from where the campaign's Gamemaster lets its players, under dnd5e, with everything else
- * off. A hello's answer wakes the campaign's fetching, which may be waiting as an answer given before
- * the hello was taken asked.
+ * off; and whether it reads Tidy 5e Sheets' journal, `notes` 3, which is sent at once
+ * where it starts to in a heartbeat's answer (tidy-journal.mjs), and whether it reads dice asks,
+ * `diceAsks`, the dice the game rolls later asked of a player typing theirs. A hello's answer wakes
+ * the campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -284,7 +305,9 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteHitPointReader(campaignId, features);
   noteAloneReader(campaignId, features, type);
   noteNotesReader(campaignId, features, type);
+  noteTidyReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);
+  noteDiceAskReader(campaignId, features);
   syncPollers();
   if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.wake?.();
 }
@@ -446,6 +469,8 @@ class Poller {
       }
       // Which of its characters the app has open decides whether Midi-QOL's saves wait on it.
       noteOpen(this.campaignId, answer.open);
+      // Since 0.44.0, so do the dice asked of a player typing theirs.
+      checkAsks();
       // The Gamemaster may have changed the campaign while the fetch was held open: its commands are
       // made as it now is.
       const current = getCampaigns().find(({ id }) => id === this.campaignId) ?? campaign;
@@ -564,7 +589,8 @@ class Poller {
  * queue settling checks whether a Wild Shape of that character's is due to end (wild-shape.mjs).
  * Since 0.44.0 hit points set, and a plain roll of the dice tray, wait for their character's earlier
  * commands, as a roll does, a companion's hit points its character's too, and their next ones for
- * them: so a form set to 0 hit points ends once the setting is done.
+ * them: so a form set to 0 hit points ends once the setting is done. Since 0.44.0 an answer to a
+ * dice ask is made at once, as a Midi prompt's answer is: the roll it answers is waiting on it.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -580,7 +606,7 @@ function take(command, campaign) {
     taken.push(command.id);
     if ( taken.length > REMEMBERED ) taken.shift();
   }
-  if ( !note && !dish && answersMidiPrompt(command) ) {
+  if ( !note && !dish && (answersMidiPrompt(command) || answersDiceAsk(command)) ) {
     void make(command, campaign).catch(err => {
       console.error(`${MODULE_ID} | Could not report a roll from Sending Stone`, err);
     });
@@ -652,7 +678,9 @@ export function queueBusy(key) {
  * and the character's next roll goes ahead; if it's made after all, as once the Gamemaster has
  * answered what a module asked them, the app is told so too; and so it is of hit dice spent at
  * once, some of which were spent before they stopped for it. A Gamemaster's roll's result lists
- * the chat messages it has made, by then.
+ * the chat messages it has made, by then. Since 0.44.0 a player's typed roll opens its run
+ * (later-dice.mjs), and its minute doesn't count the time its dice asks waited: while one waits,
+ * it isn't timed out.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {Promise<void>}
@@ -661,16 +689,31 @@ async function make(command, campaign) {
   if ( command.by === "gm" ) made.set(command.id, []);
   let timer;
   const watchdog = new AbortController();
+  const started = Date.now();
   const timeout = new Promise(resolve => {
-    timer = setTimeout(() => {
+    const fire = () => {
+      const { held, waiting } = heldFor(command.id);
+      if ( waiting ) {
+        timer = setTimeout(fire, HELD_CHECK);
+        return;
+      }
+      // A command none of whose asks waited times out now, as before 0.44.0.
+      const left = held ? (started + WATCHDOG + held - Date.now()) : 0;
+      if ( left > 0 ) {
+        timer = setTimeout(fire, left);
+        return;
+      }
       watchdog.abort();
       resolve(failedResult(command, "timeout"));
-    }, WATCHDOG);
+    };
+    timer = setTimeout(fire, WATCHDOG);
   });
+  const run = beginRun(command, campaign);
   const running = runCommand(command, campaign, watchdog.signal).catch(err => {
     console.error(`${MODULE_ID} | Could not make a roll from Sending Stone`, err);
     return failedResult(command, "error", err instanceof Error ? err.message : String(err));
   });
+  void running.finally(() => endRun(run));
   try {
     const result = await Promise.race([running, timeout]);
     send(EVENTS.COMMAND_RESULT, withMessages(command, result), campaign, { sequenced: false });
@@ -751,6 +794,7 @@ function runCommand(command, campaign, signal) {
     case "hitPoints": return runHitPointsCommand(command, campaign);
     case "plainRoll": return runPlainRollCommand(command, campaign);
     case "note": return runNoteCommand(command, campaign);
+    case "dice": return runDiceAnswer(command, campaign);
     default: return runRollCommand(command, campaign, { signal });
   }
 }

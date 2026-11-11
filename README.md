@@ -82,7 +82,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | GM-only details | Also send what only a Gamemaster can see. Off by default. |
 | General | Run players' attacks through Midi | Shown while Midi-QOL is active. On by default: players' attacks, spells and features from the app go through Midi's workflow. Off: they stay in the app while Midi handles items' uses. |
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
-| Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; and whether the game system is D&D Fifth Edition. |
+| Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; since 0.44.0 whether Tidy 5e Sheets is active, turned off or not installed, none of which is a fault; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
 | A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Allow Players to change their hit points from the app, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Hit points**, whether its players may set their characters', forms' and companions' hit points and temporary hit points from the app, on by default ([Hit points](#hit-points)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
@@ -167,13 +167,40 @@ while the roll is being made.
   effects applied to the character in Foundry are found: a Bless the table narrates is added with
   Modify Roll. The die they type is the die kept: Foundry rerolls none of it, a Halfling's 1 or a
   Great Weapon Fighter's 1 or 2, as they rerolled at the table; a die the game throws itself still
-  rerolls. An explosion is still Foundry's. Since 0.42.1, the 2024 Bardic Inspiration a bard gave
-  the character is offered beside Done, left out until the player adds it once the Gamemaster says
-  the roll fails; once the roll is made, the app removes Inspired where the campaign lets players
+  rerolls. An explosion is still Foundry's, but since 0.44.0, under dnd5e 5, the player is asked
+  for the die it throws too (below). Since 0.42.1, the 2024 Bardic Inspiration a bard gave the
+  character is offered beside Done, left out until the player adds it once the Gamemaster says the
+  roll fails; once the roll is made, the app removes Inspired where the campaign lets players
   remove their own effects, and otherwise says to ask the Gamemaster. Inspired is applied from the
   bard's card by the Gamemaster (a player can't apply it to another player's character). The 2014
   one is added with Modify Roll. Midi-QOL's optional bonuses are still offered on the Gamemaster's
   screen.
+- **The dice the game rolls later, since 0.44.0, under dnd5e 5.** A player typing in their dice is
+  asked for the dice their item rolls after the roll they sent too: the 2d6 cold that Midi-QOL rolls
+  with dnd5e's own Ice Knife's 1d10, another activity's damage Midi rolls once saves are checked,
+  the dice a use spends (a cost of `1d4` charges), a Midi bonus damage macro's formula, such as
+  Sneak Attack's, and a die of theirs Foundry throws again, an explosion or a reroll they didn't
+  keep at the table, one die at a time, where the die before it was theirs. It follows whatever the
+  item's workflow rolls, homebrew included, from what dnd5e and Midi put on each roll, and a use's
+  cost from the use's own spending, with no code for any item. The app asks on the device the
+  player rolled from; while it waits, a small window on your screen says whose dice and how long is
+  left, with **Roll it now**; if you're typing in the chat as it opens, you go on typing there.
+  After a minute, or once the character is closed in the app, Foundry's computer dice roll it,
+  never your own Manual Dice. Rolls of other players, of targets, NPCs and
+  your own are never asked, a damage you roll for a player's attack among them, from the app or on
+  Midi's card, your own use of the player's item from its sheet or Midi's card, nor a d20 the game
+  rolls later: the saves a spell asks come as prompts. A roll of yours may be asked wrongly only
+  where a macro or module of yours makes it with the very item the player is rolling, with no
+  click, while their roll is being made, or builds it just as Midi builds a bonus damage, in the
+  instant before Midi rolls one; PROTOCOL.md names both.
+  Not yet under dnd5e 6, whose campaigns' hellos say so. See
+  [PROTOCOL.md](PROTOCOL.md#dice-the-game-rolls-later). And under dnd5e 5 or 6, the module's own
+  check of what a use from the app would spend, which it throws away, rolls a dice cost with
+  Foundry's computer dice, never your Manual Dice; so do Midi-QOL's own check of it as Midi's use
+  begins, its check of the cost of a player's typed run's other activity, under dnd5e 5, and the
+  module's dice self-test as it starts. The cost the use spends is rolled as ever: your own dice
+  settings, or a typing player's dice. Midi's checks of other uses, as the reactions it looks for
+  among the targets, are rolled as Midi rolls them.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -477,6 +504,21 @@ edited in Foundry's other editor is shown read only in the app. A page you hide 
 journal's players isn't shown in the app at all. A secret you write stays in Foundry wherever a
 player couldn't read it there: in a party's journal, and on a page of a character's journal that its
 players don't all own. There's no switch.
+
+**Tidy 5e Sheets' journal**, since 0.44.0. Under D&D Fifth Edition, the entries a character's
+players keep on the Journal tab of [Tidy 5e Sheets](https://foundryvtt.com/packages/tidy5e-sheet)
+show in the app too, read only, in a section of their own at the end of the character's journal,
+each marked as Tidy's, in Tidy's order: the current sheet's entries, then the five boxes of Tidy's
+Classic sheet (Persons of Interest, Locations of Interest, Quests, Miscellaneous and Journal
+Entries), which Tidy 13 still offers and Tidy 14 keeps on the character but no longer shows. Change
+them in Foundry, on the character's Journal tab, as ever: the app shows the change within a few
+seconds, and nothing it does ever writes Tidy's entries, or anything else of Tidy's. They're read
+off the character itself, so they still show while Tidy is turned off, or once it's uninstalled,
+the app saying they can't be changed until it's back; and from the character, never its Wild Shape
+form, whose Journal tab dnd5e doesn't carry back when the form ends. Their secrets go to the app
+only where a player owns the character, as on your own journal's pages. Tidy keeps no dates for its
+entries: the app shows when it first saw each, and when it last changed. A character's Tidy journal
+of more than 400 entries, or larger than the app takes, isn't sent, and you're told so once.
 
 ### Dishes from the Magical Recipe Book
 
@@ -848,7 +890,8 @@ Gamemaster-only information switched on.
   d20s, Elven Accuracy's among them, and a Halfling's reroll of those stays Foundry's.
 - **A die skipped for the game** isn't in the app's own total, which says so; the tray's table total
   has it.
-- **An exploding die** typed in still has Foundry throw its extra die.
+- **An exploding die** typed in has its extra die asked of the player since 0.44.0, under dnd5e 5;
+  under dnd5e 6, or where the app doesn't take the dice the game rolls later, Foundry throws it.
 - **Midi-QOL's optional bonuses**, its Bardic Inspiration among them, are offered on the
   Gamemaster's screen after the roll, with Foundry's dice.
 - **Bane where the game nests a lone negative die** (checked by the self-test) is rolled by Foundry.
@@ -1121,6 +1164,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-turn.mjs` | Ending the current turn from the app, the character's or one of its companions', where it's still the turn the app was shown, by Foundry's own Next Turn; and taking back the turn one just ended, with Foundry's turn events off |
 | `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat; from 0.42.1, a spell slot spent or restored |
 | `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent |
+| `scripts/tidy-journal.mjs` | From 0.44.0, Tidy 5e Sheets' journal on a campaign's characters, read only: its current sheet's entries and its Classic sheet's boxes, read straight off the character's flags whether Tidy is active or not, in Tidy's order, without secrets where no player owns the character; what the hello says of it; sending each character's in `journal.tidy` after a hello's books and 500 ms after its Tidy flags or ownership change, never twice the same, withheld when too large |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch; nothing posted |
@@ -1134,7 +1178,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-dishes.mjs` | Dishes from the Magical Recipe Book, from 0.38.0: whether a campaign takes them, by its own switch under dnd5e 5; fetching them from an app that takes them; each dish command checked and posted once as its card, answered again from its card or its tombstone |
 | `scripts/dish-card.mjs` | A dish's card, whispered to the Gamemasters and the campaign's players: its words, its buttons for Gamemasters, what became of it for anyone, the dialog of who ate it, serving it and setting it aside; telling the app what was decided, again after a drop and after every hello; deleted cards' tombstones; one dish effect per character |
 | `scripts/dish-effects.mjs` | A dish's Active Effect: its changes on dnd5e 5.3.3's paths, its one-offs, its duration and flags; cookbook strings made inert for enrichers; dish effects ended once their time has passed; the long rest's top-up |
-| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test |
+| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.44.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one, and Midi-QOL's of a use from the app, Foundry's computer dice |
+| `scripts/later-dice.mjs` | From 0.44.0, under dnd5e 5, the dice the game rolls later asked of a player typing theirs: a typed roll's run, bound to its Midi-QOL workflow; which rolls are its, by their subject, workflow, a use's own spending (its consumption hooks, and Midi's check of a workflow's other activity's consumption) and Midi's bonus damage; one ask per step, or per die thrown again, a minute's wait, the Gamemaster's window with Roll it now, the answers and their refusals, what the watchdog doesn't count, the hello's list, and its self-test |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster; and from 0.39.0 the links to the module's issue forms at the end of its side |
 | `scripts/apps/help-window.mjs` | From 0.39.0, Configure Settings' Report a bug or request a feature, which any user may open: the links to the module's issue forms |
 | `scripts/issue-links.mjs` | From 0.39.0, the module's bug and feature forms on GitHub, the bug form's with the module's, Foundry's and the system's versions filled in |

@@ -36,7 +36,7 @@ const realSetTimeout = globalThis.setTimeout
 globalThis.setTimeout = (fn, ms = 0, ...args) => realSetTimeout(fn, ms >= 1000 ? ms / 100 : ms, ...args)
 globalThis.document = { hidden: false }
 
-const { messages } = await import('./dice-core.mjs')
+const { core, messages, prompts } = await import('./dice-core.mjs')
 const { default: BasicDie } = await import(`${DND5E}/basic-die.mjs`)
 const { default: BasicRoll } = await import(`${DND5E}/basic-roll.mjs`)
 const { default: D20Die } = await import(`${DND5E}/d20-die.mjs`)
@@ -70,7 +70,7 @@ settings.set('criticalDamageMaxDice', false)
 settings.set('attackRollVisibility', 'hideAC')
 
 const { Actor5e } = await import('./actor5e.mjs')
-const { activityTypes, equip, screen } = await import('./activity5e.mjs')
+const { ConsumptionTarget, Item5e, activityTypes, equip, screen } = await import('./activity5e.mjs')
 const { midi, installMidi, MidiActivity } = await import('./midi-fake.mjs')
 const {
   ActiveEffect5e, EnchantActivity, createRules, effectReads, effectsMade, midiEnchant, midiEnchantActivity, registry: enchantments,
@@ -79,6 +79,8 @@ const {
 globalThis.dnd5e = {
   settings: { rulesVersion: 'modern' },
   documents: { activity: { EnchantActivity, CastActivity: { ENCHANTMENT_ID: staticID('dnd5espellchanges') } } },
+  // Since module 0.44.0 its consumption targets, as dnd5e's, whose roll of a dice cost the module wraps.
+  dataModels: { activity: { ConsumptionTargetData: ConsumptionTarget } },
   utils: { staticID },
   registry: {
     enchantments,
@@ -1121,6 +1123,28 @@ for (const [named, activity, enchant] of [
 assert.equal(madeEnchantments(), madeBefore, 'no enchantment was made')
 assert.equal(messages.size, cardsBefore, 'no card was posted')
 ok('a magic item\'s template or a choice made once, left to Foundry, is refused if named anyway, applying nothing')
+
+// Since module 0.44.0 (ROADMAP item 22): an enchantment from the app that spends dice, a Spark
+// Dagger's Charge Blade, 1d4 of its charges, with the Gamemaster rolling their own dice by hand: the
+// module's own check of what it spends, and with MIDI=1 Midi-QOL's own (its use's checkAutoConsume),
+// each thrown away, are Foundry's computer dice; only the cost dnd5e spends is the Gamemaster's.
+ari.items.set('spark', new Item5e(ari, weapon('spark', 'Spark Dagger', 40, 'simpleM', ['mgc'], {
+  system: { uses: { max: 8, spent: 0 } },
+  activities: [{ id: 'spark-coat', type: 'enchant', name: 'Charge Blade', activation: { type: 'bonus', value: 1 }, self: true,
+    consumption: [{ type: 'itemUses', value: '1d4', target: '' }], restrictionType: 'weapon', allowMagical: true, categories: ['simpleM'],
+    profiles: [{ _id: 'sparkprofile0001' }] }],
+  effects: [enchantment('sparkprofile0001', 'Charged', [], { duration: { seconds: 60 } })],
+})))
+const consumeChecks = midi.consumeChecks.length
+prompts.splice(0)
+core.interactive = true
+const charged = await use('spark', 'spark-coat', { enchant: { profile: 'sparkprofile0001' } })
+core.interactive = false
+assert.equal(charged.status, 'done', JSON.stringify(charged))
+assert.ok((item('spark').system.uses.spent >= 1) && (item('spark').system.uses.spent <= 4), `1d4 spent: ${item('spark').system.uses.spent}`)
+assert.deepEqual([prompts.splice(0), midi.consumeChecks.length - consumeChecks], [['0 + 1d4'], MIDI ? 1 : 0],
+  "the cost the Gamemaster's manual dice once; its checks beforehand Foundry's computer dice")
+ok(`an enchantment from the app spending 1d4 charges: its cost rolled once by the Gamemaster's own manual dice, as before; the module's own check of it${MIDI ? ", and Midi-QOL's own as its use began," : ''} thrown away, Foundry's computer dice (ROADMAP item 22)`)
 
 const stranger = await send({ id: `end-${++ids}`, actorId: 'bryn', kind: 'endEnchantment', mode: 0, explicit: false, extras: [], dice: [], enchantment: { item: 'club', effect: 'brynmwonclub0001' } })
 assert.deepEqual([stranger.status, stranger.reason], ['failed', 'item'], 'Bryn has no club')

@@ -7,7 +7,8 @@ import {
 import { defaultSlot, offersTypes, scaleAsUsed } from "./command-uses.mjs";
 import { commandActor } from "./creatures.mjs";
 import {
-  changesDamage, diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable, withPlan
+  changesDamage, costCheck, diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable,
+  withPlan
 } from "./dice-plan.mjs";
 import {
   markMidiBonusAction, markMidiReaction, midiActivities, midiBonusActionUsed, midiReactionUsed
@@ -233,13 +234,18 @@ export async function runItemDamageCommand(command, campaign) {
 
   // What using it would spend, worked out without spending it, as dnd5e's use works it out: never
   // the action itself; its other consumption as dnd5e fills it in, a target spent only in a fight
-  // left out of one; and concentration begun, at the limit the one dnd5e names ended.
+  // left out of one; and concentration begun, at the limit the one dnd5e names ended. Since 0.44.0
+  // its spending names the roll it's made for, so that a typed roll's run's dice costs are told by
+  // it (later-dice.mjs), and a dice cost rolled for this check, thrown away, is Foundry's computer
+  // dice, asked of no one.
   let usage = null;
   if ( consume ) {
-    usage = activity._prepareUsageConfig({ consume: { action: false, spellSlot: spendsSlot }, ...(slot && { spell: { slot } }) });
+    usage = activity._prepareUsageConfig({
+      consume: { action: false, spellSlot: spendsSlot }, ...(slot && { spell: { slot } }), [ROLL_TAG]: command.id
+    });
     scaleAsUsed(usage, activity);
     try {
-      const errors = await activity._prepareUsageUpdates(usage, { returnErrors: true });
+      const errors = await costCheck(usage, () => activity._prepareUsageUpdates(usage, { returnErrors: true }));
       if ( Array.isArray(errors) && errors.length ) return failed("consume", errors[0]?.message ?? null);
     } catch (err) {
       return failed("consume", err instanceof Error ? err.message : String(err));
@@ -391,7 +397,8 @@ async function spend({ actor, character, item, activity, usage, ammunition, thro
   let concentrating = false;
   let again = null;
   try {
-    again = await activity._prepareUsageUpdates(usage, { returnErrors: true });
+    // Since 0.44.0 a dice cost rolled for this, thrown away, is Foundry's computer dice, asked of no one.
+    again = await costCheck(usage, () => activity._prepareUsageUpdates(usage, { returnErrors: true }));
   } catch {
     again = null;
   }

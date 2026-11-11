@@ -1454,9 +1454,12 @@ export class ConsumptionError extends Error {}
 /**
  * An activity's consumption target, as dnd5e's ConsumptionTargetData, for item uses and the
  * activity's own only (consumption-targets-field.mjs, consumeItemUses and consumeActivityUses): its
- * value of the uses per use, more for each level of scaling where it scales by amount.
+ * value of the uses per use, more for each level of scaling where it scales by amount. Since module
+ * 0.44.0 exported, as a harness may hand it to the module as dnd5e's
+ * (`dnd5e.dataModels.activity.ConsumptionTargetData`), whose `resolveCost` it wraps; and its cost
+ * rolled as dnd5e rolls it, by `resolveCost` itself unless told not to evaluate it.
  */
-class ConsumptionTarget {
+export class ConsumptionTarget {
   constructor(activity, { type = 'itemUses', target = '', value = 1, scaling = {}, combatOnly = false } = {}) {
     // consumption-targets-field.mjs: `combatOnly`, spent only in a fight (module 0.41.0).
     Object.assign(this, { activity, type, target, value, combatOnly: combatOnly === true })
@@ -1464,18 +1467,20 @@ class ConsumptionTarget {
   }
 
   /** consumption-targets-field.mjs:709-711 */
-  resolveCost({ config = {} } = {}) {
-    return this._resolveScaledRoll(this.value, (this.scaling.mode === 'amount') ? (config.scaling ?? 0) : 0)
+  resolveCost({ config = {}, ...options } = {}) {
+    return this._resolveScaledRoll(this.value, (this.scaling.mode === 'amount') ? (config.scaling ?? 0) : 0, options)
   }
 
   /**
    * consumption-targets-field.mjs:743-773: its formula's dice and numbers grown by the scaling, or
-   * the scaling formula, multiplied by it, added.
+   * the scaling formula, multiplied by it, added; since module 0.44.0 a BasicRoll, where dnd5e's
+   * is loaded, carrying what it spends from in its options, `delta`, as dnd5e's does; evaluated,
+   * a Promise of it, unless `evaluate` is false, and kept among the use's `rolls` where it throws dice.
    */
-  _resolveScaledRoll(formula, scaling) {
+  _resolveScaledRoll(formula, scaling, { delta, evaluate = true, rolls } = {}) {
     const { DiceTerm, NumericTerm, OperatorTerm } = foundry.dice.terms
     const rollData = this.activity.getRollData()
-    const roll = new Roll(formula ? `0 + ${formula}` : '0', rollData)
+    const roll = new (CONFIG.Dice?.BasicRoll ?? Roll)(formula ? `0 + ${formula}` : '0', rollData, { delta })
     if (scaling) {
       if (this.scaling.formula) {
         const scalingRoll = new Roll(this.scaling.formula, rollData)
@@ -1494,6 +1499,13 @@ class ConsumptionTarget {
       }
       roll.resetFormula()
     }
+    if (evaluate) {
+      return roll.evaluate().then(evaluated => {
+        if (rolls && !evaluated.isDeterministic) rolls.push(evaluated)
+        return evaluated
+      })
+    }
+    if (rolls && !roll.isDeterministic) rolls.push(roll)
     return roll
   }
 
@@ -1508,8 +1520,7 @@ class ConsumptionTarget {
     const item = this.target ? this.activity.actor.items.get(this.target) : this.activity.item
     const spent = Number(item.system.uses?.spent) || 0
     const value = Math.max((Number(item.system.uses?.max) || 0) - spent, 0)
-    const roll = this.resolveCost({ config })
-    const cost = roll.isDeterministic ? roll.evaluateSync().total : (await roll.evaluate()).total
+    const cost = (await this.resolveCost({ config, delta: { item: item.id, keyPath: 'system.uses.spent' }, rolls: updates.rolls })).total
     let warning
     if ((cost > 0) && !value) warning = 'DND5E.CONSUMPTION.Warning.None'
     else if (cost > value) warning = 'DND5E.CONSUMPTION.Warning.NotEnough'
@@ -1535,8 +1546,7 @@ class ConsumptionTarget {
   async #consumeAttribute(config, updates) {
     const actor = this.activity.actor
     const keyPath = `system.${this.target}`
-    const roll = this.resolveCost({ config })
-    const cost = roll.isDeterministic ? roll.evaluateSync().total : (await roll.evaluate()).total
+    const cost = (await this.resolveCost({ config, delta: { keyPath }, rolls: updates.rolls })).total
     if (getProperty(actor, keyPath) === undefined) throw new ConsumptionError('DND5E.CONSUMPTION.Warning.MissingAttribute')
     let current = getProperty(actor, keyPath)
     let warning
@@ -1556,8 +1566,7 @@ class ConsumptionTarget {
    */
   async #consumeActivityUses(config, updates) {
     const uses = this.activity.uses ?? { value: 0, spent: 0 }
-    const roll = this.resolveCost({ config })
-    const cost = roll.isDeterministic ? roll.evaluateSync().total : (await roll.evaluate()).total
+    const cost = (await this.resolveCost({ config, delta: { item: this.activity.item.id, keyPath: `system.activities.${this.activity.id}.uses.spent` }, rolls: updates.rolls })).total
     let warning
     if ((cost > 0) && !uses.value) warning = 'DND5E.CONSUMPTION.Warning.None'
     else if (cost > uses.value) warning = 'DND5E.CONSUMPTION.Warning.NotEnough'

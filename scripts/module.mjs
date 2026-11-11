@@ -18,9 +18,11 @@ import { installDicePlans, selfTest } from "./dice-plan.mjs";
 import { registerSettingsWatch } from "./foundry-settings.mjs";
 import { startHeartbeat } from "./heartbeat.mjs";
 import { registerJournalHooks } from "./journals.mjs";
+import { installLaterDice } from "./later-dice.mjs";
 import { installMidiPrompts, registerMidiPromptHooks } from "./midi-prompts.mjs";
 import { registerPromptHooks } from "./prompts.mjs";
 import { registerSettings } from "./settings.mjs";
+import { registerTidyHooks } from "./tidy-journal.mjs";
 
 Hooks.once("init", () => {
   registerSettings();
@@ -30,6 +32,7 @@ Hooks.once("init", () => {
   registerCharacterHooks();
   registerCreatureHooks();
   registerJournalHooks();
+  registerTidyHooks();
   registerPromptHooks();
   registerMidiPromptHooks();
   registerCommandHooks();
@@ -52,6 +55,8 @@ Hooks.once("ready", async () => {
     if ( game.system.id === "dnd5e" ) {
       installDicePlans();
       installMidiPrompts();
+      // Since 0.44.0, after the dice plans, whose hooks it follows: under dnd5e 5 alone.
+      installLaterDice();
     }
     await selfTest();
   }

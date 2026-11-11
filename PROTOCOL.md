@@ -21,7 +21,7 @@ Authorization: Bearer <the campaign's secret>     (only when one is configured)
 
 | Your answer | What the module does |
 | --- | --- |
-| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). In answer to a `bridge.hello` or `bridge.heartbeat`, `{"features": {"commands": true}}` says the listener has players' rolls for the module to fetch; see [Rolls from the app](#rolls-from-the-app). Since module 0.22.0, in answer to those and to a `character.updated`, `features`' `slimSheets` and `maxBytes` say what the listener takes of sheets and posts; see [below](#post-size-and-slim-sheets). Since module 0.27.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `midiPrompts` says the listener reads [Midi-QOL's prompts](#midi-qols-own-saves). Since module 0.30.0, in answer to those, `features`' `groups` says it reads [groups](#group), and `settings` that it reads [`bridge.settings`](#bridgesettings); and a `group.updated`'s answer says what it takes of sheets, as a `character.updated`'s does. Since module 0.38.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `dishes` says the listener takes [dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). Since module 0.41.0, in answer to those, `features`' `companions` at 2 or more says it reads the [saves the game asks](#saves-the-game-asks-for) of companions, as well as companions. Since module 0.44.0, in answer to those, `features`' `hitPoints` says it takes [hit points set](#hit-points) from the app. All may be in one body. Anything else is ignored. |
+| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). In answer to a `bridge.hello` or `bridge.heartbeat`, `{"features": {"commands": true}}` says the listener has players' rolls for the module to fetch; see [Rolls from the app](#rolls-from-the-app). Since module 0.22.0, in answer to those and to a `character.updated`, `features`' `slimSheets` and `maxBytes` say what the listener takes of sheets and posts; see [below](#post-size-and-slim-sheets). Since module 0.27.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `midiPrompts` says the listener reads [Midi-QOL's prompts](#midi-qols-own-saves). Since module 0.30.0, in answer to those, `features`' `groups` says it reads [groups](#group), and `settings` that it reads [`bridge.settings`](#bridgesettings); and a `group.updated`'s answer says what it takes of sheets, as a `character.updated`'s does. Since module 0.38.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `dishes` says the listener takes [dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). Since module 0.41.0, in answer to those, `features`' `companions` at 2 or more says it reads the [saves the game asks](#saves-the-game-asks-for) of companions, as well as companions. Since module 0.44.0, in answer to those, `features`' `hitPoints` says it takes [hit points set](#hit-points) from the app, and `diceAsks` that it reads [dice asks](#dice-the-game-rolls-later), the dice the game rolls later asked of a player typing theirs. All may be in one body. Anything else is ignored. |
 | `408`, `425`, `429`, any `5xx`, no answer, or no answer within 10 s | Retried after 1 s, then again after 3 s, with the same envelope. Dropped after the third failure. |
 | Any other status, such as `400` or `401` | Dropped immediately. |
 
@@ -1232,7 +1232,7 @@ Dice is switched on or off while a campaign allows its players to enter their di
 | `system` | `{ id, title, version }` of the game system. |
 | `bridge` | `{ userId, name }` of the Gamemaster whose browser is sending. |
 | `config` | `{ chat, chatScope, combat, gmContent }`: which events are on, whether chat is `"all"` a campaign's players can read or only what its characters said (`"connected"`), and whether Gamemaster-only information is sent. |
-| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls, gmRollMessages, manualDice, midiPrompts, aloneChoices, companionPrompts, effectDice, keptRerolls } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; since module 0.29.0 `"endConcentration"` wherever players' rolls are made, and `"spend"` and `"inspiration"` wherever the Gamemaster lets them attack and cast, whether or not the game can make their attacks now, as while the attack self-test fails or **Run players' attacks through Midi** is off; since module 0.42.1 `"spellSlot"` right after them, wherever they are; since module 0.42.1 `"prepare"` right after them, wherever they are; since module 0.44.0 `"plainRoll"`, a [plain roll](#a-plain-roll) of the dice tray, right after `"formula"`, wherever players' rolls are made; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). And since module 0.25.0 `gmRollMessages`, `true` wherever `gmRolls` is: such a roll's [`command.result`](#commandresult) lists the chat messages it made, `messages`. And since module 0.26.0 `manualDice`, whether the campaign's players may enter what their own dice show in the app: `true` only while players' rolls are made (`enabled`), the Gamemaster allows it and [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) is on, else `false`. Since module 0.32.0 a player enters them where their character's [`manualDice`](#character) is also `true`, sending the roll [`typed`](#fetching-rolls); before it, nothing was entered. And since module 0.27.0 `midiPrompts`: `true` where `prompts` is and this Midi-QOL has what [asking its own saves](#midi-qols-own-saves) needs, else `false`; a listener needs nothing from it, as Midi prompts are sent only to one that says it reads them. And since module 0.41.0 `aloneChoices`, `true` exactly where `"itemDamage"` is among the `kinds`, else `false`: [damage on its own](#damage-on-its-own-and-recharges) may name a spell slot, an attack mode and ammunition and ask to spend what its use would, on a row whose [`tableDamage`](#what-an-item-rolls) carries `choices`, which it carries to a listener that answers `"aloneChoices": 1`. And since module 0.41.0 `companionPrompts`, after it, `true` exactly where `prompts` is, else `false`: the [saves the game asks](#saves-the-game-asks-for) of a listed [companion](#companions) are asked too, of a listener that answers `"companions": 2`. And since module 0.42.0 `effectDice`, after it, `true` under dnd5e 5 where `manualDice` is and the self-test has checked a typed roll's effect dice: a typed d20 roll's [`effectDice`](#fetching-rolls) are its player's; and `keptRerolls`, last, `true` where `manualDice` is and the self-test has checked a kept reroll: a typed roll's [`rerolls`](#fetching-rolls) `"kept"` is honoured. See [Rolls from the app](#rolls-from-the-app). Since module 0.31.0, beside `rolls`, never inside it, and under any system, `transfers`: `{ enabled, kinds, reason }`, whether the campaign's players may [move items and coins](#moving-items-and-coins) from the app: `{ enabled: false, kinds: [], reason: "off" }` until the Gamemaster turns **Players move items and coins** on; `reason` `"system"` with it on under a system other than D&D Fifth Edition; and with it on under dnd5e, `{ enabled: true, kinds: ["transfer"], reason: null }`. Since module 0.32.0 it ends with `partySends` and `distribute`, `true` both wherever `enabled` is and `false` otherwise: `partySends`, a party's items and coins may be [sent](#moving-items-and-coins) by a player whose character's users own it to any of the campaign's characters or another of its parties they own, and by the Gamemaster to any of them, party to party no longer refused; `distribute`, a `transfer` may share a party's coin among its characters, `among`. It reads neither the rolls, nor the self-test, nor whether the world has groups. Since module 0.33.0, beside them, under any system, `removals`: `{ enabled, kinds, reason }`, whether an item may be [removed](#removing-an-item) from a character from the app: `{ enabled: true, kinds: ["remove"], reason: null }` under dnd5e, otherwise `{ enabled: false, kinds: [], reason: "system" }`; there's no switch. Since module 0.34.0, beside them, `notes`: `{ enabled, kinds, reason, journals }`, whether [journal notes](#journal-notes) are kept here (always, under any system: `{ enabled: true, kinds: ["personal", "party"], reason: null }`), and `journals`, the campaign's characters and parties whose journal for this campaign exists in Foundry, as `{ kind, actorId }`, `kind` `"personal"` or `"party"`: `[]` where none has one. A book it doesn't list has no journal; one it lists follows the hello in a [`journal.updated`](#journalupdated). Since module 0.35.0 `notes` also says `orders: true`, that it takes the app's [`order`](#journal-notes) of a group's notes and keeps Foundry's order, and `changes: true`, that it says who deleted or reordered notes in Foundry, in `journal.updated`'s `journal.changed`, to a listener that answers `"notes": 2`. Since module 0.36.0, beside them, `companions`: `{ kinds, initiative }`, the kinds a [companion](#companions)'s command may be, as the campaign takes them now, `rolls`' `kinds` without `inspiration`, `hitDie`, `hitDice`, `spend`, `transfer`, `remove`, `note`, `endTurn` and `undoEndTurn`, and, since module 0.42.1, `spellSlot` and `prepare`, and since module 0.44.0 `plainRoll`, `[]` where rolls are off; and the campaign's companions' initiative, `"own"` or `"after"`, whether or not rolls are on. And `rolls`' `kinds` gain `"itemDamage"` and `"recharge"`, after the descriptions', where the Gamemaster lets players attack and the damage self-test has passed, Midi-QOL's integration on or off, under dnd5e 5 and 6: [damage on its own and recharges](#damage-on-its-own-and-recharges); `modifiers` is then `true` where the self-test allows it; and `"endTurn"`, right after `"endConcentration"`, [ending the current turn](#rolls-from-the-app), the character's or one of its companions', wherever the campaign's rolls are made, attacks or not, Midi-QOL or not; never among `features.companions.kinds`; and `"undoEndTurn"` right after it, taking back an `endTurn` the listener just sent; never among `features.companions.kinds`. Since module 0.37.0, after `companions`, `favorites`: `{ enabled, kinds, reason }`, whether a character's [favorites](#favorites) may be added and removed from the app: `{ enabled: true, kinds: ["favorite"], reason: null }` under dnd5e, otherwise `{ enabled: false, kinds: [], reason: "system" }`; there's no switch, and it reads neither the rolls nor the self-test. `"favorite"` is never among `rolls`' `kinds`, nor `features.companions.kinds`. Since module 0.38.0, after `favorites`, `dishes`: `{ enabled, kinds, reason, versions }`, whether the campaign takes [dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book), by its own switch, **Dishes from the Magical Recipe Book**: `{ enabled: false, kinds: [], reason: "off", versions: [] }` until the Gamemaster turns it on; `reason` `"system"` with it on under any system but dnd5e 5, dnd5e 6 among them; and with it on under dnd5e 5, `{ enabled: true, kinds: ["dish"], reason: null, versions: [1] }`, `versions` the cookbook body versions it reads. It reads neither the rolls nor the self-test. `"dish"` is never among `rolls`' `kinds`, nor `features.companions.kinds`. Since module 0.39.0, after `dishes`, `effects`: `{ enabled, kinds, reason }`, whether the campaign's players may turn off, turn on and delete [their own effects](#a-players-own-effects) from the app, by its own switch, **Allow Players to disable & remove their own active effects**: `{ enabled: false, kinds: [], reason: "off" }` until the Gamemaster turns it on; `reason` `"system"` with it on under a system other than D&D Fifth Edition; and with it on under dnd5e 5 or 6, `{ enabled: true, kinds: ["effect"], reason: null }`. It reads neither the rolls nor the self-test. `"effect"` is never among `rolls`' `kinds`, nor `features.companions.kinds`. Since module 0.40.0, after `effects`, `wildShape`: `{ enabled, kinds, reason }`, whether the campaign's players may use [Wild Shape](#wild-shape) from the app, by its own switch, **Allow Players to use Wild Shape from the app**: `{ enabled: false, kinds: [], reason: "off" }` until the Gamemaster turns it on; `reason` `"system"` with it on under a system other than D&D Fifth Edition; and with it on under dnd5e 5 or 6, `{ enabled: true, kinds: ["wildShape"], reason: null }`. It reads neither the rolls nor the self-test. `"wildShape"` is never among `rolls`' `kinds`, nor `features.companions.kinds`. Since module 0.44.0, after `wildShape`, `hitPoints`: `{ enabled, kinds, reason }`, whether the campaign's players may set [their hit points](#hit-points) from the app, by its own switch, **Allow Players to change their hit points from the app**, on until the Gamemaster turns it off, a campaign saved before 0.44.0 on too: `{ enabled: true, kinds: ["hitPoints"], reason: null }` under dnd5e 5 or 6; `{ enabled: false, kinds: [], reason: "off" }` with it off; and `reason` `"system"` with it on under a system other than D&D Fifth Edition. It reads neither the rolls nor the self-test. `"hitPoints"` is never among `rolls`' `kinds`, nor `features.companions.kinds`, but is taken with [`of`](#fetching-rolls), for a companion, wherever `enabled` is. |
+| `features` | `{ rolls: { enabled, kinds, reason, modifiers, areaAttacks, prompts, activityChecks, signedDice, selfTargets, gmRolls, gmRollMessages, manualDice, midiPrompts, aloneChoices, companionPrompts, effectDice, keptRerolls, diceAsks, diceAsksReason } }`: whether the campaign's players' rolls in the app are made in the game, which `kinds` it makes (since module 0.16.0, `"formula"` among the checks, and `"hitDie"` once the self-test has checked that a hit die takes the player's die, and since module 0.20.0 `"hitDice"` with it, never without; with `"attack"`, `"use"` and `"damage"` when the Gamemaster lets the campaign's players attack and cast from the app too, and the game can make their attacks and spells, and since module 0.21.0 `"endEnchantment"` with them, never without; since module 0.29.0 `"endConcentration"` wherever players' rolls are made, and `"spend"` and `"inspiration"` wherever the Gamemaster lets them attack and cast, whether or not the game can make their attacks now, as while the attack self-test fails or **Run players' attacks through Midi** is off; since module 0.42.1 `"spellSlot"` right after them, wherever they are; since module 0.42.1 `"prepare"` right after them, wherever they are; since module 0.44.0 `"plainRoll"`, a [plain roll](#a-plain-roll) of the dice tray, right after `"formula"`, wherever players' rolls are made; and since module 0.17.0, for the [links in their descriptions](#descriptions-that-roll), under dnd5e 5 only, `"textRoll"`, `"ask"` where its roll request card can be made, and `"textDamage"` when the Gamemaster lets the campaign's players attack too, and the self-test has checked that damage takes their dice, even with **Run players' attacks through Midi** off), and if not, why not: `"off"` until the Gamemaster turns them on, `"system"` under a system other than D&D Fifth Edition, `"self-test"` when this Foundry or a module rolls dice differently than expected; and `modifiers`, whether players may change their damage in the app, with more dice, another die or every die at its highest, which the self-test checks: an attack's or use's, and since module 0.19.0 a description's, so wherever `"damage"` or `"textDamage"` is among the `kinds`; `areaAttacks`, whether an attack at an area is made at the targets the player picks, `true` wherever attacks are made, since module 0.16.0; `prompts`, whether its players are asked in the app for the [saves the game asks](#saves-the-game-asks-for) of their characters; and since module 0.21.0 `activityChecks`, whether a `skill`, `tool` or `ability` may name a check activity's `item` and `activity`, to [roll the character's own check](#descriptions-that-roll) for it, `true` wherever players' rolls are made under dnd5e 5, attacks or not; and since module 0.21.0 `signedDice`, `true` wherever players' rolls are made: more dice and another die change only a die damage adds, never one it takes away, and attack and use previews mark those [`subtracted`](#attacks). A listener needs it for a description's damage, which it plans itself; an attack's preview shows it by its marks. And since module 0.22.0 `selfTargets`, whether a `use` may be made at its user beside the combatants picked, [`self`](#spells-and-features), `true` wherever `"use"` is among the `kinds`. And since module 0.23.0 `gmRolls`, `true` wherever players' rolls are made: a roll may say it's the campaign's Gamemaster's, made in the app as the character, [`by`](#fetching-rolls) `"gm"`, which is then [marked as theirs](#making-a-roll). And since module 0.25.0 `gmRollMessages`, `true` wherever `gmRolls` is: such a roll's [`command.result`](#commandresult) lists the chat messages it made, `messages`. And since module 0.26.0 `manualDice`, whether the campaign's players may enter what their own dice show in the app: `true` only while players' rolls are made (`enabled`), the Gamemaster allows it and [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) is on, else `false`. Since module 0.32.0 a player enters them where their character's [`manualDice`](#character) is also `true`, sending the roll [`typed`](#fetching-rolls); before it, nothing was entered. And since module 0.27.0 `midiPrompts`: `true` where `prompts` is and this Midi-QOL has what [asking its own saves](#midi-qols-own-saves) needs, else `false`; a listener needs nothing from it, as Midi prompts are sent only to one that says it reads them. And since module 0.41.0 `aloneChoices`, `true` exactly where `"itemDamage"` is among the `kinds`, else `false`: [damage on its own](#damage-on-its-own-and-recharges) may name a spell slot, an attack mode and ammunition and ask to spend what its use would, on a row whose [`tableDamage`](#what-an-item-rolls) carries `choices`, which it carries to a listener that answers `"aloneChoices": 1`. And since module 0.41.0 `companionPrompts`, after it, `true` exactly where `prompts` is, else `false`: the [saves the game asks](#saves-the-game-asks-for) of a listed [companion](#companions) are asked too, of a listener that answers `"companions": 2`. And since module 0.42.0 `effectDice`, after it, `true` under dnd5e 5 where `manualDice` is and the self-test has checked a typed roll's effect dice: a typed d20 roll's [`effectDice`](#fetching-rolls) are its player's; and `keptRerolls`, after it, `true` where `manualDice` is and the self-test has checked a kept reroll: a typed roll's [`rerolls`](#fetching-rolls) `"kept"` is honoured. And since module 0.44.0 `diceAsks`, after it, `true` under dnd5e 5 where `manualDice` is and the self-test has checked dice asks, else `false`: a player typing in their dice is asked for [the dice the game rolls later](#dice-the-game-rolls-later), by a listener that answers `"diceAsks": 1`, and `"dice"`, the answer to an ask, is then last among the `kinds` and among `features.companions.kinds`, never without; and `diceAsksReason`, last, `null` where `diceAsks` is `true`, else why not: `"system"` under any system but dnd5e 5, dnd5e 6 among them, whose support is to come; else `"manualDice"` where `manualDice` is `false`; else `"self-test"`. See [Rolls from the app](#rolls-from-the-app). Since module 0.31.0, beside `rolls`, never inside it, and under any system, `transfers`: `{ enabled, kinds, reason }`, whether the campaign's players may [move items and coins](#moving-items-and-coins) from the app: `{ enabled: false, kinds: [], reason: "off" }` until the Gamemaster turns **Players move items and coins** on; `reason` `"system"` with it on under a system other than D&D Fifth Edition; and with it on under dnd5e, `{ enabled: true, kinds: ["transfer"], reason: null }`. Since module 0.32.0 it ends with `partySends` and `distribute`, `true` both wherever `enabled` is and `false` otherwise: `partySends`, a party's items and coins may be [sent](#moving-items-and-coins) by a player whose character's users own it to any of the campaign's characters or another of its parties they own, and by the Gamemaster to any of them, party to party no longer refused; `distribute`, a `transfer` may share a party's coin among its characters, `among`. It reads neither the rolls, nor the self-test, nor whether the world has groups. Since module 0.33.0, beside them, under any system, `removals`: `{ enabled, kinds, reason }`, whether an item may be [removed](#removing-an-item) from a character from the app: `{ enabled: true, kinds: ["remove"], reason: null }` under dnd5e, otherwise `{ enabled: false, kinds: [], reason: "system" }`; there's no switch. Since module 0.34.0, beside them, `notes`: `{ enabled, kinds, reason, journals }`, whether [journal notes](#journal-notes) are kept here (always, under any system: `{ enabled: true, kinds: ["personal", "party"], reason: null }`), and `journals`, the campaign's characters and parties whose journal for this campaign exists in Foundry, as `{ kind, actorId }`, `kind` `"personal"` or `"party"`: `[]` where none has one. A book it doesn't list has no journal; one it lists follows the hello in a [`journal.updated`](#journalupdated). Since module 0.35.0 `notes` also says `orders: true`, that it takes the app's [`order`](#journal-notes) of a group's notes and keeps Foundry's order, and `changes: true`, that it says who deleted or reordered notes in Foundry, in `journal.updated`'s `journal.changed`, to a listener that answers `"notes": 2`. Since module 0.44.0, under D&D Fifth Edition, `notes` ends with `tidy`, `{ active, version, actors }`, where [Tidy 5e Sheets](#tidy-5e-sheets-journal) is installed, or one of the campaign's characters holds an entry of its journal, and is left out otherwise: `active`, whether Tidy is active in the world; `version`, its version, `null` where it isn't installed; and `actors`, the campaign's characters, never one of its groups, that hold at least one entry [`journal.tidy`](#journaltidy) would send, in the campaign's order, `[]` where none does. Each it lists follows the hello in a `journal.tidy` to a listener that answers `"notes": 3`; to any other it's only said. Since module 0.36.0, beside them, `companions`: `{ kinds, initiative }`, the kinds a [companion](#companions)'s command may be, as the campaign takes them now, `rolls`' `kinds` without `inspiration`, `hitDie`, `hitDice`, `spend`, `transfer`, `remove`, `note`, `endTurn` and `undoEndTurn`, and, since module 0.42.1, `spellSlot` and `prepare`, and since module 0.44.0 `plainRoll`, `[]` where rolls are off; and the campaign's companions' initiative, `"own"` or `"after"`, whether or not rolls are on. And `rolls`' `kinds` gain `"itemDamage"` and `"recharge"`, after the descriptions', where the Gamemaster lets players attack and the damage self-test has passed, Midi-QOL's integration on or off, under dnd5e 5 and 6: [damage on its own and recharges](#damage-on-its-own-and-recharges); `modifiers` is then `true` where the self-test allows it; and `"endTurn"`, right after `"endConcentration"`, [ending the current turn](#rolls-from-the-app), the character's or one of its companions', wherever the campaign's rolls are made, attacks or not, Midi-QOL or not; never among `features.companions.kinds`; and `"undoEndTurn"` right after it, taking back an `endTurn` the listener just sent; never among `features.companions.kinds`. Since module 0.37.0, after `companions`, `favorites`: `{ enabled, kinds, reason }`, whether a character's [favorites](#favorites) may be added and removed from the app: `{ enabled: true, kinds: ["favorite"], reason: null }` under dnd5e, otherwise `{ enabled: false, kinds: [], reason: "system" }`; there's no switch, and it reads neither the rolls nor the self-test. `"favorite"` is never among `rolls`' `kinds`, nor `features.companions.kinds`. Since module 0.38.0, after `favorites`, `dishes`: `{ enabled, kinds, reason, versions }`, whether the campaign takes [dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book), by its own switch, **Dishes from the Magical Recipe Book**: `{ enabled: false, kinds: [], reason: "off", versions: [] }` until the Gamemaster turns it on; `reason` `"system"` with it on under any system but dnd5e 5, dnd5e 6 among them; and with it on under dnd5e 5, `{ enabled: true, kinds: ["dish"], reason: null, versions: [1] }`, `versions` the cookbook body versions it reads. It reads neither the rolls nor the self-test. `"dish"` is never among `rolls`' `kinds`, nor `features.companions.kinds`. Since module 0.39.0, after `dishes`, `effects`: `{ enabled, kinds, reason }`, whether the campaign's players may turn off, turn on and delete [their own effects](#a-players-own-effects) from the app, by its own switch, **Allow Players to disable & remove their own active effects**: `{ enabled: false, kinds: [], reason: "off" }` until the Gamemaster turns it on; `reason` `"system"` with it on under a system other than D&D Fifth Edition; and with it on under dnd5e 5 or 6, `{ enabled: true, kinds: ["effect"], reason: null }`. It reads neither the rolls nor the self-test. `"effect"` is never among `rolls`' `kinds`, nor `features.companions.kinds`. Since module 0.40.0, after `effects`, `wildShape`: `{ enabled, kinds, reason }`, whether the campaign's players may use [Wild Shape](#wild-shape) from the app, by its own switch, **Allow Players to use Wild Shape from the app**: `{ enabled: false, kinds: [], reason: "off" }` until the Gamemaster turns it on; `reason` `"system"` with it on under a system other than D&D Fifth Edition; and with it on under dnd5e 5 or 6, `{ enabled: true, kinds: ["wildShape"], reason: null }`. It reads neither the rolls nor the self-test. `"wildShape"` is never among `rolls`' `kinds`, nor `features.companions.kinds`. Since module 0.44.0, after `wildShape`, `hitPoints`: `{ enabled, kinds, reason }`, whether the campaign's players may set [their hit points](#hit-points) from the app, by its own switch, **Allow Players to change their hit points from the app**, on until the Gamemaster turns it off, a campaign saved before 0.44.0 on too: `{ enabled: true, kinds: ["hitPoints"], reason: null }` under dnd5e 5 or 6; `{ enabled: false, kinds: [], reason: "off" }` with it off; and `reason` `"system"` with it on under a system other than D&D Fifth Edition. It reads neither the rolls nor the self-test. `"hitPoints"` is never among `rolls`' `kinds`, nor `features.companions.kinds`, but is taken with [`of`](#fetching-rolls), for a companion, wherever `enabled` is. |
 | `characters` | Every [character](#character) in the campaign: since module 0.22.0 without its `sheet`, which follows in `character.updated`; since module 0.26.0 each with `manualDice`, whether its player may enter its dice results in the app, as [Character](#character) says: always `false` before module 0.32.0. |
 | `groups` | Since module 0.30.0, the campaign's [groups](#group), its parties, in the order the Gamemaster listed them, each without its sheet: `[]` where it has none, and under any system but D&D Fifth Edition. Actors that no longer exist, or aren't of dnd5e's Group type, are left out. Each group's sheet follows in [`group.updated`](#groupupdated) to a listener that reads groups. |
 | `companions` | Since module 0.36.0, the campaign's characters' [companions](#companions), at most 50, each without its sheet, to every listener: `[]` where there are none. Each companion's sheet follows in [`companion.updated`](#companionupdated) to a listener that reads companions. Never a companion in `characters`. |
@@ -1240,17 +1240,22 @@ Dice is switched on or off while a campaign allows its players to enter their di
 | `sheetsApart` | `true` since module 0.22.0: the characters carry no sheets, and each follows once the hello is answered. Absent before, when each carried its sheet. |
 | `combats` | Every [combat](#combat) the campaign's characters are in, when combat events are on; otherwise empty. |
 | `prompts` | Every [prompt](#prompts) open for the campaign's players, read afresh from the chat log, and since module 0.27.0 every [Midi prompt](#midi-qols-own-saves) waiting on them: any the campaign was told of that isn't among them has closed. Empty while its players aren't asked for their saves. |
+| `diceAsks` | Since module 0.44.0, every [dice ask](#dice-asks) open for the campaign, in the order asked: any the campaign was told of that isn't among them has closed, `"gone"`. `[]` where none is open, as after the Gamemaster reloads, and while its app doesn't read them. |
 
 Since module 0.22.0 nothing comes before it, and once it's answered `2xx`, each character follows
 in the order listed, each in a [`character.updated`](#characterupdated) of its own after the
 [`character.texts`](#charactertexts) with the descriptions its sheet refers to that haven't gone
 since the hello. Since module 0.30.0, to a listener that reads groups, each of the campaign's groups
 follows its characters in a [`group.updated`](#groupupdated) of its own, in the order listed. Since
-module 0.34.0, to a listener that reads notes, each book whose journal the hello's `features.notes`
-lists follows the groups in a [`journal.updated`](#journalupdated) of its own. Since module 0.36.0, to a
-listener that reads companions, each companion the hello lists that still is one follows them in a
-[`companion.updated`](#companionupdated) of its own, in the order listed, and then, at once, a
-[`companions.listed`](#companionslisted) where the list has changed since the hello was built. A
+module 0.36.0, to a listener that reads companions, each companion the hello lists that still is one
+follows the groups in a [`companion.updated`](#companionupdated) of its own, in the order listed, and
+then, at once, a [`companions.listed`](#companionslisted) where the list has changed since the hello
+was built. Since module 0.34.0, to a listener that reads notes, each book whose journal the hello's
+`features.notes` lists follows the groups, and since 0.36.0 the companions, in a
+[`journal.updated`](#journalupdated) of its own. Since
+module 0.44.0, to a listener that reads [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal), each
+character the hello's `features.notes.tidy` lists, and each that holds an entry of it by then,
+follows the books in a [`journal.tidy`](#journaltidy) of its own. A
 hello refused is followed by nothing: ask for another, as ever. Before 0.22.0 a hello came after the
 `character.texts` with every description its characters' sheets refer to, and carried their sheets
 itself.
@@ -1404,6 +1409,63 @@ Foundry, a party page's or chapter's, or one on a character's page its player ow
 a page with no title. Every note is as the app's schema takes it, so one odd page, as a hand-edited flag or a null
 `createdTime`, reads as written in Foundry rather than failing the event.
 
+### `journal.tidy`
+
+Since module 0.44.0, the journal [Tidy 5e Sheets](#tidy-5e-sheets-journal) keeps on one of the
+campaign's characters, whole, as the character holds it in Foundry, for the app to show **read
+only** beside the character's own [journal of notes](#journal-notes). Part of the event stream.
+Sent only under D&D Fifth Edition, and only to a listener whose latest answer to the campaign's
+hello or heartbeat said `"notes": 3`, as an integer of 3 or more: never to one that said less, or
+nothing, and none while the campaign's hello is on its way, which every one follows.
+
+```
+{
+  actorId: <the character's id>,
+  entries: Entry[],
+  withheld?: { reason: "tooLarge", bytes: <int>, limit: <int> }
+}
+Entry = {
+  from: "journal"|"classic",
+  id: <"journal": Tidy's key, 1-64 letters and digits; "classic": "notes1", "notes2", "notes3", "notes4" or "notes">,
+  title: <0-200 characters>,
+  html: <at most 100,000 characters>,
+  cut?: true, secret?: true,
+  sort: <a whole number from 1>,
+  rev: <14 hex>
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `actorId` | The character: one of the campaign's characters that isn't one of its groups, by its own id. Its entries are read from its own actor, never from its Wild Shape form, whose flags dnd5e doesn't copy back when the form ends. |
+| `entries` | Its entries, at most 400, in the order Tidy shows them: first the entries of its current sheet's Journal tab, `from` `"journal"`, by Tidy's own `sort` alone, those of the same `sort` in the order the flag holds them, as Tidy's stable sort keeps them; then the boxes of its Classic sheet's Journal tab, `from` `"classic"`, in that tab's order. `[]` where it holds none: drop what you hold of the character. |
+| `withheld` | Its entries aren't told now, and `entries` is `[]`: keep what you hold. `"tooLarge"`: more than 400 entries, or a post larger than the listener takes, `bytes` the post's size and `limit` the most it takes; the Gamemaster is warned once a page load. The character's own journal goes as ever. |
+| `from`, `id` | Where Tidy keeps it on the character. `"journal"`: an entry of `flags["tidy5e-sheet"]["document-journal"]`, by its key there, which Tidy deletes it by; a duplicated entry has a new key, so it's an entry of its own. `"classic"`: one of the Classic sheet's five boxes in `flags["tidy5e-sheet"]`, by its key: `notes1` to `notes4`, headed in Tidy "Persons of Interest", "Locations of Interest", "Quests" and "Miscellaneous" until named, and `notes`, "Journal Entries". An entry is known by both. |
+| `title` | A journal entry's `title`, or a box's `name`, as Tidy keeps it, cut to 200 characters (`cut`): `""` where it has none, and always for `notes`, which has no name. Tidy shows an untitled journal entry as "Journal Entry {n}", `n` its place among the journal's entries, which `sort` is, and an unnamed box by its heading. |
+| `html` | Its text, HTML as Tidy keeps it, not enriched: Foundry's links, as `@UUID[…]{…}`, as written. Where no player owns the character in Foundry, its secret sections (`section.secret`) are removed, and it's marked `secret: true`, as Tidy shows a secret to the character's Owners alone; with a player owner it goes whole, in every campaign the character is in, as the character's own journal pages do. Over 100,000 characters, cut there (`cut`). |
+| `sort` | Its place: a journal entry's among the journal's entries, `1` to their number, in the order sent; a box's among Classic's five, `1` for `notes1` to `5` for `notes`, whichever are sent. Never the same for two of one `from`. Not Tidy's own `sort`, which may repeat, or not be whole. |
+| `rev` | Its revision: a hash of `from`, its title and its text as Tidy keeps them, before anything is cut or a secret removed, so it changes only when the entry is changed in Foundry, never when what's sent of it changes with the character's owners. |
+
+**When.** After each answered hello, after its books, one for each character the hello's
+[`features.notes.tidy`](#bridgehello) lists and each that holds an entry by then; when the
+listener's answer to a heartbeat first says `"notes"` of 3 or more, as an app deployed mid-session
+does, and when what the listener takes of sheets changes, a larger post maybe taking what was
+withheld, one for each character that holds an entry then, that the campaign's last answered hello
+listed, or that it was sent since; and 500 ms after the last change the bridge hears to one of the
+campaign's characters that touches Tidy's flags, an entry added, edited, reordered or deleted in
+Tidy, Tidy 13's `-=<key>` delete and Tidy 14's `_del` alike, or a Classic box written, or that
+changes the character's ownership, which decides its secrets. Never for a group, a token's own actor
+or a Wild Shape form, and never twice the same, until the campaign's next hello. What's changed
+while no Gamemaster is connected goes with the next hello. One lost to failures that might not last
+sends the hello again 30 seconds later, which every one follows.
+
+**What's never sent.** A journal entry whose key isn't 1 to 64 letters and digits, as a stray
+`-=<key>` key, which Tidy 13's delete may leave behind on Foundry 14.365 to 14.368, or whose value
+isn't an object with a string `title`, a string `value` and a finite `sort`; a Classic box that isn't
+an object with a string `value`, or whose `value` holds nothing: empty, or only tags, spaces and
+`&nbsp;` with no image, as an emptied editor leaves `<p></p>`; a box's `name` that isn't a string
+reads as `""`. Every entry is as the app's schema takes it, so one odd entry never fails the event.
+
 ### `dish.applied`
 
 Since module 0.38.0, who a Gamemaster served a [dish from the Magical Recipe
@@ -1492,7 +1554,7 @@ app's address or any token, nor the Gamemaster's user, nor a free-text error.
 | Field | Meaning |
 | --- | --- |
 | `format` | `1`. |
-| `modules` | The modules Sending Stone works with that are installed, in this order: `midi-qol`, `lib-wrapper`, `manual-dice`, `combat-focus`; each `{ id, title, version, active }`, `version` `null` where it has none. Sending Stone's own is the hello's `module`. |
+| `modules` | The modules Sending Stone works with that are installed, in this order: `midi-qol`, `lib-wrapper`, `manual-dice`, `combat-focus`, and since module 0.44.0 `tidy5e-sheet`, [Tidy 5e Sheets](#tidy-5e-sheets-journal); each `{ id, title, version, active }`, `version` `null` where it has none, `active` `false` where it's installed but not enabled in the world. Sending Stone's own is the hello's `module`. |
 | `sections` | In this order: `campaign`, "This campaign", always, with `rolls`, `attacks`, `prompts`, `manualDice`, since module 0.31.0 `transfers` ("Players move items and coins", On or Off, its `note` saying it needs D&D Fifth Edition where it's on under another system), since module 0.38.0 `dishes` ("Dishes from the Magical Recipe Book", its `note` where it's on under any system but dnd5e 5), since module 0.39.0 `effects` ("Allow Players to disable & remove their own active effects", On or Off, its `note` saying it needs D&D Fifth Edition where it's on under another system), since module 0.40.0 `wildShape` ("Allow Players to use Wild Shape from the app", likewise), since module 0.44.0 `hitPoints` ("Allow Players to change their hit points from the app", likewise), since module 0.36.0 `companionInitiative` ("Companions' initiative", `value` `"own"` or `"after"`, `text` "Its own roll" or "Right after its character"), and `groups`; `sending-stone`, "Sending Stone, for every campaign", always, with `chatEvents`, `chatScope`, since module 0.31.0 `chatResults` ("Hit/miss and save results in the app", `value` `"foundry"` or `"always"`, `text` "Follow Foundry's visibility settings" or "Always show them to players"), `combatEvents`, `gmContent`, and while Midi-QOL is active `midiIntegration` and `offCanvasTargets`; `dnd5e`, titled as the system is, under D&D Fifth Edition, with `attackRollVisibility` and `challengeVisibility`, and under dnd5e 6 `chatCardSummary`, as the Gamemaster's browser has it; and `midi-qol`, "Midi-QOL", while it's active, with `autoCheckHit`, `autoCheckSaves`, `gmAttackDisplay`, `gmDamageDisplay`, `highlightSuccess`, `highLightCriticalAttackOnly`, `playerRollSaves`, `rollNPCSaves`, `rollNPCLinkedSaves`, `rollSavesBlind`, `rollChecksBlind`, `rollSkillsBlind`, `blindRollDisplay`, `showGM`, `ReplaceDefaultActivities`, and as the Gamemaster's browser has them `ForceHideRoll` and `EnableWorkflow`. Each row is `{ id, label, value, text, note? }`: `label` in the Gamemaster's Foundry language, dnd5e's and Midi-QOL's in their own words; `value` as stored, a boolean, a string up to 100 characters, a number (a list of ids is how many it names, `"all"` as it is) or `null`; `text` the value in words, "—" where there's none; and `note`, where a switch that's on can't do what it says in this game, why. |
 | `results` | What players see in chat, by the same rules as each message is told by: up to six lines, `{ id, state, text }`, `state` `"shown"`, `"partial"` or `"hidden"`. With GM-only details on, every line is shown, "(GM-only details: On)"; since module 0.31.0, with it off and **Hit/miss and save results in the app** Always, every line but `gmRolls` is shown, "(Hit/miss and save results in the app: Always show them to players)", except `midiSaves` under Midi-QOL's *Auto check Saves* "Off", hidden, as Midi records no saves on its card then; `gmRolls` still says what Midi trims. `id` is one of `hits` (dnd5e's own attacks), `midiHits`, `saves`, `checks`, `midiSaves` and `gmRolls` (a Gamemaster's rolls on Midi-QOL's cards), the Midi ones while it's active; or alone, `chat`, with chat messages off, or `system`, under another system. Read `id` as any string. |
 
@@ -1525,7 +1587,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | --- | --- |
 | `id` | The roll's `id`, as fetched. |
 | `status` | `"done"`, or `"failed"` when it wasn't made. |
-| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), since module 0.36.0 `"legendary"` (a legendary or mythic action with too few of the creature's legendary actions left, as dnd5e would refuse it), `"follows"` (a companion's own initiative, where it acts right after its character, who is in that combat) and, for a recharge, `"charged"` (its uses aren't spent); `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for hit dice spent at once (module 0.20.0), those and `"full-hp"` (the character is at full hit points); for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). Since module 0.21.0, for an enchant activity's use, also `"profile"`, `"enchant-target"`, `"applied"` and `"enchant"`, and for ending an enchantment, `"enchantment"`, besides those of a use; see [Enchantments](#enchantments). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). Since module 0.29.0, for ending a concentration, also `"concentration"` and `"cancelled"`; for spending charges, `"attacks-off"`, `"item"`, `"uses"` and `"short"`; and for Heroic Inspiration, `"attacks-off"`, `"not-inspired"` and `"inspired"`; see [Concentration, charges and Heroic Inspiration](#concentration-charges-and-heroic-inspiration). Since module 0.42.1, for a spell slot spent or restored, `"attacks-off"`, `"shaped"` (the character is transformed), `"slot"` (no such pool with slots), `"changed"` (its count isn't the one the app showed), `"slots"` (none left to spend) and `"full"` (none used to restore); see [Concentration, charges and Heroic Inspiration](#concentration-charges-and-heroic-inspiration). Since module 0.42.1, for a spell prepared or unprepared, `"attacks-off"`, `"shaped"`, `"gone"` (no such spell on the character), `"prepare"` (not one the character prepares: a cantrip, one always prepared, one whose method doesn't prepare, or one an item casts) and `"cancelled"`; see [Preparing spells](#preparing-spells). For an ask, a description's roll, damage or healing, or a save or check rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). Since module 0.31.0, for a move of items and coins, `"off"`, `"transfers-off"`, `"invalid"`, `"unknown"`, `"not-yours"`, `"not-owner"`, `"gone"`, `"short"`, `"container"`, `"nested"`, `"deep"`, `"error"` and `"timeout"`, and since module 0.32.0 `"members"` and `"split"`, for a party's coin shared among its characters; see [Moving items and coins](#moving-items-and-coins). Since module 0.33.0, for an item removed, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"short"`, `"changed"` (the stack isn't as many as the app's sheet showed now), `"error"` and `"timeout"`; see [Removing an item](#removing-an-item). Since module 0.34.0, for a note command, `"off"`, `"invalid"`, `"unknown"`, `"private"`, `"not-member"`, `"not-yours"`, `"foundry-only"`, `"headings"`, `"full"`, `"error"` and `"timeout"`, and `"changed"` and `"gone"` where it was changed or deleted in Foundry since; see [Journal notes](#journal-notes). Since module 0.35.0, for an order, `"off"`, `"invalid"`, `"unknown"`, `"private"`, `"not-member"`, `"gone"`, `"changed"`, `"error"` and `"timeout"`. Since module 0.36.0, for ending a turn, `"off"`, `"invalid"`, `"unknown"`, `"not-in-combat"` (combat events are off, or there's no such combat the campaign is told of), `"not-started"` (the combat hasn't started), `"moved"` (its round or current combatant isn't the one named, or the current one is hidden: the turn has moved on, as when the Gamemaster, or an earlier command, ended it already), `"not-turn"` (the current combatant is neither the character nor one of its companions now), `"cancelled"` (the turn didn't move: a module stopped it), `"error"` and `"timeout"`; and for taking a turn back, those and `"not-undoable"` (that `endTurn` isn't one this Foundry remembers making for the character, as one taken back already, a later one of the combat, one older than a minute or one made before Foundry reloaded, or the combatant whose turn it ended has left the combat or is hidden); see [Rolls from the app](#rolls-from-the-app). Since module 0.37.0, for a favorite added or removed, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"error"` and `"timeout"`; see [Favorites](#favorites). Since module 0.38.0, for a dish, `"off"`, `"invalid"`, `"error"` or `"timeout"`, never `"unknown"`; see [Dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). Since module 0.39.0, for an effect, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"effect"` (there, but its player may not do that to it now), `"cancelled"` (Foundry, or a module's hook, stopped the write), `"error"` or `"timeout"`; see [A player's own effects](#a-players-own-effects). Since module 0.40.0, for Wild Shape, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"form"` (not a form usable now), `"full"` (every place for a known form taken), `"swap"` (no replacement since the last Long Rest), `"consume"` (no use left), `"incapacitated"`, `"transformed"` (another kind of transformation, which ends in Foundry), `"shaped"` (a replacement of the form the character is in), `"cancelled"`, `"error"` or `"timeout"`; and `"shaped"` for a favorite, effect, move or removal while its character, for a move either end, is transformed; see [Wild Shape](#wild-shape). Since module 0.41.0, for damage on its own, also `"slot"` (a spell slot not offered for it), `"mode"` (an attack mode not its weapon's, or named for no attack), `"ammo"` (ammunition its weapon doesn't fire, or none left of it to spend), `"consume"` (nothing left to spend: dnd5e's own message in `error`, or a thrown weapon with none in hand), `"bonus-action"` and `"reaction"` (Midi-QOL's used, where it enforces them, in a fight); and for Wild Shape, `"bonus-action"` (Midi-QOL's Bonus Action used in a fight, where it enforces them); see [Damage on its own and recharges](#damage-on-its-own-and-recharges). Since module 0.44.0, for a plain roll, `"off"`, `"invalid"`, `"unknown"`, `"dice"`, `"cancelled"`, `"error"` and `"timeout"`, see [A plain roll](#a-plain-roll); and for hit points, `"off"`, `"invalid"`, `"unknown"`, `"changed"` (a field set isn't the number the app showed), `"cancelled"`, `"error"` and `"timeout"`, see [Hit points](#hit-points). `null` when done. |
+| `reason` | Why it failed: `"off"` (the campaign doesn't take players' rolls now), since module 0.36.0 `"legendary"` (a legendary or mythic action with too few of the creature's legendary actions left, as dnd5e would refuse it), `"follows"` (a companion's own initiative, where it acts right after its character, who is in that combat) and, for a recharge, `"charged"` (its uses aren't spent); `"invalid"` (not a roll the module makes; `error` says what), `"unknown"` (no such character in the campaign, or no such skill, tool or ability), `"not-dying"`, `"not-in-combat"` (the character isn't in the combat the Gamemaster has up), `"already-rolled"` (it has initiative), `"busy"`, `"cancelled"` (a module called the roll off), `"timeout"` (not made within a minute, as when a module asks the Gamemaster something first; since module 0.44.0 the time its [dice asks](#dice-the-game-rolls-later) waited isn't counted) or `"error"`. For a hit die, also `"no-hit-dice"` and `"self-test"`, and for it or a formula, `"dice"`; for hit dice spent at once (module 0.20.0), those and `"full-hp"` (the character is at full hit points); for a formula, also `"item"` and `"activity"`; see [Hit dice and formulas](#hit-dice-and-formulas). For an attack, a use or their damage, also: `"attacks-off"`, `"midi-off"`, `"self-test"`, `"item"`, `"activity"`, `"area"`, `"slot"`, `"ammo"`, `"mode"`, `"target"`, `"scene"`, `"consume"`, `"active-defence"`, `"reaction"`, `"bonus-action"`, `"midi-dialog"`, `"midi"`, `"no-attack"`, `"gone"`, `"not-waiting"`, `"type"` and `"damaged"`; see [Attacks](#attacks) and [Spells and features](#spells-and-features). Since module 0.21.0, for an enchant activity's use, also `"profile"`, `"enchant-target"`, `"applied"` and `"enchant"`, and for ending an enchantment, `"enchantment"`, besides those of a use; see [Enchantments](#enchantments). For a save answering a prompt, also `"prompt"`; see [Saves the game asks for](#saves-the-game-asks-for). Since module 0.29.0, for ending a concentration, also `"concentration"` and `"cancelled"`; for spending charges, `"attacks-off"`, `"item"`, `"uses"` and `"short"`; and for Heroic Inspiration, `"attacks-off"`, `"not-inspired"` and `"inspired"`; see [Concentration, charges and Heroic Inspiration](#concentration-charges-and-heroic-inspiration). Since module 0.42.1, for a spell slot spent or restored, `"attacks-off"`, `"shaped"` (the character is transformed), `"slot"` (no such pool with slots), `"changed"` (its count isn't the one the app showed), `"slots"` (none left to spend) and `"full"` (none used to restore); see [Concentration, charges and Heroic Inspiration](#concentration-charges-and-heroic-inspiration). Since module 0.42.1, for a spell prepared or unprepared, `"attacks-off"`, `"shaped"`, `"gone"` (no such spell on the character), `"prepare"` (not one the character prepares: a cantrip, one always prepared, one whose method doesn't prepare, or one an item casts) and `"cancelled"`; see [Preparing spells](#preparing-spells). For an ask, a description's roll, damage or healing, or a save or check rolled for a description, also `"gone"`, `"link"`, `"busy"`, `"secret"`, `"type"`, `"dice"`, `"attacks-off"` and `"self-test"`; see [Descriptions that roll](#descriptions-that-roll). Since module 0.31.0, for a move of items and coins, `"off"`, `"transfers-off"`, `"invalid"`, `"unknown"`, `"not-yours"`, `"not-owner"`, `"gone"`, `"short"`, `"container"`, `"nested"`, `"deep"`, `"error"` and `"timeout"`, and since module 0.32.0 `"members"` and `"split"`, for a party's coin shared among its characters; see [Moving items and coins](#moving-items-and-coins). Since module 0.33.0, for an item removed, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"short"`, `"changed"` (the stack isn't as many as the app's sheet showed now), `"error"` and `"timeout"`; see [Removing an item](#removing-an-item). Since module 0.34.0, for a note command, `"off"`, `"invalid"`, `"unknown"`, `"private"`, `"not-member"`, `"not-yours"`, `"foundry-only"`, `"headings"`, `"full"`, `"error"` and `"timeout"`, and `"changed"` and `"gone"` where it was changed or deleted in Foundry since; see [Journal notes](#journal-notes). Since module 0.35.0, for an order, `"off"`, `"invalid"`, `"unknown"`, `"private"`, `"not-member"`, `"gone"`, `"changed"`, `"error"` and `"timeout"`. Since module 0.36.0, for ending a turn, `"off"`, `"invalid"`, `"unknown"`, `"not-in-combat"` (combat events are off, or there's no such combat the campaign is told of), `"not-started"` (the combat hasn't started), `"moved"` (its round or current combatant isn't the one named, or the current one is hidden: the turn has moved on, as when the Gamemaster, or an earlier command, ended it already), `"not-turn"` (the current combatant is neither the character nor one of its companions now), `"cancelled"` (the turn didn't move: a module stopped it), `"error"` and `"timeout"`; and for taking a turn back, those and `"not-undoable"` (that `endTurn` isn't one this Foundry remembers making for the character, as one taken back already, a later one of the combat, one older than a minute or one made before Foundry reloaded, or the combatant whose turn it ended has left the combat or is hidden); see [Rolls from the app](#rolls-from-the-app). Since module 0.37.0, for a favorite added or removed, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"error"` and `"timeout"`; see [Favorites](#favorites). Since module 0.38.0, for a dish, `"off"`, `"invalid"`, `"error"` or `"timeout"`, never `"unknown"`; see [Dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). Since module 0.39.0, for an effect, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"effect"` (there, but its player may not do that to it now), `"cancelled"` (Foundry, or a module's hook, stopped the write), `"error"` or `"timeout"`; see [A player's own effects](#a-players-own-effects). Since module 0.40.0, for Wild Shape, `"off"`, `"invalid"`, `"unknown"`, `"gone"`, `"form"` (not a form usable now), `"full"` (every place for a known form taken), `"swap"` (no replacement since the last Long Rest), `"consume"` (no use left), `"incapacitated"`, `"transformed"` (another kind of transformation, which ends in Foundry), `"shaped"` (a replacement of the form the character is in), `"cancelled"`, `"error"` or `"timeout"`; and `"shaped"` for a favorite, effect, move or removal while its character, for a move either end, is transformed; see [Wild Shape](#wild-shape). Since module 0.41.0, for damage on its own, also `"slot"` (a spell slot not offered for it), `"mode"` (an attack mode not its weapon's, or named for no attack), `"ammo"` (ammunition its weapon doesn't fire, or none left of it to spend), `"consume"` (nothing left to spend: dnd5e's own message in `error`, or a thrown weapon with none in hand), `"bonus-action"` and `"reaction"` (Midi-QOL's used, where it enforces them, in a fight); and for Wild Shape, `"bonus-action"` (Midi-QOL's Bonus Action used in a fight, where it enforces them); see [Damage on its own and recharges](#damage-on-its-own-and-recharges). Since module 0.44.0, for a plain roll, `"off"`, `"invalid"`, `"unknown"`, `"dice"`, `"cancelled"`, `"error"` and `"timeout"`, see [A plain roll](#a-plain-roll); and for hit points, `"off"`, `"invalid"`, `"unknown"`, `"changed"` (a field set isn't the number the app showed), `"cancelled"`, `"error"` and `"timeout"`, see [Hit points](#hit-points); and for an answer to a dice ask, `"invalid"` and `"diceAsk"`, see [Dice the game rolls later](#dice-the-game-rolls-later). `null` when done. |
 | `error` | What went wrong, for `"invalid"` and `"error"`, what dnd5e said for `"consume"`, and why for `"prompt"`; otherwise `null`. |
 | `messageId` | The chat message the roll made; for hit dice, the last of their cards. Since module 0.21.0, an enchant activity's use that failed once used, `"enchant"` or `"midi"`, has its card's while the card is there, with `visible`, for the Gamemaster to apply it from; one with no card, as a module stopped dnd5e posting it or Midi-QOL deleted it, or with a card no one can apply it from, as one naming a concentration that has since ended, has `null`, with `visible` `true`, and so does the end of an enchantment, and since module 0.29.0 the end of a concentration, and since module 0.37.0 a favorite added or removed, and since module 0.39.0 an effect turned off, on or deleted, and since module 0.44.0 hit points set. Charges spent and Heroic Inspiration have the line they posted, and `null`, with `visible` `true`, where it couldn't be posted. Since module 0.27.0, an answer to a [Midi prompt](#midi-qols-own-saves) has `null` where Midi makes no message for the roll, as when the Gamemaster's browser rolls it and Midi doesn't show saves, with `visible` `true`: its dice are the player's own. |
 | `visible` | May the roll's player see that message? `false` for a roll made blind, as Midi-QOL can make a player's check; for hit dice, `false` unless they may see every card. |
@@ -1625,6 +1687,33 @@ Since module 0.41.0 a companion's open prompts are sent again, each in `roll.pro
 listener's answer first says `"companions": 2`, from less or from nothing, as after the Gamemaster
 reloads, whose hello was built before the answer and left them out; a listener reopens a prompt it
 had closed `"gone"` when it's opened again.
+
+### Dice asks
+
+Since module 0.44.0, sent only to a listener whose latest answer to the campaign's `bridge.hello` or
+`bridge.heartbeat` said `"features": {"diceAsks": 1}`, for a campaign whose `features.rolls.diceAsks`
+is `true`, and only to the campaign the typed roll was fetched for; see
+[Dice the game rolls later](#dice-the-game-rolls-later).
+
+| Type | Payload |
+| --- | --- |
+| `roll.dice.asked` | `{ ask }`: a roll in the run of a player's typed roll waits for its dice, or a die of it thrown again waits for its value. |
+| `roll.dice.closed` | `{ id, reason }`: an ask no longer waits. `reason` is exactly one of: `"answered"` (an answer from the listener naming dice was taken), `"skipped"` (an answer naming none, `dice` `[]`, was taken: Foundry rolled every die), `"rolled"` (the Gamemaster chose **Roll it now**), `"expired"` (the wait ended; or the character, for a companion its character, is no longer open in the listener; or the campaign no longer asks, as with its rolls or Manual Dice off; or its run is over, its Midi-QOL workflow completed once its roll was made, or five minutes after its roll; or, untold, as no such event can reach the listener then, a listener's answer no longer says `"diceAsks": 1`, or this Foundry is no longer the bridge: the next hello lists none) or `"gone"` (its roll was called off before it was answered, as when its Midi-QOL workflow was aborted, or, with no Midi-QOL workflow, the roll whose run it's in was made without waiting for it). Foundry's computer dice roll whatever wasn't answered. |
+
+An ask:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | Its own key, `^[A-Za-z0-9]{1,64}$`: never a card's, a character's or a command's. |
+| `actorId` | The character it's asked of, its form's rolls among them, or a [companion](#companions)'s key. |
+| `of` | For a companion's, its character, as the typed roll's `of`; absent otherwise. |
+| `command` | The `id` of the typed roll it's asked for: the roll whose item's run makes it, or, for `"again"`, the roll whose die is thrown again. |
+| `label` | At most 200 characters, what rolls: the item's name, and its activity's after a colon where that's another, such as `"Ice Knife: Shard Explosion"`, or for `"again"` of a typed roll's own die, that roll's, such as `"Wand of Luck: Use"`; where there's no item, as for a check's die thrown again, the roll's flavor, or else its formula. |
+| `purpose` | `"damage"`, `"healing"`, `"formula"` (a utility's roll), `"cost"` (dice its use spends, such as `1d4` charges), `"bonus"` (a Midi-QOL bonus damage macro's formula), `"again"` (one die of a roll, thrown again) or `"other"`. |
+| `again` | For `"again"` only: `"explode"` or `"reroll"`, why the die is thrown again. Absent otherwise. |
+| `critical` | `true` for a critical hit's damage, its dice already counted as dnd5e throws them, twice over; else `false`. |
+| `rolls` | 1 to 10, in the order thrown, each `{ formula, type?, flavor?, terms }`: `formula` as Foundry writes it, at most 400 characters; `type`, a damage or healing roll's dnd5e type key, such as `"cold"`, where it has one; `flavor`, at most 200 characters, where it has one; and `terms`, 1 to 10, the roll's own dice terms in order, each `{ faces, number }`, `faces` 4, 6, 8, 10, 12, 20 or 100 and `number` 1 to 40. A die not listed, as one within parentheses or a function, a d3, or one past those counts, is Foundry's; a roll with none listed isn't among them. For `"again"`, one roll and one term, of `number` 1. |
+| `askedAt`, `expiresAt` | When it was asked, and when its wait ends, a minute later at most, by the game's clock: as for a [Midi prompt](#prompts), count what's left from the envelope's `time`. |
 
 ## Additions within protocol 2
 
@@ -2271,6 +2360,31 @@ had closed `"gone"` when it's opened again.
   kind it doesn't know; a module before 0.44.0 says neither, so a listener sends neither to it, and
   handed one anyway it answers `"off"` where the campaign's rolls are off, else `"invalid"` with error
   `"kind"`.
+- Module 0.44.0 also sends a character's [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal), read only,
+  to a listener that answers `"notes": 3`, under D&D Fifth Edition: a new event,
+  [`journal.tidy`](#journaltidy), `{ actorId, entries, withheld? }`, each entry `{ from, id, title,
+  html, cut?, secret?, sort, rev }`, the entries of Tidy's current sheet's Journal tab in Tidy's
+  order, then its Classic sheet's five boxes, read off the character's flags whether Tidy is active,
+  off or not installed, its secrets left out where no player owns the character; after each hello's
+  books, 500 ms after a change to Tidy's flags or the character's ownership, when the answer first
+  says 3 in a heartbeat's and when what the listener takes of sheets changes; withheld
+  `"tooLarge"` past 400 entries or the listener's `maxBytes`. Every hello's `features.notes` ends with
+  `tidy`, `{ active, version, actors }`, where Tidy is installed or a character holds its entries.
+  And Tidy 5e Sheets, `tidy5e-sheet`, joins the hello's `settings.modules`, after `combat-focus`. No
+  new command, and nothing is written to Foundry. A listener before 0.44.0 answers `"notes"` 2 at
+  most, so it's sent no `journal.tidy`, and it ignores `features.notes.tidy`; a module before 0.44.0
+  sends none, and reads `"notes": 3` as 2.
+- Module 0.44.0 also asks a player typing in their dice for [the dice the game rolls later](#dice-the-game-rolls-later),
+  under dnd5e 5: `features.rolls.diceAsks` and `diceAsksReason` in `bridge.hello`, after
+  `keptRerolls`; `"dice"` last among `features.rolls.kinds` and `features.companions.kinds` with
+  `diceAsks`; the hello's `diceAsks`, the asks open; the [`roll.dice.asked`](#dice-asks) and
+  `roll.dice.closed` events, sent to a listener that answers `"diceAsks": 1`; the `dice` command,
+  `{ diceAsk, dice: [{ roll, term, results }] }`, made at once, with the new `command.result` reason
+  `"diceAsk"` and `"invalid"` error `"diceAsk"`; and a roll waiting on an ask not timed out. A
+  listener before 0.44.0 never answers `"diceAsks": 1`: it's asked nothing, sends no `dice`, ignores
+  the flags and the hello's list, and its players' later dice are Foundry's computer dice in their
+  item's run. A module before 0.44.0 says no `diceAsks`, so a listener sends no `dice` to it, and
+  one handed it anyway is refused as a kind it doesn't know.
 
 ## Changes from protocol 1
 
@@ -2320,6 +2434,7 @@ campaign, with **Players roll in the app** on its Player actions tab. It is made
 | `recharge` | A spent recharge rolled, dnd5e's own. Module 0.36.0. | `item`, `activity`; see [Damage on its own and recharges](#damage-on-its-own-and-recharges). |
 | `endTurn` | Not a roll: the current turn ended, the character's or one of its companions', as Foundry's Next Turn does, made on the Gamemaster's Foundry. Module 0.36.0. | `turn: { combatId, round, combatantId }`: the combat, its round (1 or more) and its current combatant, as the listener was shown them; never a turn index. It names nothing else and throws no dice (`mode` `0`, `explicit` `false`, `extras` and `dice` empty). An `endTurn` names the character, never `of`, and is never the Gamemaster's (`by`). It's made where that combat is one the campaign is told of and has started, its round and current combatant are those named and that combatant isn't hidden, and it's the character or one of its companions now; then by `combat.nextTurn()`, with nothing waited for between those checks and it, after waiting up to 10 seconds for any use from the app still going through Midi-QOL's workflow, which may hold the Gamemaster's targets. It waits for the character's earlier commands, and its companions', and for any earlier `endTurn` of the same combat, any character's: of two players ending the turn of a companion they share at once, the later is refused `"moved"`. Its result is a plain `done`; the new turn comes as [`combat.turn`](#combat), ahead of it. |
 | `undoEndTurn` | Not a roll: the turn an `endTurn` from the listener just ended, taken back, on the Gamemaster's Foundry. Module 0.36.0. | `undo`, that `endTurn`'s `id`; `turn: { combatId, round, combatantId }`, the combat and where that `endTurn` left it, as the listener shows it now; never a turn index. It names nothing else and throws no dice. It names the character, never `of`, and is never the Gamemaster's (`by`). It's made only for the character whose `endTurn` it names, made on this Foundry a minute ago at most and the last `endTurn` of that combat; only while the combat stands where that `endTurn` left it, by its round and current combatant, and the combatant whose turn it ended is still in it, not hidden, and the character or one of its companions; then by one update of the combat's `round` and `turn` back to that combatant, found by its id, with Foundry's turn events off (`turnEvents: false`), so no start- or end-of-turn work runs again. It waits as `endTurn` does. Its result is a plain `done`; the turn comes as [`combat.turn`](#combat) ahead of it, its `direction` `"backward"` unless the order changed since. |
+| `dice` | Not a roll of its own: the dice of a later roll the game [asked for](#dice-the-game-rolls-later), answering a [`roll.dice.asked`](#dice-asks). Module 0.44.0, last among `features.rolls.kinds` and `features.companions.kinds` wherever `features.rolls.diceAsks` is `true`. | `diceAsk`, the ask's `id`; `dice: [{ roll, term, results }]`. |
 
 ### Fetching rolls
 
@@ -2381,18 +2496,20 @@ stopped it, and nothing was told.
 **Hand each roll over once.** One whose answer is lost is lost: never a roll made twice. The
 module also makes a roll only once, however often it's handed over, and a character's rolls in
 the order they came; but for an answer to a [Midi prompt](#midi-qols-own-saves), made at once
-(module 0.27.0), as Midi may be waiting on it inside the character's own roll before it.
+(module 0.27.0), as Midi may be waiting on it inside the character's own roll before it; and
+since module 0.44.0 an answer to a [dice ask](#dice-the-game-rolls-later), `dice`, made at once
+too, as the roll it answers is waiting on it.
 
 | Roll field | Meaning |
 | --- | --- |
 | `id` | Unique to the roll. |
 | `actorId` | The campaign's character it is for. |
-| `kind`, `key`, `combatId`, `denomination`, `hitDice`, `item`, `activity`, `text`, `link`, `turn`, `plainRoll`, `hitPoints` | What is rolled, as above. |
+| `kind`, `key`, `combatId`, `denomination`, `hitDice`, `item`, `activity`, `text`, `link`, `turn`, `plainRoll`, `hitPoints`, `diceAsk` | What is rolled, as above. |
 | `mode` | `-1`, `0` or `1`: rolled with disadvantage, normally, or with advantage. |
 | `explicit` | Did the player choose how, as in dnd5e's roll dialog? Then the game rolls it that way. Otherwise it rolls as the character's sheet has it, which is where the app's `mode` came from. |
 | `extras` | What the player added, each `{ sign, count, sides }` or `{ sign, flat }`: such as `+1d4` for Bless. At most 10. Made as the roll's situational bonus. |
 | `dice` | Every die thrown, in order: the d20s, one or two (`mode` not `0`), or since module 0.32.0 three for an `attack` with advantage whose sheet says [`elvenAccuracy`](#character-sheet), then each added term's dice; for a hit die, its one die; for hit dice, one entry per `hitDice` entry, in the same order, with `count` results; for a formula or a description's roll, each of its dice terms'; since module 0.44.0, for a [plain roll](#a-plain-roll), one entry per term, in the same order, with `count` results. Each `{ faces, results }`, every result one of the die's faces. Dice a command asks the module to throw are named by their size and `count`: `extras`' `{ sign, count, sides }`, `hitDice`' `{ denomination, count }` and `plainRoll`'s `terms`, `{ faces, count }`; what the module tells a listener a roll will throw is `{ faces, number }`, as Foundry has it ([What an item rolls](#what-an-item-rolls), [Attacks](#attacks)); and dice thrown are `{ faces, results }`. A d100 is one die of 100 faces everywhere. |
-| `by` | `"gm"` for a roll the campaign's Gamemaster made in the app as the character (module 0.23.0), where the hello says `gmRolls`; absent for its player's, as is `null`. Anything else, or `"gm"` on an `endEnchantment`, since module 0.29.0 an `endConcentration` or since module 0.36.0 an `endTurn` or an `undoEndTurn`, or since module 0.37.0 a `favorite`, or since module 0.42.1 a `prepare`, or since module 0.44.0 a `hitPoints`, none of which posts anything to mark as theirs, is refused (`"invalid"`, `error` `"by"`) with nothing posted. A `spend` and an `inspiration` may have it, and since 0.42.1 a `spellSlot`: their line is marked as the Gamemaster's, and since module 0.31.0 so may a `transfer`, and since 0.33.0 a `remove`, and since 0.34.0 a `note`. Any other kind may have it: an attack, a use, their damage, an ask and a prompt's answer too. |
+| `by` | `"gm"` for a roll the campaign's Gamemaster made in the app as the character (module 0.23.0), where the hello says `gmRolls`; absent for its player's, as is `null`. Anything else, or `"gm"` on an `endEnchantment`, since module 0.29.0 an `endConcentration` or since module 0.36.0 an `endTurn` or an `undoEndTurn`, or since module 0.37.0 a `favorite`, or since module 0.42.1 a `prepare`, or since module 0.44.0 a `hitPoints` or a `dice`, none of which posts anything to mark as theirs, is refused (`"invalid"`, `error` `"by"`) with nothing posted. A `spend` and an `inspiration` may have it, and since 0.42.1 a `spellSlot`: their line is marked as the Gamemaster's, and since module 0.31.0 so may a `transfer`, and since 0.33.0 a `remove`, and since 0.34.0 a `note`. Any other kind may have it: an attack, a use, their damage, an ask and a prompt's answer too. |
 | `of` | Since module 0.36.0, the campaign character whose [companion](#companions) the roll is for, `actorId` then being the companion's key: any kind among `features.companions.kinds`, never `inspiration`, `hitDie`, `hitDice`, `spend`, since module 0.42.1 `spellSlot`, `transfer`, `remove`, since module 0.37.0 `favorite`, `note`, since module 0.42.1 `prepare`, `endTurn` or `undoEndTurn` (a companion's turn is ended, and taken back, by its character's command), or since module 0.44.0 `plainRoll`, each refused `"invalid"`, `error` `"of"`, as is an `of` that isn't an id; and since module 0.44.0 `hitPoints`, wherever `features.hitPoints.enabled` is. Made only where the companion is `of`'s now, on its live actor, as `of`'s player, else refused `"unknown"`: a companion's key is never a character's, so a module before 0.36.0, which ignores `of`, refuses it `"unknown"` too. A companion's commands wait for its character's, and its character's for its own. Every message it makes is flagged `companion` with its key. Absent, or `null`, for the character's own. |
 | `typed` | `true` where the player typed these dice in, from their own physical dice (module 0.32.0), as the app offers where their character's [`manualDice`](#character) is `true`. Anything else, or left out, is read as not, and never refused: it changes nothing of how the dice are used on its own; since module 0.42.0 `rerolls` beside it may. A module before 0.32.0 ignores it. Since module 0.33.0 a [`remove`](#removing-an-item) with it, as anything but left out or `null`, is refused (`"invalid"`, `error` `"remove"`): nothing is typed in for one. Every message the roll makes is then [flagged and marked](#making-a-roll) as typed; never a roll with `by` `"gm"`, whose mark it would hide. |
 | `effectDice` | Since module 0.42.0, on a typed `skill`, `tool`, `ability`, `save`, `death`, `initiative` or `attack`, where `features.rolls.effectDice` says `true`: the values the player typed for the dice their character's effects add to the roll, as its sheet's [`effectDice`](#character-sheet) lists them, each `{ faces, sign, results }`, at most 10: `faces` a die a player rolls, never 20; `sign` `1` for a die added, `-1` for one taken away; and 1 to 20 `results`, each from 1 to `faces`. A die the player skipped is left out, for Foundry to roll; never an empty list. Anything else, or on another kind, is refused (`"invalid"`, `error` `"effectDice"`); `null` is read as none. Used only where `typed` is `true`, never with `by` `"gm"`, and where the self-test has checked it, and otherwise ignored; each value is [taken](#making-a-roll) by a die of the roll's own of its faces and sign. Never refused for what the sheet says: a value no die takes is dropped, and a die no value reaches is Foundry's. A die the sheet offers (`offer`) is never among them: the player adds it as one of the roll's `extras`. |
@@ -2479,6 +2596,14 @@ sheet's [`critical`](#character-sheet) says so.
 It then sends [`command.result`](#commandresult). A roll made blind, as Midi-QOL can make a
 player's check, is reported as made, with `visible: false` and no rolls, so that the app tells
 its player no more than Foundry would.
+
+Since module 0.44.0, for a roll its player [typed](#fetching-rolls), where `features.rolls.diceAsks`
+is `true` and the listener reads them, the dice the game throws after the player's own are asked
+of them too: the later rolls of the item's run, such as dnd5e's Ice Knife's 2d6 cold that Midi-QOL
+rolls with its 1d10, the dice its use spends, and a die of theirs thrown again, as an explosion; see
+[Dice the game rolls later](#dice-the-game-rolls-later). A roll waiting on such an ask isn't
+timed out: its minute doesn't count the time its asks waited, and its run's asks end within five
+minutes.
 
 Before offering rolls, the module checks, as the game loads, that the player's dice reach a roll
 made for them and only that roll. If they don't, its hellos say `"self-test"`, and Manage
@@ -2842,7 +2967,10 @@ anything the app doesn't use, such as a Cast activity, a summoning, a transforma
 enchantment, or a spell's check with no activation of its own, which a free casting would spend its
 use on without casting the spell; through a chain that goes round, is broken, runs on past ten or
 passes an activity or forward the player can't see; and where it lets its level be chosen; and
-(`"consume"`), with nothing spent, where what it spends isn't left.
+(`"consume"`), with nothing spent, where what it spends isn't left. Since module 0.44.0, a dice cost
+thrown for that check of what a use or an attack from the app would spend, worked out beforehand and
+thrown away, is Foundry's computer dice, never the Gamemaster's Manual Dice nor a player's
+[ask](#dice-the-game-rolls-later).
 
 Refused beforehand, beyond what an attack is: an activity of another kind (`"activity"`), such as a
 summoning, which dnd5e would ask the Gamemaster about; more targets than it takes, its user among
@@ -3691,6 +3819,39 @@ they come back, has its result wait for the hello: the books follow the hello, t
 A listener before module 0.34.0 never says `"notes"`, so it's handed no note command and sent no
 `journal.updated`, and it may ignore the hello's `features.notes`.
 
+#### Tidy 5e Sheets' journal
+
+Since module 0.44.0 the journal [Tidy 5e Sheets](https://foundryvtt.com/packages/tidy5e-sheet)
+keeps on a character goes to the app too, for its players to read beside their own notes: the
+entries of the Journal tab of Tidy's current character sheet, and the five boxes of its Classic
+sheet's Journal tab, which Tidy 13.10.5, the Tidy for dnd5e 5.3, still offers, and Tidy 14 no longer
+shows, though they stay on the character. They're **read only**: no command reads or writes Tidy's
+flags, and they're changed in Foundry, on the character's Journal tab, as ever. The app's own notes
+are untouched: they're kept apart, in their own event, [`journal.tidy`](#journaltidy), never mixed
+with a journal's pages or its order, and the character's `journal.updated` goes as ever, whatever
+becomes of Tidy's.
+
+- **Read off the character.** The module reads `flags["tidy5e-sheet"]` straight off the character's
+  actor as Foundry holds it, never through `getFlag`, so its entries are read alike whether Tidy is
+  active, turned off or not installed. The hello's [`features.notes.tidy`](#bridgehello) says which,
+  for the app to say they can't be changed until Tidy is on again, and Tidy's version, from which
+  Classic's boxes are shown nowhere in Foundry (Tidy 14 and later).
+- **No dates.** Tidy keeps no time for an entry, made or changed, nor who wrote it, and the module
+  writes nothing to say so: the app dates them itself, by when it first hears of each and when its
+  `rev` changes.
+- **Secrets** follow the personal journal's rule: an entry's secret sections are kept from the app
+  where no player owns the character in Foundry, and sent where one does, in every campaign the
+  character is in. Its entries go again when the character's ownership changes.
+- **Who reads them**: the character's seat and the campaign's Gamemaster, as its personal journal
+  is read; they're sent only for the campaign's characters, never a group's or a companion's.
+- **D&D Fifth Edition only**, dnd5e 5 and 6 alike, as they're Tidy's flags, read the same way under
+  both; nothing of dnd5e's or Midi-QOL's is used.
+
+A listener before module 0.44.0 answers `"notes"` 1 or 2, so it's sent no `journal.tidy`, and it may
+ignore the hello's `features.notes.tidy`; it shows Tidy's row among the hello's `settings.modules` as
+any module's. A module before 0.44.0 reads `"notes": 3` as 2, sends no `journal.tidy`, and says no
+`tidy`.
+
 ### Saves the game asks for
 
 With **Save and concentration prompts** also ticked for the campaign, its players are
@@ -3847,6 +4008,207 @@ way at once, closed `"gone"`. A character's form is asked as the character, neve
   preferred one, as it's set up.
 - **Known Midi behaviour.** In its chat request, Midi takes any roll message whose speaker is the
   target's token as the save, another workflow's request for the same token among them.
+
+### Dice the game rolls later
+
+Since module 0.44.0, under dnd5e 5, a player typing in their dice is asked for the dice the game
+throws after the roll they sent, as Foundry's Manual Dice would ask them at the table: the rolls their
+item makes on its own, whatever its workflow rolls, homebrew among it, and a die of theirs thrown
+again. Only where the hello's `features.rolls.diceAsks` is `true`, and the listener's latest answer to
+the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks": 1}`.
+
+- **Whose roll opens a run.** A player's typed roll, [`typed`](#fetching-rolls) `true` and never
+  `by` `"gm"`, of `kind` `attack`, `use`, `damage`, `itemDamage`, `formula`, `textRoll`,
+  `textDamage` or `recharge`, opens its item's **run**. A roll whose dice the player threw in the
+  app, untyped, opens none, nor does the Gamemaster's from the app: their later dice are Foundry's,
+  as before 0.44.0. With Midi-QOL, such a roll fed into a workflow, as the Gamemaster's `damage`
+  from the app after a player's typed `attack`, or the player's own untyped one, takes the workflow
+  out of the run it was in: what Midi rolls with that damage, and after it, is Foundry's too.
+- **How long a run lasts.** Without Midi-QOL, while the roll is being made: a character's rolls are
+  made one at a time, so its runs never overlap. With Midi-QOL, from the roll until the Midi workflow
+  it started (an `attack` or a `use`) or fed (its `damage`) completes, cleaning up once its roll is
+  finished and its `postActiveEffects` macros have run, or is aborted, five minutes at most; a
+  target's save asked meanwhile doesn't end it. A workflow fed by a later roll is that roll's run from
+  then on, or no run's where that roll opens none. Each use is a workflow of its own, so two runs, or
+  the Gamemaster's own use of the same item, never mix.
+- **What's asked.** A roll dnd5e builds in a run, after the roll's own, of the run's character, its
+  Wild Shape form or the companion named, with dice to throw:
+  - with Midi-QOL, a roll whose roll process names the run's workflow: another activity's damage or
+    healing that Midi rolls with the item's damage, as dnd5e's own Ice Knife's 2d6 cold Shard
+    Explosion with its 1d10, or once hits and saves are checked, where that activity spends
+    something, after the `damage`'s result; an ammunition's activity's damage; a utility's formula
+    Midi rolls itself (`"formula"`); a roll a macro of the item's makes in the workflow, as its
+    `postActiveEffects` macros as Midi finishes the roll;
+  - with no workflow on its process, a roll whose subject (dnd5e's "Document that initiated this
+    roll") is an activity of the run's item, built while the roll is being made, with no click
+    event;
+  - the dice a use spends (`"cost"`), as a charge cost of `1d4`: dnd5e's roll of each, of its
+    formula as dnd5e resolves it (`"0 + 1d4"`), as dnd5e spends what the run's own use spends, the
+    use the module makes for the roll, a linked activity's cost with it, as a staff's for a spell it
+    casts; or, with Midi-QOL, as Midi spends what the other activity of the run's workflow spends,
+    within that very workflow's check of its other activity's consumption: Midi's own spending of
+    that workflow's own copy of the activity, the first within the check, while the workflow goes on.
+    Each is told by the use's own spending, which the module marks as dnd5e begins it
+    (`dnd5e.preActivityConsumption`) and no longer once it's spent (`dnd5e.activityConsumption`), or
+    once the spending returns where a later hook stopped it, and which dnd5e passes to each cost it
+    rolls: never by a roll's formula, nor by a run's being open. So never the Gamemaster's own use of
+    the item meanwhile, in Foundry or from Midi's card, even within that check; never a spending of
+    the activity after Midi's own within it, as other code spending it again; never another run's;
+    and never a check of the cost beforehand, Midi's or the module's, whose roll is thrown away;
+  - with Midi-QOL, a bonus damage macro's formula (`"bonus"`), as Sneak Attack's or Hunter's Mark's,
+    as Midi rolls each formula a `DamageBonus` macro of the run's workflow returned: a damage roll of
+    that formula, of the type the macro named where it's one of dnd5e's, flavored as the macro says,
+    else as its type; never a roll a macro made itself, nor any other macro's.
+
+  Midi rolls bonus damage one roll after another, within the workflow's own roll of it: while one of
+  a workflow's bonus formulas is being thrown, waiting on its ask among it, no other roll is taken
+  for that workflow. Where two runs' workflows await bonus rolls of one formula at once, which roll
+  of that formula is whose can't be told: from then on, until each has rolled its bonus damage,
+  neither run's roll of that formula is asked, and Foundry's computer dice roll them, never the
+  Gamemaster's Manual Dice; a formula only one of them awaits is still asked of its own player. A
+  roll of a formula both await uses up none of what either awaits; and while one of them waits on an
+  ask made before the other's came, nothing is taken for it, so a roll of that formula meanwhile that
+  no other awaits is the Gamemaster's own, as with one workflow. While a roll of a formula both
+  await is being thrown, another roll one of them awaits may be taken for it unasked, Foundry's
+  computer dice, as the two workflows roll at once.
+- **What's never asked.** A d20 roll the game makes later, in the run's workflow or not: the attack
+  is the roll's own, and the saves and checks a run asks of the character are asked as
+  [prompts](#midi-qols-own-saves) already; a die of a typed d20 roll thrown again is asked as below.
+  The roll's own dice, as the 1d10 of an Ice Knife's `damage`, nor another player's typed roll being
+  made meanwhile. A roll in another browser; another player's, a target's, an NPC's or the
+  Gamemaster's own, made outside the run, of another actor, in another workflow, or in the run's own
+  once it has ended or been aborted; a roll of the run's item with no workflow once the roll is made,
+  while its workflow goes on; a roll made with a click, as the Gamemaster's from a Midi card's damage
+  button for the player's workflow, which also takes that workflow out of the run, as their `damage`
+  from the app does; a roll whose dice are all numbers, maximized or minimized; where Midi-QOL
+  averages the actor's damage, its damage. The one roll that may be asked wrongly is one the
+  Gamemaster's own code makes, of the same item of the same character, with no click and no
+  workflow of its own, as a macro using the item, while the player's roll is being made: a few
+  seconds, or as long as its asks wait, up to a minute each, or, with Midi-QOL, as long as Midi goes
+  on with a `damage` rolled into its workflow before that roll returns, as it may while waiting for
+  its targets' saves or the Gamemaster to confirm the damage, and an area's up to a minute more as
+  the module waits for Midi to go past its targeting; five minutes at most in all. Or, with
+  Midi-QOL, in the instant before each of a run's bonus formulas is rolled, within its workflow's
+  roll of them, never while one waits, a damage roll made just as Midi would make it, of its
+  formula, type and flavor: it's asked as the run's, and Midi's own bonus rolls of that workflow
+  while it waits are then the Gamemaster's own; or, where another run's workflow awaits that
+  formula too, it's Foundry's computer dice, and theirs are still.
+- **Checks of a cost.** Before it uses an item from the app, the module works out what the use
+  would spend, and throws that away, as it has since before 0.44.0; and with Midi-QOL, Midi's own
+  use does the same before dnd5e spends it, as it does for a use that spends what it uses without
+  its dialog, as the module's uses from the app do. Since 0.44.0 a dice cost rolled for either
+  check, for any use from the app, typed or not, any player's or the Gamemaster's, under dnd5e 5 or
+  6, is Foundry's computer dice: it's never asked of anyone, neither of a player in the app nor of
+  the Gamemaster by their Manual Dice window, and it's never taken for a run's cost. The module
+  marks the use it hands Midi as a check until dnd5e begins spending it
+  (`dnd5e.preActivityConsumption`), so the cost the use spends is rolled as ever. So, under dnd5e 5,
+  is Midi-QOL's own check of the cost of a run's workflow's other activity, which Midi works out and
+  throws away before it spends it. A Gamemaster's own workflow's check is rolled as Midi rolls it,
+  and so are Midi's checks of what other uses would spend, as the reactions it looks for among a
+  run's targets.
+- **A die thrown again** (`"again"`). A die of a typed roll's own, of any kind, or of a roll asked,
+  that Foundry throws again: an explosion (`x`, `xo`), or a reroll (`r`, `rr`) where the roll wasn't
+  sent [`rerolls`](#fetching-rolls) `"kept"`, as a Halfling's of a 1. It's asked one die at a time,
+  each as it comes, as Foundry's Manual Dice asks: its value is the die thrown again. Only where the
+  throw it follows, the one that exploded or is rerolled, took its player's value: a die they typed
+  in the roll they sent, one they gave in answer to an ask, or one they gave for an earlier die
+  thrown again. Never one Foundry's computer threw: a die of the roll the player had no value for, a
+  term an answer left out, a roll whose ask closed `"skipped"`, `"rolled"`, `"expired"` or
+  `"gone"`, or a die thrown again whose own ask closed so; that die, and every die it throws again,
+  is Foundry's computer dice.
+- **When it's asked.** As the first roll of a step, the rolls dnd5e builds together, is about to be
+  thrown: one ask for the step, listing up to 10 of its rolls, in [`roll.dice.asked`](#dice-asks),
+  to the campaign the typed roll was fetched for alone; and the step waits for the answer; a die
+  thrown again, as it's thrown. Each only while the character, or for a companion's its character,
+  is open in the listener, by the fetch's [`open`](#fetching-rolls) within the last 45 seconds:
+  otherwise, and for a listener that doesn't answer `"diceAsks": 1`, Foundry's computer dice roll it
+  at once, as they roll a typed roll's, never the Gamemaster's Manual Dice window. Where the
+  module's self-test failed (`features.rolls.diceAsks` `false`, `diceAsksReason` `"self-test"`), no
+  run is opened and nothing is asked: the game's later dice are rolled as before 0.44.0, a dice
+  cost, say, with the Gamemaster's own dice settings, their Manual Dice window among them, though
+  never the module's own check of it beforehand, nor Midi-QOL's as its use begins.
+- **The wait** is a minute. Then the ask closes `"expired"` and Foundry's computer dice roll it; and
+  so it does, looked at after each fetch and every 5 seconds, before its minute is out, once the
+  character is no longer open, the campaign no longer asks, as with its rolls or Manual Dice turned
+  off or a listener's answer no longer saying `"diceAsks": 1`, this Foundry is no longer the bridge,
+  or its run is over, its Midi workflow completed once its roll was made, or five minutes after the
+  roll. A Midi workflow aborted meanwhile closes it `"gone"`, and so does, with no Midi workflow, the
+  roll whose run it's in being made without waiting for it, as the Gamemaster's own code's roll of
+  the same item may be. While it waits, the bridge Gamemaster's Foundry shows a small window, not in
+  their way, saying whose player it waits for, what, and how long is left, with **Roll it now**: the
+  ask closes `"rolled"` and Foundry's computer dice roll it. The window has no default button, and
+  where the Gamemaster was typing as it opened, as in the chat, the keyboard goes back to where they
+  were typing, so that Enter never chooses **Roll it now** for them. A reload of the Gamemaster's browser
+  forgets every ask, and the next hello lists none.
+- **What waits.** The roll, and with it its Midi workflow; a dice cost holds its character's
+  commands too. With Midi-QOL, a use's dice cost, and an area's damage, hold every Midi use from the
+  app after it, any player's, as the module makes them one at a time. A roll whose run waits on an
+  ask isn't [timed out](#making-a-roll) meanwhile: its minute doesn't count the time its asks
+  waited, counted once while two wait together. A Midi use held behind it keeps its own minute: past
+  it, it's told `"timeout"`, and a use that hadn't begun is then not made, while a damage is still
+  made once its turn comes, its result following.
+- **The hello** lists every open ask, in `diceAsks`, so a hello sent again, as when the settings
+  change, closes none; a listener closes `"gone"` any it holds that a hello doesn't list.
+
+The player answers an ask with a command:
+
+| Roll field | Meaning |
+| --- | --- |
+| `kind` | `"dice"`. |
+| `diceAsk` | The ask's `id`. |
+| `actorId`, `of` | The ask's. |
+| `dice` | `[{ roll, term, results }]`: `roll`, the index of one of the ask's `rolls`; `term`, the index of one of that roll's `terms`; and `results`, exactly that term's `number` of values, each a whole number from 1 to its `faces`; each term once at most, at most 100 entries. A term left out is Foundry's; `[]` leaves every die to the game. |
+| `mode`, `explicit`, `extras`, `typed` | `0`, `false`, `[]` and `true`. |
+
+It's made at once, never queued behind the character's commands: the roll it answers is waiting on
+it. Each term named takes its values, die by die, in order; any other die, a term left out among
+them, is Foundry's computer dice. The ask closes `"answered"`, or `"skipped"` for `[]`. Once every roll
+it lists is thrown, or ten seconds on, `command.result` follows: `"done"`, with `messageId` `null`,
+`visible` `true`, and `rolls` those of the ask thrown by then, as a [chat message's](#chat-message)
+are. The first answer taken is the one used: another, as from a second device, is refused
+`"answered"`. Refused, with nothing taken:
+
+- `"invalid"`, `error` `"by"`, with `by`;
+- `"invalid"`, `error` `"diceAsk"`: a `diceAsk` that isn't an id; `dice` that isn't such a list; a
+  roll or term the ask doesn't list; a term twice; a term with more or fewer values than its
+  `number`; a value its die doesn't have; `typed` other than `true`, `mode` other than `0`,
+  `explicit` other than `false`, `extras` other than `[]`; or any `effectDice` or `rerolls`;
+- `"diceAsk"`, with `error`: `"gone"` (no such ask, as after the Gamemaster reloads, or its roll was
+  called off), `"character"` (another character's or companion's, or fetched for another campaign),
+  `"answered"` (answered, skipped or rolled already) or `"expired"` (its wait ended, or its
+  character was closed).
+
+**Midi-QOL.** Its other damage keeps the `damage` command's run, so dnd5e's Ice Knife's 2d6 is asked
+within a typed `damage`, after its 1d10, its critical hit's 4d6 counted as dnd5e counts them, and its
+higher levels' dice with it, while within the Gamemaster's `damage`, or an untyped one, it's
+Foundry's; one Midi rolls once hits and saves are checked is asked after the `damage`'s result, its
+cost once, as Midi spends it within that workflow's check of its other activity's consumption, its
+check of it beforehand Foundry's computer dice: the Gamemaster's own spending of that activity
+meanwhile, as their own use of it in Foundry, even within that check, their own use of the item whose
+workflow defers it, or Midi's card's button, is never asked, nor that activity spent again within the
+check by other code. Midi pairs an
+attack with its item's one other activity only where that activity's own pairing is unset and its *Default other activity* is "auto", as for a
+compendium's Ice Knife; an activity a Gamemaster adds by hand is stamped "none" and so isn't
+paired: it's a use of its own from the app, typed already. The optional bonuses Midi offers the Gamemaster on their screen
+are theirs. Midi's internals were read from its source, not at a table: a workflow the module can't
+find on a roll leaves that roll to the rule without one, a Midi with no bonus damage macros to
+wrap leaves their dice to Foundry, and one with no check of its other activity's consumption to wrap
+leaves that activity's dice costs to Foundry too.
+
+dnd5e passes a use's spending to each cost it rolls through its consumption targets'
+`resolveCost`: where a dnd5e has none the module can follow, dice costs aren't asked, and they, and
+the module's own check of them and Midi-QOL's, are rolled as before 0.44.0.
+
+**Under dnd5e 6**, `features.rolls.diceAsks` is `false`, `diceAsksReason` `"system"`, and nothing
+is asked, nor any run opened: the game's later dice are Foundry's, as before 0.44.0, but for the
+module's own check of a cost, and Midi-QOL's as its use from the app begins, Foundry's computer dice
+there too. dnd5e 6 and Midi-QOL's line for it
+are to be supported apart.
+
+**Older.** A listener before 0.44.0 never answers `"diceAsks": 1`: it's asked nothing, and the
+later rolls of its players' runs are thrown by Foundry's computer dice. A module before 0.44.0 says
+no `diceAsks` and asks nothing: a listener sends it no `dice`, which it would refuse as a kind it
+doesn't know, `"off"` where the campaign's rolls are off, else `"invalid"`, `error` `"kind"`.
 
 ### Descriptions that roll
 
@@ -4091,10 +4453,12 @@ for a character in [Wild Shape](#wild-shape) the character, is in a combat, a Bo
 (`"all"`, or its type) and one is used; then the checks of the dice as before; then, with `consume`,
 what using it would spend is worked out as dnd5e's use works it out, never the action itself, a
 spell slot where casting it spends one, a target spent only in a fight left out of one, and refused
-`"consume"`, with dnd5e's own message in `error`, where something isn't there to spend. Under
-Midi-QOL, with a mode named, the damage is rolled on a copy whose damage configuration is dnd5e's
-own followed by Midi's damage roll modifiers, as Midi adds them, so that the mode holds and Midi's
-modifiers still apply; the activity itself is never changed.
+`"consume"`, with dnd5e's own message in `error`, where something isn't there to spend; since module
+0.44.0, a dice cost thrown for that, and for its working out again as it's spent, is Foundry's
+computer dice, never the Gamemaster's Manual Dice nor a player's ask. Under Midi-QOL, with a mode
+named, the damage is rolled on a copy whose damage configuration is dnd5e's own followed by Midi's
+damage roll modifiers, as Midi adds them, so that the mode holds and Midi's modifiers still apply;
+the activity itself is never changed.
 
 The card's flavor is dnd5e's own, `{item} - {damage flavor}`, followed by ` · ` and the slot's level
 as dnd5e names it (`"2nd Level"`), where a slot is named; the mode as dnd5e names it (`"Two-Handed"`,

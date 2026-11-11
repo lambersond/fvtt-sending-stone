@@ -1,5 +1,5 @@
 import {
-  CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, MODULE_ID, RESULTS_MODES, SETTINGS, STATUS_HOOK, WILD_SHAPE_PACKS
+  CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, MODULE_ID, RESULTS_MODES, SETTINGS, STATUS_HOOK, TIDY, WILD_SHAPE_PACKS
 } from "../constants.mjs";
 import { getCampaigns, manualDiceOn } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
@@ -516,8 +516,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   }
 
   /**
-   * The Modules section: the author's own modules, those Sending Stone works with, and the system
-   * it needs.
+   * The Modules section: the author's own modules, those Sending Stone works with, since 0.44.0 Tidy
+   * 5e Sheets among them, and the system it needs.
    * @returns {object}
    */
   #modulesContext() {
@@ -543,6 +543,9 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     const wrapper = module("lib-wrapper", "LibWrapper", "fa-solid fa-link");
     // libWrapper is only recommended, so not having it isn't a fault.
     if ( wrapper.state !== "active" ) Object.assign(wrapper, { stateLabel: label("recommended"), tone: "warning" });
+    // Since 0.44.0 players read their characters' Tidy journals in the app; not having Tidy is no
+    // fault either, so it's never more than the neutral tone.
+    const tidy = module(TIDY, "Tidy", "fa-solid fa-book-open");
     const dnd5e = game.system.id === "dnd5e";
     return {
       family: familyModules().map(entry => ({
@@ -551,7 +554,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         stateLabel: label(entry.state),
         tone: MODULE_TONES[entry.state]
       })),
-      integrations: [midi, wrapper],
+      integrations: [midi, wrapper, tidy],
       system: {
         title: dnd5e ? game.system.title : game.i18n.localize("SENDINGSTONE.Modules.System.Title"),
         hint: game.i18n.localize("SENDINGSTONE.Modules.System.Hint"),

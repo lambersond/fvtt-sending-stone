@@ -66,6 +66,10 @@ for v in X=1 "X=1 DND5E6=1"; do run removals $v SLIM_CHECK=1; done
 # Module 0.34.0: journal notes, personal and party, chapters, kept in step with Foundry (dnd5e 5.3.3 and
 # 6.0.5 stand-ins), fetched with rolls, moves and removals off.
 for v in X=1 "X=1 DND5E6=1"; do run notes $v; done
+# Module 0.44.0: Tidy 5e Sheets' journal, read only, in journal.tidy: Tidy 13.10.5's flags under
+# dnd5e 5.3.3, Tidy 14.4.1's under 6.0.5, both deletes, the Classic sheet's boxes, secrets, Tidy off
+# and uninstalled, older apps; and Tidy in the settings window's Works with and the hello's modules.
+for v in X=1 "X=1 DND5E6=1"; do run tidy-journal $v; done
 # Module 0.36.0: companions (the creatures a character summons, and the NPCs its player owns),
 # found, sent and commanded on their own tokens (dnd5e 5.3.3 and 6.0.5 stand-ins, and Midi-QOL's);
 # and damage on its own and recharges. Module 0.41.0: damage on its own at the level, in the mode and
@@ -98,4 +102,10 @@ for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run wildshape $v; done
 # dnd5e 5.3.3 and 6.0.5, with Midi-QOL's stand-ins and through libWrapper.
 for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run hitpoints $v; done
 for v in X=1 "X=1 DND5E6=1" MIDI=1 LIBWRAPPER=1; do run plain $v; done
+# Module 0.44.0: the dice the game rolls later, asked of a player typing theirs, under dnd5e 5.3.3 and
+# Midi-QOL's stand-ins (dnd5e's Ice Knife's 2d6, deferred other damage and its cost, bonus damage
+# macros, dice a use spends, a die thrown again), through libWrapper, off under dnd5e 6.0.5, an app
+# before them asked nothing, and a core whose die doesn't await its fulfillment failing the self-test,
+# with dnd5e alone and Midi-QOL's stand-ins, whose own check of a use's cost stays on computer dice.
+for v in X=1 "X=1 DND5E6=1" MIDI=1 "MIDI=1 DND5E6=1" "MIDI=1 LIBWRAPPER=1" OLD_APP=1 BREAK_ASK=1 "MIDI=1 BREAK_ASK=1"; do run later-dice $v; done
 exit $fail
