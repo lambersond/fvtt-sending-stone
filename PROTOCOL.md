@@ -225,21 +225,23 @@ Use `characters` to route a message to the right player's device.
 
 ### A character's players
 
-Since module 0.46.0 a character's players, wherever the module reads them for a campaign, are as
-its [companions](#companions) have read them since module 0.45.0: the non-Gamemaster users whose
-own id has Owner in the character's `ownership`, never through `default`, and for a character none
-owns so, the non-Gamemaster users it's assigned to as their character (User Configuration). A
-character shared with every player through its default, as a Gamemaster may share a party's sheets,
-is then its own players' alone, and one no player owns by id and none is assigned has no player.
-They are whose whispers and private rolls reach it, an audience's `characters` above, and so the
-saves a whispered card asks of it; its [`owners`](#character); the characters of a save's or
-check's author, its [`readers`](#chat-message); the authors whose cards' DCs its
+Since module 0.46.0 a character's players, for what a campaign is sent of other players and for a
+dish's card, are as its [companions](#companions) have read them since module 0.45.0: the
+non-Gamemaster users whose own id has Owner in the character's `ownership`, never through `default`,
+and for a character none owns so, the non-Gamemaster users it's assigned to as their character (User
+Configuration). A character shared with every player through its default, as a Gamemaster may share
+a party's sheets, is then its own players' alone, and one no player owns by id and none is assigned
+has no player. They are whose whispers and private rolls reach it, an audience's `characters` above,
+and so the saves a whispered card asks of it; its [`owners`](#character); the characters of a save's
+or check's author, its [`readers`](#chat-message); the authors whose cards' DCs its
 [prompts](#prompts) show as its player's own; whose ownership of a [group](#group) gives it
 `access`; and in Foundry, whom a [dish's card](#dishes-from-the-magical-recipe-book) is whispered
 to. Before 0.46.0 they were every non-Gamemaster user with Owner on it, through `default` too, so a
 character shared with *All Players: Owner* had every player's whispers and private rolls, every
 player as its owners, the outcome of every player's check, the DC of every player's card, and a
-group's best access among them.
+group's best access among them. Its [journal notes](#journal-notes)' ownership, the primary players
+its [`manualDice`](#character) reads and its [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal)'s
+secrets still follow Foundry's own ownership of it, through `default` too.
 
 ## Shared shapes
 
@@ -2449,19 +2451,20 @@ An ask:
   leaves in `companions.listed`, as any does, and a fight only it brought ends for the campaign, as
   when its last character leaves; the first hello lists only the fights the campaign is in. A module
   before 0.45.0 sends as before.
-- Module 0.46.0 reads [a character's players](#a-characters-players) wherever it reads them for a
-  campaign as module 0.45.0 read them for its companions: the users who own it by their own id,
-  never through `default`, or where none does, the users it's assigned to as their character, with
-  no new event, field or format. A character shared with *All Players: Owner* is then sent no other
-  player's whispers or private rolls, nor asked the saves a card whispered to them asks; a save's or
-  check's outcome its author's characters alone may see names only its author's own as `readers`;
-  a prompt shows the DC of its own players' cards alone as theirs; its `owners` in the hello and
-  `character.updated` are its own players; a group's `access` is read from them, or the group's
-  default where it has none; and in Foundry a dish's card is whispered to the campaign's
-  characters' own players. A character no player owns by id and none is assigned has no player:
-  no whisper reaches it, and its `owners` is `[]`. A listener reads all of it as before: a message
-  it's no longer sent never arrives, one it was sent before stays until the chat is cleared, and the
-  first hello lists each character's `owners` afresh. A module before 0.46.0 sends as before.
+- Module 0.46.0 reads [a character's players](#a-characters-players), for what a campaign is sent of
+  other players and for a dish's card, as module 0.45.0 read them for its companions: the users who
+  own it by their own id, never through `default`, or where none does, the users it's assigned to as
+  their character, with no new event, field or format. A character shared with *All Players: Owner*
+  is then sent no other player's whispers or private rolls, nor asked the saves a card whispered to
+  them asks; a save's or check's outcome its author's characters alone may see names only its
+  author's own as `readers`; a prompt shows the DC of its own players' cards alone as theirs; its
+  `owners` in the hello and `character.updated` are its own players; a group's `access` is read from
+  them, or the group's default where it has none; and in Foundry a dish's card is whispered to the
+  campaign's characters' own players. A character no player owns by id and none is assigned has no
+  player: no whisper reaches it, and its `owners` is `[]`. A listener reads all of it as before: a
+  message it's no longer sent never arrives, one it was sent before stays until the chat is cleared,
+  and the first hello lists each character's `owners` afresh. A module before 0.46.0 sends as
+  before.
 
 ## Changes from protocol 1
 
