@@ -249,7 +249,9 @@ secrets still follow Foundry's own ownership of it, through `default` too.
 Since module 0.47.0 they're also whom a [roll from the app](#making-a-roll) is made as where no
 player is assigned the character: its only player. A character shared with every player through its
 default and owned by one player by id, assigned to no one, is then made as that player, where before
-0.47.0 every player through `default` counted, so it was made as the Gamemaster.
+0.47.0 every player through `default` counted, so it was made as the Gamemaster. One shared through
+`default` alone, owned by no player by id, has none and is made as the Gamemaster, where before a
+world's single player was its only owner.
 
 ## Shared shapes
 
@@ -2485,8 +2487,10 @@ An ask:
   as its only player by [a character's players](#a-characters-players), never through `default`,
   with no new event, field or format: a character shared with *All Players: Owner* and owned by one
   player by id is made as that player, its card theirs, where before it was the Gamemaster's. One
-  assigned to a player is still made as them, and one with no player as the Gamemaster. A listener
-  reads its messages and `command.result` as before. A module before 0.47.0 makes it as before.
+  assigned to a player is still made as them, and one with no player as the Gamemaster: so too one
+  shared through `default` alone, owned by no player by id and assigned to no one, which before
+  0.47.0, in a world with a single player, was made as that player. A listener reads its messages
+  and `command.result` as before. A module before 0.47.0 makes it as before.
   And it puts a character's [favorites](#favorites) in the order the app sends: the hello's
   `features.favorites` ends with `orders`, `true` wherever `enabled` is, and a `favorite` may be
   `{ op: "order", order, was }`, refused `"changed"` where the favorites the sheet lists now aren't

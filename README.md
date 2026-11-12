@@ -126,7 +126,9 @@ that's assigned to a player is that player's, where before 0.46.0 it had none: i
 whispers and private rolls, and its roster names them. Since 0.47.0 a roll from the app for a
 character assigned to no one is made as its player read so, where it has just one: a character
 shared with All Players as Owner and owned by one player by name rolls as that player, where before
-it rolled as you. Its journals, and who may type in its dice, still follow who owns it here.
+it rolled as you. One shared with All Players and owned by no player by name, assigned to no one,
+has no player and rolls as you, even in a world with a single player, whom it rolled as before
+0.47.0. Its journals, and who may type in its dice, still follow who owns it here.
 
 Worlds set up before campaigns keep working: the connected characters chosen then are moved into a
 campaign titled after the world the first time a Gamemaster loads it.
