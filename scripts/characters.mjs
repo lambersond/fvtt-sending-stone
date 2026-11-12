@@ -246,7 +246,8 @@ export function charactersSeenBy(userIds, campaign) {
 /* -------------------------------------------- */
 
 /**
- * A character as a campaign's roster lists it: who it is and who plays it, without its sheet.
+ * A character as a campaign's roster lists it: who it is and who plays it, without its sheet. Since
+ * 0.46.0 its owners are its players (`characterPlayers`), never every player through `default`.
  * @param {Actor} actor
  * @returns {{id: string, uuid: string, name: string, img: string, type: string, owners: object[]}}
  */
@@ -257,7 +258,7 @@ export function rosterEntry(actor) {
     name: actor.name,
     img: actor.img,
     type: actor.type,
-    owners: playerOwners(actor).map(user => ({ id: user.id, name: user.name }))
+    owners: characterPlayers(actor).map(user => ({ id: user.id, name: user.name }))
   };
 }
 

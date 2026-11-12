@@ -1,7 +1,7 @@
 import { EVENTS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { groupsWanted } from "./character-sync.mjs";
-import { campaignActors, playerOwners } from "./characters.mjs";
+import { campaignActors, characterPlayers } from "./characters.mjs";
 
 /**
  * Groups: since 0.30.0, the Group actors, parties, a campaign's Gamemaster adds to it, whose sheets
@@ -94,14 +94,16 @@ function accessOf(group, campaign) {
  * What one character may do with a group, as Foundry lets its players: by the highest ownership of
  * the group among them, or for one no player owns, the group's default. Owner, Observer, or none for
  * Limited or less. Since 0.31.0 also who may move items and coins with a group from the app, so that
- * the module and the app, which is told `access`, can't disagree.
+ * the module and the app, which is told `access`, can't disagree. Since 0.46.0 its players are
+ * `characterPlayers`, so a character shared with every player through its default takes its own
+ * players' access, never the best any player has.
  * @param {Actor} group
  * @param {Actor} actor
  * @returns {"owner"|"observer"|null}
  */
 export function accessFor(group, actor) {
   const { OBSERVER, OWNER } = CONST.DOCUMENT_OWNERSHIP_LEVELS;
-  const owners = playerOwners(actor);
+  const owners = characterPlayers(actor);
   const level = owners.length
     ? Math.max(...owners.map(user => Number(group.getUserLevel(user)) || 0))
     : (Number(group.ownership?.default) || 0);

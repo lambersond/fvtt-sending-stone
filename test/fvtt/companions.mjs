@@ -1548,6 +1548,18 @@ if (MIDI) {
   settings.delete('challengeVisibility')
   ok("module 0.46.0: Orla, shared with every player through her default and owned by no one by id, has no player: Bob's whisper to Alice and Alice's private roll reach Ashlands alone; and under Hide all, Alice's check in the fight both are in tells its outcome to Thorin's seat alone, never Brightwater")
 
+  // Item 38: her roster names no owner; and in Foundry a dish's card is whispered to the Gamemaster
+  // alone, and a group Bob owns isn't hers to see.
+  const { readersOf } = await import(`${MODULE}/scripts/dish-card.mjs`)
+  const { accessFor } = await import(`${MODULE}/scripts/groups.mjs`)
+  const brightwater = () => getCampaigns().find(campaign => campaign.id === 'camp-b')
+  // A group the Gamemaster lists for Brightwater, its ownership as core keeps it: Carol observes it,
+  // and Bob, of Ashlands, owns it.
+  const hall = { ownership: { default: 0, carol: 2, bob: 3 }, getUserLevel(user) { return user.isGM ? 3 : (this.ownership[user.id] ?? this.ownership.default) } }
+  assert.deepEqual(helloOf('camp-b').data.characters.map(each => [each.id, each.owners]), [['orla', []]], 'her roster')
+  assert.deepEqual([readersOf(brightwater()), accessFor(hall, orla)], [['gm'], null], "a dish's card's readers, the hall")
+  ok("module 0.46.0: Orla's roster names no owner; a dish's card is whispered to the Gamemaster alone; and a hall Bob owns and Carol observes isn't hers to see")
+
   // Whose a card is is read as it's made: its edits go where it went, whatever fight has begun or
   // ended since, and a deletion goes to every campaign, as one never held deletes nothing; one made
   // while this browser didn't send chat, as before it began sending, is read as the fights stand at
@@ -1622,6 +1634,13 @@ if (MIDI) {
   assert.deepEqual([Object.keys(carols), carols['camp-b']?.readers, 'outcome' in (carols['camp-b'] ?? {})], [['camp-b'], ['orla'], true], "Carol's check on Orla")
   settings.delete('challengeVisibility')
   ok("module 0.46.0: Orla owned by Carol and Alice by their own ids, still shared through her default: the Gamemaster's whisper to Carol reaches Brightwater, Bob's to Dave doesn't; and Carol's check on Orla tells her seat its outcome")
+
+  // Item 38: her roster names Alice and Carol; a dish's card is whispered to them; and the hall is
+  // hers to observe, as Carol does, never to own, as Bob does.
+  await until(() => ofType(since(from), 'character.updated', 'camp-b').some(e => e.data.character.id === 'orla'), "Orla's roster entry again")
+  assert.deepEqual(ofType(since(from), 'character.updated', 'camp-b').at(-1).data.character.owners, [{ id: 'alice', name: 'Alice' }, { id: 'carol', name: 'Carol' }], 'her roster')
+  assert.deepEqual([readersOf(brightwater()), accessFor(hall, orla)], [['gm', 'alice', 'carol'], 'observer'], "a dish's card's readers, the hall")
+  ok("module 0.46.0: Orla owned by Carol and Alice by their own ids: her roster names them; a dish's card is whispered to them and the Gamemaster; and the hall is hers to observe, as Carol does, never to own, as Bob does")
 }
 
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
