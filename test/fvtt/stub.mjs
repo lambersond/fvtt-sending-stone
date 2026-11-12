@@ -125,12 +125,18 @@ export const user = (id, name, isGM = false, role = isGM ? 4 : 1) => {
 }
 users.activeGM = undefined
 
+// An actor and core's ownership of it, by user id: Owner for each of its `owners` and nothing by
+// default, unless a harness sets it whole, which its testUserPermission reads as core's does (module
+// 0.46.0 reads a character's players by it, as actor5e.mjs's actors since module 0.45.0).
 export const actor = (id, name, owners = [], type = 'character', hp = { value: 30, max: 40, temp: 0 }) => {
   const a = {
     id, name, type, uuid: `Actor.${id}`, img: `${id}.webp`,
     hasPlayerOwner: owners.length > 0,
     system: { attributes: { hp } },
-    testUserPermission: (u, level) => owners.includes(u.id),
+    _ownership: { default: 0, ...Object.fromEntries(owners.map(owner => [owner, 3])) },
+    get ownership() { return this._ownership },
+    set ownership(value) { this._ownership = value },
+    testUserPermission(u) { return ((this.ownership[u.id] ?? this.ownership.default ?? 0) >= 3) },
   }
   actors.set(id, a)
   return a

@@ -277,7 +277,7 @@ told = await changed(() => { thorin.system.attributes.hp.value = 3; return Hooks
 assert.equal(told.length, 0, "a member's hit points: nothing")
 told = await changed(() => { thorin.name = 'Thorin Oakenshield'; return Hooks.callAll('updateActor', thorin, { name: 'Thorin Oakenshield' }) })
 assert.deepEqual(told.map(g => g.sheet.members.find(m => m.id === 'thorin').name), ['Thorin Oakenshield'], "a member's name")
-told = await changed(() => { ghost.testUserPermission = (u) => u.id === 'dave'; ghost.hasPlayerOwner = true; return Hooks.callAll('updateActor', ghost, { ownership: { dave: 3 } }) })
+told = await changed(() => { ghost.ownership = { default: 0, dave: 3 }; ghost.hasPlayerOwner = true; return Hooks.callAll('updateActor', ghost, { ownership: { dave: 3 } }) })
 assert.equal(told.length, 1, "a campaign character's ownership: every group of its campaign")
 assert.equal(told[0].access.ghost, undefined, 'Dave has none on the group')
 told = await changed(() => Hooks.callAll('updateActor', ghost, { name: 'Ghost' }))
