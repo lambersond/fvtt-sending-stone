@@ -219,8 +219,9 @@ export function playerOwners(actor) {
  * share a party's sheets, is then no one's but its own player's. Since 0.45.0 for its companions, so
  * another campaign's players' NPCs never become its companions; since 0.46.0 for what a campaign is
  * sent of other players too (whose whispers reach it, its roster's owners, its author's outcomes, its
- * own cards' DCs, a group's access) and a dish's card's readers; `playerOwners` keeps its other
- * readers.
+ * own cards' DCs, a group's access) and a dish's card's readers and its result's `visible`;
+ * `playerOwners` keeps its other readers. One no player has Owner on at all, even through `default`,
+ * but assigned to a player, is that player's: before 0.46.0 it had no player outside its companions.
  * @param {Actor} actor
  * @returns {User[]}
  */

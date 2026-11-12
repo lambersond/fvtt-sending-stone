@@ -118,10 +118,13 @@ companions since 0.45.0: the players you gave Owner on it by name, or where you 
 player it's assigned to; never every player through All Players. So a character shared with All
 Players as Owner, as you might share a party's sheets, gets only its own players' whispers and
 private rolls, and is asked only the saves a card whispered to them asks; its roster names only them
-as its owners; a check's outcome only its author sees, and a card's DC, show as its player's own
-only for theirs; it sees a party sheet as they may; and a dish's card is whispered to them here. A
-character no player owns by name and no one is assigned has no player: no whisper reaches it. Its
-journals, and who may type in its dice, still follow who owns it here.
+as its owners; where the game shows a check's outcome or a card's DC only to the player who made it,
+it's shown them only for its own players' checks and cards; it sees a party sheet as they may; and a
+dish's card is whispered to them here. A character no player owns by name and no one is assigned has
+no player: no whisper reaches it. And one no player owns at all, by name or through All Players, but
+that's assigned to a player is that player's, where before 0.46.0 it had none: it gets their
+whispers and private rolls, and its roster names them. Its journals, and who may type in its dice,
+still follow who owns it here.
 
 Worlds set up before campaigns keep working: the connected characters chosen then are moved into a
 campaign titled after the world the first time a Gamemaster loads it.

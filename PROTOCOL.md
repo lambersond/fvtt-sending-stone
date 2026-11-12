@@ -239,10 +239,12 @@ or check's author, its [`readers`](#chat-message); the authors whose cards' DCs 
 to, and so its result's `visible`. Before 0.46.0 they were every non-Gamemaster user with Owner on
 it, through `default` too, so a character shared with *All Players: Owner* had every player's
 whispers and private rolls, every player as its owners, the outcome of every player's check, the DC
-of every player's card, and a group's best access among them. Its [journal notes](#journal-notes)'
-ownership, the primary players its [`manualDice`](#character) reads and its [Tidy 5e Sheets'
-journal](#tidy-5e-sheets-journal)'s secrets still follow Foundry's own ownership of it, through
-`default` too.
+of every player's card, and a group's best access among them; and one no player had Owner on, by id
+or through `default`, had no player, where since 0.46.0 one assigned to a player is theirs, with
+their whispers and private rolls, them as its owners, their outcomes and DCs, and their access to a
+group. Its [journal notes](#journal-notes)' ownership, the primary players its
+[`manualDice`](#character) reads and its [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal)'s
+secrets still follow Foundry's own ownership of it, through `default` too.
 
 ## Shared shapes
 
@@ -2466,9 +2468,11 @@ An ask:
   where a user added, removed, or given a new role or assigned Character changes it; and in Foundry
   a dish's card is whispered to the campaign's characters' own players, and its result's `visible`
   says whether its cook's own player is among them. A character no player owns by id and none is
-  assigned has no player: no whisper reaches it, and its `owners` is `[]`. A listener reads all of
-  it as before: a message it's no longer sent never arrives, one it was sent before stays until the
-  chat is cleared, and the first hello lists each character's `owners` afresh. A module before
+  assigned has no player: no whisper reaches it, and its `owners` is `[]`. One no player has Owner
+  on at all, even through `default`, but assigned to a player, is that player's, where before it had
+  none: their whispers and private rolls reach it, and its `owners` names them. A listener reads all
+  of it as before: a message it's no longer sent never arrives, one it was sent before stays until
+  the chat is cleared, and the first hello lists each character's `owners` afresh. A module before
   0.46.0 sends as before.
 
 ## Changes from protocol 1

@@ -73,7 +73,9 @@ const DAMAGE_DISPLAYS = new Set(["full", "totalOnly", "hidden"]);
 const LONGEST_FLAVOR = 100;
 
 /**
- * Which players can read a message, and which of a campaign's characters those players own.
+ * Which players can read a message, and which of a campaign's characters those players play: since
+ * 0.46.0 by `characterPlayers` (`charactersSeenBy`), so a character shared with every player through
+ * its default is among them only where one of its own players can read it.
  *
  * Gamemasters are left out of the reader list: they can read everything, so including them would
  * make every message look like it had an audience. A message with no player readers is
@@ -1194,7 +1196,9 @@ function midiSaves(message, targets, rules) {
  * doesn't count otherwise, a legendary resistance's forced success a success; and while Midi-QOL is
  * active, only where it leaves dnd5e's highlight. Seen by players as Challenge Visibility has it for
  * the card it was rolled from, or the roll itself: by everyone, on every card or on players'; by its
- * author's players alone; or by none.
+ * author's players alone, `readers` the characters its author plays, since 0.46.0 by
+ * `characterPlayers` (`charactersSeenBy`), never every one shared with them through its default; or
+ * by none.
  * @param {ChatMessage} message
  * @param {Campaign} campaign
  * @param {ResultRules} rules
