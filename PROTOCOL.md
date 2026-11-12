@@ -1367,10 +1367,12 @@ character's ownership, or its deletion, which changes who may see every group of
 module 0.46.0 a user added, removed, or given a new role or assigned Character, which may change who
 [plays](#a-characters-players) a campaign character and so who may see every group of its campaign;
 and the world's primary party. Nothing is sent where the group is as the campaign was last told, so
-a member's hit points changing sends nothing. A burst of changes is sent once it settles, and a
-change while a hello is on its way goes after it. Any description its sheet refers to that the
-campaign hasn't had since its hello comes first, in `character.texts`. Answer it with your
-`features`, as you answer a `character.updated`.
+a member's hit points changing sends nothing. A burst of changes is sent once it settles, except
+where the world's primary party changes or an actor is deleted, and since module 0.46.0 where a user
+changes, as above: each group that changed is then sent at once, while the characters' own updates
+still settle. A change while a hello is on its way goes after it. Any description its sheet refers
+to that the campaign hasn't had since its hello comes first, in `character.texts`. Answer it with
+your `features`, as you answer a `character.updated`.
 
 ### `group.removed`
 
