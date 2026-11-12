@@ -284,6 +284,30 @@ told = await changed(() => Hooks.callAll('updateActor', ghost, { name: 'Ghost' }
 assert.equal(told.length, 0, 'any other change to a character in no group: nothing')
 ok("a group is sent again when one of its items is made, changed, moved or deleted, and when a member's name changes, or a campaign character's ownership; a member's hit points changing sends nothing")
 
+// Since module 0.46.0 a character no player owns by id is played by the player it's assigned to
+// (`characterPlayers`), so a user's assigned Character changing changes who may see each group of its
+// campaign: each is sent again, one no campaign character is a member of too. Keeper, no player's by
+// id, assigned to Cara, who is Limited on the hall, sees it no longer; assigned to no one, again.
+group('hall', 'The Hall', { ownership: { cara: 1, default: 2 } })
+const withHall = hall => settings.get('campaigns').map(c => (c.id === 'camp-a') ? { ...c, groups: [...c.groups.filter(id => id !== 'hall'), ...(hall ? ['hall'] : [])] } : c)
+settings.set('campaigns', withHall(true))
+announce({ campaignId: 'camp-a' })
+await settle()
+take()
+const assignCara = async character => {
+  const cara = users.get('cara')
+  const sent = await changed(() => { cara.character = character; return Hooks.callAll('updateUser', cara, { character: character?.id ?? null }) })
+  return sent.filter(g => g.id === 'hall').map(g => g.access.keeper ?? null)
+}
+assert.deepEqual(await assignCara(keeper), [null], 'Keeper assigned to Cara: the hall, without him')
+assert.deepEqual(await assignCara(null), ['observer'], 'assigned to no one: the hall, by its default')
+settings.set('campaigns', withHall(false))
+actors.delete('hall')
+announce({ campaignId: 'camp-a' })
+await settle()
+take()
+ok("module 0.46.0: a user's assigned Character changing sends again each group of its campaign whose access it changes, one no campaign character is a member of too: Keeper, assigned to Cara, who is Limited on the hall, sees it no longer, and again once assigned to no one")
+
 primary = 'band'
 told = await changed(() => Hooks.callAll('updateSetting', { key: 'dnd5e.primaryParty' }))
 assert.deepEqual(told.map(g => [g.id, g.primary]), [['party', false]])

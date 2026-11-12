@@ -138,8 +138,8 @@ const CRITICAL_SETTINGS = new Set([
 /* -------------------------------------------- */
 
 /**
- * What changing on a user may change who may type a character's dice: their role, their assigned
- * Character, or a permission of their own.
+ * What changing on a user may change who may type a character's dice, and since 0.46.0 who plays it:
+ * their role, their assigned Character, or a permission of their own.
  * @type {string[]}
  */
 const USER_KEYS = ["role", "character", "permissions"];
@@ -793,7 +793,10 @@ function permissionsChanged(setting) {
 
 /**
  * Note that every campaign character may have changed when a user is added, removed, or changed
- * in a way that changes who may type its dice.
+ * in a way that changes who may type its dice. Since 0.46.0 that also changes who plays it, by their
+ * role and their assigned Character (`characterPlayers`), and so who may see each group of its
+ * campaigns: every group is sent again where that changed, as for a character's ownership, a group
+ * none of its characters is a member of too.
  * @param {object} [changes]   What an update of the user changed; none for one added or removed.
  * @returns {void}
  */
@@ -801,6 +804,9 @@ function usersChanged(changes) {
   if ( !canSend() ) return;
   if ( changes && !USER_KEYS.some(key => Object.hasOwn(changes, key)) ) return;
   for ( const actor of campaignCharacters() ) characterChanged(actor);
+  for ( const campaign of getCampaigns() ) {
+    if ( groupsTaken(campaign) ) sendGroups(campaign);
+  }
 }
 
 /**

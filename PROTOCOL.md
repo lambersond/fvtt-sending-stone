@@ -1360,12 +1360,14 @@ Part of the event stream. Sent after every answered hello, after its characters;
 the listener starts to read groups in a heartbeat's answer, and when what it takes of sheets
 changes; and when a group may have changed: the group itself or its items, as an item made, changed,
 deleted or moved into a container; a member renamed or given a new portrait, or deleted; a campaign
-character's ownership, or its deletion, which changes who may see every group of its campaign; and
-the world's primary party. Nothing is sent where the group is as the campaign was last told, so a
-member's hit points changing sends nothing. A burst of changes is sent once it settles, and a change
-while a hello is on its way goes after it. Any description its sheet refers to that the campaign
-hasn't had since its hello comes first, in `character.texts`. Answer it with your `features`, as you
-answer a `character.updated`.
+character's ownership, or its deletion, which changes who may see every group of its campaign; since
+module 0.46.0 a user added, removed, or given a new role or assigned Character, which may change who
+[plays](#a-characters-players) a campaign character and so who may see every group of its campaign;
+and the world's primary party. Nothing is sent where the group is as the campaign was last told, so
+a member's hit points changing sends nothing. A burst of changes is sent once it settles, and a
+change while a hello is on its way goes after it. Any description its sheet refers to that the
+campaign hasn't had since its hello comes first, in `character.texts`. Answer it with your
+`features`, as you answer a `character.updated`.
 
 ### `group.removed`
 
@@ -2459,12 +2461,13 @@ An ask:
   them asks; a save's or check's outcome its author's characters alone may see names only its
   author's own as `readers`; a prompt shows the DC of its own players' cards alone as theirs; its
   `owners` in the hello and `character.updated` are its own players; a group's `access` is read from
-  them, or the group's default where it has none; and in Foundry a dish's card is whispered to the
-  campaign's characters' own players. A character no player owns by id and none is assigned has no
-  player: no whisper reaches it, and its `owners` is `[]`. A listener reads all of it as before: a
-  message it's no longer sent never arrives, one it was sent before stays until the chat is cleared,
-  and the first hello lists each character's `owners` afresh. A module before 0.46.0 sends as
-  before.
+  them, or the group's default where it has none, and every group goes again in `group.updated`
+  where a user added, removed, or given a new role or assigned Character changes it; and in Foundry
+  a dish's card is whispered to the campaign's characters' own players. A character no player owns
+  by id and none is assigned has no player: no whisper reaches it, and its `owners` is `[]`. A
+  listener reads all of it as before: a message it's no longer sent never arrives, one it was sent
+  before stays until the chat is cleared, and the first hello lists each character's `owners`
+  afresh. A module before 0.46.0 sends as before.
 
 ## Changes from protocol 1
 
