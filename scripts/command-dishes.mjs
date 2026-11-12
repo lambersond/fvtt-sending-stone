@@ -2,7 +2,7 @@ import {
   DISH_KINDS, DISH_OUTCOMES, DISH_VERSIONS, EVENTS, MODULE_ID, MOST_DISH_CHANGES, MOST_DISH_INGREDIENTS
 } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { playerOwners } from "./characters.mjs";
+import { characterPlayers } from "./characters.mjs";
 import { dnd5eGeneration } from "./command-alone.mjs";
 import { checkCommand, failedResult, isId, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
 import { commandActor } from "./creatures.mjs";
@@ -223,8 +223,10 @@ async function dishNow(command, passed) {
 }
 
 /**
- * Is the card whispered to a player who owns the cook's character, still the campaign's? A card
- * module 0.38.x posted, whispered to the Gamemasters alone, isn't.
+ * Is the card whispered to a player of the cook's character, still the campaign's? A card module
+ * 0.38.x posted, whispered to the Gamemasters alone, isn't. Since 0.46.0 its players are read as the
+ * card's readers are (`characterPlayers`), so the two agree; before, they were every player with
+ * Owner on it, through `default` too.
  * @param {ChatMessage} card
  * @param {object} command
  * @param {Campaign} campaign
@@ -235,5 +237,5 @@ function cookReads(card, command, campaign) {
   const cook = commandActor(command, campaign)?.character;
   if ( !cook ) return false;
   const readers = new Set(card.whisper ?? []);
-  return playerOwners(cook).some(user => readers.has(user.id));
+  return characterPlayers(cook).some(user => readers.has(user.id));
 }

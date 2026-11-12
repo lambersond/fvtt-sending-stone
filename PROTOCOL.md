@@ -236,12 +236,13 @@ and so the saves a whispered card asks of it; its [`owners`](#character); the ch
 or check's author, its [`readers`](#chat-message); the authors whose cards' DCs its
 [prompts](#prompts) show as its player's own; whose ownership of a [group](#group) gives it
 `access`; and in Foundry, whom a [dish's card](#dishes-from-the-magical-recipe-book) is whispered
-to. Before 0.46.0 they were every non-Gamemaster user with Owner on it, through `default` too, so a
-character shared with *All Players: Owner* had every player's whispers and private rolls, every
-player as its owners, the outcome of every player's check, the DC of every player's card, and a
-group's best access among them. Its [journal notes](#journal-notes)' ownership, the primary players
-its [`manualDice`](#character) reads and its [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal)'s
-secrets still follow Foundry's own ownership of it, through `default` too.
+to, and so its result's `visible`. Before 0.46.0 they were every non-Gamemaster user with Owner on
+it, through `default` too, so a character shared with *All Players: Owner* had every player's
+whispers and private rolls, every player as its owners, the outcome of every player's check, the DC
+of every player's card, and a group's best access among them. Its [journal notes](#journal-notes)'
+ownership, the primary players its [`manualDice`](#character) reads and its [Tidy 5e Sheets'
+journal](#tidy-5e-sheets-journal)'s secrets still follow Foundry's own ownership of it, through
+`default` too.
 
 ## Shared shapes
 
@@ -1655,7 +1656,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | `transfer` | For a move of items and coins (module 0.31.0) that moved anything: `{ from, to, items, currency }`, its ends' actor ids, each item moved `{ id, quantity, created, stacked }`, in the command's order, and the coins moved, `{ <key>: <count> }`, or `null` for none; on `"done"`, and on `"error"` after some moved, listing only those. Never a name, nor what a container held. Since module 0.32.0, for a party's coin shared among its characters, `{ from, to: null, items: [], currency, among }`: `currency` the coins given out, `{ <key>: <share × those given one> }`, and `among` the characters given their share, in order, every one of them when done; on `"error"` only where any was given one. Left out on any other failure. See [Moving items and coins](#moving-items-and-coins). |
 | `removed` | For an item removed (module 0.33.0): `{ item, quantity }`, the item's id and how many of it were removed; on `"done"`, and on `"error"` where the item itself was lowered or deleted. Never a name, nor what a container held. See [Removing an item](#removing-an-item). |
 | `favorited` | For a favorite added or removed (module 0.37.0): whether it's one of the character's favorites now, on `"done"`. See [Favorites](#favorites). |
-| `dish` | For a dish (module 0.38.0): `{ card, state }`, on `"done"`: its card's id, the `messageId` too, and `"waiting"`; or, for a dish handed over again whose card was decided, `"applied"` or `"dismissed"`, for one whose card was deleted undecided, `"dismissed"`, and for one whose card was deleted once decided, its choice. Since module 0.39.0 `visible` is `true` where the cook's character's player is among the card's readers; before, it was `false`, as no player saw the card. See [Dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). |
+| `dish` | For a dish (module 0.38.0): `{ card, state }`, on `"done"`: its card's id, the `messageId` too, and `"waiting"`; or, for a dish handed over again whose card was decided, `"applied"` or `"dismissed"`, for one whose card was deleted undecided, `"dismissed"`, and for one whose card was deleted once decided, its choice. Since module 0.39.0 `visible` is `true` where the cook's character's player is among the card's readers, since module 0.46.0 one of its [players](#a-characters-players), as the card's readers are; before, it was `false`, as no player saw the card. See [Dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). |
 | `effect` | For an effect turned off, on or deleted (module 0.39.0): `{ id, disabled, deleted }`, on `"done"`: the effect's id as the sheet names it, whether it's turned off now, `null` once deleted, and `deleted`, `true` for a delete, one already gone among them. See [A player's own effects](#a-players-own-effects). |
 | `wildShape` | For Wild Shape (module 0.40.0), on `"done"`: for `"transform"` `{ op, form: { id, name, uuid }, temp, hours }`, the sheet sent first; for `"revert"` `{ op, form: { name } }`, the sheet sent first, or `{ op, form: null }` where the character wasn't shaped; for `"learn"` `{ op, form: { id, name, uuid }, replaced: { id, name } \| null }`, the sheet sent first where it wrote; for `"forms"` `{ op, forms, more, limits }`, the Beasts the character may learn now, each `{ uuid, name, img, size, cr, ac, speeds, known }`, by Challenge Rating then name, at most 200, `more` `true` where there were more, and `limits` `{ count, cr, fly }`, as the sheet's `wildShape.limits`. See [Wild Shape](#wild-shape). |
 | `hitPoints` | For hit points set (module 0.44.0), on `"done"`: `{ value, max, temp }`, the actor's after the write, the character's, its form's or a companion's, `max` the maximum its sheet shows, with any temporary change to it, `null` where dnd5e has none. See [Hit points](#hit-points). |
@@ -2463,11 +2464,12 @@ An ask:
   `owners` in the hello and `character.updated` are its own players; a group's `access` is read from
   them, or the group's default where it has none, and every group goes again in `group.updated`
   where a user added, removed, or given a new role or assigned Character changes it; and in Foundry
-  a dish's card is whispered to the campaign's characters' own players. A character no player owns
-  by id and none is assigned has no player: no whisper reaches it, and its `owners` is `[]`. A
-  listener reads all of it as before: a message it's no longer sent never arrives, one it was sent
-  before stays until the chat is cleared, and the first hello lists each character's `owners`
-  afresh. A module before 0.46.0 sends as before.
+  a dish's card is whispered to the campaign's characters' own players, and its result's `visible`
+  says whether its cook's own player is among them. A character no player owns by id and none is
+  assigned has no player: no whisper reaches it, and its `owners` is `[]`. A listener reads all of
+  it as before: a message it's no longer sent never arrives, one it was sent before stays until the
+  chat is cleared, and the first hello lists each character's `owners` afresh. A module before
+  0.46.0 sends as before.
 
 ## Changes from protocol 1
 
