@@ -219,9 +219,32 @@ Every chat message carries an `audience`:
 | `public` | Everyone can read it. |
 | `gmOnly` | No player can read it. Only ever `true` when Gamemaster-only information is on. |
 | `users` | The ids of the players who can read it. Empty when `public`. Gamemasters are never listed. |
-| `characters` | The ids of the campaign's characters whose players can read it. All of them when `public`. |
+| `characters` | The ids of the campaign's characters whose [players](#a-characters-players) can read it. All of them when `public`. |
 
 Use `characters` to route a message to the right player's device.
+
+### A character's players
+
+Since module 0.46.0 a character's players, for what a campaign is sent of other players and for a
+dish's card, are as its [companions](#companions) have read them since module 0.45.0: the
+non-Gamemaster users whose own id has Owner in the character's `ownership`, never through `default`,
+and for a character none owns so, the non-Gamemaster users it's assigned to as their character (User
+Configuration). A character shared with every player through its default, as a Gamemaster may share
+a party's sheets, is then its own players' alone, and one no player owns by id and none is assigned
+has no player. They are whose whispers and private rolls reach it, an audience's `characters` above,
+and so the saves a whispered card asks of it; its [`owners`](#character); the characters of a save's
+or check's author, its [`readers`](#chat-message); the authors whose cards' DCs its
+[prompts](#prompts) show as its player's own; whose ownership of a [group](#group) gives it
+`access`; and in Foundry, whom a [dish's card](#dishes-from-the-magical-recipe-book) is whispered
+to, and so its result's `visible`. Before 0.46.0 they were every non-Gamemaster user with Owner on
+it, through `default` too, so a character shared with *All Players: Owner* had every player's
+whispers and private rolls, every player as its owners, the outcome of every player's check, the DC
+of every player's card, and a group's best access among them; and one no player had Owner on, by id
+or through `default`, had no player, where since 0.46.0 one assigned to a player is theirs, with
+their whispers and private rolls, them as its owners, their outcomes and DCs, and their access to a
+group. Its [journal notes](#journal-notes)' ownership, the primary players its
+[`manualDice`](#character) reads and its [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal)'s
+secrets still follow Foundry's own ownership of it, through `default` too.
 
 ## Shared shapes
 
@@ -239,7 +262,9 @@ Use `characters` to route a message to the right player's device.
 }
 ```
 
-`owners` lists players only, never Gamemasters, and may be empty. `sheet` is the character's
+`owners` lists players only, never Gamemasters, and may be empty: since module 0.46.0 the
+character's [players](#a-characters-players), before, every player with Owner on it, through
+`default` too. `sheet` is the character's
 [sheet](#character-sheet) under dnd5e, or `null` under another system, or where it can't be
 described; in the [slim shape](#slim-sheets), with `slim`, to a listener that expands it. In a
 `bridge.hello` since module 0.22.0 (`sheetsApart`), a character has no `sheet` at all: it follows
@@ -871,7 +896,7 @@ their own, are never one.
 | --- | --- |
 | `id`, `uuid`, `name`, `img`, `type` | The group's actor: `uuid` `"Actor.<id>"`, `img` as stored or `null`, `type` always `"group"`. |
 | `primary` | Is it the world's primary party, as dnd5e's actors directory sets it (`game.actors.party`)? |
-| `access` | Which of the campaign's characters may see it, as Foundry lets their players: by each character's player owners' highest ownership of the group, or for a character no player owns, the group's default; `"owner"` for Owner, `"observer"` for Observer. A character whose players have Limited or less on it, or none, has no key. Gamemasters count for none: they see every group. `{}` means no player may see it. |
+| `access` | Which of the campaign's characters may see it, as Foundry lets their players: by each character's player owners' highest ownership of the group, or for a character no player owns, the group's default; `"owner"` for Owner, `"observer"` for Observer. A character whose players have Limited or less on it, or none, has no key. Gamemasters count for none: they see every group. `{}` means no player may see it. Since module 0.46.0 a character's player owners are its [players](#a-characters-players); before, every player with Owner on it, through `default` too, so a character shared with *All Players: Owner* took the best access any player had. |
 | `sheet` | In `group.updated`, the group's sheet, as below; `null` where it's private, `access` being `{}`, or withheld as too large, with `sheetWithheld` saying so: `{ reason: "private" }` or `{ reason: "tooLarge", bytes, limit }`, as a character's (see [Character](#character)). A private group goes with no descriptions at all. Absent in a hello. |
 
 Its sheet: what any of its players may see of it, and nothing more, observers and owners alike.
@@ -1123,7 +1148,7 @@ a hello, and no message already sent again.
 | `targets[].save` | `"success"` or `"failure"`, on Midi-QOL's card only, from the tokens Midi records as saved (`saveUuids`) and as failed (`failedSaveUuids`), each taken for its actor, never from `saved`: only once Midi has checked saves, its *Auto check Saves* not "Off" (`none`), and shown them, some target marked `saved` `true` or `false` (Midi lists every target as failed before anyone rolls). Since module 0.30.0, told for each target as Midi draws it, by the target alone: under *Auto check Saves* "Save - All see result only", "Save - All see result + save total" or "Save - All see Result + Rolls" (`allNoRoll`, `all`, `allShow`), for a target a player owns where dnd5e's *Challenge Visibility* is "Show all" or "Show only from other players", and for any other only under "Show all". The card's speaker, its DC, its whispers and its activity's own *Save Display* play no part, as they did before 0.30.0. Nothing for a target Midi decided nothing of. |
 | `save.target` | The `uuid` of the actor who saved, as cards' `targets` name it: the message's speaker's. Sent whenever that resolves, on a save of any origin since module 0.30.0: a save activity's card, Midi-QOL's card, a request in chat, dnd5e's concentration card, a link in a description, or none. Before, on a save activity's card still in the chat log alone. |
 | `save.outcome` | `"success"` or `"failure"`, as dnd5e highlights it: its first roll a `D20Roll` against a DC (`options.target`), whose first die is one d20 dnd5e counts no otherwise (no success counting or margins); a legendary resistance's forced success (dnd5e 5's `roll.forceSuccess`, dnd5e 6's `resisted`) a success. A link whose author hid its DC is rolled against it anyway, so its roller sees it, but the DC itself is never sent. With Midi-QOL active, since module 0.30.0 only while its *Color code Hit/Miss/Save Display* is on and *Only highlight critical/fumble hits* off, as Midi strips dnd5e's highlight from every roll otherwise. Told as dnd5e's *Challenge Visibility* shows it for the card it was rolled from, its `originatingMessage` still in the chat log, Midi-QOL's among them, or else for the roll itself, whose author is its roller: under "Show all", or "Show only from other players" for a card a player posted, to everyone; otherwise, for a card a player posted, to its author's characters alone, with `readers`, and not at all where they have none; otherwise not at all. |
-| `save.readers` | The ids of the campaign's characters whose players alone may see `outcome`: those the card's author owns. Absent where everyone who can read the message may. |
+| `save.readers` | The ids of the campaign's characters whose players alone may see `outcome`: those the card's author owns, since module 0.46.0 those it's one of the [players](#a-characters-players) of, before, every one it had Owner on, through `default` too. Absent where everyone who can read the message may. |
 | `check.target`, `check.outcome`, `check.readers` | Since module 0.30.0, as `save`'s, for an ability, skill or tool check: from a check activity's card, a request in chat, a link in a description, or none. |
 
 #### A Gamemaster's rolls on Midi-QOL's cards
@@ -1338,12 +1363,16 @@ Part of the event stream. Sent after every answered hello, after its characters;
 the listener starts to read groups in a heartbeat's answer, and when what it takes of sheets
 changes; and when a group may have changed: the group itself or its items, as an item made, changed,
 deleted or moved into a container; a member renamed or given a new portrait, or deleted; a campaign
-character's ownership, or its deletion, which changes who may see every group of its campaign; and
-the world's primary party. Nothing is sent where the group is as the campaign was last told, so a
-member's hit points changing sends nothing. A burst of changes is sent once it settles, and a change
-while a hello is on its way goes after it. Any description its sheet refers to that the campaign
-hasn't had since its hello comes first, in `character.texts`. Answer it with your `features`, as you
-answer a `character.updated`.
+character's ownership, or its deletion, which changes who may see every group of its campaign; since
+module 0.46.0 a user added, removed, or given a new role or assigned Character, which may change who
+[plays](#a-characters-players) a campaign character and so who may see every group of its campaign;
+and the world's primary party. Nothing is sent where the group is as the campaign was last told, so
+a member's hit points changing sends nothing. A burst of changes is sent once it settles, except
+where the world's primary party changes or an actor is deleted, and since module 0.46.0 where a user
+changes, as above: each group that changed is then sent at once, while the characters' own updates
+still settle. A change while a hello is on its way goes after it. Any description its sheet refers
+to that the campaign hasn't had since its hello comes first, in `character.texts`. Answer it with
+your `features`, as you answer a `character.updated`.
 
 ### `group.removed`
 
@@ -1631,7 +1660,7 @@ What became of a player's roll, attack or use fetched from the listener; see
 | `transfer` | For a move of items and coins (module 0.31.0) that moved anything: `{ from, to, items, currency }`, its ends' actor ids, each item moved `{ id, quantity, created, stacked }`, in the command's order, and the coins moved, `{ <key>: <count> }`, or `null` for none; on `"done"`, and on `"error"` after some moved, listing only those. Never a name, nor what a container held. Since module 0.32.0, for a party's coin shared among its characters, `{ from, to: null, items: [], currency, among }`: `currency` the coins given out, `{ <key>: <share × those given one> }`, and `among` the characters given their share, in order, every one of them when done; on `"error"` only where any was given one. Left out on any other failure. See [Moving items and coins](#moving-items-and-coins). |
 | `removed` | For an item removed (module 0.33.0): `{ item, quantity }`, the item's id and how many of it were removed; on `"done"`, and on `"error"` where the item itself was lowered or deleted. Never a name, nor what a container held. See [Removing an item](#removing-an-item). |
 | `favorited` | For a favorite added or removed (module 0.37.0): whether it's one of the character's favorites now, on `"done"`. See [Favorites](#favorites). |
-| `dish` | For a dish (module 0.38.0): `{ card, state }`, on `"done"`: its card's id, the `messageId` too, and `"waiting"`; or, for a dish handed over again whose card was decided, `"applied"` or `"dismissed"`, for one whose card was deleted undecided, `"dismissed"`, and for one whose card was deleted once decided, its choice. Since module 0.39.0 `visible` is `true` where the cook's character's player is among the card's readers; before, it was `false`, as no player saw the card. See [Dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). |
+| `dish` | For a dish (module 0.38.0): `{ card, state }`, on `"done"`: its card's id, the `messageId` too, and `"waiting"`; or, for a dish handed over again whose card was decided, `"applied"` or `"dismissed"`, for one whose card was deleted undecided, `"dismissed"`, and for one whose card was deleted once decided, its choice. Since module 0.39.0 `visible` is `true` where the cook's character's player is among the card's readers, since module 0.46.0 one of its [players](#a-characters-players), as the card's readers are; before, it was `false`, as no player saw the card. See [Dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). |
 | `effect` | For an effect turned off, on or deleted (module 0.39.0): `{ id, disabled, deleted }`, on `"done"`: the effect's id as the sheet names it, whether it's turned off now, `null` once deleted, and `deleted`, `true` for a delete, one already gone among them. See [A player's own effects](#a-players-own-effects). |
 | `wildShape` | For Wild Shape (module 0.40.0), on `"done"`: for `"transform"` `{ op, form: { id, name, uuid }, temp, hours }`, the sheet sent first; for `"revert"` `{ op, form: { name } }`, the sheet sent first, or `{ op, form: null }` where the character wasn't shaped; for `"learn"` `{ op, form: { id, name, uuid }, replaced: { id, name } \| null }`, the sheet sent first where it wrote; for `"forms"` `{ op, forms, more, limits }`, the Beasts the character may learn now, each `{ uuid, name, img, size, cr, ac, speeds, known }`, by Challenge Rating then name, at most 200, `more` `true` where there were more, and `limits` `{ count, cr, fly }`, as the sheet's `wildShape.limits`. See [Wild Shape](#wild-shape). |
 | `hitPoints` | For hit points set (module 0.44.0), on `"done"`: `{ value, max, temp }`, the actor's after the write, the character's, its form's or a companion's, `max` the maximum its sheet shows, with any temporary change to it, `null` where dnd5e has none. See [Hit points](#hit-points). |
@@ -1705,7 +1734,7 @@ A prompt:
 | `type` | `"save"`, or `"concentration"` for a concentration check; since module 0.27.0, for a Midi prompt only, `"check"` for an ability check or `"skill"` for a skill check. |
 | `abilities` | The abilities it may be rolled with, such as `["dex"]`, or `["str", "dex"]` for a choice; one for a concentration check or an ability check; `[]` for a `"skill"`. At most 10. |
 | `skills` | A Midi prompt's of `type` `"skill"` only: the skills it may be rolled with, dnd5e's keys, such as `["ath", "acr"]` for a choice. At most 10. |
-| `dc` | The DC, where dnd5e's *Challenge Visibility* lets the character's player see it on the card; otherwise `null`, as also for a card that shows it no one, such as a request for a link whose author hid its DC (module 0.17.0). |
+| `dc` | The DC, where dnd5e's *Challenge Visibility* lets the character's player see it on the card, as on their own card always; otherwise `null`, as also for a card that shows it no one, such as a request for a link whose author hid its DC (module 0.17.0). Since module 0.46.0 a card is its player's own where its author is one of the character's [players](#a-characters-players); before, where its author had Owner on it, through `default` too, so a character shared with *All Players: Owner* was shown the DC of every player's card. |
 | `label` | What asks: the spell or feature whose card it is, or what the character is concentrating on; or `null`. |
 | `openedAt`, `expiresAt` | When its card was posted, and when it stops waiting, ten minutes later; for a Midi prompt, when it was sent, and when Midi's own way is taken, at most a minute later, by the game's clock: a listener may put it on its own once, as it first stores it, counting what's left from the envelope's `time`, as a hello may be the first to carry one; a post held up in the module's queue isn't counted. |
 | `source` | Since module 0.27.0, a Midi prompt's only: `"midi"` for a save, check or skill check a Midi-QOL workflow asks, `"concentration"` for a concentration check Midi asks, in its "item" mode or on its own card, and `"overtime"` for an OverTime effect's turn save. Absent from every other prompt, whose rules are as before. |
@@ -2429,6 +2458,24 @@ An ask:
   leaves in `companions.listed`, as any does, and a fight only it brought ends for the campaign, as
   when its last character leaves; the first hello lists only the fights the campaign is in. A module
   before 0.45.0 sends as before.
+- Module 0.46.0 reads [a character's players](#a-characters-players), for what a campaign is sent of
+  other players and for a dish's card, as module 0.45.0 read them for its companions: the users who
+  own it by their own id, never through `default`, or where none does, the users it's assigned to as
+  their character, with no new event, field or format. A character shared with *All Players: Owner*
+  is then sent no other player's whispers or private rolls, nor asked the saves a card whispered to
+  them asks; a save's or check's outcome its author's characters alone may see names only its
+  author's own as `readers`; a prompt shows the DC of its own players' cards alone as theirs; its
+  `owners` in the hello and `character.updated` are its own players; a group's `access` is read from
+  them, or the group's default where it has none, and every group goes again in `group.updated`
+  where a user added, removed, or given a new role or assigned Character changes it; and in Foundry
+  a dish's card is whispered to the campaign's characters' own players, and its result's `visible`
+  says whether its cook's own player is among them. A character no player owns by id and none is
+  assigned has no player: no whisper reaches it, and its `owners` is `[]`. One no player has Owner
+  on at all, even through `default`, but assigned to a player, is that player's, where before it had
+  none: their whispers and private rolls reach it, and its `owners` names them. A listener reads all
+  of it as before: a message it's no longer sent never arrives, one it was sent before stays until
+  the chat is cleared, and the first hello lists each character's `owners` afresh. A module before
+  0.46.0 sends as before.
 
 ## Changes from protocol 1
 
@@ -4579,7 +4626,8 @@ Never `"unknown"`: a cook no longer in the campaign still gets a card.
 
 **The card.** Posted by the bridge's own user, a Gamemaster, never a player, whom a whisper would
 show it to as its author; since module 0.39.0 whispered to every Gamemaster and every player who
-owns one of the campaign's characters as it's posted, so its [chat message](#chat-message) reaches
+owns one of the campaign's characters as it's posted, since module 0.46.0 every one of their
+[players](#a-characters-players), so its [chat message](#chat-message) reaches
 those players' app, as text, in this campaign only, though one of them plays in another (before, it
 was whispered to the Gamemasters alone, `gmOnly`, sent only with **GM-only details** on); spoken by
 the cook's character where it's still the campaign's, else by the cook's name in the cookbook. The whole dish is in its

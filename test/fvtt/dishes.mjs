@@ -380,6 +380,21 @@ assert.deepEqual(flagsOf(card), {
 })
 ok("one card per dish, whispered to every Gamemaster and the campaign's players, Alice and Bob, never Carol, who plays in another campaign alone; authored by the bridge's user, the whole dish in its flags; the result done, visible, its card waiting")
 
+// Since module 0.46.0 the result's `visible` reads the cook's players as the card's readers are read
+// (`characterPlayers`), so the two agree. Bree, shared with every player through her default and
+// owned by no one by id, has no player: her card goes to Alice and Bob for Thorin and Vex, and isn't
+// visible. Owned by no one and assigned to Carol, she's Carol's: her card goes to Carol too, visible.
+bree.ownership = { default: 3 }
+const sharedCook = await serve(dishOf(BOON(), { actorId: 'bree' }))
+bree.ownership = { default: 0 }
+users.get('carol').character = bree
+const assignedCook = await serve(dishOf(BOON(), { actorId: 'bree' }))
+users.get('carol').character = null
+bree.ownership = undefined
+assert.deepEqual([sharedCook.result.visible, [...sharedCook.card.whisper].sort()], [false, ['alice', 'bob', 'gm', 'gm2']], 'Bree shared through her default')
+assert.deepEqual([assignedCook.result.visible, [...assignedCook.card.whisper].sort()], [true, ['alice', 'bob', 'carol', 'gm', 'gm2']], 'Bree assigned to Carol')
+ok("module 0.46.0: a dish's `visible` reads the cook's players as its card's readers: Bree shared through her default, no one's by id, isn't visible, though Alice and Bob read her card; assigned to Carol, it's whispered to Carol and visible")
+
 /* -------------------------------------------- */
 /*  3b. Its chat message                        */
 /* -------------------------------------------- */

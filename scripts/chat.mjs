@@ -53,7 +53,10 @@ function active() {
  * 0.36.0, for an app that reads companions, one of their companions' messages counts as said by one
  * of its characters, under every chat scope. Since 0.39.0 a dish's card belongs to its own campaign
  * alone: whispered to its players, it would otherwise reach another campaign one of them plays in.
- * Since 0.45.0 a public message that belongs only to other campaigns (`leftOutOf`) doesn't.
+ * Since 0.45.0 a public message that belongs only to other campaigns (`leftOutOf`) doesn't. Since
+ * 0.46.0 the player of one of its characters is one of that character's players (`characterPlayers`,
+ * as the audience's `characters` reads them), never every player it's shared with through its
+ * default.
  * @param {ChatMessage} message
  * @param {object} audience       The message's audience in the campaign.
  * @param {Campaign} campaign

@@ -213,15 +213,19 @@ export function playerOwners(actor) {
 }
 
 /**
- * A character's players for its companions, since 0.45.0: the non-Gamemaster users whose own id has
- * Owner in its ownership, never through `default`; for a character none owns so, the non-Gamemaster
- * users it's assigned to as their character. A character shared with every player through its
- * default, as a Gamemaster may share a party's sheets, is then no one's but its own player's, so
- * another campaign's players' NPCs never become its companions.
+ * A character's players: the non-Gamemaster users whose own id has Owner in its ownership, never
+ * through `default`; for a character none owns so, the non-Gamemaster users it's assigned to as
+ * their character. A character shared with every player through its default, as a Gamemaster may
+ * share a party's sheets, is then no one's but its own player's. Since 0.45.0 for its companions, so
+ * another campaign's players' NPCs never become its companions; since 0.46.0 for what a campaign is
+ * sent of other players too (whose whispers reach it, its roster's owners, its author's outcomes, its
+ * own cards' DCs, a group's access) and a dish's card's readers and its result's `visible`;
+ * `playerOwners` keeps its other readers. One no player has Owner on at all, even through `default`,
+ * but assigned to a player, is that player's: before 0.46.0 it had no player outside its companions.
  * @param {Actor} actor
  * @returns {User[]}
  */
-export function companionPlayers(actor) {
+export function characterPlayers(actor) {
   const owner = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
   const players = game.users.filter(user => !user.isGM);
   const named = players.filter(user => actor?.ownership?.[user.id] === owner);
@@ -229,22 +233,24 @@ export function companionPlayers(actor) {
 }
 
 /**
- * A campaign's characters owned by any of the given users.
+ * A campaign's characters any of the given users plays: since 0.46.0 by `characterPlayers`, so a
+ * character shared with every player through its default is seen by its own players alone.
  * @param {Iterable<string>} userIds   Ids of the users who can see something.
  * @param {Campaign} campaign
- * @returns {string[]}                  Actor ids of the campaign characters those users own.
+ * @returns {string[]}                  Actor ids of the campaign characters those users play.
  */
 export function charactersSeenBy(userIds, campaign) {
-  const users = Array.from(userIds, id => game.users.get(id)).filter(Boolean);
+  const ids = new Set(userIds);
   return campaignActors(campaign)
-    .filter(actor => users.some(user => actor.testUserPermission(user, "OWNER")))
+    .filter(actor => characterPlayers(actor).some(user => ids.has(user.id)))
     .map(actor => actor.id);
 }
 
 /* -------------------------------------------- */
 
 /**
- * A character as a campaign's roster lists it: who it is and who plays it, without its sheet.
+ * A character as a campaign's roster lists it: who it is and who plays it, without its sheet. Since
+ * 0.46.0 its owners are its players (`characterPlayers`), never every player through `default`.
  * @param {Actor} actor
  * @returns {{id: string, uuid: string, name: string, img: string, type: string, owners: object[]}}
  */
@@ -255,7 +261,7 @@ export function rosterEntry(actor) {
     name: actor.name,
     img: actor.img,
     type: actor.type,
-    owners: playerOwners(actor).map(user => ({ id: user.id, name: user.name }))
+    owners: characterPlayers(actor).map(user => ({ id: user.id, name: user.name }))
   };
 }
 

@@ -4,7 +4,7 @@ import {
 } from "./constants.mjs";
 import { canSend, isBridge } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { campaignActors, playerOwners, rosterEntry } from "./characters.mjs";
+import { campaignActors, characterPlayers, rosterEntry } from "./characters.mjs";
 import { dishReader, dishSystem } from "./command-dishes.mjs";
 import { commandActor } from "./creatures.mjs";
 import {
@@ -144,13 +144,15 @@ export async function postDishCard(command, campaign) {
 
 /**
  * Who a dish's card is whispered to, since 0.39.0: every Gamemaster, and every player who owns one of
- * the campaign's characters, each once. A player of another campaign alone isn't among them.
+ * the campaign's characters, each once, since 0.46.0 one of its players (`characterPlayers`). A
+ * player of another campaign alone isn't among them, even where a character is shared with every
+ * player through its default.
  * @param {Campaign} campaign
  * @returns {string[]}   User ids.
  */
 export function readersOf(campaign) {
   const gamemasters = game.users.filter(user => user.isGM).map(user => user.id);
-  const players = campaignActors(campaign).flatMap(actor => playerOwners(actor).map(user => user.id));
+  const players = campaignActors(campaign).flatMap(actor => characterPlayers(actor).map(user => user.id));
   return [...new Set([...gamemasters, ...players])];
 }
 

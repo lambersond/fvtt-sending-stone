@@ -112,6 +112,20 @@ involves its characters, described for it alone:
   when its first character joins and ends for it when its last one leaves.
 - **Hit points and audiences** cover only its own characters.
 
+**A character's players.** Give each player Owner on their own character by name, or assign it to
+them in User Configuration. Since 0.46.0 Sending Stone reads a character's players as it has for its
+companions since 0.45.0: the players you gave Owner on it by name, or where you gave no one, the
+player it's assigned to; never every player through All Players. So a character shared with All
+Players as Owner, as you might share a party's sheets, gets only its own players' whispers and
+private rolls, and is asked only the saves a card whispered to them asks; its roster names only them
+as its owners; where the game shows a check's outcome or a card's DC only to the player who made it,
+it's shown them only for its own players' checks and cards; it sees a party sheet as they may; and a
+dish's card is whispered to them here. A character no player owns by name and no one is assigned has
+no player: no whisper reaches it. And one no player owns at all, by name or through All Players, but
+that's assigned to a player is that player's, where before 0.46.0 it had none: it gets their
+whispers and private rolls, and its roster names them. Its journals, and who may type in its dice,
+still follow who owns it here.
+
 Worlds set up before campaigns keep working: the connected characters chosen then are moved into a
 campaign titled after the world the first time a Gamemaster loads it.
 
@@ -542,8 +556,10 @@ whose buttons only Gamemasters have, whether or not players' rolls are made here
 Gamemaster to be connected. The card says what
 the dish does, who cooked it and through whose link it came. **Apply…** (or **Who ate it…** for a
 standard dish, which has no effect) asks you who ate it, the sender ticked; **Set aside** says nobody
-did. Each character you tick gets one effect holding what the dish does, for 24 hours of game time:
-one dish at a time, a new dish replacing the last, the same dish never twice. Its dice were rolled
+did. Since 0.46.0 the dialog names beside each character its players: those who own it by name,
+else the player it's assigned to, never every player who reaches it through All Players. Each
+character you tick gets one effect holding what the dish does, for 24 hours of game time: one dish
+at a time, a new dish replacing the last, the same dish never twice. Its dice were rolled
 once, in the cookbook, so everyone who eats it gets the same, and the card says what was rolled.
 What the module can't apply by itself, the card lists, for you to apply by hand. A dish that raises
 maximum hit points heals by as much, and a long rest wakes the character at the raised maximum; a
@@ -839,7 +855,7 @@ With **GM-only details** off, the listener receives what players could see:
 | Information | Sent? |
 | --- | --- |
 | Public chat messages | Yes; since 0.45.0, where a world runs more than one campaign, not one that's another campaign's alone ([Campaigns](#campaigns)). |
-| Whispers, and private or self rolls | Yes, to the campaigns of the characters whose players can read them, marked with which they are. |
+| Whispers, and private or self rolls | Yes, to the campaigns of the characters whose players can read them, marked with which they are; since 0.46.0 a character's players are those who own it by name, else the one it's assigned to ([Campaigns](#campaigns)), so a character shared with All Players gets no other player's. |
 | Whispers only Gamemasters can read, private Gamemaster rolls, blind rolls | No. |
 | A blind roll the Gamemaster later reveals | Yes, from then on, as an update. |
 | A message made private after it was sent | The listener is told to delete it. |
@@ -1133,7 +1149,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status; what the app says it takes of sheets, and no post larger; why the app refused a post or fetch |
 | `scripts/delivery-status.mjs` | What the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
-| `scripts/characters.mjs` | A campaign's characters and who owns them |
+| `scripts/characters.mjs` | A campaign's characters and who owns them; a character's players, those who own it by name, else those it's assigned to: from 0.45.0 for its companions, and from 0.46.0 for what its campaign is sent of other players and a dish's card |
 | `scripts/typed-dice.mjs` | Whether a character's player may type in what their own dice show in the app: its primary players, and core's Make Manual Rolls permission |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |

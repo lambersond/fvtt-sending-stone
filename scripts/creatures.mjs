@@ -1,11 +1,11 @@
 import { MOST_COMPANIONS, MOST_COMPANIONS_EACH } from "./constants.mjs";
-import { activeForm, campaignActors, companionPlayers, transformed } from "./characters.mjs";
+import { activeForm, campaignActors, characterPlayers, transformed } from "./characters.mjs";
 import { wildShapeReader } from "./command-wildshape.mjs";
 
 /**
  * A campaign's characters' companions, since 0.36.0: the creatures each summoned in Foundry, whose
  * tokens are on the active scene, and the NPCs its players own there by name (round 0.36.0 §2.1), its
- * players since 0.45.0 those who own it by name, else those it's assigned to (`companionPlayers`).
+ * players since 0.45.0 those who own it by name, else those it's assigned to (`characterPlayers`).
  * dnd5e has no companion, familiar or sidekick type; it marks a summoned creature with the item
  * that summoned it, `flags.dnd5e.summon.origin`, which this reads itself, as dnd5e's own registry
  * misses linked summons and fills lazily, per client.
@@ -84,7 +84,7 @@ export function companionsOf(campaign) {
   const characters = campaignActors(campaign);
   if ( !characters.length ) return [];
   const owner = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
-  const players = characters.map(character => ({ character, users: companionPlayers(character) }));
+  const players = characters.map(character => ({ character, users: characterPlayers(character) }));
   // The characters whose players own a live actor in Foundry by name, never through its default.
   const ownersOf = actor => players
     .filter(({ users }) => users.some(user => actor.ownership?.[user.id] === owner))
@@ -205,7 +205,7 @@ export function companionKeyOf(entries, combatant) {
 /**
  * Does a player of one of these characters own this live actor in Foundry, by id, never through
  * `default`? A companion none of their players owns goes without the Gamemaster's secrets. Since
- * 0.45.0 their players are as their companions are found (`companionPlayers`), so a character shared
+ * 0.45.0 their players are as their companions are found (`characterPlayers`), so a character shared
  * with every player through its default doesn't show another's NPC its secrets.
  * @param {Actor} actor
  * @param {Iterable<string|Actor>} characters   The characters, or their actor ids.
@@ -215,7 +215,7 @@ export function ownedByPlayers(actor, characters) {
   const owner = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
   return Array.from(characters ?? []).some(each => {
     const character = (typeof each === "string") ? game.actors.get(each) : each;
-    return Boolean(character) && companionPlayers(character).some(user => actor?.ownership?.[user.id] === owner);
+    return Boolean(character) && characterPlayers(character).some(user => actor?.ownership?.[user.id] === owner);
   });
 }
 

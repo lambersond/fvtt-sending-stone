@@ -1,7 +1,7 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { campaignCharacterId, endedForms, originalOf, playerOwners } from "./characters.mjs";
+import { campaignCharacterId, characterPlayers, endedForms, originalOf } from "./characters.mjs";
 import { askedSave, chatAudience } from "./chat-data.mjs";
 import { resultsAlways } from "./config.mjs";
 import { midiActivities } from "./command-uses.mjs";
@@ -278,14 +278,17 @@ export function ownConcentrationAbility(actor) {
 
 /**
  * May a character's player see a card's DC, and whether they saved against it? As dnd5e shows
- * them: on their own card, and on others' as its Challenge Visibility has it.
+ * them: on their own card, and on others' as its Challenge Visibility has it. Since 0.46.0 a card is
+ * their own where its author is one of the character's players (`characterPlayers`), a form's
+ * character's for a form, as Midi-QOL's concentration card speaks for it; so a character shared with
+ * every player through its default isn't shown every player's DC.
  * @param {ChatMessage} message
- * @param {Actor} actor
+ * @param {Actor} actor   The creature asked: a character, its form, or a companion.
  * @returns {boolean}
  */
 export function showsChallenge(message, actor) {
   const author = message.author;
-  if ( author && playerOwners(actor).some(user => user.id === author.id) ) return true;
+  if ( author && characterPlayers(originalOf(actor) ?? actor).some(user => user.id === author.id) ) return true;
   let visibility;
   try {
     visibility = game.settings.get("dnd5e", "challengeVisibility");
