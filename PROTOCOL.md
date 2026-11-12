@@ -170,7 +170,7 @@ characters.
 
 | Event | Sent to |
 | --- | --- |
-| A chat message | Each campaign one of whose characters said it, or whose characters' players can read it. A public message reaches every campaign with characters. |
+| A chat message | Each campaign one of whose characters said it, or whose characters' players can read it. A public message reaches every campaign with characters, but since module 0.45.0 not one that [belongs only to other campaigns](#a-public-message-another-campaigns-alone). |
 | `chat.cleared` | Every campaign. |
 | A combat event | Each campaign with a character in the combat. |
 | `character.updated` | Each campaign the character is in. |
@@ -179,6 +179,32 @@ A campaign hears about a combat while any of its characters are in it. When the 
 joins, the combat arrives as **`combat.created` with its full snapshot**, which may already be
 under way. When the last of them leaves, the campaign is sent **`combat.ended`**: for that
 campaign, the fight is over.
+
+### A public message another campaign's alone
+
+Since module 0.45.0, under the chat scope *All its players can read* (`"all"`), a public message
+that belongs only to other campaigns is left out of a campaign. Such a message is one that none of
+the campaign's characters or [companions](#companions) said, whose speaker is a combatant of no
+fight the campaign is in, and that:
+
+- was said by another campaign's character or companion; or
+- was said by a combatant of a fight another campaign is in.
+
+A speaker is matched to a combatant by its token and scene, or for a linked actor by its actor. A
+campaign is in a fight as it's told of one: one of its characters, or a companion of theirs it was
+listed, is among the combatants it may be told of ([Combatant](#combatant)). Every other public
+message still reaches every campaign with characters, such as the Gamemaster's narration, an NPC in
+no fight, or any card of a fight both campaigns are in, and a world with one campaign sees no change.
+
+Whether a message belongs only to other campaigns is decided as it's made, by the fights as they
+stand then, and its edits follow that, whatever fight has begun or ended since: an edit of such a
+message isn't sent to the campaign, as `chat.message.updated` is an upsert, and an edit of one it was
+sent is. Only for a campaign added since, or for a message made before the Gamemaster's browser
+began sending, is an edit read by the fights as they stand at the edit. A deletion is sent as before
+0.45.0, wherever the message may have gone: a public message's id tells nothing, and a listener
+deletes nothing it never held. A card a campaign was sent before 0.45.0 is kept until the chat is
+cleared. Under *Its characters' messages only* (`"connected"`) nothing changes. Before 0.45.0 every
+public message reached every campaign with characters.
 
 ## Visibility
 
@@ -861,9 +887,12 @@ Its sheet: what any of its players may see of it, and nothing more, observers an
 
 Since module 0.36.0 a campaign's characters' companions are listed beside them, to a listener that
 reads them: the creatures each character summons, and the NPCs its player owns. For each campaign
-character `C` and its players `U` (its non-Gamemaster users with Owner), each condition read on the
-creature's **live actor**: a token's synthetic actor for an unlinked token, the world actor for a
-linked one or one with no token.
+character `C` and its players `U`, each condition read on the creature's **live actor**: a token's
+synthetic actor for an unlinked token, the world actor for a linked one or one with no token. Since
+module 0.45.0 `U` are the non-Gamemaster users whose own id has Owner in `C`'s `ownership`, never
+through `default`, and for a character no such user owns, the non-Gamemaster users it's assigned to
+as their character (User Configuration). Before 0.45.0 `U` were its non-Gamemaster users with Owner,
+through `default` too, so a character shared with *All Players: Owner* had every player's NPCs.
 
 1. **Summoned:** a token on the **active scene**, not hidden, whose live actor is an NPC, isn't
    transformed (`flags.dnd5e.isPolymorphed`), and has `flags.dnd5e.summon.origin` beginning
@@ -1708,7 +1737,7 @@ An ask:
 | `actorId` | The character it's asked of, its form's rolls among them, or a [companion](#companions)'s key. |
 | `of` | For a companion's, its character, as the typed roll's `of`; absent otherwise. |
 | `command` | The `id` of the typed roll it's asked for: the roll whose item's run makes it, or, for `"again"`, the roll whose die is thrown again. |
-| `label` | At most 200 characters, what rolls: the item's name, and its activity's after a colon where that's another, such as `"Ice Knife: Shard Explosion"`, or for `"again"` of a typed roll's own die, that roll's, such as `"Wand of Luck: Use"`; where there's no item, as for a check's die thrown again, the roll's flavor, or else its formula. |
+| `label` | At most 200 characters, what rolls: the item's name, and its activity's after a colon where that's another, such as `"Ice Knife: Shard Explosion"`, or for `"again"` of a typed roll's own die, that roll's, such as `"Wand of Luck: Use"`, and since module 0.45.0, of a typed `formula`'s own die where its utility's roll has a name of its own, the item's name and the roll's after a colon, such as `"Wild Sparks: Burst"`, as dnd5e's card's button names the roll; where there's no item, as for a check's die thrown again, the roll's flavor, or else its formula. |
 | `purpose` | `"damage"`, `"healing"`, `"formula"` (a utility's roll), `"cost"` (dice its use spends, such as `1d4` charges), `"bonus"` (a Midi-QOL bonus damage macro's formula), `"again"` (one die of a roll, thrown again) or `"other"`. |
 | `again` | For `"again"` only: `"explode"` or `"reroll"`, why the die is thrown again. Absent otherwise. |
 | `critical` | `true` for a critical hit's damage, its dice already counted as dnd5e throws them, twice over; else `false`. |
@@ -2385,6 +2414,21 @@ An ask:
   the flags and the hello's list, and its players' later dice are Foundry's computer dice in their
   item's run. A module before 0.44.0 says no `diceAsks`, so a listener sends no `dice` to it, and
   one handed it anyway is refused as a kind it doesn't know.
+- Module 0.45.0 names a typed `formula`'s own die thrown again by its roll, where the utility's roll
+  has a name of its own: the [dice ask](#dice-asks)'s `label`, and the Gamemaster's window with it,
+  is the item's name and the roll's, such as `"Wild Sparks: Burst"`, as dnd5e's card's button names
+  the roll, where before it was the item's and its activity's, `"Wild Sparks: Use"`. A roll with no
+  name, and every other ask, is labelled as before. Nothing else changes: a listener shows the
+  `label` as it did, and a module before 0.45.0 labels it as before. And where a world runs more than
+  one campaign, it sends a campaign less of the others', with no new event, field or format: under
+  `chatScope` `"all"`, a public message that [belongs only to other campaigns](#a-public-message-another-campaigns-alone)
+  as it's made is left out, and so are its edits; and a character's players `U`, whose NPCs are its
+  [companions](#companions) and whose ownership of one gives its sheet the Gamemaster's secrets, are
+  the users who own it by their own id, never through `default`, or where none does, the users it's
+  assigned to as their character. A listener reads both as before: a companion no longer listed
+  leaves in `companions.listed`, as any does, and a fight only it brought ends for the campaign, as
+  when its last character leaves; the first hello lists only the fights the campaign is in. A module
+  before 0.45.0 sends as before.
 
 ## Changes from protocol 1
 

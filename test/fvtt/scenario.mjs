@@ -92,10 +92,13 @@ assert.deepEqual(out.map(e => e.campaign.title), ['Erebor'])
 assert.deepEqual(out[0].data.message.audience, { public: false, gmOnly: false, users: ['alice'], characters: ['thorin'] })
 ok("a whisper to Thorin's player goes only to Thorin's campaign")
 
+// Changed on purpose (module 0.45.0, the app's ROADMAP item 19, the owner's Q1 A): a public message
+// another campaign's character said is that campaign's alone; Erebor, none of whose characters said
+// it, isn't sent it.
 out = await say(message('m3', { speakerActor: vex, speaker: { actor: 'vex' }, alias: 'Vex', author: users.get('bob'), _source: { author: 'bob' } }))
+assert.deepEqual(out.map(e => e.campaign.title), ['Mirkwood'])
 assert.equal(byCampaign(out).Mirkwood.data.message.character, 'vex')
-assert.equal(byCampaign(out).Erebor.data.message.character, null)
-ok("a campaign's own character is named as the speaker only in its campaign")
+ok("a public message Vex said goes to his campaign alone, naming him as its speaker")
 
 out = await say(message('m4', { whisper: ['gm'], blind: true, speakerActor: thorin, speaker: { actor: 'thorin' } }))
 assert.deepEqual(out, [])

@@ -883,7 +883,7 @@ function formulaActivity(command, actor) {
  * @param {Item} item
  * @returns {Activity|null}
  */
-function activityNamed(command, item) {
+export function activityNamed(command, item) {
   const found = item.system?.activities?.get?.(command.activity);
   const named = shownActivity(found) ? found : null;
   if ( named?.type === "cast" ) return castSpellOf(named)?.lead ?? null;

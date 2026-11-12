@@ -76,7 +76,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | --- | --- | --- |
 | General | App address | The Sending Stone app's address. Each event goes to the campaigns it involves. |
 | General | Chat messages | Chat messages created, edited and deleted, and the log being cleared. |
-| General | Which messages | Every message a campaign's players can read, or only those its characters spoke. |
+| General | Which messages | Every message a campaign's players can read, or only those its characters spoke. Since 0.45.0 the first leaves out a public message that's another campaign's alone ([Campaigns](#campaigns)). |
 | General | Hit/miss and save results in the app | "Follow Foundry's visibility settings", the default: hits, misses and saves show in the app where Foundry shows players them. "Always show them to players": every target's hit or miss, and every save and check's success or failure, whatever Foundry shows; armor class and DCs still need GM-only details. See [Hit, miss and save results](#hit-miss-and-save-results). |
 | General | Combat tracker | Encounters created, started, updated and ended; turns and rounds; combatants joining, leaving, rolling initiative and being defeated. |
 | General | GM-only details | Also send what only a Gamemaster can see. Off by default. |
@@ -100,7 +100,14 @@ be in more than one. Every event names the campaign it is for, and each campaign
 involves its characters, described for it alone:
 
 - **Chat:** messages one of its characters said, or that the player of one of its characters can
-  read. Every public message reaches every campaign with characters.
+  read. Every public message reaches every campaign with characters, but since 0.45.0, under **Which
+  messages: All its players can read**, not one that's another campaign's alone: said by another
+  campaign's character or companion, or by a combatant in another campaign's fight, where none of
+  this campaign's said it and its speaker is in none of this campaign's fights. Your narration, an
+  NPC in no fight, and every card of a fight both campaigns are in still reach both. Whose a card
+  is is decided as it's made: its edits go where it went, even once its fight is over, and its
+  deletion to every campaign that may hold it. A card a campaign was sent before 0.45.0 stays in its
+  chat until you clear the chat.
 - **Combat:** encounters while any of its characters are in them. A fight reaches the campaign
   when its first character joins and ends for it when its last one leaves.
 - **Hit points and audiences** cover only its own characters.
@@ -119,6 +126,9 @@ Edition, and an app that reads them.
 as a familiar from Find Familiar, while their tokens are on the active scene, whoever cast the
 spell; and the NPCs its player owns in Foundry (give the player Owner on the NPC by name, or on one
 placed token). A linked NPC shows always; an unlinked one while its token is on the active scene.
+Its player is a player you gave Owner on the character by name; since 0.45.0 a character shared with
+All Players as Owner isn't everyone's for this, so another campaign's sidekicks never show beside it,
+and where no player owns it by name, its player is the one it's assigned to in User Configuration.
 Players roll for them, attack and cast with them from the app, as for their character; summoning,
 dismissing and changing them stay in Foundry. A creature its player doesn't own in Foundry goes
 without its secrets, with its public biography. To take one from a player in the app, take their
@@ -180,7 +190,9 @@ while the roll is being made.
   with dnd5e's own Ice Knife's 1d10, another activity's damage Midi rolls once saves are checked,
   the dice a use spends (a cost of `1d4` charges), a Midi bonus damage macro's formula, such as
   Sneak Attack's, and a die of theirs Foundry throws again, an explosion or a reroll they didn't
-  keep at the table, one die at a time, where the die before it was theirs. It follows whatever the
+  keep at the table, one die at a time, where the die before it was theirs; since 0.45.0 a
+  utility's die thrown again is called by its roll's own name where it has one, as its card's button
+  calls it, such as "Wild Sparks: Burst", in the app and your window alike. It follows whatever the
   item's workflow rolls, homebrew included, from what dnd5e and Midi put on each roll, and a use's
   cost from the use's own spending, with no code for any item. The app asks on the device the
   player rolled from; while it waits, a small window on your screen says whose dice and how long is
@@ -826,7 +838,7 @@ With **GM-only details** off, the listener receives what players could see:
 
 | Information | Sent? |
 | --- | --- |
-| Public chat messages | Yes. |
+| Public chat messages | Yes; since 0.45.0, where a world runs more than one campaign, not one that's another campaign's alone ([Campaigns](#campaigns)). |
 | Whispers, and private or self rolls | Yes, to the campaigns of the characters whose players can read them, marked with which they are. |
 | Whispers only Gamemasters can read, private Gamemaster rolls, blind rolls | No. |
 | A blind roll the Gamemaster later reveals | Yes, from then on, as an update. |
@@ -1141,9 +1153,9 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-group.mjs` | A group's sheet: its members' names and portraits, its description, and its inventory without what items roll or are used through |
 | `scripts/sheet-slim.mjs` | A sheet in the smaller shape the app expands: actions by reference, defaults left out, and since 0.41.0 damage on its own's choices with only what isn't their row's own |
 | `scripts/character-sync.mjs` | Sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes, then each of the campaign's groups, again when it, its members' names or portraits, or its characters' ownership change, or one of its characters is deleted, and its removal when deleted, after the hello if one was on its way; withholding a sheet too large to post or a group's no player sees; sending again what was lost |
-| `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene, and the NPCs its players own by name, each read as its live actor, a token's synthetic actor for an unlinked token; their keys, the characters each is a companion of, and the creature a command names |
+| `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene, and the NPCs its players own by name, its players from 0.45.0 those who own it by name, else those it's assigned to, each read as its live actor, a token's synthetic actor for an unlinked token; their keys, the characters each is a companion of, and the creature a command names |
 | `scripts/creature-sync.mjs` | Sending each campaign's companions to an app that reads them: the list in its hello and in `companions.listed` when it changes, each companion's sheet in `companion.updated` after the hello and when it changes, without secrets where its players don't own it in Foundry; from 0.41.0, whether the app reads what the game asks of companions, and who left the list, for the prompts |
-| `scripts/chat.mjs` | Chat hooks |
+| `scripts/chat.mjs` | Chat hooks, and which campaigns a message belongs to: from 0.45.0, not a public one that's another campaign's alone as it's made, nor its edits |
 | `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack; whether an attack hit each target, who saved and whether a save or check succeeded, by the rules of `results.mjs`; dnd5e 6's typed messages, and their data without what players don't see; its content without what cards keep from players; the Gamemaster's rolls on Midi-QOL's cards trimmed as Midi shows them to players |
 | `scripts/results.mjs` | The rules of what players see of chat results, as dnd5e and Midi-QOL show them, or always where the Gamemaster has players told so, read once per message, and the verdict on them that Manage Campaigns and the app show |
 | `scripts/foundry-settings.mjs` | A campaign's Foundry settings for its Gamemaster in the app: versions, its switches, the visibility settings that decide chat results and the verdict; sent again when one changes or a listed group is renamed or deleted, and after a hello if they changed while it was on its way |

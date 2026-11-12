@@ -103,7 +103,15 @@ export class Actor5e {
     return { amount: Math.trunc(damages.reduce((total, d) => total + d.value, 0)), temp: 0, tempMax: 0 }
   }
 
-  testUserPermission(user) { return this.owners.includes(user.id) }
+  /**
+   * Core's ownership, by user id: Owner for each of its `owners`, which a harness may change, and
+   * nothing by default; or as a harness sets it whole, as a character shared with every player
+   * through its default (module 0.45.0 reads a character's players by it).
+   */
+  get ownership() { return this._ownership ?? { default: 0, ...Object.fromEntries(this.owners.map(id => [id, 3])) } }
+  set ownership(value) { this._ownership = value }
+  /** Core's testUserPermission for Owner, by its ownership: the user's own level, else its default. */
+  testUserPermission(user) { return ((this.ownership[user.id] ?? this.ownership.default ?? 0) >= 3) }
   getFlag(scope, key) { return this.flags?.[scope]?.[key] }
   getRollData() { return { abilities: deepClone(this.system.abilities), prof: this.system.attributes.prof } }
   get isToken() { return false }
