@@ -3,7 +3,7 @@ import {
   MODULE_ID, MOST_EFFECT_DICE, MOST_HIT_DICE, MOST_PLAIN_BONUS, MOST_PLAIN_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG,
   SPELL_SLOT_OPS, TURN_KINDS
 } from "./constants.mjs";
-import { originalOf, playerOwners, seatActor, standingFor } from "./characters.mjs";
+import { characterPlayers, originalOf, seatActor, standingFor } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mjs";
 import { checkFavoriteCommand } from "./command-favorites.mjs";
@@ -1462,7 +1462,8 @@ async function rollInitiative(command, actor, { author, flags }) {
  * or else the Gamemaster making it. Since 0.36.0 a companion's is made as its character's, the
  * seat's player's, whoever owns the companion in Foundry: so that one two players own, or none, as
  * a familiar the Gamemaster summoned, still rolls as its player, its cards not trimmed as a
- * Gamemaster's.
+ * Gamemaster's. Since 0.47.0 its only player is by `characterPlayers`, never through `default`: a
+ * character shared with every player as Owner and owned by one by name rolls as that one.
  * @param {Actor} actor
  * @param {Actor} [character]   The campaign character whose player makes it: the actor's own.
  * @returns {User}
@@ -1470,8 +1471,8 @@ async function rollInitiative(command, actor, { author, flags }) {
 export function authorFor(actor, character=actor) {
   const assigned = game.users.find(user => !user.isGM && (user.character?.id === character.id));
   if ( assigned ) return assigned;
-  const owners = playerOwners(character);
-  return (owners.length === 1) ? owners[0] : game.user;
+  const players = characterPlayers(character);
+  return (players.length === 1) ? players[0] : game.user;
 }
 
 /**

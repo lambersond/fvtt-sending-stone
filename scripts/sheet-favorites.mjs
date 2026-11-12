@@ -26,12 +26,21 @@ import { countedUses, finite, limitedUses, localize, RESOURCES } from "./sheet-v
  * @returns {object[]}
  */
 export function favoritesOf(actor, texts) {
-  const marked = Array.from(actor.system?.favorites ?? [])
-    .sort((a, b) => (finite(a?.sort) ?? 0) - (finite(b?.sort) ?? 0));
   return [
     ...resourcesOf(actor),
-    ...marked.map(favorite => describeFavorite(actor, favorite, texts)).filter(Boolean)
+    ...storedInOrder(actor).map(favorite => describeFavorite(actor, favorite, texts)).filter(Boolean)
   ];
+}
+
+/**
+ * Since module 0.47.0, what dnd5e stores of the character's favorites, in its order, each with how
+ * the sheet lists it (`favoritesOf`), or null for one it leaves out: what an order from the app
+ * is checked against and written into, those it leaves out keeping their places.
+ * @param {Actor} actor
+ * @returns {{stored: {type: string, id: string, sort: number}, listed: object|null}[]}
+ */
+export function storedFavorites(actor) {
+  return storedInOrder(actor).map(stored => ({ stored, listed: describeFavorite(actor, stored) }));
 }
 
 /**
@@ -47,6 +56,17 @@ export function listedFavorite(actor, favorite) {
 }
 
 /* -------------------------------------------- */
+
+/**
+ * What dnd5e stores of the character's favorites, by their sort, as its sheet orders them, those of
+ * one sort in the order stored.
+ * @param {Actor} actor
+ * @returns {object[]}
+ */
+function storedInOrder(actor) {
+  return Array.from(actor.system?.favorites ?? [])
+    .sort((a, b) => (finite(a?.sort) ?? 0) - (finite(b?.sort) ?? 0));
+}
 
 /**
  * A favorite, as the listener needs it, or null for one to leave out.

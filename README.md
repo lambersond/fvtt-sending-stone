@@ -123,8 +123,12 @@ it's shown them only for its own players' checks and cards; it sees a party shee
 dish's card is whispered to them here. A character no player owns by name and no one is assigned has
 no player: no whisper reaches it. And one no player owns at all, by name or through All Players, but
 that's assigned to a player is that player's, where before 0.46.0 it had none: it gets their
-whispers and private rolls, and its roster names them. Its journals, and who may type in its dice,
-still follow who owns it here.
+whispers and private rolls, and its roster names them. Since 0.47.0 a roll from the app for a
+character assigned to no one is made as its player read so, where it has just one: a character
+shared with All Players as Owner and owned by one player by name rolls as that player, where before
+it rolled as you. One shared with All Players and owned by no player by name, assigned to no one,
+has no player and rolls as you, even in a world with a single player, whom it rolled as before
+0.47.0. Its journals, and who may type in its dice, still follow who owns it here.
 
 Worlds set up before campaigns keep working: the connected characters chosen then are moved into a
 campaign titled after the world the first time a Gamemaster loads it.
@@ -506,8 +510,12 @@ long-press or press the context-menu key on an item, one of its activities or an
 shows them too, and a new one goes last, as dnd5e adds it. There's no switch: it works under
 D&D Fifth Edition wherever the app takes it, whether or not players' rolls are made here.
 Nothing is posted in chat, as dnd5e posts nothing, so only a character's player does it from the
-app. Skills, tools and spell slots are made favorites in Foundry, and favorites are reordered
-there.
+app. Skills, tools and spell slots are made favorites in Foundry. Since 0.47.0 a player can put
+their favorites in order from the app too, and Sending Stone writes dnd5e's own order of them, so
+the character's sheet in Foundry shows the same order; the old-style resources dnd5e lists first
+stay first. An order made from a sheet older than Foundry's, as where a favorite was added or moved
+in Foundry a moment before, is refused, and the app shows Foundry's order; none is made while the
+character is in Wild Shape.
 
 ### Journal notes
 
@@ -1149,7 +1157,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status; what the app says it takes of sheets, and no post larger; why the app refused a post or fetch |
 | `scripts/delivery-status.mjs` | What the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
-| `scripts/characters.mjs` | A campaign's characters and who owns them; a character's players, those who own it by name, else those it's assigned to: from 0.45.0 for its companions, and from 0.46.0 for what its campaign is sent of other players and a dish's card |
+| `scripts/characters.mjs` | A campaign's characters and who owns them; a character's players, those who own it by name, else those it's assigned to: from 0.45.0 for its companions, from 0.46.0 for what its campaign is sent of other players and a dish's card, and from 0.47.0 for who a roll from the app is made as |
 | `scripts/typed-dice.mjs` | Whether a character's player may type in what their own dice show in the app: its primary players, and core's Make Manual Rolls permission |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
@@ -1195,7 +1203,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/tidy-journal.mjs` | From 0.44.0, Tidy 5e Sheets' journal on a campaign's characters, read only: its current sheet's entries and its Classic sheet's boxes, read straight off the character's flags whether Tidy is active or not, in Tidy's order, without secrets where no player owns the character; what the hello says of it; sending each character's in `journal.tidy` after a hello's books and 500 ms after its Tidy flags or ownership change, never twice the same, withheld when too large |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
-| `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch; nothing posted |
+| `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch, and from 0.47.0 putting them in order, writing dnd5e's own sorts; nothing posted |
 | `scripts/command-prepare.mjs` | Preparing and unpreparing a character's spells from the app, as dnd5e's menu does; nothing posted |
 | `scripts/command-effects.mjs` | A player's own effects turned off, on and deleted from the app, from 0.39.0, by the campaign's switch under dnd5e: fetching them from an app that takes them; each checked against what `sheet-effects.mjs` says its player may do, written with the mark of the app's own Turn off, and read again; the hook that clears the mark on any other change; nothing posted |
 | `scripts/command-hit-points.mjs` | Hit points and temporary hit points set from the app, from 0.44.0, by the campaign's switch, on by default, under dnd5e: fetching them from an app that takes them; the character's, its form's or a companion's, each field only from the number the app showed, within the maximum the sheet shows, one plain update read again; nothing posted |

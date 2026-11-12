@@ -445,6 +445,12 @@ if (DND5E6) {
     assert.equal(prone6.type, 'condition', "dnd5e 6's Prone, a condition effect")
     // While she is the Wolf, the Hall's token, on the scene not viewed, moved to another level and hidden.
     assert.ok(!('level' in elowenHall.flags.dnd5e.previousTokenData) && !('hidden' in elowenHall.flags.dnd5e.previousTokenData), "where it stands not kept at the change, as dnd5e 6's")
+    // Module 0.47.0: her favorites put in order while she is the Wolf, "shaped" under dnd5e 6.0.5 too.
+    const { withFavorites } = await import('./favorites-core.mjs')
+    withFavorites(elowen, { favorites: [{ type: 'item', id: '.Item.elowenStaff00000', sort: 1 }] })
+    const staffOnly = [{ type: 'item', id: 'elowenStaff00000' }]
+    const ordered6 = await made({ id: `seat-${++ids}`, actorId: 'elowen', kind: 'favorite', favorite: { op: 'order', order: staffOnly, was: staffOnly }, mode: 0, explicit: false, extras: [], dice: [] })
+    assert.deepEqual([refusal(ordered6), elowen.system.favorites.map(f => f.sort)], [['failed', 'shaped', null], [1]], 'her favorites put in order: "shaped", nothing written')
     Object.assign(elowenHall, { level: 3, hidden: true })
     const reverted6 = await made(revert())
     assert.deepEqual([reverted6.result.status, formOf(), elowenHall.actorId, elowenForest.actorId], ['done', undefined, 'elowen', 'elowen'], 'returned, her tokens hers')
@@ -453,7 +459,7 @@ if (DND5E6) {
     assert.deepEqual([prones.length, prones[0]?.type, prones[0]?.id], [1, 'condition', dnd5e.utils.staticID('dnd5eprone')], 'the type "condition" Prone carried back, one effect')
     assert.deepEqual(lastSheet().form, undefined)
   }
-  ok('dnd5e 6.0.5: transform and return as cases 7 and 11, each token keeping its level, and on the return the level and visibility it has then; a type "condition" Prone gained in form carried back as one condition effect')
+  ok('dnd5e 6.0.5: transform and return as cases 7 and 11, each token keeping its level, and on the return the level and visibility it has then; a type "condition" Prone gained in form carried back as one condition effect; since 0.47.0 her favorites put in order while shaped "shaped"')
   await slotWhileShaped(profilesOf()[0]._id)
   ok('dnd5e 6.0.5, since 0.42.1: a spell slot spent from the app while she is shaped "shaped", from a count gone stale or of a pool she lacks too, her pool and the form\'s unchanged, nothing posted; once she is back, spent from her own')
   await prepareWhileShaped(profilesOf()[0]._id)
@@ -1799,6 +1805,8 @@ ok("queue: a transform waits behind the same character's held roll, by its actor
   const plain = { mode: 0, explicit: false, extras: [], dice: [] }
   for (const [command, why] of [
     [{ kind: 'favorite', favorite: { op: 'add', type: 'item', id: STAFF } }, 'a favorite added'],
+    // Module 0.47.0: and her favorites put in order.
+    [{ kind: 'favorite', favorite: { op: 'order', order: [{ type: 'item', id: STAFF }], was: [{ type: 'item', id: STAFF }] } }, 'her favorites put in order'],
     [{ kind: 'effect', effect: { op: 'disable', id: 'rowanBlessOnElow' } }, 'an effect turned off'],
     [{ kind: 'transfer', transfer: { from: 'elowen', to: 'thorin', items: [{ id: STAFF, quantity: 1 }] } }, 'a move from her'],
     [{ kind: 'transfer', transfer: { from: 'thorin', to: 'elowen', items: [{ id: 'thorinClass00000', quantity: 1 }] }, actorId: 'thorin' }, 'a move to her'],
@@ -1988,7 +1996,7 @@ ok("queue: a transform waits behind the same character's held roll, by its actor
   for (const key of ['chatEvents', 'chatScope', 'combatEvents']) settings.delete(key)
   game.combat = null
 }
-ok(`the seat while shaped: a skill and a save rolled on the form, its card hers under Connected${DND5E6 ? '' : "; since 0.42.0 Bless on the form listed on her seat's sheet, the form's, its d4 taken by a save typed on the form"}; the Bite on the form's item; initiative its combatant's; End Turn on its turn done; a familiar her form summoned hers; a dnd5e save card at the form asked of Elowen (<card>-elowen), answered from her seat, the save the form's, closed and gone from the open list; the form's concentration card answered the same${MIDI ? "; Midi-QOL's save asked of the form reaches the app as Elowen's, is answered, and rolled on the form" : ''}; a favorite, an effect, a move to and from her and a removal "shaped"; End concentration ends both copies and what they kept up; charges and an activity's use spent on the form's copies, her sheet first; a dish's card spoken by Elowen, her id the cook's; to an app that takes no Wild Shape, a skill on her own actor, End concentration on both copies, a spend on her own item, her initiative the form's combatant's and a card's save at the form rolled on it; Heroic Inspiration used on the form's copy${MIDI ? '' : "; the form's concentration ended in Foundry closes its card's prompt, her own copy alone leaves it open; a card through her token answered by the form stays answered after the return"}; a fight with only the Wolf's combatant stays the campaign's through the 0 hit points ending, the combatant hers, as do fights whose combatant's token names the deleted form or that has none, that combatant with no token hers with her hit points and its turn hers to end, and one whose form is deleted by hand; the form's card with no token stays hers after the return, updated and deleted`)
+ok(`the seat while shaped: a skill and a save rolled on the form, its card hers under Connected${DND5E6 ? '' : "; since 0.42.0 Bless on the form listed on her seat's sheet, the form's, its d4 taken by a save typed on the form"}; the Bite on the form's item; initiative its combatant's; End Turn on its turn done; a familiar her form summoned hers; a dnd5e save card at the form asked of Elowen (<card>-elowen), answered from her seat, the save the form's, closed and gone from the open list; the form's concentration card answered the same${MIDI ? "; Midi-QOL's save asked of the form reaches the app as Elowen's, is answered, and rolled on the form" : ''}; a favorite, since 0.47.0 her favorites put in order, an effect, a move to and from her and a removal "shaped"; End concentration ends both copies and what they kept up; charges and an activity's use spent on the form's copies, her sheet first; a dish's card spoken by Elowen, her id the cook's; to an app that takes no Wild Shape, a skill on her own actor, End concentration on both copies, a spend on her own item, her initiative the form's combatant's and a card's save at the form rolled on it; Heroic Inspiration used on the form's copy${MIDI ? '' : "; the form's concentration ended in Foundry closes its card's prompt, her own copy alone leaves it open; a card through her token answered by the form stays answered after the return"}; a fight with only the Wolf's combatant stays the campaign's through the 0 hit points ending, the combatant hers, as do fights whose combatant's token names the deleted form or that has none, that combatant with no token hers with her hit points and its turn hers to end, and one whose form is deleted by hand; the form's card with no token stays hers after the return, updated and deleted`)
 
 /* -------------------------------------------- */
 /*  17. Manage Campaigns and the settings row   */
