@@ -556,8 +556,10 @@ whose buttons only Gamemasters have, whether or not players' rolls are made here
 Gamemaster to be connected. The card says what
 the dish does, who cooked it and through whose link it came. **Apply…** (or **Who ate it…** for a
 standard dish, which has no effect) asks you who ate it, the sender ticked; **Set aside** says nobody
-did. Each character you tick gets one effect holding what the dish does, for 24 hours of game time:
-one dish at a time, a new dish replacing the last, the same dish never twice. Its dice were rolled
+did. Since 0.46.0 the dialog names beside each character its players: those who own it by name,
+else the player it's assigned to, never every player who reaches it through All Players. Each
+character you tick gets one effect holding what the dish does, for 24 hours of game time: one dish
+at a time, a new dish replacing the last, the same dish never twice. Its dice were rolled
 once, in the cookbook, so everyone who eats it gets the same, and the card says what was rolled.
 What the module can't apply by itself, the card lists, for you to apply by hand. A dish that raises
 maximum hit points heals by as much, and a long rest wakes the character at the raised maximum; a
