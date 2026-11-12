@@ -1560,6 +1560,13 @@ if (MIDI) {
   assert.deepEqual([readersOf(brightwater()), accessFor(hall, orla)], [['gm'], null], "a dish's card's readers, the hall")
   ok("module 0.46.0: Orla's roster names no owner; a dish's card is whispered to the Gamemaster alone; and a hall Bob owns and Carol observes isn't hers to see")
 
+  // Item 40: under "Hide all", Alice's card's DC isn't her player's own.
+  const { showsChallenge } = await import(`${MODULE}/scripts/prompts.mjs`)
+  settings.set('challengeVisibility', 'none')
+  assert.equal(showsChallenge({ author: alice }, orla), false, "Alice's card's DC")
+  settings.delete('challengeVisibility')
+  ok("module 0.46.0: under Hide all, Alice's card's DC isn't Orla's player's own")
+
   // Whose a card is is read as it's made: its edits go where it went, whatever fight has begun or
   // ended since, and a deletion goes to every campaign, as one never held deletes nothing; one made
   // while this browser didn't send chat, as before it began sending, is read as the fights stand at
@@ -1606,6 +1613,14 @@ if (MIDI) {
   await settle()
   assert.deepEqual(listed(from, 'camp-b').at(-1).data.companions.map(each => [each.key, each.of]), [['kestrel', ['orla']]])
   ok("Orla assigned to Carol, owned by no one by id: Carol's own sidekick, Kestrel, is listed hers, and no one else's NPC")
+  // Module 0.46.0: her card's DC is her player's own on her form too, as Midi-QOL's concentration card
+  // speaks for the form, which dnd5e makes with her ownership and assigns no one: Carol's, never Bob's.
+  const wolfForm = new Actor5e({ id: 'orlaWolf', name: 'Orla (Wolf)', flags: { isPolymorphed: true, originalActor: 'orla', previousActorIds: [] } })
+  wolfForm.ownership = { ...orla.ownership }
+  settings.set('challengeVisibility', 'none')
+  assert.deepEqual([showsChallenge({ author: carol }, wolfForm), showsChallenge({ author: bob }, wolfForm)], [true, false], "Carol's and Bob's cards' DCs, on her form")
+  settings.delete('challengeVisibility')
+  ok("module 0.46.0: Orla assigned to Carol, in a form dnd5e made of her: Carol's card's DC is her player's own, Bob's isn't")
 
   // Carol and Alice made Owners of Orla by their own ids, Alice playing in both: Alice's NPCs are
   // Orla's too, and, as since module 0.36.0, a fight her sidekick is in reaches Brightwater.
@@ -1641,6 +1656,12 @@ if (MIDI) {
   assert.deepEqual(ofType(since(from), 'character.updated', 'camp-b').at(-1).data.character.owners, [{ id: 'alice', name: 'Alice' }, { id: 'carol', name: 'Carol' }], 'her roster')
   assert.deepEqual([readersOf(brightwater()), accessFor(hall, orla)], [['gm', 'alice', 'carol'], 'observer'], "a dish's card's readers, the hall")
   ok("module 0.46.0: Orla owned by Carol and Alice by their own ids: her roster names them; a dish's card is whispered to them and the Gamemaster; and the hall is hers to observe, as Carol does, never to own, as Bob does")
+
+  // Item 40: Carol's card's DC is her player's own, Bob's isn't.
+  settings.set('challengeVisibility', 'none')
+  assert.deepEqual([showsChallenge({ author: carol }, orla), showsChallenge({ author: bob }, orla)], [true, false], "Carol's and Bob's cards' DCs")
+  settings.delete('challengeVisibility')
+  ok("module 0.46.0: Orla owned by Carol and Alice by their own ids: under Hide all, Carol's card's DC is her player's own, Bob's isn't")
 }
 
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
