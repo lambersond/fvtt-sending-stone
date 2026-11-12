@@ -327,6 +327,16 @@ export const FAVORITE_TYPES = Object.freeze(["item", "activity", "effect", "skil
 export const FAVORITE_OPS = Object.freeze(["add", "remove"]);
 
 /**
+ * Since 0.47.0, the op that puts a character's favorites in the order the app sends, as dnd5e's
+ * sheet does when one is dragged among them.
+ * @type {string}
+ */
+export const FAVORITE_ORDER = "order";
+
+/** Since 0.47.0, the most favorites an order names. */
+export const MOST_FAVORITE_ORDER = 400;
+
+/**
  * What a player can have done here from the app with a dish they cooked in the Magical Recipe Book,
  * since module 0.38.0: a card the Gamemasters and the campaign's players see, from which only
  * Gamemasters choose who ate it. Offered under dnd5e 5 where the campaign's Gamemaster turns dishes

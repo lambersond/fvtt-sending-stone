@@ -1,10 +1,12 @@
-import { EFFECT_ID, FAVORITE_KINDS, FAVORITE_OPS, FAVORITE_TYPES } from "./constants.mjs";
+import {
+  EFFECT_ID, FAVORITE_KINDS, FAVORITE_OPS, FAVORITE_ORDER, FAVORITE_TYPES, MOST_FAVORITE_ORDER
+} from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { checkCommand, failedResult, isKey, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
 import { campaignGroups } from "./groups.mjs";
-import { listedFavorite } from "./sheet-favorites.mjs";
+import { listedFavorite, storedFavorites } from "./sheet-favorites.mjs";
 
 /**
  * Adding to and removing from a character's favorites from the Sending Stone app, since module
@@ -16,7 +18,18 @@ import { listedFavorite } from "./sheet-favorites.mjs";
  *
  * Offered wherever the system is D&D Fifth Edition, with no switch of its own, whether or not the
  * campaign's players' rolls are made here: it throws no dice and uses nothing.
+ *
+ * Since module 0.47.0 the favorites are put in order from the app too, as dnd5e's sheet does when
+ * one is dragged among them: their `sort`s written in one update, so that Foundry's sheet shows the
+ * order the app sent. The old-style resources dnd5e lists first aren't among its favorites, so they
+ * stay first.
  */
+
+/**
+ * dnd5e's favorites' sorts, as Foundry spaces them (`CONST.SORT_INTEGER_DENSITY`).
+ * @type {number}
+ */
+const DENSITY = 100_000;
 
 /**
  * The campaigns whose app takes favorites, by id, as their latest answer to a hello or heartbeat
@@ -46,12 +59,13 @@ export function favoritesOn() {
 
 /**
  * What a campaign tells the app of its characters' favorites in its hello, beside its rolls: whether
- * they may be added and removed here, and if not, why not, another system.
- * @returns {{enabled: boolean, kinds: string[], reason: "system"|null}}
+ * they may be added and removed here, and if not, why not, another system; and since 0.47.0
+ * `orders`, whether they may be put in order here, wherever they may be added.
+ * @returns {{enabled: boolean, kinds: string[], reason: "system"|null, orders: boolean}}
  */
 export function favoriteFeatures() {
-  if ( game.system?.id !== "dnd5e" ) return { enabled: false, kinds: [], reason: "system" };
-  return { enabled: true, kinds: [...FAVORITE_KINDS], reason: null };
+  if ( game.system?.id !== "dnd5e" ) return { enabled: false, kinds: [], reason: "system", orders: false };
+  return { enabled: true, kinds: [...FAVORITE_KINDS], reason: null, orders: true };
 }
 
 /**
@@ -82,10 +96,10 @@ export function favoriteReader(campaignId) {
 
 /**
  * Why a fetched favorite isn't one to make, if it isn't: it adds or removes one favorite, of a type
- * dnd5e keeps, named by its id as the sheet names it, and an activity by its item's too; and names
- * nothing else, nothing a roll names, no move, removal or anything typed in, and throws no dice.
- * Only its player adds or removes one from the app: it posts nothing, so would leave no mark of the
- * Gamemaster's.
+ * dnd5e keeps, named by its id as the sheet names it, and an activity by its item's too, or since
+ * 0.47.0 puts them in order (`validOrder`); and names nothing else, nothing a roll names, no move,
+ * removal or anything typed in, and throws no dice. Only its player adds or removes one from the
+ * app: it posts nothing, so would leave no mark of the Gamemaster's.
  * @param {object} command
  * @returns {string|null}
  */
@@ -95,12 +109,45 @@ export function checkFavoriteCommand(command) {
   const given = value => (value !== undefined) && (value !== null);
   if ( namesRollFields(command) || given(command.transfer) || given(command.remove) || given(command.typed)
     || !isObject(favorite) ) return "favorite";
-  const { op, type, id, item } = favorite;
-  if ( !FAVORITE_OPS.includes(op) || !FAVORITE_TYPES.includes(type) ) return "favorite";
-  const fields = (type === "activity") ? "id,item,op,type" : "id,op,type";
-  if ( Object.keys(favorite).sort().join() !== fields ) return "favorite";
-  if ( !validId(type, id) || ((type === "activity") && !isText(ID, item)) ) return "favorite";
+  const valid = (favorite.op === FAVORITE_ORDER) ? validOrder(favorite)
+    : (FAVORITE_OPS.includes(favorite.op) && namesFavorite(favorite, ["op"]));
+  if ( !valid ) return "favorite";
   return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Is this a favorite as the sheet names one: an object of `type` and `id`, `item` beside them for
+ * an activity alone, and the other fields given; one of dnd5e's types, its ids as `validId` has
+ * them?
+ * @param {unknown} favorite
+ * @param {string[]} [more]   Its other fields, such as `op`.
+ * @returns {boolean}
+ */
+function namesFavorite(favorite, more=[]) {
+  if ( !isObject(favorite) ) return false;
+  const { type, id, item } = favorite;
+  if ( !FAVORITE_TYPES.includes(type) ) return false;
+  const fields = [...((type === "activity") ? ["id", "item", "type"] : ["id", "type"]), ...more].sort().join();
+  if ( Object.keys(favorite).sort().join() !== fields ) return false;
+  return validId(type, id) && ((type !== "activity") || isText(ID, item));
+}
+
+/**
+ * Is this an order of the favorites, since 0.47.0: `{op: "order", order, was}` and nothing else,
+ * `was` the favorites the app showed, in their order, and `order` the same in the order wanted;
+ * each 1 to `MOST_FAVORITE_ORDER` favorites as the sheet names them, none twice.
+ * @param {object} favorite
+ * @returns {boolean}
+ */
+function validOrder(favorite) {
+  if ( Object.keys(favorite).sort().join() !== "op,order,was" ) return false;
+  const { order, was } = favorite;
+  const listed = list => Array.isArray(list) && (list.length > 0) && (list.length <= MOST_FAVORITE_ORDER)
+    && list.every(each => namesFavorite(each));
+  if ( !listed(order) || !listed(was) || (order.length !== was.length) ) return false;
+  const shown = new Set(was.map(favoriteKey));
+  return (shown.size === was.length) && order.every(each => shown.has(favoriteKey(each)))
+    && (new Set(order.map(favoriteKey)).size === order.length);
 }
 
 /**
@@ -128,6 +175,7 @@ export async function runFavoriteCommand(command, passed) {
   if ( !api ) return failed("unknown");
   // Since 0.40.0 none while she's transformed: her form's favorites are a copy her return loses.
   if ( activeForm(actor) ) return failed("shaped");
+  if ( command.favorite.op === FAVORITE_ORDER ) return orderFavorites(command, actor, failed);
   const { op, type } = command.favorite;
   const stored = storedId(command.favorite);
 
@@ -148,7 +196,66 @@ export async function runFavoriteCommand(command, passed) {
   };
 }
 
+/**
+ * Put a character's favorites in the order the app sent, since 0.47.0, as dnd5e's sheet does when
+ * one is dragged among them: refused `"changed"` where the favorites the sheet lists now, in their
+ * order, aren't those the app showed (`was`), as when one was added, removed or moved in Foundry
+ * meanwhile, the sheet as it stands first. Otherwise those it lists take the places they held among
+ * dnd5e's favorites in the order wanted, any it leaves out, as one hidden from the player, keeping
+ * theirs, and every one's `sort` is written afresh, `DENSITY` apart, in one update; already in that
+ * order, nothing is written. Then the sheet, as it then stands, ahead of the result.
+ * @param {object} command                         `{favorite: {op: "order", order, was}}`.
+ * @param {Actor} actor                           The character, checked.
+ * @param {(reason: string, error?: string|null) => CommandResult} failed
+ * @returns {Promise<CommandResult>}
+ */
+async function orderFavorites(command, actor, failed) {
+  const { order, was } = command.favorite;
+  const stored = storedFavorites(actor);
+  const shown = stored.filter(({ listed }) => listed);
+  const keys = shown.map(({ listed }) => favoriteKey(sheetName(listed)));
+  if ( keys.join("\n") !== was.map(favoriteKey).join("\n") ) {
+    sheetFirst(actor);
+    return failed("changed");
+  }
+  const byKey = new Map(shown.map(({ stored }, index) => [keys[index], stored]));
+  const wanted = order.map(each => byKey.get(favoriteKey(each)));
+  let next = 0;
+  const favorites = stored.map(({ stored, listed }) => (listed ? wanted[next++] : stored));
+  if ( favorites.some((favorite, index) => favorite !== stored[index].stored) ) {
+    try {
+      await actor.update({
+        "system.favorites": favorites.map((favorite, index) => ({ ...favorite, sort: (index + 1) * DENSITY }))
+      });
+    } catch (err) {
+      // Foundry's update writes whole or not at all: nothing was written.
+      return failed("error", messageOf(err));
+    }
+  }
+  sheetFirst(actor);
+  return { id: command.id, status: "done", reason: null, error: null, messageId: null, visible: true, rolls: [] };
+}
+
 /* -------------------------------------------- */
+
+/**
+ * A favorite the sheet lists, as the app names it back: `{type, id}`, and an activity's `item`.
+ * @param {{type: string, id: string, itemId?: string}} listed   As `favoritesOf` lists it.
+ * @returns {{type: string, id: string, item?: string}}
+ */
+function sheetName({ type, id, itemId }) {
+  return (type === "activity") ? { type, id, item: itemId } : { type, id };
+}
+
+/**
+ * A favorite's key, as the sheet names it: an activity's by its item's id too, as two items may
+ * hold activities of one id.
+ * @param {{type: string, id: string, item?: string}} favorite
+ * @returns {string}
+ */
+function favoriteKey({ type, id, item }) {
+  return (type === "activity") ? `activity:${item}.${id}` : `${type}:${id}`;
+}
 
 /**
  * The id dnd5e keeps a favorite by, built as its sheet's menus build it: an item, an activity and an

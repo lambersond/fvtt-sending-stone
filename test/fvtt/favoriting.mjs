@@ -405,7 +405,9 @@ okay("a character sheet, as dnd5e has it: Ki, then the Rope and the pact slots b
 /*  1. The hello                                */
 /* -------------------------------------------- */
 
-const ON = { enabled: true, kinds: ['favorite'], reason: null }
+// Changed on purpose (module 0.47.0, the app's ROADMAP item 28): and `orders`, that they're put in order here.
+const ON = { enabled: true, kinds: ['favorite'], reason: null, orders: true }
+const OFF = { enabled: false, kinds: [], reason: 'system', orders: false }
 assert.deepEqual(helloOf().data.features.favorites, ON)
 // Changed on purpose (round 0.38.0 §D8.3): dishes from the Magical Recipe Book after favorites, `"off"` with
 // the switch off, under dnd5e 6 too.
@@ -426,17 +428,17 @@ assert.deepEqual([on.favorites, on.rolls.enabled], [ON, true], 'the same with ro
 assert.ok(on.rolls.kinds.length && !on.rolls.kinds.includes('favorite'), "never among the rolls' kinds")
 assert.ok(on.companions.kinds.length && !on.companions.kinds.includes('favorite'), "nor a companion's")
 game.system.id = 'pf2e'
-assert.deepEqual(favoriteFeatures(), { enabled: false, kinds: [], reason: 'system' })
+assert.deepEqual(favoriteFeatures(), OFF)
 assert.equal(favoritesOn(), false)
 announce({ campaignId: 'camp-a' })
 await settle()
-assert.deepEqual(helloOf().data.features.favorites, { enabled: false, kinds: [], reason: 'system' })
+assert.deepEqual(helloOf().data.features.favorites, OFF)
 game.system.id = 'dnd5e'
 campaignAs()
 announce({ campaignId: 'camp-a' })
 await settle()
 assert.deepEqual(helloOf().data.features.favorites, ON)
-okay("the hello's features.favorites, after companions, says favorites are added and removed under dnd5e, kind `favorite`, with rolls, moves and the self-test off or on, and never among the rolls' or a companion's kinds; under another system `{ enabled: false, kinds: [], reason: 'system' }`")
+okay("the hello's features.favorites, after companions, says favorites are added and removed under dnd5e, kind `favorite`, and since 0.47.0 put in order (`orders: true`), with rolls, moves and the self-test off or on, and never among the rolls' or a companion's kinds; under another system `{ enabled: false, kinds: [], reason: 'system', orders: false }`")
 
 /* -------------------------------------------- */
 /*  2. Fetching                                 */
@@ -733,6 +735,101 @@ const [taken, rope] = await fetched(removal('rope', 1), add('item', 'rope'))
 assert.equal(taken.result.status, 'done')
 assert.deepEqual(refusal(rope), ['failed', 'gone', null], 'the Rope removed first: gone')
 okay("an Add and a Remove of the Potion fetched together are made in that order, ending not a favorite; two Adds fetched together, the second last, its sort the higher; a removal of the Rope ahead of an Add of it leaves the Add `gone`")
+
+/* -------------------------------------------- */
+/*  9. Put in order (module 0.47.0)             */
+/* -------------------------------------------- */
+
+// The app's ROADMAP item 28: the favorites put in order from the app, as dnd5e's sheet orders them
+// (character-sheet.mjs's _prepareFavorites, by `sort`, and _onSortFavorites, which writes them).
+const characterSheetSource = readFileSync(`${D}/applications/actor/character-sheet.mjs`, 'utf8')
+for (const line of [
+  '}, [])).sort((a, b) => a.sort - b.sort);',
+  'return this.actor.update({ "system.favorites": Array.from(favorites.values()) });',
+]) assert.ok(characterSheetSource.includes(line), `dnd5e's character sheet has: ${line}`)
+await settle()
+// Thorin's favorites as dnd5e stores them: the Veiled Gift, which the sheet leaves out, among them,
+// and Perception and his 1st-level slots of one sort, in the order stored.
+thorin.system.favorites = [
+  { type: 'item', id: '.Item.sword', sort: 100 }, { type: 'item', id: '.Item.veiled', sort: 150 },
+  { type: 'activity', id: '.Item.staff.Activity.fireball', sort: 200 }, { type: 'skill', id: 'prc', sort: 300 },
+  { type: 'slots', id: 'spell1', sort: 300 }, { type: 'effect', id: '.ActiveEffect.bless', sort: 400 },
+]
+const SWORD = { type: 'item', id: 'sword' }
+const FIREBALL = { type: 'activity', id: 'fireball', item: 'staff' }
+const PERCEPTION = { type: 'skill', id: 'prc' }
+const SLOTS = { type: 'slots', id: 'spell1' }
+const BLESS = { type: 'effect', id: 'bless' }
+const SHOWN = [SWORD, FIREBALL, PERCEPTION, SLOTS, BLESS]
+const listed = list => [['resource', 'primary', null], ...list.map(({ type, id, item }) => [type, id, item ?? null])]
+assert.deepEqual(characterSheet(thorin).favorites.map(f => [f.type, f.id, f.itemId ?? null]), listed(SHOWN), 'Ki, then by sort, those of one sort as stored, the Veiled Gift left out')
+const ordering = (order, was, fields) => ({ id: `favorite-${++ids}`, ...BASE, favorite: { op: 'order', order, was }, ...fields })
+// Foundry's actor update, counted, as dnd5e's _onSortFavorites makes it.
+const writes = []
+const update = thorin.update
+thorin.update = async function (changes) { writes.push(changes); return update.call(this, changes) }
+const WANTED = [BLESS, PERCEPTION, SWORD, SLOTS, FIREBALL]
+lines = messages.size
+it = await made(ordering(WANTED, SHOWN))
+assert.deepEqual(it.result, { id: it.command.id, ...DONE }, 'done, with no `favorited`')
+assert.deepEqual(stored(), [
+  ['effect', '.ActiveEffect.bless', 100000], ['item', '.Item.veiled', 200000], ['skill', 'prc', 300000],
+  ['item', '.Item.sword', 400000], ['slots', 'spell1', 500000], ['activity', '.Item.staff.Activity.fireball', 600000],
+], 'those listed in the order sent, in the places they held; the Veiled Gift in its own; every sort afresh')
+assert.equal(writes.length, 1, 'one update')
+assert.deepEqual(Object.keys(writes[0]), ['system.favorites'], "of dnd5e's favorites alone")
+assert.deepEqual(sheetsIn(it), [['character.updated', 'thorin']], 'the sheet before the result')
+assert.deepEqual(sentFavorites(it), listed(WANTED), 'Ki first, then in the order sent')
+assert.equal(messages.size, lines, 'no chat message')
+okay("an order of Thorin's favorites puts those the sheet lists in the order sent, in the places they held among dnd5e's, the Veiled Gift, left out of the sheet, in its own, every `sort` written afresh in one update of `system.favorites`, as dnd5e's sheet sorts them; Ki stays first; the sheet ahead of the result, `done`, no `favorited`, nothing posted")
+
+// The same order again, as the app hands it over once more: nothing written, nothing new to send.
+await settle()
+it = await made(ordering(WANTED, WANTED))
+assert.deepEqual([it.result.status, writes.length, sheetsIn(it)], ['done', 1, []], 'already so')
+// Shown in an older order, as when Foundry's sheet moved one meanwhile: refused, nothing written.
+it = await made(ordering(SHOWN, SHOWN))
+assert.deepEqual([refusal(it), writes.length, sheetsIn(it)], [['failed', 'changed', null], 1, []], 'an older order')
+// The Rope made a favorite in Foundry meanwhile, its sheet not yet sent: refused, the sheet first.
+await settle()
+thorin.items.set('rope', new Item(itemData('Rope', 'loot', {}, { id: 'rope' }), thorin))
+thorin.system.favorites.push({ type: 'item', id: '.Item.rope', sort: 700000 })
+it = await made(ordering([...WANTED].reverse(), WANTED))
+assert.deepEqual([refusal(it), writes.length, sheetsIn(it)], [['failed', 'changed', null], 1, [['character.updated', 'thorin']]], 'one added in Foundry')
+assert.deepEqual(sentFavorites(it), listed([...WANTED, { type: 'item', id: 'rope' }]), 'the sheet as it stands')
+const WITH_ROPE = [...WANTED, { type: 'item', id: 'rope' }]
+// Foundry's update throwing: `error` with what it said, nothing written.
+thorin.update = async () => { throw new Error('The update was refused') }
+it = await made(ordering([...WITH_ROPE].reverse(), WITH_ROPE))
+thorin.update = async function (changes) { writes.push(changes); return update.call(this, changes) }
+assert.deepEqual([refusal(it), sheetsIn(it)], [['failed', 'error', 'The update was refused'], []], 'a throw')
+assert.deepEqual(characterSheet(thorin).favorites.map(f => [f.type, f.id, f.itemId ?? null]), listed(WITH_ROPE), 'nothing written')
+okay("an order already made is `done` with nothing written or sent; one made from an older order, `changed`, nothing written; one made while a favorite was added in Foundry, `changed`, the sheet as it stands ahead of the result; Foundry's update throwing, `error` with what it said, nothing written")
+
+const before9 = stored()
+for (const [favorite, why] of [
+  [{ op: 'order', order: WITH_ROPE }, 'no `was`'],
+  [{ op: 'order', order: WITH_ROPE, was: WITH_ROPE, sort: 1 }, 'an extra key'],
+  [{ op: 'order', order: [], was: [] }, 'none'],
+  [{ op: 'order', order: WITH_ROPE.slice(1), was: WITH_ROPE }, 'one left out'],
+  [{ op: 'order', order: [SWORD, ...WITH_ROPE.slice(1)], was: WITH_ROPE }, 'one twice, for another'],
+  [{ op: 'order', order: [...WITH_ROPE, SWORD], was: [...WITH_ROPE, SWORD] }, 'one twice in both'],
+  [{ op: 'order', order: [...WITH_ROPE.slice(1), { type: 'item', id: 'potion' }], was: WITH_ROPE }, 'one not shown'],
+  [{ op: 'order', order: [{ type: 'resource', id: 'primary' }], was: [{ type: 'resource', id: 'primary' }] }, 'a resource'],
+  [{ op: 'order', order: [{ ...SWORD, op: 'add' }], was: [SWORD] }, 'an op on one'],
+  [{ op: 'order', order: [{ type: 'activity', id: 'fireball' }], was: [{ type: 'activity', id: 'fireball' }] }, 'an activity without its item'],
+  [{ op: 'order', order: SWORD, was: [SWORD] }, 'not a list'],
+  [{ op: 'order', order: Array.from({ length: 401 }, (_, n) => ({ type: 'item', id: `item${n}` })), was: Array.from({ length: 401 }, (_, n) => ({ type: 'item', id: `item${n}` })) }, 'more than 400'],
+  [{ op: 'order', type: 'item', id: 'sword' }, "an add's fields"],
+]) {
+  it = await made({ id: `favorite-${++ids}`, ...BASE, favorite })
+  assert.deepEqual([refusal(it), sheetsIn(it)], [['failed', 'invalid', 'favorite'], []], why)
+}
+assert.deepEqual(refusal(await made(ordering(WITH_ROPE, WITH_ROPE, { by: 'gm' }))), ['failed', 'invalid', 'by'], "the Gamemaster's")
+assert.deepEqual(refusal(await made(ordering(WITH_ROPE, WITH_ROPE, { dice: [{ faces: 20, results: [3] }] }))), ['failed', 'invalid', 'dice'], 'a die')
+assert.deepEqual([stored(), writes.length], [before9, 1], 'nothing written')
+thorin.update = update
+okay("refuses as `invalid` an order without `was`, with another key, of none, of a list not the same favorites as `was`, of one twice, of one not shown, of a resource, of one with an op, of an activity without its item, not a list, of more than 400, or with an add's fields (`favorite`); the Gamemaster's (`by`); with a die (`dice`): nothing written or sent")
 
 // ---- END ----
 console.log(`favoriting${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
