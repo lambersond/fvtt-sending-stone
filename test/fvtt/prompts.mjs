@@ -292,6 +292,28 @@ made = await save({ actorId: 'vex', key: 'dex', prompt: `${card.id}-vex`, dice: 
 assert.deepEqual([made.result.status, made.roll.total, made.result.outcome], ['done', 8, 'failure'])
 ok("shows the DC, and the outcome, of another player's card, as dnd5e shows them")
 
+// Module 0.46.0, the app's ROADMAP item 40: a card is a character's player's own where its author is
+// one of its players (`characterPlayers`), never every player it's shared with through its default.
+// Under "Hide all", Pip, shared with every player as Owner and owned by no one by name, isn't shown
+// the DC of Alice's card; owned by Carol by name, still shared so, Carol's card's DC is his own.
+settings.set('challengeVisibility', 'none')
+pip.ownership = { default: 3 }
+const alices = await saveCard({ by: thorin, item: sleet, dc: 14, targets: [pip], author: 'alice' })
+await settle()
+const shownAlices = opened().at(-1)
+pip.ownership = { default: 3, carol: 3 }
+const carols = await saveCard({ by: pip, item: sleet, dc: 15, targets: [pip], author: 'carol' })
+await settle()
+const shownCarols = opened().at(-1)
+pip.ownership = undefined
+settings.set('challengeVisibility', 'player')
+await deleteMessage(alices)
+await deleteMessage(carols)
+await settle()
+assert.deepEqual([shownAlices.id, shownAlices.dc], [`${alices.id}-pip`, null], "Alice's card, Pip shared through his default")
+assert.deepEqual([shownCarols.id, shownCarols.dc], [`${carols.id}-pip`, 15], "Carol's card, Pip hers by name")
+ok("module 0.46.0: under Hide all, Pip, shared with every player through his default, is asked Alice's card's save without its DC; owned by Carol by name, Carol's card's DC is his player's own")
+
 const before = opened().length
 card = await saveCard({ by: goblin, item: burningHands, dc: 13, targets: [thorin], whisper: ['gm'] })
 await settle()
