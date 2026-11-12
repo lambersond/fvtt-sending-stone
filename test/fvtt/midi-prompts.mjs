@@ -72,7 +72,7 @@ settings.set('challengeVisibility', 'all')
 settings.set('criticalDamageModifiers', false)
 settings.set('criticalDamageMaxDice', false)
 
-const { Character, saveCard, requestCardHtml } = await import('./dnd5e-cards.mjs')
+const { Character, saveCard, requestCardHtml, midiConcentrationCard } = await import('./dnd5e-cards.mjs')
 const { Actor5e } = await import('./actor5e.mjs')
 const { AttackActivity, SaveActivity, DamageActivity, HealActivity, equip } = await import('./activity5e.mjs')
 globalThis.dnd5e = {
@@ -1059,6 +1059,28 @@ assert.deepEqual(thorin.ended, ['Bless'], "Midi's hook ends a failed check's con
 await settle()
 assert.equal(conc.flags['sending-stone'].midiDone, true)
 ok("Midi's concentration card, made here for a character open in the app, is held, so Midi doesn't roll it; asked in the app, it's rolled as Midi's Gamemaster would, with the player's d20, and a failed check ends concentration through Midi")
+
+// Module 0.46.0, its review's M1: Midi's card is a character's player's own, and its DC shown under
+// Hide all, where its author is one of the character's players (`showsChallenge`), never every
+// player it's shared with through its default. Bob's card asks Thorin, shared with every player as
+// Owner and no one's by name (Alice's, her assigned Character), without its DC; owned by Bob by name,
+// still shared so, with it. The card is made here with Bob as its author (`midiConcentrationCard`),
+// since the bridge holds only cards it makes itself.
+settings.set('challengeVisibility', 'none')
+thorin.concentrateOn('Bless')
+const bobsCards = []
+for (const ownership of [{ default: 3 }, { default: 3, bob: 3 }]) {
+  thorin.ownership = ownership
+  count = opened().length
+  conc = await midiConcentrationCard(thorin, 13, { author: 'bob' })
+  prompt = await nextPrompt(count)
+  await answer(prompt, { d20s: [18] })
+  bobsCards.push([prompt.messageId === conc.id, prompt.dc])
+}
+thorin.ownership = undefined
+settings.set('challengeVisibility', 'all')
+assert.deepEqual(bobsCards, [[true, null], [true, 13]], "Bob's cards: Thorin shared through his default, then his by name too")
+ok("module 0.46.0: under Hide all, Midi's concentration card by a player asks Thorin, shared with every player through his default, without its DC; owned by its author by name, with it")
 
 // Challenge Visibility hiding the DC: none on the prompt, nor whether they kept it.
 settings.set('challengeVisibility', 'none')

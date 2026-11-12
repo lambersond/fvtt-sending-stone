@@ -304,9 +304,15 @@ export async function requestCard({ type = 'save', abilities = [], dc, hideDC = 
   })
 }
 
-/** Midi-QOL's own concentration card, in its "chat" mode: no button, and Midi rolls it. */
-export async function midiConcentrationCard(actor, dc) {
+/**
+ * Midi-QOL's own concentration card, in its "chat" mode: no button, and Midi rolls it. Since module
+ * 0.46.0 with a player as its author where a harness names one (`author`), as `saveCard`'s may be,
+ * made on this client all the same: Midi's own card is its maker's, so a player's own client's is
+ * never the bridge's to hold; this is for the module's reading of a held card's author.
+ */
+export async function midiConcentrationCard(actor, dc, { author = game.user.id } = {}) {
   return ChatMessage.create({
+    author,
     content: `<div class="dnd5e chat-card request-card" data-action="concentration" data-dc="${dc}" data-type="midi-concentration">
       <div><span class="visible-dc">DC ${dc} Concentration Roll</span></div>
       <div><span class="hidden-dc">Concentration Roll</span></div>
