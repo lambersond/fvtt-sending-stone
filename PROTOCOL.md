@@ -246,6 +246,11 @@ group. Its [journal notes](#journal-notes)' ownership, the primary players its
 [`manualDice`](#character) reads and its [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal)'s
 secrets still follow Foundry's own ownership of it, through `default` too.
 
+Since module 0.47.0 they're also whom a [roll from the app](#making-a-roll) is made as where no
+player is assigned the character: its only player. A character shared with every player through its
+default and owned by one player by id, assigned to no one, is then made as that player, where before
+0.47.0 every player through `default` counted, so it was made as the Gamemaster.
+
 ## Shared shapes
 
 ### Character
@@ -2476,6 +2481,12 @@ An ask:
   of it as before: a message it's no longer sent never arrives, one it was sent before stays until
   the chat is cleared, and the first hello lists each character's `owners` afresh. A module before
   0.46.0 sends as before.
+- Module 0.47.0 makes a [roll from the app](#making-a-roll) for a character no player is assigned
+  as its only player by [a character's players](#a-characters-players), never through `default`,
+  with no new event, field or format: a character shared with *All Players: Owner* and owned by one
+  player by id is made as that player, its card theirs, where before it was the Gamemaster's. One
+  assigned to a player is still made as them, and one with no player as the Gamemaster. A listener
+  reads its messages and `command.result` as before. A module before 0.47.0 makes it as before.
 
 ## Changes from protocol 1
 
@@ -2609,7 +2620,8 @@ too, as the roll it answers is waiting on it.
 ### Making a roll
 
 The module makes the roll as dnd5e's roll dialog would, without it, as the character's player
-(the user whose character it is, or else its only player), shown to everyone. Each die the roll
+(the user whose character it is, or else its only player, since module 0.47.0 by [a character's
+players](#a-characters-players), never through `default`, or else the Gamemaster), shown to everyone. Each die the roll
 throws takes the next value the player rolled for a die of its faces: their d20s, then their added
 dice. Only a die's first roll is the player's: a reroll, such as a Halfling's of a 1, or a die the
 player didn't roll, such as a Bless the game applies, is Foundry's. Elven Accuracy's third d20 is

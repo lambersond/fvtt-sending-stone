@@ -390,6 +390,21 @@ made = await roll({ actorId: 'pip', dice: [{ faces: 20, results: [3] }] })
 assert.equal(made.message.author.id, 'gm')
 ok("is made as the character's player: the one it's assigned to, else its only player, else the Gamemaster")
 
+// Module 0.47.0, the app's ROADMAP item 45: its only player is by `characterPlayers`, never every
+// player through `default`. Pip, shared with every player as Owner and Carol's by name, assigned to
+// no one, rolls as Carol; assigned to Dave, as Dave; shared so with no player, as the Gamemaster.
+const author = async () => (await roll({ actorId: 'pip', dice: [{ faces: 20, results: [3] }] })).message.author.id
+pip.ownership = { default: 3, carol: 3 }
+const byName = await author()
+users.get('dave').character = pip
+const assigned = await author()
+users.get('dave').character = null
+pip.ownership = { default: 3 }
+const noPlayer = await author()
+pip.ownership = undefined
+assert.deepEqual([byName, assigned, noPlayer], ['carol', 'dave', 'gm'])
+ok("module 0.47.0: Pip, shared with every player as Owner, is made as Carol, his player by name; as Dave, assigned him; with no player, as the Gamemaster")
+
 // ---- Death saving throws ----
 thorin.system.attributes.hp.value = 0
 thorin.system.attributes.death.success = 1

@@ -123,8 +123,10 @@ it's shown them only for its own players' checks and cards; it sees a party shee
 dish's card is whispered to them here. A character no player owns by name and no one is assigned has
 no player: no whisper reaches it. And one no player owns at all, by name or through All Players, but
 that's assigned to a player is that player's, where before 0.46.0 it had none: it gets their
-whispers and private rolls, and its roster names them. Its journals, and who may type in its dice,
-still follow who owns it here.
+whispers and private rolls, and its roster names them. Since 0.47.0 a roll from the app for a
+character assigned to no one is made as its player read so, where it has just one: a character
+shared with All Players as Owner and owned by one player by name rolls as that player, where before
+it rolled as you. Its journals, and who may type in its dice, still follow who owns it here.
 
 Worlds set up before campaigns keep working: the connected characters chosen then are moved into a
 campaign titled after the world the first time a Gamemaster loads it.
@@ -1149,7 +1151,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status; what the app says it takes of sheets, and no post larger; why the app refused a post or fetch |
 | `scripts/delivery-status.mjs` | What the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
-| `scripts/characters.mjs` | A campaign's characters and who owns them; a character's players, those who own it by name, else those it's assigned to: from 0.45.0 for its companions, and from 0.46.0 for what its campaign is sent of other players and a dish's card |
+| `scripts/characters.mjs` | A campaign's characters and who owns them; a character's players, those who own it by name, else those it's assigned to: from 0.45.0 for its companions, from 0.46.0 for what its campaign is sent of other players and a dish's card, and from 0.47.0 for who a roll from the app is made as |
 | `scripts/typed-dice.mjs` | Whether a character's player may type in what their own dice show in the app: its primary players, and core's Make Manual Rolls permission |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
