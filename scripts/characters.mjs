@@ -217,8 +217,10 @@ export function playerOwners(actor) {
  * through `default`; for a character none owns so, the non-Gamemaster users it's assigned to as
  * their character. A character shared with every player through its default, as a Gamemaster may
  * share a party's sheets, is then no one's but its own player's. Since 0.45.0 for its companions, so
- * another campaign's players' NPCs never become its companions; since 0.46.0 wherever a campaign
- * reads who plays it.
+ * another campaign's players' NPCs never become its companions; since 0.46.0 for what a campaign is
+ * sent of other players too (whose whispers reach it, its roster's owners, its author's outcomes, its
+ * own cards' DCs, a group's access) and a dish's card's readers; `playerOwners` keeps its other
+ * readers.
  * @param {Actor} actor
  * @returns {User[]}
  */
