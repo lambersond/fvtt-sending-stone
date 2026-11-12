@@ -112,6 +112,17 @@ involves its characters, described for it alone:
   when its first character joins and ends for it when its last one leaves.
 - **Hit points and audiences** cover only its own characters.
 
+**A character's players.** Give each player Owner on their own character by name, or assign it to
+them in User Configuration. Since 0.46.0 Sending Stone reads a character's players as it has for its
+companions since 0.45.0: the players you gave Owner on it by name, or where you gave no one, the
+player it's assigned to; never every player through All Players. So a character shared with All
+Players as Owner, as you might share a party's sheets, gets only its own players' whispers and
+private rolls, and is asked only the saves a card whispered to them asks; its roster names only them
+as its owners; a check's outcome only its author sees, and a card's DC, show as its player's own
+only for theirs; it sees a party sheet as they may; and a dish's card is whispered to them here. A
+character no player owns by name and no one is assigned has no player: no whisper reaches it. Its
+journals, and who may type in its dice, still follow who owns it here.
+
 Worlds set up before campaigns keep working: the connected characters chosen then are moved into a
 campaign titled after the world the first time a Gamemaster loads it.
 
@@ -839,7 +850,7 @@ With **GM-only details** off, the listener receives what players could see:
 | Information | Sent? |
 | --- | --- |
 | Public chat messages | Yes; since 0.45.0, where a world runs more than one campaign, not one that's another campaign's alone ([Campaigns](#campaigns)). |
-| Whispers, and private or self rolls | Yes, to the campaigns of the characters whose players can read them, marked with which they are. |
+| Whispers, and private or self rolls | Yes, to the campaigns of the characters whose players can read them, marked with which they are; since 0.46.0 a character's players are those who own it by name, else the one it's assigned to ([Campaigns](#campaigns)), so a character shared with All Players gets no other player's. |
 | Whispers only Gamemasters can read, private Gamemaster rolls, blind rolls | No. |
 | A blind roll the Gamemaster later reveals | Yes, from then on, as an update. |
 | A message made private after it was sent | The listener is told to delete it. |
@@ -1133,7 +1144,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/transport.mjs` | Envelope, ordered delivery queue, retries and status; what the app says it takes of sheets, and no post larger; why the app refused a post or fetch |
 | `scripts/delivery-status.mjs` | What the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
-| `scripts/characters.mjs` | A campaign's characters and who owns them |
+| `scripts/characters.mjs` | A campaign's characters and who owns them; a character's players, from 0.45.0 for its companions and from 0.46.0 everywhere, those who own it by name, else those it's assigned to |
 | `scripts/typed-dice.mjs` | Whether a character's player may type in what their own dice show in the app: its primary players, and core's Make Manual Rolls permission |
 | `scripts/sheet.mjs` | A character's sheet under dnd5e: abilities, saves, skills, tools and the like |
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
