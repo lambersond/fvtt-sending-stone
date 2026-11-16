@@ -1,12 +1,13 @@
 import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import { askFlavor } from "./chat-data.mjs";
+import { findLink } from "./command-links.mjs";
 import { appFlags, authorFor, checkCommand, describeResult, failedResult, PUBLIC } from "./command-rolls.mjs";
 import { commandActor, ownedByPlayers } from "./creatures.mjs";
 import {
   changesDamage, damageRollsFor, diceStatus, matchesDice, modifiedDice, plannedDamage, plannedDice, readModifiers,
   takesAway, unmaximizable, withPlan
 } from "./dice-plan.mjs";
-import { findLink, linkCritical } from "./sheet-links.mjs";
+import { linkCritical } from "./sheet-links.mjs";
 
 /**
  * Acting from the Sending Stone app on the links in a character's descriptions: asking the table

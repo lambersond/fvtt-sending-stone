@@ -3,7 +3,7 @@ import {
   MODULE_ID, PREPARE_KINDS, PROTOCOL_VERSION, ROLL_KINDS, TURN_KINDS
 } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
-import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
+import { describeCampaign, getCampaigns, manualDiceOn, prompting } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
 import { noteAloneReader, runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
@@ -36,7 +36,6 @@ import {
 } from "./later-dice.mjs";
 import { noteNotesReader, notesOn, notesReader } from "./journals.mjs";
 import { answersMidiPrompt, midiPromptsOffered, noteMidiReader, noteOpen } from "./midi-prompts.mjs";
-import { prompting } from "./prompts.mjs";
 import { effectDiceSystem } from "./sheet-effect-dice.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
 import { noteTidyReader } from "./tidy-journal.mjs";

@@ -9,7 +9,7 @@
 // concentration (dnd5e-cards.mjs); dnd5e's createRollLabel, ported from its enrichers.mjs;
 // its roll-request-card.hbs, rendered by Handlebars with its dnd5e-dataset helper, ported from its
 // utils.mjs; its English strings, read from its lang/en.json; jsdom's HTML parser; and a stand-in
-// app. Links come from made-up descriptions, by hash, for their exact shapes: sheet-links.mjs's
+// app. Links come from made-up descriptions, by hash, for their exact shapes: command-links.mjs's
 // findLink is wrapped by texts-hooks.mjs to answer those, and passes any other hash to the real
 // one; and from real ones on Thorin's sheet, in dnd5e 5.3.3's enriched markup, through the module's
 // own normaliser and findLink: his biography, an item's, the copy of a spell an item casts, and an

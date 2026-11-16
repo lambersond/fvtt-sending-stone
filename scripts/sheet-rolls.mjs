@@ -5,7 +5,7 @@ import {
   aloneSubject, challenge, checkOptions, criticalAdditions, DND5E_ACTIVITIES, eligibleSlots, ownDamageConfig,
   previewDamage, slotChoice
 } from "./sheet-links.mjs";
-import { countedUses, finite, limitedUses, localize, RESOURCES } from "./sheet-values.mjs";
+import { castCopy, countedUses, finite, limitedUses, localize, RESOURCES } from "./sheet-values.mjs";
 
 /**
  * What an item rolls, or is used through, as the sheet tells the app: its bonus to hit and the
@@ -583,15 +583,6 @@ export function castSpellOf(cast) {
   const spell = cast.cachedSpell;
   const [lead] = spell ? visibleActivities(spell) : [];
   return lead ? { spell, lead } : null;
-}
-
-/**
- * Is this the copy of a spell dnd5e keeps for an item that casts it, such as a wand's?
- * @param {Item} spell
- * @returns {boolean}
- */
-export function castCopy(spell) {
-  return (spell.type === "spell") && Boolean(spell.getFlag?.("dnd5e", "cachedFor") ?? spell.flags?.dnd5e?.cachedFor);
 }
 
 /**

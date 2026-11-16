@@ -1,11 +1,10 @@
 import { MODULE_ID } from "./constants.mjs";
 import { includeGmContent } from "./config.mjs";
 import { campaignActors, charactersSeenBy, speakerCharacterId } from "./characters.mjs";
-import { outcomeOf as attackOutcome } from "./command-uses.mjs";
 import { messageCompanion } from "./creature-sync.mjs";
 import {
   attacksShown, challengeAudience, gmRollTrim, midiCard, midiHighlightShown, midiHitsShown, midiSaveSeen,
-  midiTotalShown, readSetting, resultRules, resultsTold
+  midiTotalShown, outcomeOf as attackOutcome, readSetting, resultRules, resultsTold
 } from "./results.mjs";
 import { traitLabel } from "./sheet-details.mjs";
 import { localize } from "./sheet-values.mjs";

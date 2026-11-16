@@ -7,8 +7,8 @@ import {
   checkCommand, failedResult, isId, isObject, namesRollFields, throwsNoDice, visibleTo
 } from "./command-rolls.mjs";
 import { accessFor, campaignGroups, campaignMembers } from "./groups.mjs";
-import { hidesContents, inventoryTypes, listedInSheet } from "./sheet-inventory.mjs";
-import { localize } from "./sheet-values.mjs";
+import { hidesContents, listedInSheet } from "./sheet-inventory.mjs";
+import { inventoryTypes, localize } from "./sheet-values.mjs";
 
 /**
  * Moving items and coins from the Sending Stone app, since module 0.31.0: a player taking from a

@@ -1,5 +1,5 @@
+import { characterPlayers, originalOf } from "./characters.mjs";
 import { chatEnabled, includeGmContent, resultsAlways } from "./config.mjs";
-import { OUTCOME_SHOWN } from "./midi-prompts.mjs";
 
 /**
  * What players see in chat of hits, misses, saves and checks, and of a Gamemaster's rolls on
@@ -30,6 +30,13 @@ const ATTACKS_SHOWN = new Set(["hideAC", "all"]);
  * @type {Set<string>}
  */
 const MIDI_MARKS = new Set(["none", "all"]);
+
+/**
+ * The ways Midi shows saves for which it shows players whether they saved: on a save asked in the
+ * app, and since 0.29.0 on the targets of its card in chat.
+ * @type {Set<string>}
+ */
+export const OUTCOME_SHOWN = new Set(["all", "allNoRoll", "allShow"]);
 
 /**
  * The prefix of Midi-QOL's own words for each of its settings that's a choice, as it registers them
@@ -187,6 +194,20 @@ export function attacksShown(rules) {
 }
 
 /**
+ * Whether an attack hit its target, as dnd5e's card shows it: a critical hit always does; a
+ * fumble, or a total under the target's armor class, misses. A target under total cover can't be
+ * hit, as Midi-QOL has it. Since 0.29.0 so it's read for each target of dnd5e's attack in chat.
+ * @param {Roll} roll
+ * @param {{ac: number|null}} target
+ * @returns {"hit"|"miss"}
+ */
+export function outcomeOf(roll, { ac }) {
+  if ( ac === null ) return "miss";
+  const miss = !roll.isCritical && ((roll.total < ac) || roll.isFumble);
+  return miss ? "miss" : "hit";
+}
+
+/**
  * Does Midi-QOL leave dnd5e's success and failure on a roll? It strips them from every roll message
  * unless Color code Hit/Miss/Save Display is on and Only highlight critical/fumble hits is off (MQX
  * ChatMessageMidi:453-495, 547-556); on any value of the second but none, as its own test reads it.
@@ -245,6 +266,30 @@ export function challengeAudience(rules, author) {
   const player = Boolean(author) && !author.isGM;
   if ( (visibility === "player") && player ) return "everyone";
   return player ? "author" : "none";
+}
+
+/**
+ * May a character's player see a card's DC, and whether they saved against it? As dnd5e shows
+ * them: on their own card, and on others' as its Challenge Visibility has it. Since 0.46.0 a card is
+ * their own where its author is one of the character's players (`characterPlayers`), a form's
+ * character's for a form, as Midi-QOL's concentration card speaks for it; so a character shared with
+ * every player through its default isn't shown every player's DC.
+ * @param {ChatMessage} message
+ * @param {Actor} actor   The creature asked: a character, its form, or a companion.
+ * @returns {boolean}
+ */
+export function showsChallenge(message, actor) {
+  const author = message.author;
+  if ( author && characterPlayers(originalOf(actor) ?? actor).some(user => user.id === author.id) ) return true;
+  let visibility;
+  try {
+    visibility = game.settings.get("dnd5e", "challengeVisibility");
+  } catch {
+    return false;
+  }
+  if ( visibility === "all" ) return true;
+  if ( visibility === "player" ) return author?.isGM === false;
+  return false;
 }
 
 /**

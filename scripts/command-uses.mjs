@@ -12,12 +12,13 @@ import { commandActor } from "./creatures.mjs";
 import { bindWorkflow } from "./later-dice.mjs";
 import { midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
 import { midiPromptWaits } from "./midi-prompts.mjs";
+import { outcomeOf } from "./results.mjs";
 import { DND5E_ACTIVITIES, eligibleSlots, ownDamageConfig, previewDamage, slotChoice } from "./sheet-links.mjs";
 import { enchantInPlay } from "./sheet-enchant.mjs";
 import {
-  castCopy, castSpellOf, checkUsable, followUpCheck, forwardTarget, FORWARDED, freeCheck, offeredLevels, USES
+  castSpellOf, checkUsable, followUpCheck, forwardTarget, FORWARDED, freeCheck, offeredLevels, USES
 } from "./sheet-rolls.mjs";
-import { finite } from "./sheet-values.mjs";
+import { castCopy, finite } from "./sheet-values.mjs";
 
 /**
  * Making a player's attack, spell or feature from the Sending Stone app: using the item as in
@@ -106,7 +107,7 @@ export function attacksUnavailable() {
 }
 
 // Since 0.41.0 in midi-economy.mjs, which the uses, Wild Shape and damage on its own share; still
-// exported from here, where prompts.mjs and the harness import it.
+// exported from here, where the harness imports it.
 export { midiActivities };
 
 /**
@@ -732,20 +733,6 @@ function hits(use, outcome) {
     outcome: (targets.length === 1) ? targets[0].outcome : null,
     ...(use.area && { targets })
   };
-}
-
-/**
- * Whether an attack hit its target, as dnd5e's card shows it: a critical hit always does; a
- * fumble, or a total under the target's armor class, misses. A target under total cover can't be
- * hit, as Midi-QOL has it. Since 0.29.0 so it's read for each target of dnd5e's attack in chat.
- * @param {Roll} roll
- * @param {{ac: number|null}} target
- * @returns {"hit"|"miss"}
- */
-export function outcomeOf(roll, { ac }) {
-  if ( ac === null ) return "miss";
-  const miss = !roll.isCritical && ((roll.total < ac) || roll.isFumble);
-  return miss ? "miss" : "hit";
 }
 
 /**

@@ -5,8 +5,8 @@ import { sheetFirst } from "./command-enchant.mjs";
 import { checkCommand, failedResult, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { campaignGroups } from "./groups.mjs";
-import { castCopy } from "./sheet-rolls.mjs";
 import { hiddenCopy, preparedOf } from "./sheet-spells.mjs";
+import { castCopy } from "./sheet-values.mjs";
 
 /**
  * Preparing and unpreparing a character's spells from the Sending Stone app, since module 0.42.1, as

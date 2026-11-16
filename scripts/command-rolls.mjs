@@ -10,6 +10,7 @@ import { checkFavoriteCommand } from "./command-favorites.mjs";
 import { checkDishCommand } from "./command-dishes.mjs";
 import { checkEffectCommand } from "./command-effects.mjs";
 import { checkHitPointsCommand } from "./command-hit-points.mjs";
+import { findLink } from "./command-links.mjs";
 import { checkWildShapeCommand } from "./command-wildshape.mjs";
 import { checkPrepareCommand } from "./command-prepare.mjs";
 import { checkNoteCommand } from "./command-notes.mjs";
@@ -22,7 +23,7 @@ import {
   midiPromptAnswered
 } from "./midi-prompts.mjs";
 import { findPrompt, outcomeOf } from "./prompts.mjs";
-import { findLink, MOST_LINKS } from "./sheet-links.mjs";
+import { MOST_LINKS } from "./sheet-links.mjs";
 import { castSpellOf, checkOf, forwardTarget, shownActivity } from "./sheet-rolls.mjs";
 import { castFrom } from "./sheet-spells.mjs";
 

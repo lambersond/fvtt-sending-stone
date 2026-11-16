@@ -1,14 +1,13 @@
-import { EVENTS, MODULE_ID, SETTINGS } from "./constants.mjs";
+import { EVENTS, MODULE_ID, PROMPT_LIFETIME, SETTINGS } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
-import { getCampaigns } from "./campaigns.mjs";
+import { getCampaigns, prompting } from "./campaigns.mjs";
 import { originalOf } from "./characters.mjs";
 import { resultsAlways } from "./config.mjs";
 import { companionOfActor, companionPart } from "./creatures.mjs";
 import { companionPromptReader, toldList } from "./creature-sync.mjs";
 import { wrap } from "./dice-plan.mjs";
-import {
-  concentratingOn, ownConcentrationAbility, prompting, PROMPT_LIFETIME, showsChallenge
-} from "./prompts.mjs";
+import { OUTCOME_SHOWN, showsChallenge } from "./results.mjs";
+import { concentratingOn, ownConcentrationAbility } from "./sheet-effects.mjs";
 import { send } from "./transport.mjs";
 
 /**
@@ -84,13 +83,6 @@ const ID = /^[A-Za-z0-9]{1,64}$/;
  * @type {RegExp}
  */
 const KEY = /^[A-Za-z][\w-]{0,31}$/;
-
-/**
- * The ways Midi shows saves for which it shows players whether they saved: on a save asked in the
- * app, and since 0.29.0 on the targets of its card in chat.
- * @type {Set<string>}
- */
-export const OUTCOME_SHOWN = new Set(["all", "allNoRoll", "allShow"]);
 
 /**
  * The roll mode of a player's save in Midi's standard roll, by its *Player Roll Saves*.

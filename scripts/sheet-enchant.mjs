@@ -1,7 +1,5 @@
 import { durationOf, hiddenFromPlayer } from "./sheet-effects.mjs";
-import { inventoryTypes } from "./sheet-inventory.mjs";
-import { castCopy } from "./sheet-rolls.mjs";
-import { finite } from "./sheet-values.mjs";
+import { castCopy, finite, inventoryTypes } from "./sheet-values.mjs";
 
 /**
  * What a character's sheet says of enchantments: which of their enchant activities can be used
