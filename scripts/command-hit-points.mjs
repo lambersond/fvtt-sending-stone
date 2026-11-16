@@ -15,7 +15,7 @@ import { campaignGroups } from "./groups.mjs";
  * writes it, as it writes every command, with one plain update; dnd5e then does what it does for any
  * change of hit points: a concentration check asked where they went down, its floating numbers over
  * the token, and its damage and healing hooks. A form at 0 hit points ends its Wild Shape, by the
- * module's own ending, once the command is done (wild-shape.mjs).
+ * module's own ending, once the command is done (wild-shape.mjs, wild-shape-hooks.mjs).
  *
  * Each field is set only while it still holds the number the app showed (`from`), as a spell slot is
  * spent, so a change made in Foundry meanwhile is never written over unseen. Nothing is posted in

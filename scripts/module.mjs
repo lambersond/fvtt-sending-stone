@@ -12,7 +12,7 @@ import { registerFollowHooks } from "./creature-initiative.mjs";
 import { registerCreatureHooks } from "./creature-sync.mjs";
 import { registerDishHooks, renderDishCard } from "./dish-card.mjs";
 import { registerEffectHooks } from "./command-effects.mjs";
-import { registerWildShapeHooks } from "./wild-shape.mjs";
+import { registerWildShapeHooks } from "./wild-shape-hooks.mjs";
 import { topUpAfterRest } from "./dish-effects.mjs";
 import { installDicePlans, selfTest } from "./dice-plan.mjs";
 import { registerSettingsWatch } from "./foundry-settings.mjs";

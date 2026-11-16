@@ -1,13 +1,14 @@
 import { MODULE_ID } from "./constants.mjs";
-import { wildShapeOn } from "./command-wildshape.mjs";
 import { finite } from "./sheet-values.mjs";
-import { fitsNow, formName, formSummary, inPool, knownProfiles, sizeLabel, wildShapeRules } from "./wild-shape.mjs";
+import {
+  fitsNow, formName, formSummary, inPool, knownProfiles, sizeLabel, wildShapeOn, wildShapeRules
+} from "./wild-shape.mjs";
 
 /**
  * What a character's sheet says of Wild Shape, since module 0.40.0, to an app that takes it (see
- * command-wildshape.mjs): on a 2024 druid's sheet, `wildShape`, what a change gives her now, her known
- * forms and her last ending; and on a transformed character's, which is its form's, `form`, what she
- * is now. Each is left out, never the sheet, should building it fail.
+ * wild-shape.mjs, command-wildshape.mjs): on a 2024 druid's sheet, `wildShape`, what a change gives
+ * her now, her known forms and her last ending; and on a transformed character's, which is its form's,
+ * `form`, what she is now. Each is left out, never the sheet, should building it fail.
  */
 
 /**

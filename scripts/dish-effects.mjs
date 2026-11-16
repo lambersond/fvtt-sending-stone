@@ -1,5 +1,6 @@
 import { MODULE_ID, MOST_DISH_LIST } from "./constants.mjs";
 import { isBridge } from "./bridge-role.mjs";
+import { dnd5eGeneration } from "./dnd5e-generation.mjs";
 
 /**
  * The effect a dish from the Magical Recipe Book leaves on each character a Gamemaster serves it to,
@@ -78,6 +79,18 @@ function secondsOf(duration) {
 /* -------------------------------------------- */
 /*  Mapping a dish's changes                    */
 /* -------------------------------------------- */
+
+/**
+ * Is the system one dishes are taken under: dnd5e 5, whose paths the mapping writes. dnd5e 6.0.5
+ * shims the bonus keys the mapping writes (D6 documents/active-effect.mjs:75-101), so 6 is off as a
+ * choice of scope, untested, its exhaustion and its expiry being its own (D6
+ * documents/active-effect.mjs:803-807). 5.3.3 is the 5.x tested, the harness's pin, so the README
+ * names it as the version tested rather than this refusing other 5.x releases.
+ * @returns {boolean}
+ */
+export function dishSystem() {
+  return (game.system.id === "dnd5e") && (dnd5eGeneration() === 5);
+}
 
 /**
  * Is this an integer from -10 to 10, other than 0: an ability score's change, a roll's bonus, or a

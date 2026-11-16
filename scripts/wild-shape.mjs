@@ -1,11 +1,9 @@
-import { ENDING_STATUSES, FORM_GONE_SETTLE, MODULE_ID, MOST_FORMS, NOT_FORM_FOLDERS } from "./constants.mjs";
+import { ENDING_STATUSES, EVENTS, FORM_GONE_SETTLE, MODULE_ID, MOST_FORMS, NOT_FORM_FOLDERS } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
-import { characterChanged } from "./character-sync.mjs";
-import { activeForm, endedForms, madeForm, noteFormDeleted, originalOf, playerOwners, transformed } from "./characters.mjs";
-import { queueBusy, registerQueueSettled } from "./commands.mjs";
-import { postEnding, wildShapeOn } from "./command-wildshape.mjs";
+import { characterChanged, wildShapeTermsChanged } from "./character-sync.mjs";
+import { endedForms, madeForm, originalOf, playerOwners, transformed } from "./characters.mjs";
 import { traitsOf } from "./sheet-details.mjs";
 import { damageOf, toHitOf } from "./sheet-rolls.mjs";
 import { finite, localize } from "./sheet-values.mjs";
@@ -66,7 +64,7 @@ const returning = new Set();
  * The characters whose Wild Shape this client is ending now, by id: one at a time each.
  * @type {Set<string>}
  */
-const ending = new Set();
+export const ending = new Set();
 
 /**
  * The forms of the module's record deleted lately, on the bridge, by id, each with the earlier
@@ -89,6 +87,48 @@ const summaries = new Map();
  * @type {Map<string, Set<string>>}
  */
 const waiting = new Map();
+
+/**
+ * The campaigns whose app takes Wild Shape, by id, as their latest answer to a hello or heartbeat said.
+ * @type {Set<string>}
+ */
+const readers = new Set();
+
+/**
+ * May a campaign's players use Wild Shape from the app: by its own switch, under dnd5e.
+ * @param {Campaign} campaign
+ * @returns {boolean}
+ */
+export function wildShapeOn(campaign) {
+  return (campaign?.wildShape === true) && (game.system?.id === "dnd5e");
+}
+
+/**
+ * Note whether a campaign's app takes Wild Shape: `features.wildShape`, 1 or later. One that says
+ * nothing of it, as an older or rolled back app, is fetched from for it no longer, and is sent its
+ * characters' own sheets. An answer to a heartbeat that changes it sends the campaign's sheets again,
+ * with or without their forms; a hello's are sent after it anyway.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @param {string} [type]   The event answered.
+ * @returns {void}
+ */
+export function noteWildShapeReader(campaignId, features, type) {
+  const format = features?.wildShape;
+  const was = readers.has(campaignId);
+  if ( Number.isInteger(format) && (format >= 1) ) readers.add(campaignId);
+  else readers.delete(campaignId);
+  if ( (was !== readers.has(campaignId)) && (type !== EVENTS.HELLO) ) wildShapeTermsChanged(campaignId);
+}
+
+/**
+ * Does a campaign's app take Wild Shape, and a shaped character's sheet?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function wildShapeReader(campaignId) {
+  return readers.has(campaignId);
+}
 
 /* -------------------------------------------- */
 /*  The rules                                   */
@@ -481,7 +521,7 @@ function profileOf(original, uuid) {
  * @param {object} options   The creation's options, `sendingStone` the app's.
  * @returns {void}
  */
-function record(host, source, data, settings, options) {
+export function record(host, source, data, settings, options) {
   const original = originalOf(host) ?? host;
   const wild = (settings?.preset === "wildshape") && Boolean(original.classes?.druid);
   const rules = wild ? wildShapeRules(original) : null;
@@ -957,7 +997,7 @@ export async function endWildShape(form, why) {
  * @param {object} record
  * @returns {"hp"|"incapacitated"|"time"|null}
  */
-function dueWhy(form, record) {
+export function dueWhy(form, record) {
   const statuses = form.statuses ?? new Set();
   if ( ((form.system?.attributes?.hp?.value ?? 1) <= 0) || statuses.has("dead") ) return "hp";
   if ( ENDING_STATUSES.some(status => statuses.has(status)) ) return "incapacitated";
@@ -969,86 +1009,14 @@ function dueWhy(form, record) {
  * The characters of the campaigns whose switch is on, once each.
  * @returns {Actor[]}
  */
-function switchedOnCharacters() {
+export function switchedOnCharacters() {
   const ids = new Set(getCampaigns().filter(campaign => wildShapeOn(campaign)).flatMap(campaign => Array.from(campaign.characters)));
   return Array.from(ids, id => game.actors.get(id)).filter(Boolean);
-}
-
-/**
- * End each due Wild Shape, on the bridge alone: a character's (or every character's) active form
- * alone, where the 2024 rules time it and its campaign's switch is on; never while a command of that
- * character's is on its way, which checks again when it settles.
- * @param {Actor} [character]   Only this one.
- * @returns {void}
- */
-export function endDueForms(character) {
-  if ( !canSend() ) return;
-  const on = switchedOnCharacters();
-  const characters = character ? on.filter(each => each.id === character.id) : on;
-  for ( const each of characters ) void endIfDue(each);
-}
-
-/**
- * End a character's active form where it's due, and say so in chat.
- * @param {Actor} character
- * @returns {Promise<void>}
- */
-async function endIfDue(character) {
-  if ( queueBusy(character.id) || ending.has(character.id) ) return;
-  const form = activeForm(character);
-  const record = form?.getFlag(MODULE_ID, "form");
-  if ( !form || !Number.isFinite(record?.hours) ) return;
-  const why = dueWhy(form, record);
-  if ( !why ) return;
-  if ( await endWildShape(form, why) ) await postEnding(character, record, why);
-}
-
-/**
- * Check a character again once a write is done, on the next tick.
- * @param {Actor|null} character
- * @returns {void}
- */
-function checkSoon(character) {
-  if ( !character || !canSend() ) return;
-  setTimeout(() => endDueForms(character), 0);
 }
 
 /* -------------------------------------------- */
 /*  Hooks                                       */
 /* -------------------------------------------- */
-
-/**
- * Register Wild Shape's hooks: on every client, the record of a transformation, what comes back on a
- * return, the replacement after a Long Rest, and the forms deleted; on the bridge, the endings, the
- * deletion safety net, and a player's leftover forms.
- * @returns {void}
- */
-export function registerWildShapeHooks() {
-  Hooks.on("dnd5e.transformActorV2", (host, source, data, settings, options) => record(host, source, data, settings, options));
-  Hooks.on("dnd5e.revertOriginalForm", (form, options) => returned(form, options));
-  Hooks.on("dnd5e.restCompleted", (actor, result) => rested(actor, result));
-  Hooks.on("updateWorldTime", () => {
-    if ( canSend() ) setTimeout(() => endDueForms(), 0);
-  });
-  Hooks.on("updateActor", actor => {
-    if ( transformed(actor) ) checkSoon(originalOf(actor));
-    else leftover(actor);
-  });
-  for ( const hook of ["createActiveEffect", "updateActiveEffect"] ) {
-    Hooks.on(hook, effect => {
-      const actor = effect?.parent;
-      if ( (actor?.documentName === "Actor") && transformed(actor) ) checkSoon(originalOf(actor));
-    });
-  }
-  Hooks.on("deleteActor", actor => {
-    noteFormDeleted(actor);
-    formDeleted(actor);
-  });
-  registerQueueSettled(key => {
-    const character = game.actors.get(key);
-    if ( character ) endDueForms(character);
-  });
-}
 
 /**
  * On the client that returns her, from wherever: what comes back, unless the module is returning her
@@ -1059,7 +1027,7 @@ export function registerWildShapeHooks() {
  * @param {object} [options]   The return's, `sendingStone` the module's reason.
  * @returns {void}
  */
-function returned(form, options={}) {
+export function returned(form, options={}) {
   const record = form?.getFlag?.(MODULE_ID, "form");
   const original = originalOf(form);
   if ( (record?.kind !== "wildShape") || !original?.isOwner || !madeForm(form, original) ) return;
@@ -1101,7 +1069,7 @@ function afterCopy(original, kept) {
  * @param {object} [result]
  * @returns {void}
  */
-function rested(actor, result) {
+export function rested(actor, result) {
   if ( !result?.longRest ) return;
   const original = originalOf(actor) ?? actor;
   if ( !original?.isOwner || !getCampaigns().some(campaign => campaign.characters.has(original.id) && wildShapeOn(campaign)) ) return;
@@ -1120,7 +1088,7 @@ function rested(actor, result) {
  * @param {Actor} form
  * @returns {void}
  */
-function formDeleted(form) {
+export function formDeleted(form) {
   const record = form?.getFlag?.(MODULE_ID, "form");
   const original = game.actors.get(form?.getFlag?.("dnd5e", "originalActor"));
   if ( !record || !original || !canSend() || !madeForm(form, original) ) return;
@@ -1199,7 +1167,7 @@ function copiesSlots(form) {
  * @param {Actor} actor
  * @returns {void}
  */
-function leftover(actor) {
+export function leftover(actor) {
   if ( !canSend() || !actor?.getFlag?.(MODULE_ID, "form") || transformed(actor) ) return;
   const original = actor.getFlag("dnd5e", "originalActor");
   if ( (typeof original !== "string") || (original === actor.id) || !game.actors.get(actor.id) ) return;

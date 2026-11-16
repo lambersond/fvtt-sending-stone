@@ -25,7 +25,8 @@ import { openPrompts } from "./prompts.mjs";
 import { forgetSent } from "./sheet-texts.mjs";
 import { tidyHello } from "./tidy-journal.mjs";
 import { send } from "./transport.mjs";
-import { deleteLeftovers, endDueForms } from "./wild-shape.mjs";
+import { deleteLeftovers } from "./wild-shape.mjs";
+import { endDueForms } from "./wild-shape-hooks.mjs";
 
 /**
  * The bridge: the single client that talks to the listener.
@@ -155,7 +156,8 @@ export function announce({ campaignId }={}) {
  * 0.38.0 it ends the dish effects whose time passed while no client looked (dish-effects.mjs). Since
  * 0.40.0 it ends each Wild Shape due to end, as one whose hours ran out while no Gamemaster was
  * connected, and deletes the forms a player's own return left meanwhile, as the bridge does when it
- * hears one (wild-shape.mjs). A client that is no longer the bridge stops fetching players' rolls.
+ * hears one (wild-shape-hooks.mjs, wild-shape.mjs). A client that is no longer the bridge stops
+ * fetching players' rolls.
  * @returns {void}
  */
 export function checkBridge() {

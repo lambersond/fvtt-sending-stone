@@ -3,11 +3,11 @@ import {
 } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { dishSystem } from "./command-dishes.mjs";
 import { attacksUnavailable } from "./command-uses.mjs";
 import { MANUAL_DICE, moduleState } from "./companions.mjs";
 import { chatEnabled, chatScope, combatEnabled, includeGmContent, resultsAlways } from "./config.mjs";
 import { diceStatus } from "./dice-plan.mjs";
+import { dishSystem } from "./dish-effects.mjs";
 import { campaignGroups } from "./groups.mjs";
 import { dnd5eChoice, midiSettings, midiValueText, MISSING, readSetting, resultsVerdict } from "./results.mjs";
 import { helloPending, send } from "./transport.mjs";

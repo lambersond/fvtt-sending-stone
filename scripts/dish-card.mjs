@@ -5,10 +5,10 @@ import {
 import { canSend, isBridge } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, characterPlayers, rosterEntry } from "./characters.mjs";
-import { dishReader, dishSystem } from "./command-dishes.mjs";
 import { commandActor } from "./creatures.mjs";
 import {
-  deleteHeld, dishChanges, dishEffectData, dishEffectsOf, durationOf, expireDishEffects, inert, rolledLine, rolledOf
+  deleteHeld, dishChanges, dishEffectData, dishEffectsOf, dishSystem, durationOf, expireDishEffects, inert, rolledLine,
+  rolledOf
 } from "./dish-effects.mjs";
 import { send } from "./transport.mjs";
 
@@ -81,6 +81,12 @@ let writeTombstones = () => {};
  * @type {Map<string, {type: string, data: object}>}
  */
 const deletedDecisions = new Map();
+
+/**
+ * The campaigns whose app takes dishes, by id, as their latest answer to a hello or heartbeat said.
+ * @type {Set<string>}
+ */
+const readers = new Set();
 
 /* -------------------------------------------- */
 /*  Hooks                                       */
@@ -554,6 +560,38 @@ async function keepOneDish(effect) {
 /* -------------------------------------------- */
 /*  Telling the app                             */
 /* -------------------------------------------- */
+
+/**
+ * Note whether a campaign's app takes dishes: `features.dishes`, 1 or later. One that starts to in a
+ * heartbeat's answer, as an app deployed mid-session does, is sent the campaign's decided dishes at
+ * once, on the bridge; after a hello's, they follow it (character-sync.mjs). One that says nothing of
+ * them, as an older or rolled back app, is fetched from for them no longer, and sent no dish events.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @param {string} [type]   The event answered.
+ * @returns {void}
+ */
+export function noteDishReader(campaignId, features, type) {
+  const format = features?.dishes;
+  if ( !(Number.isInteger(format) && (format >= 1)) ) {
+    readers.delete(campaignId);
+    return;
+  }
+  const was = readers.has(campaignId);
+  readers.add(campaignId);
+  if ( was || (type !== EVENTS.HEARTBEAT) ) return;
+  const campaign = getCampaigns().find(({ id }) => id === campaignId);
+  if ( campaign ) resendDishDecisions(campaign);
+}
+
+/**
+ * Does a campaign's app take dishes?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function dishReader(campaignId) {
+  return readers.has(campaignId);
+}
 
 /**
  * Every string of an event cut to 200 characters, its characters to 200 and each one's skipped

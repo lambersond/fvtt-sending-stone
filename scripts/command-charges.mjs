@@ -2,11 +2,11 @@ import { MODULE_ID } from "./constants.mjs";
 import { activeForm, seatActor } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { appFlags, authorFor, checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
-import { wildShapeReader } from "./command-wildshape.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { activityName, shownActivity } from "./sheet-rolls.mjs";
 import { slotPoolOf } from "./sheet-spells.mjs";
 import { finite, limitedUses, RESOURCES, spendsDirectly } from "./sheet-values.mjs";
+import { wildShapeReader } from "./wild-shape.mjs";
 
 /**
  * Spending a character's charges from the Sending Stone app, since module 0.29.0, as a player

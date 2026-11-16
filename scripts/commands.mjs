@@ -6,16 +6,16 @@ import { canSend } from "./bridge-role.mjs";
 import { describeCampaign, getCampaigns, manualDiceOn, prompting } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
-import { noteAloneReader, runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
+import { runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpellSlotCommand, runSpendCommand } from "./command-charges.mjs";
 import { favoriteReader, favoritesOn, noteFavoriteReader, runFavoriteCommand } from "./command-favorites.mjs";
-import { dishesOn, dishInFlight, dishReader, noteDishReader, runDishCommand } from "./command-dishes.mjs";
+import { dishesOn, dishInFlight, runDishCommand } from "./command-dishes.mjs";
 import { effectReader, effectsOn, noteEffectReader, runEffectCommand } from "./command-effects.mjs";
 import { hitPointReader, hitPointsOn, noteHitPointReader, runHitPointsCommand } from "./command-hit-points.mjs";
 import { runPlainRollCommand } from "./command-plain.mjs";
-import { noteWildShapeReader, runWildShapeCommand, wildShapeOn, wildShapeReader } from "./command-wildshape.mjs";
+import { runWildShapeCommand } from "./command-wildshape.mjs";
 import { runPrepareCommand } from "./command-prepare.mjs";
 import { runEndTurnCommand, runUndoTurnCommand } from "./command-turn.mjs";
 import {
@@ -26,9 +26,11 @@ import { noteInFlight, runNoteCommand } from "./command-notes.mjs";
 import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { failedResult, HIT_DICE_KINDS, isId, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
+import { noteAloneReader } from "./character-sync.mjs";
 import { gmRollOf } from "./chat-data.mjs";
 import { noteCompanionReader } from "./creature-sync.mjs";
 import { diceStatus } from "./dice-plan.mjs";
+import { dishReader, noteDishReader } from "./dish-card.mjs";
 import { noteSettingsReader } from "./foundry-settings.mjs";
 import { noteGroupReader } from "./groups.mjs";
 import {
@@ -40,6 +42,7 @@ import { effectDiceSystem } from "./sheet-effect-dice.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
 import { noteTidyReader } from "./tidy-journal.mjs";
 import { currentSession, DeliveryError, refusalError, send } from "./transport.mjs";
+import { noteWildShapeReader, wildShapeOn, wildShapeReader } from "./wild-shape.mjs";
 
 /**
  * Fetching what players ask the game to do from the Sending Stone app: their rolls, their attacks,
@@ -601,7 +604,7 @@ class Poller {
  * an effect turned off, on or deleted waits for its character's earlier commands, as a favorite does,
  * and their next ones for it. Since 0.40.0 Wild Shape waits for its character's earlier commands, as an
  * effect does, but for a list of Beasts, which writes nothing, and waits on a queue of its own; and a
- * queue settling checks whether a Wild Shape of that character's is due to end (wild-shape.mjs).
+ * queue settling checks whether a Wild Shape of that character's is due to end (wild-shape-hooks.mjs).
  * Since 0.44.0 hit points set, and a plain roll of the dice tray, wait for their character's earlier
  * commands, as a roll does, a companion's hit points its character's too, and their next ones for
  * them: so a form set to 0 hit points ends once the setting is done. Since 0.44.0 an answer to a

@@ -1,5 +1,4 @@
-import { EVENTS, MODULE_ID, ROLL_TAG } from "./constants.mjs";
-import { aloneTermsChanged } from "./character-sync.mjs";
+import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import {
   appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, isId, isKey, isOptional, isRolled,
   PUBLIC
@@ -10,6 +9,7 @@ import {
   changesDamage, costCheck, diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable,
   withPlan
 } from "./dice-plan.mjs";
+import { dnd5eGeneration } from "./dnd5e-generation.mjs";
 import {
   markMidiBonusAction, markMidiReaction, midiActivities, midiBonusActionUsed, midiReactionUsed
 } from "./midi-economy.mjs";
@@ -59,13 +59,6 @@ const NOT_RECHARGE = [
 const SPENDS = ["slot", "uses", "ammunition", "thrown"];
 
 /**
- * The campaigns whose app reads damage on its own's choices, by id, as their latest answer to a hello
- * or heartbeat said: `aloneChoices` 1 or later, since 0.41.0.
- * @type {Set<string>}
- */
-const readers = new Set();
-
-/**
  * Is this given, rather than left out?
  * @param {unknown} value
  * @returns {boolean}
@@ -81,46 +74,6 @@ function given(value) {
  */
 function plain(command) {
   return (command.mode === 0) && (command.explicit === false) && Array.isArray(command.extras) && !command.extras.length;
-}
-
-/**
- * dnd5e's generation, as its version's first number has it: 5 for 5.3.3, 6 for 6.0.5.
- * @returns {number}
- */
-export function dnd5eGeneration() {
-  return Number.parseInt(String(game.system.version ?? ""));
-}
-
-/* -------------------------------------------- */
-/*  The app's choices                           */
-/* -------------------------------------------- */
-
-/**
- * Note whether a campaign's app reads damage on its own's choices, since 0.41.0: `features.aloneChoices`,
- * 1 or later, whose sheets then carry each damaging row's plans at its other levels, modes and
- * ammunition and what it would spend. One that says nothing of it, as an older app, is sent its
- * sheets without them. An answer to a heartbeat that changes it sends the campaign's sheets again; a
- * hello's are sent after it anyway.
- * @param {string} campaignId
- * @param {object|null} features
- * @param {string} [type]   The event answered.
- * @returns {void}
- */
-export function noteAloneReader(campaignId, features, type) {
-  const format = features?.aloneChoices;
-  const was = readers.has(campaignId);
-  if ( Number.isInteger(format) && (format >= 1) ) readers.add(campaignId);
-  else readers.delete(campaignId);
-  if ( (was !== readers.has(campaignId)) && (type !== EVENTS.HELLO) ) aloneTermsChanged(campaignId);
-}
-
-/**
- * Does a campaign's app read damage on its own's choices?
- * @param {string} campaignId
- * @returns {boolean}
- */
-export function aloneReader(campaignId) {
-  return readers.has(campaignId);
 }
 
 /* -------------------------------------------- */

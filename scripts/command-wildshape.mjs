@@ -1,6 +1,5 @@
-import { ENDING_STATUSES, EVENTS, FORM_UUID, MODULE_ID, PROFILE_ID, WILD_SHAPE_KINDS, WILD_SHAPE_OPS } from "./constants.mjs";
+import { ENDING_STATUSES, FORM_UUID, MODULE_ID, PROFILE_ID, WILD_SHAPE_KINDS, WILD_SHAPE_OPS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { wildShapeTermsChanged } from "./character-sync.mjs";
 import { activeForm } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import {
@@ -11,7 +10,7 @@ import { markMidiBonusAction, midiActivities, midiBonusActionUsed } from "./midi
 import { finite } from "./sheet-values.mjs";
 import {
   beastsFor, eligible, endWildShape, entryOf, forgetTokenData, formName, inPool, knownProfiles, recheckCharacter,
-  switchTokens, wildShapeItemOf, wildShapeRules
+  switchTokens, wildShapeItemOf, wildShapeOn, wildShapeRules
 } from "./wild-shape.mjs";
 
 /**
@@ -35,12 +34,6 @@ import {
  */
 
 /**
- * The campaigns whose app takes Wild Shape, by id, as their latest answer to a hello or heartbeat said.
- * @type {Set<string>}
- */
-const readers = new Set();
-
-/**
  * What the module's own writes carry, so its hooks know them.
  * @type {string}
  */
@@ -49,15 +42,6 @@ const OWN = "wildShape";
 /* -------------------------------------------- */
 /*  Whether Wild Shape is used here             */
 /* -------------------------------------------- */
-
-/**
- * May a campaign's players use Wild Shape from the app: by its own switch, under dnd5e.
- * @param {Campaign} campaign
- * @returns {boolean}
- */
-export function wildShapeOn(campaign) {
-  return (campaign?.wildShape === true) && (game.system?.id === "dnd5e");
-}
 
 /**
  * What a campaign tells the app of Wild Shape in its hello, beside its rolls: whether its players may
@@ -69,33 +53,6 @@ export function wildShapeFeatures(campaign) {
   if ( campaign.wildShape !== true ) return { enabled: false, kinds: [], reason: "off" };
   if ( game.system?.id !== "dnd5e" ) return { enabled: false, kinds: [], reason: "system" };
   return { enabled: true, kinds: [...WILD_SHAPE_KINDS], reason: null };
-}
-
-/**
- * Note whether a campaign's app takes Wild Shape: `features.wildShape`, 1 or later. One that says
- * nothing of it, as an older or rolled back app, is fetched from for it no longer, and is sent its
- * characters' own sheets. An answer to a heartbeat that changes it sends the campaign's sheets again,
- * with or without their forms; a hello's are sent after it anyway.
- * @param {string} campaignId
- * @param {object|null} features
- * @param {string} [type]   The event answered.
- * @returns {void}
- */
-export function noteWildShapeReader(campaignId, features, type) {
-  const format = features?.wildShape;
-  const was = readers.has(campaignId);
-  if ( Number.isInteger(format) && (format >= 1) ) readers.add(campaignId);
-  else readers.delete(campaignId);
-  if ( (was !== readers.has(campaignId)) && (type !== EVENTS.HELLO) ) wildShapeTermsChanged(campaignId);
-}
-
-/**
- * Does a campaign's app take Wild Shape, and a shaped character's sheet?
- * @param {string} campaignId
- * @returns {boolean}
- */
-export function wildShapeReader(campaignId) {
-  return readers.has(campaignId);
 }
 
 /* -------------------------------------------- */
