@@ -1,5 +1,5 @@
 import { ENDING_STATUSES, FORM_GONE_SETTLE, MODULE_ID, MOST_FORMS, NOT_FORM_FOLDERS } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
 import { characterChanged } from "./character-sync.mjs";

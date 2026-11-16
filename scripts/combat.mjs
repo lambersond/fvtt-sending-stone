@@ -1,6 +1,6 @@
 import { EVENTS } from "./constants.mjs";
 import { combatEnabled, includeGmContent } from "./config.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { sendCombatEnded, sendCombatEvent } from "./campaign-combats.mjs";
 import { isCombatantShared, shareCombatant, snapshotCombat, summarizeCombatant } from "./combat-data.mjs";
 

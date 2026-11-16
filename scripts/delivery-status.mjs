@@ -1,8 +1,7 @@
 import { EVENTS, STATUS_HOOK } from "./constants.mjs";
-import { isBridge } from "./bridge.mjs";
+import { isBridge } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { getDestination, isMixedContent, parseDestination } from "./config.mjs";
-import { inMegabytes, status } from "./transport.mjs";
 
 /**
  * What the Gamemaster is told of posts and fetches that fail, and what the settings window shows of
@@ -54,6 +53,19 @@ export const TELL_AGAIN_AFTER = 600_000;
  * @type {number}
  */
 const FAILING_AFTER = 3;
+
+/**
+ * The outcome of recent deliveries from this browser.
+ * @type {{state: "idle"|"ok"|"error", delivered: number, dropped: number,
+ *         lastDelivered: number|null, lastError: {message: string, at: number}|null}}
+ */
+export const status = {
+  state: "idle",
+  delivered: 0,
+  dropped: 0,
+  lastDelivered: null,
+  lastError: null
+};
 
 /**
  * What is failing, by `events:app` for the app's address, `events:<campaignId>` for a campaign's
@@ -433,6 +445,17 @@ function dropWithheld(campaignId) {
     any = true;
   }
   return any;
+}
+
+/**
+ * A size in megabytes, to one decimal, as the Gamemaster and the app are told it.
+ * @param {number} bytes
+ * @param {(n: number) => number} round   Up for a post's size, down for a limit, so that a post
+ *                                        over the limit always reads as larger.
+ * @returns {string}                      Such as "1.1 MB".
+ */
+export function inMegabytes(bytes, round) {
+  return `${(round(bytes / 100_000) / 10).toFixed(1)} MB`;
 }
 
 /**

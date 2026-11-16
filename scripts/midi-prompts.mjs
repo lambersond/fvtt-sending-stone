@@ -1,5 +1,5 @@
 import { EVENTS, MODULE_ID, SETTINGS } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { originalOf } from "./characters.mjs";
 import { resultsAlways } from "./config.mjs";

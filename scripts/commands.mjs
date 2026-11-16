@@ -1,8 +1,8 @@
 import {
-  ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, DICE_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID,
-  PREPARE_KINDS, PROTOCOL_VERSION, ROLL_KINDS, TURN_KINDS
+  ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DICE_KINDS, ENCHANT_KINDS, EVENTS,
+  MODULE_ID, PREPARE_KINDS, PROTOCOL_VERSION, ROLL_KINDS, TURN_KINDS
 } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
@@ -241,6 +241,22 @@ export function rollFeatures(campaign) {
     keptRerolls: manualDiceOn(campaign) && diceStatus.keptRerolls,
     diceAsks: asks.diceAsks,
     diceAsksReason: asks.diceAsksReason
+  };
+}
+
+/**
+ * What a campaign's hello says of its companions' rolls, `features.companions`: the kinds a
+ * companion's command may be, as the campaign takes them now, those of its rolls but what an NPC
+ * has none of, what isn't asked and what edits it; none where its rolls are off. And since the
+ * Gamemaster chooses it per campaign, how its companions enter initiative, whether or not its rolls
+ * are made here: each its own roll, or right after its character (creature-initiative.mjs).
+ * @param {Campaign} campaign
+ * @returns {{kinds: string[], initiative: string}}
+ */
+export function companionFeatures(campaign) {
+  return {
+    kinds: rollFeatures(campaign).kinds.filter(kind => !COMPANION_UNTAKEN.includes(kind)),
+    initiative: campaign.companionInitiative
   };
 }
 

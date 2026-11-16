@@ -1,12 +1,13 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
-import { canSend, resendHello } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
+import { resendHello } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm, campaignActors, noteFormDeleted, originalOf, rosterEntry, transformed } from "./characters.mjs";
 import {
   companionsDelivered, companionTermsChanged, creatureChanged, forgetListed, listingDropped, listsChanged,
   resendCompanion, toldCompanions
 } from "./creature-sync.mjs";
-import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
+import { inMegabytes, noteSheetSent, noteWithheld } from "./delivery-status.mjs";
 import { dishReader } from "./command-dishes.mjs";
 import { aloneReader } from "./command-alone.mjs";
 import { wildShapeReader } from "./command-wildshape.mjs";
@@ -19,7 +20,7 @@ import { formBlock, wildShapeBlock } from "./sheet-wild-shape.mjs";
 import { slimSheet } from "./sheet-slim.mjs";
 import { forgetSent, sendTexts, SheetTexts, takeUnsent } from "./sheet-texts.mjs";
 import { sendTidyAll, tidyAfresh } from "./tidy-journal.mjs";
-import { buildEnvelope, helloPending, inMegabytes, post, send, termsOf } from "./transport.mjs";
+import { buildEnvelope, helloPending, post, send, termsOf } from "./transport.mjs";
 import { typesDice } from "./typed-dice.mjs";
 import { recheckCharacter } from "./wild-shape.mjs";
 
@@ -376,6 +377,28 @@ export function sheetTermsChanged(campaignId) {
   forgetBooks(campaign.id);
   sendBooks(campaign);
   tidyAfresh(campaign.id);
+}
+
+/**
+ * Describe a character for the listener, sheet included.
+ * @param {Actor} actor
+ * @param {SheetTexts} [texts]  Collects the descriptions its sheet refers to.
+ * @returns {object}
+ */
+export function summarizeCharacter(actor, texts) {
+  return { ...rosterEntry(actor), sheet: characterSheet(actor, texts) };
+}
+
+/**
+ * Every character in a campaign, as its roster lists them: since 0.22.0, a bridge.hello's
+ * characters, their sheets following it, each in a post of its own. Since 0.26.0 each says whether
+ * its player may enter its dice results in the app, `manualDice`; since 0.32.0 that's so where the
+ * campaign lets its players and its primary player has Make Manual Rolls (typed-dice.mjs).
+ * @param {Campaign} campaign
+ * @returns {object[]}
+ */
+export function roster(campaign) {
+  return campaignActors(campaign).map(actor => ({ ...rosterEntry(actor), manualDice: typesDice(actor, campaign) }));
 }
 
 /**

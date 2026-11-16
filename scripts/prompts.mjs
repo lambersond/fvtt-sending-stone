@@ -1,5 +1,5 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignCharacterId, characterPlayers, endedForms, originalOf } from "./characters.mjs";
 import { askedSave, chatAudience } from "./chat-data.mjs";

@@ -1,10 +1,11 @@
 import { EVENTS, MODULE_ID, MOST_NOTE_TEXT, MOST_NOTE_TITLE, MOST_NOTES, NOTE_BOOKS, NOTE_ID, NOTES_CHANGES, OWN_WRITE } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, playerOwners } from "./characters.mjs";
+import { inMegabytes } from "./delivery-status.mjs";
 import { campaignGroups, groupEntry, groupReader } from "./groups.mjs";
 import { textHash } from "./sheet-texts.mjs";
-import { buildEnvelope, helloPending, inMegabytes, post, termsOf } from "./transport.mjs";
+import { buildEnvelope, helloPending, post, termsOf } from "./transport.mjs";
 
 /**
  * Journal notes, since 0.34.0: what players write in the app about their game, kept in Foundry as

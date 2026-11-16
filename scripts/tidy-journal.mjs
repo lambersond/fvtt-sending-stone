@@ -1,12 +1,13 @@
 import {
   EVENTS, MOST_NOTE_TEXT, MOST_NOTE_TITLE, MOST_TIDY_ENTRIES, NOTES_TIDY, TIDY, TIDY_CLASSIC, TIDY_ID
 } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, playerOwners } from "./characters.mjs";
+import { inMegabytes } from "./delivery-status.mjs";
 import { bookActor, cutText, withoutSecrets } from "./journals.mjs";
 import { textHash } from "./sheet-texts.mjs";
-import { buildEnvelope, helloPending, inMegabytes, post, termsOf } from "./transport.mjs";
+import { buildEnvelope, helloPending, post, termsOf } from "./transport.mjs";
 
 /**
  * Tidy 5e Sheets' journal, since 0.44.0: what a character's players keep on its Journal tab in Tidy,

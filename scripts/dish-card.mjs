@@ -2,7 +2,7 @@ import {
   DISH_DECISIONS_RESENT_FOR, EVENTS, MODULE_ID, MOST_DISH_CHARACTERS, MOST_DISH_LIST, MOST_DISH_RESENDS, MOST_DISH_TEXT,
   SETTINGS
 } from "./constants.mjs";
-import { canSend, isBridge } from "./bridge.mjs";
+import { canSend, isBridge } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, characterPlayers, rosterEntry } from "./characters.mjs";
 import { dishReader, dishSystem } from "./command-dishes.mjs";

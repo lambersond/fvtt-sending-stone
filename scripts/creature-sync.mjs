@@ -1,10 +1,9 @@
-import { COMPANION_UNTAKEN, EVENTS, MODULE_ID } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { EVENTS, MODULE_ID } from "./constants.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { forgetActorKey, forgetSheetTold, sendActor } from "./character-sync.mjs";
 import { aloneReader } from "./command-alone.mjs";
-import { rollFeatures } from "./commands.mjs";
 import { combatEnabled } from "./config.mjs";
 import { companionKeyOf, companionOfActor, companionsOf, ownedByPlayers } from "./creatures.mjs";
 import { characterSheet } from "./sheet.mjs";
@@ -168,22 +167,6 @@ export function onCompanionsLeft(fn) {
  */
 export function onCompanionPromptReader(fn) {
   promptReaderListeners.push(fn);
-}
-
-/**
- * What a campaign's hello says of its companions' rolls, `features.companions`: the kinds a
- * companion's command may be, as the campaign takes them now, those of its rolls but what an NPC
- * has none of, what isn't asked and what edits it; none where its rolls are off. And since the
- * Gamemaster chooses it per campaign, how its companions enter initiative, whether or not its rolls
- * are made here: each its own roll, or right after its character (creature-initiative.mjs).
- * @param {Campaign} campaign
- * @returns {{kinds: string[], initiative: string}}
- */
-export function companionFeatures(campaign) {
-  return {
-    kinds: rollFeatures(campaign).kinds.filter(kind => !COMPANION_UNTAKEN.includes(kind)),
-    initiative: campaign.companionInitiative
-  };
 }
 
 /**

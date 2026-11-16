@@ -1,5 +1,5 @@
 import { MODULE_ID, MOST_DISH_LIST } from "./constants.mjs";
-import { isBridge } from "./bridge.mjs";
+import { isBridge } from "./bridge-role.mjs";
 
 /**
  * The effect a dish from the Magical Recipe Book leaves on each character a Gamemaster serves it to,

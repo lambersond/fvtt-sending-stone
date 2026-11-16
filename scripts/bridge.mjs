@@ -1,7 +1,8 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
-import { chatEnabled, chatScope, combatEnabled, getDestination, includeGmContent } from "./config.mjs";
+import { chatEnabled, chatScope, combatEnabled, includeGmContent } from "./config.mjs";
+import { canSend, isBridge } from "./bridge-role.mjs";
 import { forgetCombats, noteCombatSent } from "./campaign-combats.mjs";
-import { forgetTold } from "./character-sync.mjs";
+import { forgetTold, roster } from "./character-sync.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { favoriteFeatures } from "./command-favorites.mjs";
 import { dishFeatures } from "./command-dishes.mjs";
@@ -9,12 +10,12 @@ import { effectFeatures } from "./command-effects.mjs";
 import { hitPointFeatures } from "./command-hit-points.mjs";
 import { wildShapeFeatures } from "./command-wildshape.mjs";
 import { removalFeatures, transferFeatures } from "./command-transfers.mjs";
-import { rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
-import { roster } from "./characters.mjs";
+import { companionFeatures, rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
 import { followAll } from "./creature-initiative.mjs";
 import { companionList } from "./creatures.mjs";
-import { companionFeatures, noteListed } from "./creature-sync.mjs";
+import { noteListed } from "./creature-sync.mjs";
+import { diceAsksOf } from "./dice-plan.mjs";
 import { expireDishEffects } from "./dish-effects.mjs";
 import { foundrySettings, noteSettingsSent } from "./foundry-settings.mjs";
 import { campaignGroups, groupEntry } from "./groups.mjs";
@@ -41,22 +42,6 @@ import { deleteLeftovers, endDueForms } from "./wild-shape.mjs";
  */
 let wasBridge = false;
 
-/**
- * Is this client the one that posts events?
- * @returns {boolean}
- */
-export function isBridge() {
-  return (game.ready === true) && (game.user?.isActiveGM === true);
-}
-
-/**
- * Should this client post events right now? It must be the bridge and have somewhere to post.
- * @returns {boolean}
- */
-export function canSend() {
-  return isBridge() && (getDestination() !== "");
-}
-
 /* -------------------------------------------- */
 
 /**
@@ -71,24 +56,6 @@ const RESEND_AFTER = 30_000;
  * @type {Map<string, number>}
  */
 const resent = new Map();
-
-/**
- * Since 0.44.0, what lists a campaign's open dice asks for its hello, once later-dice.mjs registers
- * it as it's set up (`registerDiceAsks`), so that this file never imports it: none until then, as
- * under dnd5e 6, where none is ever asked.
- * @type {(campaign: Campaign) => object[]}
- */
-let diceAsksOf = () => [];
-
-/**
- * Let later-dice.mjs list a campaign's open dice asks in its hello, since 0.44.0: registered once,
- * as it's set up.
- * @param {(campaign: Campaign) => object[]} reader
- * @returns {void}
- */
-export function registerDiceAsks(reader) {
-  diceAsksOf = reader;
-}
 
 /* -------------------------------------------- */
 

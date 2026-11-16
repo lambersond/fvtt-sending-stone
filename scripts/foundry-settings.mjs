@@ -1,7 +1,7 @@
 import {
   CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, HELLO_DELIVERED_HOOK, MODULE_ID, RESULTS_MODES, SETTINGS, TIDY
 } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { dishSystem } from "./command-dishes.mjs";
 import { attacksUnavailable } from "./command-uses.mjs";
