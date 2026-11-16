@@ -2,7 +2,6 @@ import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { aloneReader, forgetActorKey, forgetSheetTold, sendActor } from "./character-sync.mjs";
 import { combatEnabled } from "./config.mjs";
 import { companionKeyOf, companionOfActor, companionsOf, ownedByPlayers } from "./creatures.mjs";
 import { characterSheet } from "./sheet.mjs";
@@ -99,6 +98,57 @@ const settling = new Map();
  * @type {number|null}
  */
 let listing = null;
+
+/**
+ * What sends a campaign an actor as it now stands, character-sync.mjs's `sendActor`, by which a
+ * companion's sheet goes as a character's does: the first of four functions of that file this one
+ * calls, which module.mjs hands over as it loads (`registerSheetSync`), so that this file never
+ * imports character-sync.mjs, which imports it. It does nothing until then, when no app has yet said
+ * it reads companions, and a companion's sheet is sent only to one that has.
+ * @type {(campaign: Campaign, actor: Actor, kind: object) => void}
+ */
+let sendActor = () => {};
+
+/**
+ * What forgets all a campaign was told of one actor's sheet, by its key: character-sync.mjs's
+ * `forgetActorKey`, handed over with `sendActor`. It does nothing until then, when there is nothing
+ * told to forget.
+ * @type {(campaignId: string, key: string) => void}
+ */
+let forgetActorKey = () => {};
+
+/**
+ * What forgets only that a campaign was told an actor's sheet, by its key: character-sync.mjs's
+ * `forgetSheetTold`, handed over with `sendActor`. It does nothing until then, when there is nothing
+ * told to forget.
+ * @type {(campaignId: string, key: string) => void}
+ */
+let forgetSheetTold = () => {};
+
+/**
+ * Whether a campaign's app reads damage on its own's choices: character-sync.mjs's `aloneReader`,
+ * handed over with `sendActor`. No app does until then, as `aloneReader` itself answers before one
+ * has said so.
+ * @type {(campaignId: string) => boolean}
+ */
+let aloneReader = () => false;
+
+/**
+ * Let module.mjs hand over the four functions of character-sync.mjs this file calls: registered
+ * once, as it loads.
+ * @param {object} sync
+ * @param {(campaign: Campaign, actor: Actor, kind: object) => void} sync.sendActor
+ * @param {(campaignId: string, key: string) => void} sync.forgetActorKey
+ * @param {(campaignId: string, key: string) => void} sync.forgetSheetTold
+ * @param {(campaignId: string) => boolean} sync.aloneReader
+ * @returns {void}
+ */
+export function registerSheetSync(sync) {
+  sendActor = sync.sendActor;
+  forgetActorKey = sync.forgetActorKey;
+  forgetSheetTold = sync.forgetSheetTold;
+  aloneReader = sync.aloneReader;
+}
 
 /* -------------------------------------------- */
 /*  The listener's format                       */

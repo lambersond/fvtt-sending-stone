@@ -1,6 +1,5 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
-import { resendHello } from "./bridge.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm, campaignActors, noteFormDeleted, originalOf, rosterEntry, transformed } from "./characters.mjs";
 import {
@@ -132,6 +131,24 @@ const warned = new Set();
 const CRITICAL_SETTINGS = new Set([
   "dnd5e.criticalDamageModifiers", "dnd5e.criticalDamageMaxDice", "midi-qol.ConfigSettings"
 ]);
+
+/**
+ * What sends a campaign its hello again, bridge.mjs's `resendHello`, once module.mjs hands it over
+ * as it loads (`registerHelloResend`), so that this file never imports bridge.mjs, which imports it.
+ * It does nothing until then, when nothing can have been lost: a lost post is noted on a hook, which
+ * module.mjs registers only afterwards.
+ * @type {(campaignId: string) => void}
+ */
+let resendHello = () => {};
+
+/**
+ * Let module.mjs hand over what sends a campaign its hello again: registered once, as it loads.
+ * @param {(campaignId: string) => void} resend
+ * @returns {void}
+ */
+export function registerHelloResend(resend) {
+  resendHello = resend;
+}
 
 /* -------------------------------------------- */
 

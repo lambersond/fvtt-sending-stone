@@ -2,7 +2,6 @@ import { ENDING_STATUSES, EVENTS, FORM_GONE_SETTLE, MODULE_ID, MOST_FORMS, NOT_F
 import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
-import { characterChanged, wildShapeTermsChanged } from "./character-sync.mjs";
 import { endedForms, madeForm, originalOf, playerOwners, transformed } from "./characters.mjs";
 import { traitsOf } from "./sheet-details.mjs";
 import { damageOf, toHitOf } from "./sheet-rolls.mjs";
@@ -93,6 +92,37 @@ const waiting = new Map();
  * @type {Set<string>}
  */
 const readers = new Set();
+
+/**
+ * What notes that a character may have changed, and sends it once its changes settle:
+ * character-sync.mjs's `characterChanged`, once module.mjs hands it over as it loads
+ * (`registerSheetSenders`), so that this file never imports character-sync.mjs, which imports it.
+ * It does nothing until then, as `characterChanged` itself does while this client can't send.
+ * @type {(actor: Actor|null, changes?: object) => void}
+ */
+let characterChanged = () => {};
+
+/**
+ * What sends a campaign whose app has started or stopped taking Wild Shape every character again:
+ * character-sync.mjs's `wildShapeTermsChanged`, handed over with `characterChanged`, for the same
+ * reason. It does nothing until then, as `wildShapeTermsChanged` itself does while this client
+ * can't send.
+ * @type {(campaignId: string) => void}
+ */
+let wildShapeTermsChanged = () => {};
+
+/**
+ * Let module.mjs hand over the two functions of character-sync.mjs this file calls: registered
+ * once, as it loads.
+ * @param {object} senders
+ * @param {(actor: Actor|null, changes?: object) => void} senders.characterChanged
+ * @param {(campaignId: string) => void} senders.wildShapeTermsChanged
+ * @returns {void}
+ */
+export function registerSheetSenders(senders) {
+  characterChanged = senders.characterChanged;
+  wildShapeTermsChanged = senders.wildShapeTermsChanged;
+}
 
 /**
  * May a campaign's players use Wild Shape from the app: by its own switch, under dnd5e.

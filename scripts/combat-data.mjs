@@ -1,10 +1,28 @@
 import { includeGmContent } from "./config.mjs";
 import { campaignCharacterId, combatantCharacterId, endedForms, hitPoints } from "./characters.mjs";
-import { combatantCompanion } from "./creature-sync.mjs";
 
 /**
  * Turning combats and combatants into plain data for the listener.
  */
+
+/**
+ * What says which companion a combatant is, for an app that reads companions: creature-sync.mjs's
+ * `combatantCompanion`, once module.mjs hands it over as it loads (`registerCombatantCompanion`), so
+ * that this file never imports creature-sync.mjs, which imports it by way of campaign-combats.mjs.
+ * Undefined until then, as `combatantCompanion` itself answers for an app that doesn't read them,
+ * and none has said it does before then.
+ * @type {(combatant: Combatant, campaign: Campaign) => string|null|undefined}
+ */
+let combatantCompanion = () => undefined;
+
+/**
+ * Let module.mjs hand over what says which companion a combatant is: registered once, as it loads.
+ * @param {(combatant: Combatant, campaign: Campaign) => string|null|undefined} reader
+ * @returns {void}
+ */
+export function registerCombatantCompanion(reader) {
+  combatantCompanion = reader;
+}
 
 /**
  * May the listener be told about this combatant? A hidden combatant is withheld unless

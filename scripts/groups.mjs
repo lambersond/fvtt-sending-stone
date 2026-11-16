@@ -1,6 +1,5 @@
 import { EVENTS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { groupsWanted } from "./character-sync.mjs";
 import { campaignActors, characterPlayers } from "./characters.mjs";
 
 /**
@@ -18,6 +17,24 @@ import { campaignActors, characterPlayers } from "./characters.mjs";
  * @type {Set<string>}
  */
 const readers = new Set();
+
+/**
+ * What sends a campaign every group afresh, character-sync.mjs's `groupsWanted`, once module.mjs
+ * hands it over as it loads (`registerGroupsWanted`), so that this file never imports
+ * character-sync.mjs, which imports it. It does nothing until then, as `groupsWanted` itself does
+ * while this client can't send.
+ * @type {(campaignId: string) => void}
+ */
+let groupsWanted = () => {};
+
+/**
+ * Let module.mjs hand over what sends a campaign every group afresh: registered once, as it loads.
+ * @param {(campaignId: string) => void} wanted
+ * @returns {void}
+ */
+export function registerGroupsWanted(wanted) {
+  groupsWanted = wanted;
+}
 
 /* -------------------------------------------- */
 

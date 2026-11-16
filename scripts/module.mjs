@@ -1,5 +1,8 @@
 import { checkBridge, resendHello } from "./bridge.mjs";
-import { eventDropped, helloDelivered, registerCharacterHooks, sheetTermsChanged } from "./character-sync.mjs";
+import {
+  aloneReader, characterChanged, eventDropped, forgetActorKey, forgetSheetTold, groupsWanted, helloDelivered,
+  registerCharacterHooks, registerHelloResend, sendActor, sheetTermsChanged, wildShapeTermsChanged
+} from "./character-sync.mjs";
 import { markAppRoll } from "./command-rolls.mjs";
 import { noteListenerFeatures, registerCommandHooks } from "./commands.mjs";
 import {
@@ -8,14 +11,17 @@ import {
 import { migrateConnectedCharacters } from "./campaigns.mjs";
 import { registerChatHooks } from "./chat.mjs";
 import { registerCombatHooks } from "./combat.mjs";
+import { registerCombatantCompanion } from "./combat-data.mjs";
 import { registerFollowHooks } from "./creature-initiative.mjs";
-import { registerCreatureHooks } from "./creature-sync.mjs";
+import { combatantCompanion, registerCreatureHooks, registerSheetSync } from "./creature-sync.mjs";
 import { registerDishHooks, renderDishCard } from "./dish-card.mjs";
 import { registerEffectHooks } from "./command-effects.mjs";
+import { registerSheetSenders } from "./wild-shape.mjs";
 import { registerWildShapeHooks } from "./wild-shape-hooks.mjs";
 import { topUpAfterRest } from "./dish-effects.mjs";
 import { installDicePlans, selfTest } from "./dice-plan.mjs";
 import { registerSettingsWatch } from "./foundry-settings.mjs";
+import { registerGroupsWanted } from "./groups.mjs";
 import { startHeartbeat } from "./heartbeat.mjs";
 import { registerJournalHooks } from "./journals.mjs";
 import { installLaterDice } from "./later-dice.mjs";
@@ -23,6 +29,15 @@ import { installMidiPrompts, registerMidiPromptHooks } from "./midi-prompts.mjs"
 import { registerPromptHooks } from "./prompts.mjs";
 import { registerSettings } from "./settings.mjs";
 import { registerTidyHooks } from "./tidy-journal.mjs";
+
+// Five files are handed, as this one loads, what each calls of a file built on it, so that no
+// script imports its way back to itself: before any hook is registered, so before anything of the
+// module's can run. Each of the five says what it is handed, and what that does until then.
+registerHelloResend(resendHello);
+registerSheetSenders({ characterChanged, wildShapeTermsChanged });
+registerGroupsWanted(groupsWanted);
+registerSheetSync({ sendActor, forgetActorKey, forgetSheetTold, aloneReader });
+registerCombatantCompanion(combatantCompanion);
 
 Hooks.once("init", () => {
   registerSettings();
