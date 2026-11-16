@@ -44,10 +44,10 @@ without the others, and the order they load in comes to matter.
   there: in the lowest layer that holds everything it imports, or a higher one if that says better
   what it is for, never above a script that imports it. A new declaration goes in the script it
   plainly belongs to, no higher than what reads it. Give a new script its row in README.md's Layout.
-- **The guard reads text, not syntax.** An import written in a comment counts, and the word `import`
-  before a bracket that holds something other than one quoted path fails, in prose, in a string or
-  as the name a method is declared by: word it otherwise. It also fails on any import but one of the
-  module's own `.mjs` scripts, by a relative path.
+- **The guard reads text, not syntax.** An import written in a comment can count, and the word
+  `import` before a bracket that holds something other than one quoted path fails, in prose, in a
+  string or as the name a method is declared by: word it otherwise. It also fails on any import but
+  one of the module's own `.mjs` scripts, by a relative path.
 
 ## 3. When a lower script needs something of a higher one
 
@@ -108,7 +108,7 @@ those too. The module's only two, `findLink`'s in `command-links.mjs`, point dow
 - **Its check, `check<Kind>Command`, goes beside `checkCommand` in `command-rolls.mjs`,** which asks
   it by `command.kind`, with the tables it alone reads. Give those names of their own: `FIELDS`,
   `OTHERS` and `ID` are taken there, and a script holds one of a name. (So a note's check is in
-  `journals.mjs` and hit points' in `command-checks.mjs`, with what every check asks in common.)
+  `journals.mjs` and hit points' in `command-checks.mjs`, with what the checks ask in common.)
 - **Its run, `run<Kind>Command`, goes in a `command-<kind>.mjs`,** its own or its kin's (three share
   `command-charges.mjs`), which `commands.mjs` calls, with whether a campaign takes the kind and
   what its hello says of it, as `command-effects.mjs` has `effectsOn` and `effectFeatures`.
