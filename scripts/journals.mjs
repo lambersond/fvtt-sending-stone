@@ -1,7 +1,11 @@
-import { EVENTS, MODULE_ID, MOST_NOTE_TEXT, MOST_NOTE_TITLE, MOST_NOTES, NOTE_BOOKS, NOTE_ID, NOTES_CHANGES, OWN_WRITE } from "./constants.mjs";
+import {
+  EVENTS, MODULE_ID, MOST_NOTE_BODY, MOST_NOTE_TEXT, MOST_NOTE_TITLE, MOST_NOTES, NOTE_BOOKS, NOTE_ID, NOTES_CHANGES,
+  OWN_WRITE
+} from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { campaignActors, playerOwners } from "./characters.mjs";
+import { isId, namesRollFields, throwsNoDice } from "./command-checks.mjs";
 import { inMegabytes } from "./delivery-status.mjs";
 import { campaignGroups, groupEntry, groupReader } from "./groups.mjs";
 import { textHash } from "./sheet-texts.mjs";
@@ -102,6 +106,26 @@ const ACTOR_ID = /^[A-Za-z0-9]{1,64}$/;
  */
 const MOST_NAME = 200;
 
+/**
+ * Each change's fields, exactly, by what it does and to what (round §3.4).
+ * @type {Record<string, Record<string, string>>}
+ */
+const FIELDS = (() => {
+  const base = ["book", "op", "id", "role", "base", "writer", "at"];
+  const list = (...fields) => [...base, ...fields].sort().join();
+  return {
+    create: { chapter: list("title", "createdAt"), entry: list("title", "createdAt", "markdown", "chapter") },
+    update: { chapter: list("title"), entry: list("title", "markdown", "chapter") },
+    delete: { chapter: list(), entry: list() }
+  };
+})();
+
+/**
+ * An order's fields, exactly, since 0.35.0 (round 0.35.0 §3.4).
+ * @type {string}
+ */
+const ORDER_FIELDS = ["at", "book", "chapter", "ids", "op", "was", "writer"].sort().join();
+
 /* -------------------------------------------- */
 /*  Whether notes are kept here                 */
 /* -------------------------------------------- */
@@ -177,6 +201,69 @@ export function notesReader(campaignId) {
  */
 export function notesFormat(campaignId) {
   return formats.get(campaignId) ?? 0;
+}
+
+/**
+ * Why a fetched note command isn't one to make, if it isn't (round §3.4): it names a book, what's
+ * done, a note by id, a chapter or a note, the revision it was made from, who wrote it and when,
+ * and for a new or changed one its title and, for a note, its Markdown and chapter; exactly those,
+ * nothing a roll names, no move, removal or typed dice, and it throws no dice. A chapter is never
+ * deleted from the app. A player writes only as their own character in its own journal; the
+ * Gamemaster as no character. Since 0.35.0 an order of a group's notes: the book, the group, its
+ * notes' ids in the new order and in the order it was made from, who and when; nothing else.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkNoteCommand(command) {
+  const note = command.note;
+  const given = value => (value !== undefined) && (value !== null);
+  if ( namesRollFields(command) || given(command.transfer) || given(command.remove) || given(command.typed) || !isObject(note) ) {
+    return "note";
+  }
+  if ( note.op === "order" ) return checkOrder(command, note);
+  if ( !NOTE_BOOKS.includes(note.book) || !Object.hasOwn(FIELDS, note.op) || !["chapter", "entry"].includes(note.role) ) return "note";
+  if ( Object.keys(note).sort().join() !== FIELDS[note.op][note.role] ) return "note";
+  if ( !isNoteId(note.id) || ((note.op === "delete") && (note.role === "chapter")) ) return "note";
+  if ( note.op !== "delete" ) {
+    const title = (typeof note.title === "string") ? note.title.trim() : "";
+    if ( !title || (title.length > MOST_NOTE_TITLE) || /[\r\n]/.test(title) ) return "title";
+    if ( note.role === "entry" ) {
+      if ( (typeof note.markdown !== "string") || (note.markdown.length > MOST_NOTE_BODY) ) return "body";
+      if ( (note.chapter !== null) && !isNoteId(note.chapter) ) return "chapter";
+    }
+  }
+  if ( (note.op === "create") ? (note.base !== null) : !((typeof note.base === "string") && /^[0-9a-f]{14}$/.test(note.base)) ) {
+    return "base";
+  }
+  const gm = command.by === "gm";
+  if ( (note.writer === null) ? !gm : !isId(note.writer) ) return "writer";
+  if ( !gm && (note.book === "personal") && (note.writer !== command.actorId) ) return "writer";
+  const positive = value => Number.isInteger(value) && (value > 0);
+  if ( !positive(note.at) || ((note.op === "create") && !positive(note.createdAt)) ) return "note";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Why an order of a group's notes isn't one to make, if it isn't (round 0.35.0 §6.3): exactly its
+ * fields; the group, a chapter's id or null for the notes in none; the group's notes in the new
+ * order, 1 to 400 distinct ids, and in the order it was made from, 0 to 400 (a sent journal holds at
+ * most 400, though the app adds at most 300 entries, so a group written in Foundry may hold more);
+ * who and when, as a note's; and no dice.
+ * @param {object} command
+ * @param {object} note
+ * @returns {string|null}
+ */
+function checkOrder(command, note) {
+  if ( !NOTE_BOOKS.includes(note.book) || (Object.keys(note).sort().join() !== ORDER_FIELDS) ) return "note";
+  if ( (note.chapter !== null) && !isNoteId(note.chapter) ) return "chapter";
+  const ids = (list, least) => Array.isArray(list) && (list.length >= least) && (list.length <= MOST_NOTES)
+    && list.every(isNoteId) && (new Set(list).size === list.length);
+  if ( !ids(note.ids, 1) || !ids(note.was, 0) ) return "note";
+  const gm = command.by === "gm";
+  if ( (note.writer === null) ? !gm : !isId(note.writer) ) return "writer";
+  if ( !gm && (note.book === "personal") && (note.writer !== command.actorId) ) return "writer";
+  if ( !(Number.isInteger(note.at) && (note.at > 0)) ) return "note";
+  return throwsNoDice(command) ? null : "dice";
 }
 
 /* -------------------------------------------- */
@@ -1228,6 +1315,15 @@ function isTime(value) {
  */
 function isActorId(value) {
   return (typeof value === "string") && ACTOR_ID.test(value);
+}
+
+/**
+ * Is this a note's id: 16 letters and digits?
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isNoteId(value) {
+  return (typeof value === "string") && NOTE_ID.test(value);
 }
 
 /**

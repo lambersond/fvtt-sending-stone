@@ -1,9 +1,7 @@
-import {
-  DISH_KINDS, DISH_OUTCOMES, DISH_VERSIONS, MODULE_ID, MOST_DISH_CHANGES, MOST_DISH_INGREDIENTS
-} from "./constants.mjs";
+import { DISH_KINDS, DISH_VERSIONS, MODULE_ID } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { characterPlayers } from "./characters.mjs";
-import { checkCommand, failedResult, isId, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
+import { checkCommand, failedResult } from "./command-rolls.mjs";
 import { commandActor } from "./creatures.mjs";
 import { dishTombstone, postDishCard, resendDishDecision, resendTombstone } from "./dish-card.mjs";
 import { dishSystem } from "./dish-effects.mjs";
@@ -81,45 +79,6 @@ export function findDishCard(commandId) {
 /* -------------------------------------------- */
 /*  A dish                                      */
 /* -------------------------------------------- */
-
-/**
- * Why a fetched dish isn't one to take, if it isn't: it names nothing a roll names, no move, removal,
- * anything typed in, note or favorite, and isn't the Gamemaster's; its body is a version this reads,
- * of a dish with an id, a recipe and an outcome, a cook and a message; a boon or bane has an effect,
- * with a name for it, at most 20 ingredients, a duration of whole seconds that doesn't stack, and at
- * most 100 changes, each with a kind, whose own fields are checked as each is mapped; a standard dish
- * has none; and it throws no dice.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkDishCommand(command) {
-  const given = value => (value !== undefined) && (value !== null);
-  const text = (value, most) => (typeof value === "string") && (value.length >= 1) && (value.length <= most);
-  if ( namesRollFields(command) || ["transfer", "remove", "typed", "note", "favorite"].some(key => given(command[key])) ) {
-    return "dish";
-  }
-  if ( given(command.by) ) return "by";
-  const { dish } = command;
-  if ( !isObject(dish) || !(Number.isInteger(dish.queuedAt) && (dish.queuedAt > 0)) || !isObject(dish.body) ) return "dish";
-  const { body } = dish;
-  if ( !DISH_VERSIONS.includes(body.version) ) return "version";
-  const about = body.dish;
-  if ( !isObject(about) || !isId(about.id) || !text(about.recipe, 200) || !DISH_OUTCOMES.includes(about.outcome) ) return "body.dish";
-  if ( !isObject(body.cook) || (typeof body.cook.name !== "string") ) return "body.cook";
-  if ( typeof body.message !== "string" ) return "body.message";
-  const effect = body.effect;
-  if ( about.outcome === "standard" ) return (effect === null) ? (throwsNoDice(command) ? null : "dice") : "body.effect";
-  const ingredient = i => isObject(i) && (typeof i.name === "string") && (typeof i.text === "string");
-  // An effect's name may not be blank, or every character's create would fail.
-  if ( !isObject(effect) || !text(effect.name, 300) || !Array.isArray(effect.ingredients)
-    || (effect.ingredients.length > MOST_DISH_INGREDIENTS) || !effect.ingredients.every(ingredient)
-    || !(Number.isInteger(effect.duration?.seconds) && (effect.duration.seconds > 0)) || (effect.stacks !== false) ) {
-    return "body.effect";
-  }
-  if ( !Array.isArray(effect.changes) || (effect.changes.length > MOST_DISH_CHANGES)
-    || !effect.changes.every(change => isObject(change) && (typeof change.type === "string")) ) return "body.changes";
-  return throwsNoDice(command) ? null : "dice";
-}
 
 /**
  * Take a dish fetched from the app: its card posted, once however often it's handed over, and the

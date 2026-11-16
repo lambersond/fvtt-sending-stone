@@ -1,10 +1,8 @@
-import { ENDING_STATUSES, FORM_UUID, MODULE_ID, PROFILE_ID, WILD_SHAPE_KINDS, WILD_SHAPE_OPS } from "./constants.mjs";
+import { ENDING_STATUSES, MODULE_ID, WILD_SHAPE_KINDS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
-import {
-  appFlags, authorFor, checkCommand, failedResult, isObject, namesRollFields, throwsNoDice, visibleTo
-} from "./command-rolls.mjs";
+import { appFlags, authorFor, checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
 import { campaignGroups } from "./groups.mjs";
 import { markMidiBonusAction, midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
 import { finite } from "./sheet-values.mjs";
@@ -58,35 +56,6 @@ export function wildShapeFeatures(campaign) {
 /* -------------------------------------------- */
 /*  A command                                   */
 /* -------------------------------------------- */
-
-/**
- * Why a fetched Wild Shape isn't one to make, if it isn't: exactly one of a change into a known form
- * by its profile's id, a return, a Beast learned by its compendium uuid in an empty place or in place
- * of a known form, or the Beasts to learn listed; nothing else, nothing a roll names, no move,
- * removal, anything typed in, favorite, note, dish or effect; and it throws no dice. Only its player
- * makes one from the app.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkWildShapeCommand(command) {
-  if ( command.by === "gm" ) return "by";
-  const given = value => (value !== undefined) && (value !== null);
-  const others = ["transfer", "remove", "typed", "favorite", "note", "dish", "effect"];
-  const shape = command.wildShape;
-  if ( namesRollFields(command) || others.some(key => given(command[key])) || !isObject(shape) ) return "wildShape";
-  if ( !WILD_SHAPE_OPS.includes(shape.op) ) return "wildShape";
-  const keys = Object.keys(shape).sort().join();
-  const id = value => (typeof value === "string") && PROFILE_ID.test(value);
-  const valid = {
-    transform: () => (keys === "form,op") && id(shape.form),
-    revert: () => keys === "op",
-    learn: () => (keys === "op,replace,uuid") && (typeof shape.uuid === "string") && FORM_UUID.test(shape.uuid)
-      && ((shape.replace === null) || id(shape.replace)),
-    forms: () => keys === "op"
-  }[shape.op];
-  if ( !valid() ) return "wildShape";
-  return throwsNoDice(command) ? null : "dice";
-}
 
 /**
  * Make a Wild Shape fetched from the app: every check before any write, as the character is now,

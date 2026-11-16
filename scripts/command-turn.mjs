@@ -3,7 +3,7 @@ import { combatantCharacterId } from "./characters.mjs";
 import { combatEnabled } from "./config.mjs";
 import { reportTurnChange } from "./combat.mjs";
 import { involvesCampaign } from "./combat-data.mjs";
-import { checkCommand, failedResult, isId, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
+import { checkCommand, failedResult } from "./command-rolls.mjs";
 import { midiSettled } from "./command-uses.mjs";
 import { commandActor, companionKeyOf, companionsOf } from "./creatures.mjs";
 import { diceStatus } from "./dice-plan.mjs";
@@ -25,25 +25,6 @@ import { diceStatus } from "./dice-plan.mjs";
  */
 
 /**
- * The fields a turn is named by, as the app was shown it.
- * @type {string[]}
- */
-const TURN_FIELDS = ["combatId", "round", "combatantId"];
-
-/**
- * The fields of other commands an end of a turn never names, beside those a roll names its item,
- * targets or link by; and `undo`, the End Turn that taking a turn back names, and nothing else does.
- * @type {string[]}
- */
-const NOT_TURN_FIELDS = ["combatId", "use", "types", "modifiers", "critical", "undo"];
-
-/**
- * An End Turn's request id, as the app makes one: 1 to 64 letters, digits, `_` or `-`.
- * @type {RegExp}
- */
-const REQUEST_ID = /^[\w-]{1,64}$/;
-
-/**
  * The last End Turn from the app made on this client, of each combat, by the combat's id, while it
  * may be taken back: who made it, the turn it ended and where it left the combat. A later End Turn
  * of the combat, any character's, replaces it, and taking it back forgets it; it's kept in memory
@@ -53,57 +34,6 @@ const REQUEST_ID = /^[\w-]{1,64}$/;
  *   at: number}>}
  */
 const endedTurns = new Map();
-
-/**
- * Why a fetched end of a turn isn't one to make, if it isn't: it names the turn, as the app was
- * shown it, and nothing a roll names, and throws no dice. Only its player ends one from the app: it
- * posts nothing, so would leave no mark of the Gamemaster's.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkEndTurnCommand(command) {
-  if ( command.by === "gm" ) return "by";
-  if ( namesOtherFields(command) || !namesTurn(command) ) return "turn";
-  return throwsNoDice(command) ? null : "dice";
-}
-
-/**
- * Why a fetched taking back of a turn isn't one to make, if it isn't: it names the End Turn it takes
- * back, by its id, and the turn as the app shows it now, where that End Turn left the combat, and
- * nothing a roll names, and throws no dice. Only the player who ended the turn takes it back.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkUndoTurnCommand(command) {
-  if ( command.by === "gm" ) return "by";
-  if ( namesOtherFields(command, ["undo"]) ) return "turn";
-  if ( (typeof command.undo !== "string") || !REQUEST_ID.test(command.undo) ) return "undo";
-  if ( !namesTurn(command) ) return "turn";
-  return throwsNoDice(command) ? null : "dice";
-}
-
-/**
- * Does a command name anything an end of a turn never names, but the fields its own kind names?
- * @param {object} command
- * @param {string[]} [own]   Those of NOT_TURN_FIELDS its kind names, as `undo` for taking a turn back.
- * @returns {boolean}
- */
-function namesOtherFields(command, own=[]) {
-  const given = field => !own.includes(field) && (command[field] !== undefined) && (command[field] !== null);
-  return namesRollFields(command) || NOT_TURN_FIELDS.some(given);
-}
-
-/**
- * Does a command name a turn as the app is shown one: a combat, its round, 1 or more, and its
- * current combatant, and nothing else?
- * @param {object} command
- * @returns {boolean}
- */
-function namesTurn({ turn }) {
-  if ( !isObject(turn) || (Object.keys(turn).length !== TURN_FIELDS.length)
-    || !TURN_FIELDS.every(field => Object.hasOwn(turn, field)) ) return false;
-  return isId(turn.combatId) && Number.isInteger(turn.round) && (turn.round >= 1) && isId(turn.combatantId);
-}
 
 /**
  * End the current turn of a combat, if the campaign's players' rolls are made here, the command's

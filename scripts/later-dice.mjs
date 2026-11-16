@@ -2,7 +2,8 @@ import { COST_CHECK, COST_SPENDING, DIE_FACES, EVENTS, MODULE_ID, ROLL_TAG, RUN_
 import { canSend } from "./bridge-role.mjs";
 import { getCampaigns, manualDiceOn } from "./campaigns.mjs";
 import { summarizeRoll } from "./chat-data.mjs";
-import { activityNamed, failedResult, isId } from "./command-rolls.mjs";
+import { isId } from "./command-checks.mjs";
+import { activityNamed, failedResult } from "./command-rolls.mjs";
 import { commandActor } from "./creatures.mjs";
 import { costTargetClass, isOwnRoll, planAlive, registerDiceAsks, registerLaterDice, withPlan, wrap } from "./dice-plan.mjs";
 import { isOpen } from "./midi-prompts.mjs";

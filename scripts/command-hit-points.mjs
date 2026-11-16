@@ -1,8 +1,9 @@
-import { HIT_POINT_KINDS, HIT_POINT_OPS, MOST_HIT_POINTS } from "./constants.mjs";
+import { HIT_POINT_KINDS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { hitPoints } from "./characters.mjs";
+import { HIT_POINT_FIELDS as FIELDS } from "./command-checks.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
-import { checkCommand, failedResult, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
+import { checkCommand, failedResult } from "./command-rolls.mjs";
 import { commandActor } from "./creatures.mjs";
 import { campaignGroups } from "./groups.mjs";
 
@@ -37,21 +38,6 @@ const readers = new Set();
  * @type {string}
  */
 const OWN = "hitPoints";
-
-/**
- * The fields a player may set, as the command and its `from` name them, and where each is kept.
- * @type {Record<string, string>}
- */
-const FIELDS = { value: "system.attributes.hp.value", temp: "system.attributes.hp.temp" };
-
-/**
- * What else a command may name, none of which setting hit points names: another kind's own fields.
- * @type {string[]}
- */
-const OTHERS = [
-  "transfer", "remove", "typed", "rerolls", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter",
-  "count", "inspiration", "concentration", "enchantment", "prepare", "turn", "undo"
-];
 
 /* -------------------------------------------- */
 /*  Whether hit points are set here             */
@@ -103,38 +89,6 @@ export function hitPointReader(campaignId) {
 /* -------------------------------------------- */
 /*  Setting them                                */
 /* -------------------------------------------- */
-
-/**
- * Why a fetched setting of hit points isn't one to make, if it isn't: it names exactly
- * `{ op: "set", value?, temp?, from }`, at least one of the two fields, each a whole number from 0 to
- * MOST_HIT_POINTS, and `from` the same fields, as the app showed them; and nothing else, nothing a
- * roll names nor any other kind's field, and throws no dice. Only its player sets them from the app:
- * it posts nothing, so would leave no mark of the Gamemaster's.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkHitPointsCommand(command) {
-  if ( command.by === "gm" ) return "by";
-  const given = value => (value !== undefined) && (value !== null);
-  if ( namesRollFields(command) || OTHERS.some(key => given(command[key])) ) return "hitPoints";
-  if ( !isHitPoints(command.hitPoints) ) return "hitPoints";
-  return throwsNoDice(command) ? null : "dice";
-}
-
-/**
- * Is this a setting of hit points as the app sends one?
- * @param {unknown} set
- * @returns {boolean}
- */
-function isHitPoints(set) {
-  if ( !isObject(set) || !HIT_POINT_OPS.includes(set.op) || !isObject(set.from) ) return false;
-  const fields = Object.keys(FIELDS).filter(key => Object.hasOwn(set, key));
-  if ( !fields.length || (Object.keys(set).length !== fields.length + 2) ) return false;
-  const from = Object.keys(set.from);
-  if ( (from.length !== fields.length) || !fields.every(key => from.includes(key)) ) return false;
-  const number = value => Number.isInteger(value) && (value >= 0) && (value <= MOST_HIT_POINTS);
-  return fields.every(key => number(set[key]) && number(set.from[key]));
-}
 
 /**
  * Set a character's hit points, its form's or a companion's, fetched from the app: every check before

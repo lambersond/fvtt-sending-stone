@@ -1,8 +1,9 @@
-import { EFFECT_ID, EFFECT_KINDS, EFFECT_OPS, MODULE_ID } from "./constants.mjs";
+import { EFFECT_KINDS, MODULE_ID } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm } from "./characters.mjs";
+import { isObject } from "./command-checks.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
-import { checkCommand, failedResult, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
+import { checkCommand, failedResult } from "./command-rolls.mjs";
 import { campaignGroups } from "./groups.mjs";
 import { effectIdOf, knownOf, opsOf } from "./sheet-effects.mjs";
 
@@ -115,25 +116,6 @@ function clearMark(effect, changes, options) {
 /* -------------------------------------------- */
 /*  An effect                                   */
 /* -------------------------------------------- */
-
-/**
- * Why a fetched change to an effect isn't one to make, if it isn't: it names one effect, by its id
- * as the sheet names it, and the state wanted of it, off, on or gone; and nothing else, nothing a
- * roll names, no move, removal, anything typed in, favorite, note or dish, and throws no dice. Only
- * its player changes one from the app: it posts nothing, so would leave no mark of the Gamemaster's.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkEffectCommand(command) {
-  if ( command.by === "gm" ) return "by";
-  const given = value => (value !== undefined) && (value !== null);
-  const others = ["transfer", "remove", "typed", "favorite", "note", "dish"];
-  const effect = command.effect;
-  if ( namesRollFields(command) || others.some(key => given(command[key])) || !isObject(effect) ) return "effect";
-  if ( (Object.keys(effect).sort().join() !== "id,op") || !EFFECT_OPS.includes(effect.op)
-    || (typeof effect.id !== "string") || !EFFECT_ID.test(effect.id) ) return "effect";
-  return throwsNoDice(command) ? null : "dice";
-}
 
 /**
  * Turn one of a character's effects off or on, or delete it, fetched from the app: every check before

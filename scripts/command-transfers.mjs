@@ -1,11 +1,9 @@
-import { MOST_AMONG, MOST_MOVED, MOST_MOVED_ITEMS, REMOVE_KINDS, TRANSFER_KINDS } from "./constants.mjs";
+import { REMOVE_KINDS, TRANSFER_KINDS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm } from "./characters.mjs";
 import { postLine } from "./command-charges.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
-import {
-  checkCommand, failedResult, isId, isObject, namesRollFields, throwsNoDice, visibleTo
-} from "./command-rolls.mjs";
+import { checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
 import { accessFor, campaignGroups, campaignMembers } from "./groups.mjs";
 import { hidesContents, listedInSheet } from "./sheet-inventory.mjs";
 import { inventoryTypes, localize } from "./sheet-values.mjs";
@@ -72,20 +70,6 @@ import { inventoryTypes, localize } from "./sheet-values.mjs";
  * @type {readonly string[]}
  */
 const RESET = Object.freeze(["attuned", "equipped", "prepared", "crew.value"]);
-
-/**
- * The fields a move names what it moves by; since 0.32.0, `among` for a distribution, in place of
- * `to`.
- * @type {ReadonlySet<string>}
- */
-const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among"]));
-
-/**
- * The fields a removal names what it removes by, since 0.33.0, every one of them: the item, how
- * many, and how many the app's sheet showed.
- * @type {readonly string[]}
- */
-const REMOVE_FIELDS = Object.freeze(["held", "item", "quantity"]);
 
 /**
  * The campaigns whose app takes moves, by id, as their latest answer to a hello or heartbeat said.
@@ -165,87 +149,6 @@ export function transferReader(campaignId) {
 /* -------------------------------------------- */
 /*  The command                                 */
 /* -------------------------------------------- */
-
-/**
- * Why a fetched move isn't one to make, if it isn't: it names its two ends, which differ, and what
- * moves, items by id with how many of each, each once, and coins by their keys with how many; at
- * least one of them, and nothing a roll names, and throws no dice. Since 0.32.0 a distribution names
- * the characters it shares among in place of the end it goes to: from one to MOST_AMONG of them,
- * each once, never the party itself, and coins of one kind alone, no items.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkTransferCommand(command) {
-  const transfer = command.transfer;
-  const given = value => (value !== undefined) && (value !== null);
-  if ( namesRollFields(command) || !isObject(transfer) ) return "transfer";
-  if ( Object.keys(transfer).some(key => !FIELDS.has(key)) ) return "transfer";
-  if ( !isId(transfer.from) ) return "transfer";
-  if ( given(transfer.to) === given(transfer.among) ) return "transfer";
-  if ( given(transfer.to) ) {
-    if ( !isId(transfer.to) || (transfer.from === transfer.to) ) return "transfer";
-    if ( !given(transfer.items) && !given(transfer.currency) ) return "transfer";
-  } else {
-    if ( !isAmong(transfer.among, transfer.from) ) return "among";
-    if ( given(transfer.items) ) return "items";
-    if ( !isCoins(transfer.currency) || (Object.keys(transfer.currency).length !== 1) ) return "currency";
-  }
-  if ( given(transfer.items) && !isItemList(transfer.items) ) return "items";
-  if ( given(transfer.currency) && !isCoins(transfer.currency) ) return "currency";
-  return throwsNoDice(command) ? null : "dice";
-}
-
-/**
- * Are these the characters a distribution shares among: from one to MOST_AMONG ids, each once, none
- * the party it's from?
- * @param {unknown} among
- * @param {string} from
- * @returns {boolean}
- */
-function isAmong(among, from) {
-  if ( !Array.isArray(among) || !among.length || (among.length > MOST_AMONG) ) return false;
-  return among.every(id => isId(id) && (id !== from)) && (new Set(among).size === among.length);
-}
-
-/**
- * Is this the items a move names: from one to MOST_MOVED_ITEMS, each `{id, quantity}` and nothing
- * else, by distinct ids?
- * @param {unknown} items
- * @returns {boolean}
- */
-function isItemList(items) {
-  if ( !Array.isArray(items) || !items.length || (items.length > MOST_MOVED_ITEMS) ) return false;
-  const ids = new Set();
-  for ( const entry of items ) {
-    if ( !isObject(entry) || (Object.keys(entry).sort().join() !== "id,quantity") ) return false;
-    if ( !isId(entry.id) || !isMoved(entry.quantity) || ids.has(entry.id) ) return false;
-    ids.add(entry.id);
-  }
-  return true;
-}
-
-/**
- * Is this the coins a move names: from one to MOST_MOVED_ITEMS kinds, each one dnd5e has, of a
- * whole number from 1 to MOST_MOVED?
- * @param {unknown} currency
- * @returns {boolean}
- */
-function isCoins(currency) {
-  if ( !isObject(currency) ) return false;
-  const keys = Object.keys(currency);
-  if ( !keys.length || (keys.length > MOST_MOVED_ITEMS) ) return false;
-  const known = CONFIG.DND5E?.currencies ?? {};
-  return keys.every(key => Object.hasOwn(known, key) && isMoved(currency[key]));
-}
-
-/**
- * Is this how many of something may be moved at once: a whole number from 1 to MOST_MOVED?
- * @param {unknown} value
- * @returns {boolean}
- */
-function isMoved(value) {
-  return Number.isInteger(value) && (value >= 1) && (value <= MOST_MOVED);
-}
 
 /**
  * Make a move fetched from the app, once every move before it has been made, whoever made it.
@@ -529,24 +432,6 @@ export function noteRemovalReader(campaignId, features) {
  */
 export function removalReader(campaignId) {
   return removers.has(campaignId);
-}
-
-/**
- * Why a fetched removal isn't one to make, if it isn't: it names one item by id, how many of it to
- * remove, and how many the app's sheet showed, from 1 to that many, or none of a stack of none;
- * and nothing else, nothing a roll names, no move, nothing typed in, and throws no dice.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkRemoveCommand(command) {
-  const remove = command.remove;
-  const given = value => (value !== undefined) && (value !== null);
-  if ( namesRollFields(command) || given(command.transfer) || given(command.typed) || !isObject(remove) ) return "remove";
-  if ( (Object.keys(remove).sort().join() !== REMOVE_FIELDS.join()) || !isId(remove.item) ) return "remove";
-  const { quantity: n, held } = remove;
-  const count = value => Number.isInteger(value) && (value >= 0) && (value <= MOST_MOVED);
-  if ( !count(n) || !count(held) || (n > held) || ((n === 0) && (held !== 0)) ) return "quantity";
-  return throwsNoDice(command) ? null : "dice";
 }
 
 /**
