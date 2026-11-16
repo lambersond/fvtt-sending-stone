@@ -9,9 +9,11 @@ import { characterPlayers, originalOf, seatActor, standingFor } from "./characte
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
 import { checkHitPointsCommand, isId, isObject, namesRollFields, throwsNoDice } from "./command-checks.mjs";
 import { findLink } from "./command-links.mjs";
+import { midiIntegration } from "./config.mjs";
 import { commandActor, companionPart, ownedByPlayers } from "./creatures.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
 import { checkNoteCommand } from "./journals.mjs";
+import { midiActivities } from "./midi-economy.mjs";
 import {
   claimMidiPrompt, midiAnswerAuthor, midiAnswerConfig, midiAnswerFailed, midiAnswerFlags, midiOutcome,
   midiPromptAnswered
@@ -232,6 +234,36 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   // The hit points dnd5e gave the character for a hit die: none where a module kept it from it.
   if ( command.kind === "hitDie" ) result.healed = Math.max((actor.system.attributes?.hp?.value ?? hp) - hp, 0);
   return result;
+}
+
+/**
+ * Why players' attacks can't be made here, if they can't: not until the self-test has shown that
+ * their damage takes the player's dice; nor where Midi-QOL makes items' uses and the Gamemaster has
+ * turned off making attacks through it.
+ * @returns {"pending"|"self-test"|"midi-off"|null}
+ */
+export function attacksUnavailable() {
+  if ( diceStatus.reason === "pending" ) return "pending";
+  if ( !diceStatus.attacks ) return "self-test";
+  if ( midiActivities() && !midiIntegration() ) return "midi-off";
+  return null;
+}
+
+/**
+ * Why a use, or its damage, or the end of an enchantment, isn't to be made, before looking at the
+ * character.
+ * @param {object} command
+ * @param {Campaign} campaign
+ * @returns {{reason: string, error?: string}|null}
+ */
+export function commandRefusal(command, campaign) {
+  if ( !campaign.rolls || !diceStatus.ready ) return { reason: "off" };
+  if ( !campaign.attacks ) return { reason: "attacks-off" };
+  const unavailable = attacksUnavailable();
+  if ( unavailable ) return { reason: (unavailable === "pending") ? "off" : unavailable };
+  const invalid = checkCommand(command);
+  if ( invalid ) return { reason: "invalid", error: invalid };
+  return null;
 }
 
 /**

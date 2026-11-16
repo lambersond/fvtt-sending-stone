@@ -6,7 +6,7 @@ import { candidateActors, playerOwners } from "../characters.mjs";
 import { transferReader } from "../command-transfers.mjs";
 import { effectReader } from "../command-effects.mjs";
 import { hitPointReader } from "../command-hit-points.mjs";
-import { attacksUnavailable } from "../command-uses.mjs";
+import { attacksUnavailable } from "../command-rolls.mjs";
 import { commandsOffered } from "../commands.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
 import { getDestination, getSecret, isMixedContent, parseDestination } from "../config.mjs";

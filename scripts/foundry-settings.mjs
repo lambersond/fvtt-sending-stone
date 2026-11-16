@@ -3,7 +3,7 @@ import {
 } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { attacksUnavailable } from "./command-uses.mjs";
+import { attacksUnavailable } from "./command-rolls.mjs";
 import { MANUAL_DICE, moduleState } from "./companions.mjs";
 import { chatEnabled, chatScope, combatEnabled, includeGmContent, resultsAlways } from "./config.mjs";
 import { diceStatus } from "./dice-plan.mjs";

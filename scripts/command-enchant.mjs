@@ -1,14 +1,10 @@
-import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
+import { MODULE_ID } from "./constants.mjs";
 import { sendCharacter } from "./character-sync.mjs";
 import { originalOf } from "./characters.mjs";
-import { appFlags, authorFor, describeResult, failedResult, PUBLIC, visibleTo } from "./command-rolls.mjs";
-import { castFromItem, commandRefusal, currentTargets, setTargets, workflowSettled } from "./command-uses.mjs";
+import { commandRefusal, describeResult, failedResult, visibleTo } from "./command-rolls.mjs";
 import { commandActor } from "./creatures.mjs";
 import { companionFirst } from "./creature-sync.mjs";
-import { checkedUntilSpent } from "./dice-plan.mjs";
-import {
-  availableProfiles, canTake, effectsOf, endable, goingAway, listedOn, originOf, ownName
-} from "./sheet-enchant.mjs";
+import { availableProfiles, canTake, effectsOf, endable, goingAway, listedOn, ownName } from "./sheet-enchant.mjs";
 
 /**
  * Enchanting from the Sending Stone app: using an enchant activity, such as Magic Weapon on a
@@ -83,118 +79,6 @@ export function enchantChoice(command, actor, activity, scaled) {
 }
 
 /**
- * Use an enchant activity through dnd5e, posting its card, then apply its enchantment, as the
- * card's tray would, to the item the player chose, or as dnd5e applies it to its own item: tied to
- * the concentration the card names, in place of what goes as it's used. With no item chosen, the
- * card is left with its tray, as for an ally's weapon. With no card, as a module may stop dnd5e
- * posting one, nothing is applied: the riders an enchantment adds are found from its card.
- * @param {object} command
- * @param {Campaign} campaign
- * @param {Actor} actor
- * @param {object} use   What `prepareUse` found.
- * @returns {Promise<CommandResult>}
- */
-export async function dnd5eEnchant(command, campaign, actor, use) {
-  const { activity, usage } = use;
-  const author = authorFor(actor, use.character);
-  const results = await activity.use(usage, { configure: false }, {
-    rollMode: PUBLIC,
-    data: { author: author.id, flags: { dnd5e: { targets: [] }, [MODULE_ID]: appFlags(command, "use") } }
-  });
-  castFromItem(use, results);
-  if ( !results ) return failedResult(command, "cancelled");
-  const card = results.message?.id ? results.message : null;
-  if ( !card ) return notApplied(command, null, actor, campaign, "enchant", use);
-
-  // As dnd5e's tray has it: one whose card names a concentration that has since ended is applied no
-  // more, nor can it be from the card, which then shows no tray; one whose names none is applied
-  // with no concentration.
-  const named = card.system?.concentration;
-  const concentration = named ? (actor.effects?.get(named) ?? null) : null;
-  if ( named && !concentration ) return notApplied(command, null, actor, campaign, "enchant", use);
-  return applyChosen(command, campaign, actor, use, card, concentration);
-}
-
-/**
- * Use an enchant activity through Midi-QOL's workflow, at no one, and once it has settled, apply its
- * enchantment as through dnd5e, tied to the concentration Midi began once its checks passed; unless
- * Midi applied it itself, which is then reported as it is. One Midi stopped before beginning the
- * concentration it needs, which would then never end, or whose card it deleted, is used but not
- * applied.
- * @param {object} command
- * @param {Campaign} campaign
- * @param {Actor} actor
- * @param {object} use   What `prepareUse` found.
- * @returns {Promise<CommandResult>}
- */
-export async function midiEnchantNow(command, campaign, actor, use) {
-  const { activity, usage, prepared, enchanting } = use;
-  const saved = currentTargets();
-  setTargets([]);
-  try {
-    const workflowOptions = {
-      autoRollAttack: true,
-      fastForwardAttack: true,
-      autoFastAttack: true,
-      autoRollDamage: "none",
-      fastForwardDamage: true,
-      targetConfirmation: "none",
-      forceCompletion: true,
-      autoConsumeResource: "both",
-      ignoreUserTargets: true,
-      preSelectedTargetUuids: [],
-      attackRollDSN: !document.hidden,
-      damageRollDSN: !document.hidden,
-      [ROLL_TAG]: command.id
-    };
-    const midiUsage = {
-      ...usage,
-      // Midi puts concentration off until its checks pass, then ends only what it's told to.
-      ...(prepared.concentration ? { concentration: { begin: true, end: prepared.concentration.end ?? null } } : {}),
-      midiOptions: { targetsToUse: new Set(), configureDialog: false, workflowOptions }
-    };
-    // Since 0.44.0 Midi's own check of what it would spend, worked out from it and thrown away
-    // before dnd5e spends it, is Foundry's computer dice, as the module's own check is (dice-plan.mjs).
-    const results = await activity.use(checkedUntilSpent(midiUsage), { configure: false }, {
-      rollMode: PUBLIC,
-      data: { flags: { dnd5e: { targets: [] }, [MODULE_ID]: appFlags(command, "use") } }
-    });
-    castFromItem(use, results);
-    if ( !results ) return failedResult(command, "midi");
-    const card = results.message?.id ? results.message : null;
-    if ( !card ) return notApplied(command, null, actor, campaign, "midi", use);
-    const workflow = midiUsage.workflow ?? globalThis.MidiQOL?.Workflow?.getWorkflow(card.uuid);
-    if ( !workflow ) return notApplied(command, card, actor, campaign, "midi", use);
-    const state = await workflowSettled(workflow);
-    if ( state === "aborted" ) return notApplied(command, card, actor, campaign, "midi", use);
-    if ( state === "late" ) return failedResult(command, "timeout");
-
-    // Midi begins the concentration it put off once its checks pass, and names it on the card; it
-    // may stop before then, having spent what the use spends, the card's tray left for the
-    // Gamemaster. One whose card names a concentration that has since ended has no tray, as
-    // dnd5e's.
-    const named = card.system?.concentration;
-    const concentration = named ? (actor.effects?.get(named) ?? null) : null;
-    if ( named && !concentration ) return notApplied(command, null, actor, campaign, "midi", use);
-    if ( prepared.concentration?.begin && !named ) return notApplied(command, card, actor, campaign, "midi", use);
-
-    // Applied by Midi itself, as it may be: not again.
-    const self = activity.enchant?.self === true;
-    const target = self ? activity.item : enchanting.target;
-    const { before, profile } = enchanting;
-    const applied = effectsOf(target).find(effect => !before.has(effect.id) && (originOf(effect) === activity.uuid)
-      && (effect.getFlag?.("dnd5e", "enchantmentProfile") === profile));
-    if ( applied ) {
-      const ended = await endAll(target, enchanting.prior.filter(effect => effect.id !== applied.id));
-      return enchantResult(command, card, actor, campaign, { enchanted: enchantedOf(target, applied, profile), ended }, use);
-    }
-    return applyChosen(command, campaign, actor, use, card, concentration);
-  } finally {
-    setTargets(saved);
-  }
-}
-
-/**
  * Apply an enchantment as the card's tray would, once the activity is used: to its own item, or
  * the item the player chose, if they chose one, in place of what goes as it's used; so long as
  * dnd5e would still let that item take it, and the card is for the profile chosen. What dnd5e's
@@ -207,7 +91,7 @@ export async function midiEnchantNow(command, campaign, actor, use) {
  * @param {ActiveEffect|null} concentration   What it's tied to, if anything.
  * @returns {Promise<CommandResult>}
  */
-async function applyChosen(command, campaign, actor, use, card, concentration) {
+export async function applyChosen(command, campaign, actor, use, card, concentration) {
   const { activity, enchanting } = use;
   const { profile, prior } = enchanting;
   const self = activity.enchant?.self === true;
@@ -239,7 +123,7 @@ async function applyChosen(command, campaign, actor, use, card, concentration) {
  * @param {(ActiveEffect|null)[]} effects
  * @returns {Promise<object|null>}   The first of them, as the app is told it ended; null for none.
  */
-async function endAll(item, effects) {
+export async function endAll(item, effects) {
   let ended = null;
   for ( const effect of effects ) {
     if ( !effect ) continue;
@@ -267,7 +151,7 @@ async function endAll(item, effects) {
  * @param {string} profile
  * @returns {{item: string, itemName: string, effect: string, profile: string, name: string}}
  */
-function enchantedOf(item, effect, profile) {
+export function enchantedOf(item, effect, profile) {
   return { item: item.id, itemName: ownName(item), effect: effect.id, profile, name: String(effect.name ?? "") };
 }
 
@@ -295,7 +179,7 @@ function endedOf(item, effect) {
  *                         0.36.0 the companion it was used for, if any.
  * @returns {CommandResult}
  */
-function enchantResult(command, card, actor, campaign, enchantment, use) {
+export function enchantResult(command, card, actor, campaign, enchantment, use) {
   sheetFirst(actor, use?.companion);
   return describeResult(command, card, use?.character ?? actor, campaign, {
     rolls: [], extra: { use: { type: "enchant" }, damage: null, enchantment }
@@ -336,7 +220,7 @@ export function sheetFirst(actor, companion=null) {
  * @param {object} [use]    What `prepareUse` found, with the character whose player is told.
  * @returns {CommandResult}
  */
-function notApplied(command, card, actor, campaign, reason, use) {
+export function notApplied(command, card, actor, campaign, reason, use) {
   const messageId = (card?.id && game.messages?.has(card.id)) ? card.id : null;
   return {
     ...failedResult(command, reason),

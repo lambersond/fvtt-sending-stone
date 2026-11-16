@@ -23,9 +23,9 @@ import {
   transferReader, transfersOn
 } from "./command-transfers.mjs";
 import { noteInFlight, runNoteCommand } from "./command-notes.mjs";
-import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
+import { runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { isId } from "./command-checks.mjs";
-import { failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
+import { attacksUnavailable, failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
 import { noteAloneReader } from "./character-sync.mjs";
 import { gmRollOf } from "./chat-data.mjs";

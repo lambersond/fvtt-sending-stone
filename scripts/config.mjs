@@ -158,3 +158,11 @@ export function includeGmContent() {
 export function resultsAlways() {
   return game.settings.get(MODULE_ID, SETTINGS.CHAT_RESULTS) === RESULTS_MODES.ALWAYS;
 }
+
+/**
+ * Has the Gamemaster left players' attacks to go through Midi-QOL's workflow?
+ * @returns {boolean}
+ */
+export function midiIntegration() {
+  return game.settings.get(MODULE_ID, SETTINGS.MIDI_INTEGRATION) !== false;
+}
