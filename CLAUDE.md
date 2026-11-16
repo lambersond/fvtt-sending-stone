@@ -17,20 +17,21 @@ The scripts stand in seven layers, bottom to top:
 
 1. **Ground.** What the rest reads: constants and settings, the campaigns, the dice a roll is given,
    which dnd5e runs and which other modules (the author's own, Midi-QOL's Bonus Actions and
-   reactions), which client sends, the issue forms' links, and what every command's check asks.
+   reactions), which client sends, the issue forms' links, and what the commands' checks ask in
+   common.
 2. **The post.** The queue that posts events, and what became of each post.
-3. **The game.** Whose characters and parties a campaign's are, who may type a character's dice, its
+3. **The game.** Which characters and parties are a campaign's, who may type a character's dice, its
    combats as it is told them, the rules of what players are shown of results, and a dish's effects.
 4. **Sheets.** A character's or a party's sheet as plain data, with its descriptions and their
    links; a druid's Wild Shape and its forms; and which creatures are a character's companions.
 5. **What each app was told.** Keeping every campaign's copy current: characters and parties,
-   companions and their place in initiative, journals, dishes' cards, chat, combat, the saves the
-   game asks, and heartbeats.
+   companions, journals, dishes' cards, chat, combat, the saves the game asks, and heartbeats; and,
+   posting nothing itself, companions set right after their characters in Foundry's initiative.
 6. **Commands.** What the app asks to be made here: each command's check and each kind's run, the
    dice the game rolls later, whose answer is a command, and the fetcher with its queues; and a
    campaign's Foundry settings for its Gamemaster, which say why attacks can't be made.
-7. **The bridge and the entry.** The hello, the settings and their windows, Wild Shape's hooks,
-   which wait on the command queue, and `module.mjs`.
+7. **The bridge and the entry.** The hello, the settings' registration and their windows, Wild
+   Shape's hooks, which wait on the command queue, and `module.mjs`.
 
 **A script imports only from its own layer or a lower one, and never its way back to itself,** by
 `import`, `export … from` or `import()` alike. Scripts in a loop can't be read, loaded or tested one
@@ -38,15 +39,15 @@ without the others, and the order they load in comes to matter.
 
 - **`npm test` enforces it, before any harness runs:** `test/import-layers.mjs` (alone:
   `node test/import-layers.mjs`, silent when all is well) fails on a loop, an import of a higher
-  layer, a script in no layer or in two, and an import it can't follow.
+  layer, a script in no layer or in two, one listed that isn't there, and an import it can't follow.
 - **Which script is in which layer is `LAYERS` in that file, and nowhere else.** Add a new script
   there: in the lowest layer that holds everything it imports, or a higher one if that says better
   what it is for, never above a script that imports it. A new declaration goes in the script it
-  plainly belongs to, no higher than what reads it.
+  plainly belongs to, no higher than what reads it. Give a new script its row in README.md's Layout.
 - **The guard reads text, not syntax.** An import written in a comment counts, and the word `import`
-  with a bracket after it fails wherever it stands, in prose or as a method's name: word it
-  otherwise. It also fails on any import but one of the module's own `.mjs` scripts, by a relative
-  path.
+  before a bracket that holds something other than one quoted path fails, in prose, in a string or
+  as the name a method is declared by: word it otherwise. It also fails on any import but one of the
+  module's own `.mjs` scripts, by a relative path.
 
 ## 3. When a lower script needs something of a higher one
 
@@ -61,28 +62,25 @@ without the others, and the order they load in comes to matter.
 **Never an import back up, and never an `import()` written to slip past the guard,** which follows
 those too. The module's only two, `findLink`'s in `command-links.mjs`, point down.
 
-- **`module.mjs` registers five seams as it loads,** before any hook, so that nothing can call one
-  unregistered: `registerHelloResend` (`character-sync.mjs`), `registerSheetSenders`
-  (`wild-shape.mjs`), `registerGroupsWanted` (`groups.mjs`), `registerSheetSync`
-  (`creature-sync.mjs`), `registerCombatantCompanion` (`combat-data.mjs`). A new seam goes there.
-- **The older ones are registered by the script that hands the function over,** as it is set up:
-  `registerLaterDice` and `registerDiceAsks` (`dice-plan.mjs`, by `later-dice.mjs`),
-  `registerQueueSettled` (`commands.mjs`, by `wild-shape-hooks.mjs`), `onCompanionsLeft` and
-  `onCompanionPromptReader` (`creature-sync.mjs`, by `prompts.mjs`).
+- **`module.mjs` registers a seam as it loads,** before any hook, so that nothing can call one
+  unregistered, as it does `character-sync.mjs`'s `registerHelloResend`. A new seam goes there.
+  A harness that loads a script without `module.mjs` gets such a seam's default, without a word.
+- **Older ones are registered by the script that hands the function over,** as it is set up, as
+  `later-dice.mjs` calls `dice-plan.mjs`'s `registerDiceAsks`.
 
 ## 4. State stays whole
 
 - **A `let`, a `Map` or a `Set` of state and every function that changes it are in one script:** an
   import can't be assigned, and state written from two scripts has no one place that says how it
-  changes. Others ask through its functions, as `dishReader` answers for `dish-card.mjs`'s
-  `readers`.
+  changes. Others only read it: through its functions, as `dishReader` answers for `dish-card.mjs`'s
+  `readers`, or by importing it where it is exported, as `endedForms` and `diceStatus` are.
 - **The one exception:** `transport.mjs` counts into `status`, the tally of deliveries that
-  `delivery-status.mjs` keeps, and says so where it does. Don't add a second.
+  `delivery-status.mjs` keeps, and says so. Don't add a second.
 
 ## 5. Nothing runs as a script loads, outside `module.mjs`
 
-- **No statement runs as a script loads but `module.mjs`'s own:** its five seam registrations, then
-  its hooks (`init`, `ready` and nine `Hooks.on`). No other script registers a hook as it loads: a
+- **No statement runs as a script loads but `module.mjs`'s own:** its seam registrations, then its
+  hooks (`init`, `ready` and its `Hooks.on` lines). No other script registers a hook as it loads: a
   function does that `module.mjs` calls from `init` or `ready` (`register…Hooks`, `install…`).
 - **A top-level initialiser reads only a global, its own script, or a constant of a script it
   imports,** which, with no loop, has always loaded first (`sheet-actions.mjs`'s `SECTIONS` reads
@@ -111,9 +109,11 @@ those too. The module's only two, `findLink`'s in `command-links.mjs`, point dow
   it by `command.kind`, with the tables it alone reads. Give those names of their own: `FIELDS`,
   `OTHERS` and `ID` are taken there, and a script holds one of a name. (So a note's check is in
   `journals.mjs` and hit points' in `command-checks.mjs`, with what every check asks in common.)
-- **Its run, `run<Kind>Command`, goes in its own `command-<kind>.mjs`,** which `commands.mjs` calls,
-  with whether a campaign takes the kind and what its hello says of it, as `command-effects.mjs` has
-  `effectsOn` and `effectFeatures`.
+- **Its run, `run<Kind>Command`, goes in a `command-<kind>.mjs`,** its own or its kin's (three share
+  `command-charges.mjs`), which `commands.mjs` calls, with whether a campaign takes the kind and
+  what its hello says of it, as `command-effects.mjs` has `effectsOn` and `effectFeatures`.
+- **A dice ask's answer, kind `dice`, is the one kind that follows neither:** checked and run in
+  `later-dice.mjs`, beside the asks it answers.
 
 ## 8. The harness
 
@@ -122,11 +122,12 @@ those too. The module's only two, `findLink`'s in `command-links.mjs`, point dow
   run alone: `npm run harness:one -- rolls BREAK_ROLL=1`.
 - **A change to what the module does comes with its harness cases,** in its area's
   `test/fvtt/<area>.mjs`, under both releases where they differ. A change that only moves code
-  changes no assertion: only the import lines that name what moved.
+  changes no assertion: only the import lines that name what moved. The app's e2e imports
+  `test/fvtt/`'s stand-ins too: a change to one can break it.
 - **test/README.md's counts stay true:** "48 harnesses, 115 runs" changes with `harness-all.sh`.
 - **The dnd5e checkouts are read-only:** `test:setup` fetches them at pinned SHAs into
   `.cache/dnd5e/` (or set `DND5E5_DIR` and `DND5E6_DIR`). Never edit or commit them; a pin moves in
-  `test/pins.env` alone. The app's e2e runs on these stand-ins too: a change to one can break it.
+  `test/pins.env` alone.
 
 ## 9. Standing rules
 
