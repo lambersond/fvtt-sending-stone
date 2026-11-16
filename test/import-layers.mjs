@@ -1,0 +1,451 @@
+// The guard on the scripts' imports. The module's scripts stand in layers, bottom to top, and LAYERS
+// below is the one place that says which script is in which; CLAUDE.md, at the repository's root, says
+// what each layer is for. A script imports from its own layer or a lower one, and no script reaches
+// itself through the scripts it imports. This reads every scripts/**/*.mjs, follows static imports
+// (`import … from`, `import "…"`), re-exports (`export … from`) and dynamic imports
+// (`import("…")`) alike, and exits 1, naming the script and the line, on:
+//
+//   - scripts that import one another in a loop, which it prints with one way round it;
+//   - an import of a script in a higher layer;
+//   - a script that is in no layer, or in two, and a script LAYERS lists that isn't there;
+//   - an import it can't follow to one of the module's .mjs scripts: of a file that isn't there or
+//     isn't an .mjs, by a path that isn't relative, or an `import(` holding anything but one plain
+//     string in quotes.
+//
+// Each failure says what to do about it. Where there is none, this prints nothing.
+//
+// It reads the text, not a syntax tree, so that it needs nothing but Node, and where it can't tell
+// it fails. Each script is read twice, as written and with its comments taken out, so that a comment
+// between an import's words hides nothing. So an import written in a comment counts as one, a JSDoc
+// type's `import("./x.mjs")` among them, and one written in a string may; and the word `import`
+// before a bracket, in prose or as a method's name, fails as an `import(` that can't be followed
+// (`import()` with nothing in it, which is no code, is let be).
+//
+//   node test/import-layers.mjs              the checkout this file is in
+//   node test/import-layers.mjs <dir>        another checkout of the module, the folder holding its
+//                                            scripts/ (to prove this on an older tree)
+//
+// `npm test` runs it before the harnesses. It is not a harness: it is not in fvtt/ nor in
+// harness-all.sh, and prints no `name variables oks=N exit=C` line.
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join, posix, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// The layers, bottom to top, and every script of the module in one of them: one script to a line, as
+// a failure names the line. A new script goes in the lowest layer that holds everything it imports,
+// or in a higher one if that says better what it is for; a failure says which layers are open to it.
+// The order inside a layer is for the reader, and means nothing here. Where a script's name alone
+// wouldn't tell its layer, a comment says why it is there.
+const LAYERS = [
+  {
+    name: 'Ground',
+    files: [
+      'constants.mjs',
+      'config.mjs',
+      'companions.mjs',             // the author's other Foundry modules, not a character's companions
+      'campaigns.mjs',
+      'dice-plan.mjs',
+      'midi-economy.mjs',
+      'issue-links.mjs',
+      'dnd5e-generation.mjs',
+      'bridge-role.mjs',            // which client sends, asked from far below bridge.mjs
+      'command-checks.mjs',         // imports only constants.mjs; journals.mjs, below the commands, asks it
+    ],
+  },
+  {
+    name: 'The post',
+    files: [
+      'delivery-status.mjs',
+      'transport.mjs',
+    ],
+  },
+  {
+    name: 'The game',
+    files: [
+      'characters.mjs',
+      'typed-dice.mjs',             // who may type in a character's dice: it asks characters.mjs whose it is
+      'groups.mjs',
+      'results.mjs',
+      'combat-data.mjs',
+      'campaign-combats.mjs',
+      'dish-effects.mjs',           // what a dish does to the characters it is served to
+    ],
+  },
+  {
+    name: 'Sheets',
+    files: [
+      'sheet-values.mjs',
+      'sheet-slim.mjs',
+      'sheet-details.mjs',
+      'sheet-effects.mjs',
+      'sheet-effect-dice.mjs',
+      'sheet-enchant.mjs',
+      'sheet-links.mjs',
+      'sheet-rolls.mjs',
+      'sheet-features.mjs',
+      'sheet-inventory.mjs',
+      'sheet-spells.mjs',
+      'sheet-texts.mjs',
+      'sheet-actions.mjs',
+      'sheet-favorites.mjs',
+      'sheet-group.mjs',
+      'sheet.mjs',
+      'wild-shape.mjs',             // a druid's forms, built on sheet-rolls.mjs; sheet-wild-shape.mjs reads it
+      'sheet-wild-shape.mjs',
+      'creatures.mjs',              // a character's companions, which creature-sync.mjs tells the app of
+    ],
+  },
+  {
+    name: 'What each app was told',
+    files: [
+      'journals.mjs',
+      'tidy-journal.mjs',
+      'creature-sync.mjs',
+      'creature-initiative.mjs',
+      'dish-card.mjs',
+      'character-sync.mjs',
+      'combat.mjs',
+      'chat-data.mjs',
+      'chat.mjs',
+      'midi-prompts.mjs',
+      'prompts.mjs',
+      'heartbeat.mjs',
+    ],
+  },
+  {
+    name: 'Commands',
+    files: [
+      'command-links.mjs',
+      'command-rolls.mjs',
+      'later-dice.mjs',             // a dice ask's answer is a command, refused as command-rolls.mjs refuses one
+      'foundry-settings.mjs',       // it tells why attacks can't be made here, which it asks command-rolls.mjs
+      'command-dishes.mjs',
+      'command-enchant.mjs',
+      'command-notes.mjs',
+      'command-plain.mjs',
+      'command-texts.mjs',
+      'command-charges.mjs',
+      'command-concentration.mjs',
+      'command-effects.mjs',
+      'command-favorites.mjs',
+      'command-hit-points.mjs',
+      'command-prepare.mjs',
+      'command-uses.mjs',
+      'command-wildshape.mjs',
+      'command-alone.mjs',
+      'command-transfers.mjs',
+      'command-turn.mjs',
+      'commands.mjs',
+    ],
+  },
+  {
+    name: 'The bridge and the entry',
+    files: [
+      'wild-shape-hooks.mjs',       // Wild Shape's hooks and watch, which wait on commands.mjs's queue
+      'apps/settings-window.mjs',
+      'apps/help-window.mjs',
+      'bridge.mjs',
+      'settings.mjs',
+      'module.mjs',
+    ],
+  },
+]
+
+const SELF = fileURLToPath(import.meta.url)
+// The module to check: the checkout this file is in, or the one given.
+const ROOT = resolve(process.argv[2] ?? join(dirname(SELF), '..'))
+const SCRIPTS = join(ROOT, 'scripts')
+// How a failure names this file and a script: from the module's root, as an editor opens them.
+const GUARD = relative(join(dirname(SELF), '..'), SELF).split(sep).join('/')
+const shown = file => `scripts/${file}`
+const describe = layer => `layer ${layer + 1} (${LAYERS[layer].name})`
+
+// ---- Reading a script's imports ----
+
+// How an import is written, as text. WORD keeps the end of a longer name (`reimport`) and a property
+// (`tool.import`) from being read as the word. A name in braces may be a string, which may hold a
+// brace. An import needs no space after the word, as `import{a}from"./a.mjs"` has none.
+const WORD = String.raw`(?<![\p{ID_Continue}$.])`
+const NAME = String.raw`[\p{ID_Continue}$]+`
+const STRING = String.raw`"[^"\n]*"|'[^'\n]*'`
+const BRACES = String.raw`\{(?:${STRING}|[^}])*\}`
+const QUOTED = String.raw`(?<quote>["'])(?<specifier>(?:(?!\k<quote>)[^\n])+)\k<quote>`
+const CLAUSE = String.raw`(?:${NAME}\s*,\s*)?(?:${BRACES}|\*\s*as\s+${NAME}|${NAME})`
+const STATIC = new RegExp(String.raw`${WORD}import(?:\s+|(?=[{*]))${CLAUSE}\s*from\s*${QUOTED}`, 'gu')
+const BARE = new RegExp(String.raw`${WORD}import\s*${QUOTED}`, 'gu')
+const EXPORTED = String.raw`\*(?:\s*as\s+(?:${NAME}|${STRING}))?|${BRACES}`
+const REEXPORT = new RegExp(String.raw`${WORD}export\s*(?:${EXPORTED})\s*from\s*${QUOTED}`, 'gu')
+const DYNAMIC = new RegExp(String.raw`${WORD}import\s*\((?<inside>[^)]*)\)`, 'gu')
+const LITERAL = new RegExp(String.raw`^\s*${QUOTED}\s*$`, 'u')
+// Strings and comments, to read a script without its comments too. A string is found first and kept,
+// so that a `//` or `/*` inside one (a URL, say) isn't taken for a comment's start.
+const STRING_OR_COMMENT = /"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g
+
+/**
+ * Every .mjs under a directory, as paths from SCRIPTS with forward slashes, sorted.
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function scriptsIn(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return scriptsIn(path)
+    return entry.name.endsWith('.mjs') ? [relative(SCRIPTS, path).split(sep).join('/')] : []
+  }).sort()
+}
+
+/**
+ * What a script's text imports, by either reading of it: each import as what it names, where it
+ * stands and how it is written, in the order they stand in; and where each `import(` stands that
+ * neither reading found one plain string in.
+ * @param {string} text
+ * @returns {{found: {specifier: string, index: number, how: string}[], unfollowed: number[]}}
+ */
+function importsIn(text) {
+  // Each comment becomes spaces, its line breaks kept, so that every index is the same place in both.
+  const blank = comment => comment.replace(/[^\n]/g, ' ')
+  const withoutComments = text.replace(STRING_OR_COMMENT, part => part.startsWith('/') ? blank(part) : part)
+  const found = []
+  // Where an `import(` stands, and whether either reading found one plain string in it.
+  const followed = new Map()
+  for (const reading of [text, withoutComments]) {
+    const note = (how, match) => found.push({ specifier: match.groups.specifier, index: match.index, how })
+    for (const match of reading.matchAll(STATIC)) note('import', match)
+    for (const match of reading.matchAll(BARE)) note('import', match)
+    for (const match of reading.matchAll(REEXPORT)) note('export … from', match)
+    for (const match of reading.matchAll(DYNAMIC)) {
+      // `import()` with nothing in it is no code: a comment may say it.
+      if (!match.groups.inside.trim()) continue
+      const literal = LITERAL.exec(match.groups.inside)
+      if (literal) found.push({ specifier: literal.groups.specifier, index: match.index, how: 'import()' })
+      followed.set(match.index, Boolean(literal) || (followed.get(match.index) ?? false))
+    }
+  }
+  found.sort((a, b) => a.index - b.index)
+  const unfollowed = [...followed].filter(([, wasRead]) => !wasRead).map(([index]) => index)
+  return { found, unfollowed: unfollowed.sort((a, b) => a - b) }
+}
+
+if (!existsSync(SCRIPTS)) {
+  console.error(`${SCRIPTS} isn't there: give the module's root, the folder that holds scripts/`)
+  process.exit(2)
+}
+const files = scriptsIn(SCRIPTS)
+const known = new Set(files)
+/**
+ * Each script, the scripts it imports, and its first import of each.
+ * @type {Map<string, Map<string, {line: number, how: string}>>}
+ */
+const imports = new Map(files.map(file => [file, new Map()]))
+// What can't be followed to a script. A Set: a script is read twice, and each is said once.
+const unread = new Set()
+
+for (const file of files) {
+  const text = readFileSync(join(SCRIPTS, file), 'utf8')
+  const lineOf = index => text.slice(0, index).split('\n').length
+  const { found, unfollowed } = importsIn(text)
+  for (const { specifier, index, how } of found) {
+    const line = lineOf(index)
+    const target = posix.join(posix.dirname(file), specifier)
+    const refuse = why => unread.add(`${shown(file)}:${line} imports ${specifier}${why}`)
+    const ownOnly = 'a script imports only the module\'s own scripts'
+    if (!/^\.\.?\//.test(specifier)) {
+      refuse(`: ${ownOnly}, each by a relative path, which this can follow`)
+    } else if (known.has(target)) {
+      if (!imports.get(file).has(target)) imports.get(file).set(target, { line, how })
+    } else if (target.startsWith('../')) {
+      refuse(`, which is outside scripts/: ${ownOnly}`)
+    } else if (existsSync(join(SCRIPTS, target))) {
+      refuse(`, which is not an .mjs script: ${ownOnly}, and this reads only .mjs files, so it could see`
+        + ' no loop through another')
+    } else {
+      refuse(', which isn\'t there: correct the path, or add the script and list it in LAYERS')
+    }
+  }
+  for (const index of unfollowed) {
+    unread.add(`${shown(file)}:${lineOf(index)} has an import( with something other than one plain string in it,`
+      + ' which can\'t be followed: name the script in plain quotes. If this is prose, in a comment or a string, or a'
+      + ' method\'s name, reword it, as this reads text')
+  }
+}
+
+// ---- The layers: every script in one, and none listed that isn't there ----
+
+/**
+ * Each listed script and the index of its layer.
+ * @type {Map<string, number>}
+ */
+const layerOf = new Map()
+const twice = new Set()
+LAYERS.forEach((layer, index) => {
+  for (const file of layer.files) {
+    if (layerOf.has(file)) twice.add(file)
+    else layerOf.set(file, index)
+  }
+})
+// A script listed twice is in neither layer until that is put right.
+const placed = file => layerOf.has(file) && !twice.has(file)
+
+/**
+ * The lines of this file that list a script in LAYERS, as `test/import-layers.mjs:41`.
+ * @param {string} file
+ * @returns {string[]}
+ */
+function listedAt(file) {
+  const lines = readFileSync(SELF, 'utf8').split('\n')
+  return lines.flatMap((line, i) => line.trimStart().startsWith(`'${file}'`) ? [`${GUARD}:${i + 1}`] : [])
+}
+
+/**
+ * Where a script that is in no layer may be listed, by what it imports and what imports it.
+ * @param {string} file
+ * @returns {{advice: string, open: boolean}}  What to do, and whether any layer can take it as it is.
+ */
+function whereToList(file) {
+  const below = [...imports.get(file).keys()].filter(placed).map(target => layerOf.get(target))
+  const importers = files.filter(other => placed(other) && imports.get(other).has(file))
+  const lowest = Math.max(0, ...below)
+  const highest = Math.min(LAYERS.length - 1, ...importers.map(other => layerOf.get(other)))
+  if (lowest > highest) {
+    const why = `what it imports reaches ${describe(lowest)}, and a script of ${describe(highest)} imports it`
+    return { open: false, advice: `no layer can take it as it is: ${why}` }
+  }
+  const where = `add it to LAYERS in ${GUARD}, in the lowest layer that holds everything it imports, ${describe(lowest)}`
+  if (lowest === highest) return { open: true, advice: `${where}: no higher one is open to it` }
+  const upTo = importers.length ? `, up to ${describe(highest)}, where a script imports it` : ''
+  const higher = `or in a higher one if that says better what it is for${upTo}`
+  return { open: true, advice: `${where}, ${higher}. CLAUDE.md says what each layer is for` }
+}
+
+const listing = []
+// A script no layer can take has an import that reaches up, whichever layer it is put in: the same advice.
+let noneOpen = false
+for (const file of twice) {
+  const lines = listedAt(file).join(' and ')
+  listing.push(`LAYERS lists ${file} twice (${lines}): a script is in one layer, so take one of them away`)
+}
+for (const file of layerOf.keys()) {
+  if (known.has(file)) continue
+  const line = listedAt(file)[0] ?? GUARD
+  listing.push(`${line} lists ${file}, which is no script of the module's: take it off LAYERS, or put the file back`)
+}
+for (const file of files) {
+  if (layerOf.has(file)) continue
+  const { advice, open } = whereToList(file)
+  if (!open) noneOpen = true
+  listing.push(`${shown(file)} is in no layer: ${advice}`)
+}
+
+// An import may stay in its layer or go down.
+const ups = []
+for (const file of files.filter(placed)) {
+  for (const [target, { line, how }] of imports.get(file)) {
+    if (!placed(target) || (layerOf.get(target) <= layerOf.get(file))) continue
+    const layers = `which is in ${describe(layerOf.get(target))}, from ${describe(layerOf.get(file))}`
+    ups.push(`${shown(file)}:${line} reaches up: ${how} of ${target}, ${layers}`)
+  }
+}
+
+// ---- Loops ----
+
+/**
+ * The groups of scripts that import one another in a loop, each sorted: Tarjan's strongly connected
+ * components of more than one script, and any script that imports itself.
+ * @returns {string[][]}
+ */
+function loopsOf() {
+  const order = new Map()
+  const low = new Map()
+  const stack = []
+  const onStack = new Set()
+  const loops = []
+  function visit(file) {
+    order.set(file, order.size)
+    low.set(file, order.get(file))
+    stack.push(file)
+    onStack.add(file)
+    for (const target of imports.get(file).keys()) {
+      if (!order.has(target)) {
+        visit(target)
+        low.set(file, Math.min(low.get(file), low.get(target)))
+      } else if (onStack.has(target)) {
+        low.set(file, Math.min(low.get(file), order.get(target)))
+      }
+    }
+    if (low.get(file) !== order.get(file)) return
+    const group = []
+    for (;;) {
+      const member = stack.pop()
+      onStack.delete(member)
+      group.push(member)
+      if (member === file) break
+    }
+    if ((group.length > 1) || imports.get(file).has(file)) loops.push(group.sort())
+  }
+  for (const file of files) if (!order.has(file)) visit(file)
+  return loops
+}
+
+/**
+ * The shortest way round a loop, from one of its scripts back to itself.
+ * @param {string[]} group
+ * @returns {string[]}  The scripts on the way, each importing the next and the last the first.
+ */
+function wayRound(group) {
+  const inside = new Set(group)
+  let best = null
+  for (const start of group) {
+    // Breadth first from `start`, noting which script each was reached from, until one imports `start`.
+    const from = new Map([[start, null]])
+    const queue = [start]
+    let last = null
+    while (queue.length && (last === null)) {
+      const file = queue.shift()
+      for (const target of imports.get(file).keys()) {
+        if (!inside.has(target)) continue
+        if (target === start) { last = file; break }
+        if (!from.has(target)) { from.set(target, file); queue.push(target) }
+      }
+    }
+    if (last === null) continue
+    const path = []
+    for (let file = last; file !== null; file = from.get(file)) path.unshift(file)
+    if (!best || (path.length < best.length)) best = path
+  }
+  return best ?? group
+}
+
+// ---- Saying what is wrong, and what to do about it ----
+
+const said = []
+const loops = loopsOf()
+for (const group of loops) {
+  const inside = new Set(group)
+  const within = file => [...imports.get(file).keys()].filter(target => inside.has(target)).length
+  const count = group.reduce((sum, file) => sum + within(file), 0)
+  said.push((group.length === 1)
+    ? `${shown(group[0])} imports itself`
+    : `${group.length} scripts import one another in a loop, through ${count} imports: ${group.join(' ')}`)
+  said.push('  one way round it:')
+  const path = wayRound(group)
+  path.forEach((file, i) => {
+    const target = path[(i + 1) % path.length]
+    const { line, how } = imports.get(file).get(target)
+    said.push(`    ${shown(file)}:${line}  ${how}  ${target}`)
+  })
+}
+said.push(...ups, ...listing, ...unread)
+if (loops.length || ups.length || noneOpen) {
+  said.push(
+    'What to do about an import that reaches up or closes a loop: move the declaration it imports down, to the',
+    'importing script\'s layer or a lower one; or split the script that holds two things, and put each part in its',
+    'own layer; or, as a last resort, have a higher script hand the function down at set-up. Never import back up,',
+    'and never write the import as import() to slip past this.')
+}
+if (said.length) {
+  said.push(
+    'The rule: a script imports from its own layer or a lower one, and never its way back to itself, by',
+    'import, export … from or import(). CLAUDE.md, at the repository\'s root, says what each layer is for.')
+  console.error(said.join('\n'))
+  process.exit(1)
+}

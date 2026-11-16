@@ -31,12 +31,16 @@ loads but this repository doesn't hold (`pins.env`):
 
 ## Running
 
-    npm test                                    # every run: sh test/harness-all.sh
+    npm test                                    # the guard on imports, then every run: sh test/harness-all.sh
     npm run harness:one -- rolls BREAK_ROLL=1   # one harness, one variant: sh test/run.sh …
 
 Each run prints one line, `name variables oks=N exit=C`: how many `ok` lines it printed, and its exit
 code. A failed run also prints up to 15 of its lines that aren't `ok`, and `npm test` exits 1 when any
 run failed. A full pass takes about seven minutes.
+
+Before the runs, `npm test` runs `node test/import-layers.mjs`, the guard on the scripts' imports
+(below). It is not one of the runs: where nothing is wrong it prints nothing, and the runs follow;
+where something is, it says what and what to do about it, `npm test` exits 1, and no harness runs.
 
 `MODULE_DIR` is the module under test: this checkout unless set. The variables the harnesses read:
 
@@ -58,7 +62,8 @@ run failed. A full pass takes about seven minutes.
 
 ## The files
 
-`fvtt/` holds the harnesses (one per area of the module, named in `harness-all.sh`) and what they share:
+`fvtt/` holds the harnesses (one per area of the module, named in `harness-all.sh`) and what they share;
+the last row's file is beside `harness-all.sh`, not in `fvtt/`:
 
 | file | what it is |
 |---|---|
@@ -79,11 +84,12 @@ run failed. A full pass takes about seven minutes.
 | `settings-app.mjs` | ApplicationV2 and Handlebars, enough to draw and use the module's settings window in jsdom |
 | `results-world.mjs` | the world `verdict`, `gmrolls`, `chat6` and `foundry-settings` share |
 | `slim-check.mjs`, `slim-expand.mjs` | the slim-sheet check, and the app's expansion of a slim sheet, ported; since module 0.41.0 with damage on its own's choices put back from their row's own plan |
-| `texts-hooks.mjs` | a loader that wraps `sheet-links.mjs`'s `findLink` for made-up descriptions |
+| `texts-hooks.mjs` | a loader that wraps `command-links.mjs`'s `findLink` for made-up descriptions |
 | `dnd5e-hooks.mjs`, `dnd5e-register.mjs` | a loader that stubs the roll dialogs dnd5e's dice import, for files under `/module/dice/` |
 | `unref-timers.mjs` | lets Node exit with the module's timers still set |
 | `paths.mjs` | dnd5e's two roots and `oldModule(version)` |
 | `THIRD-PARTY.md` | dnd5e's MIT notice and the Midi-QOL attribution |
+| `../import-layers.mjs` | no harness: the guard on the scripts' imports, in Node alone. It holds the one list of the layers the module's scripts stand in, bottom to top (`LAYERS`), and exits 1, naming the script and the line, on scripts that import one another in a loop, by `import`, `export … from` or `import()` alike, which it prints with one way round it; on an import of a script in a higher layer; on a script that is in no layer, or in two, and a listed script that isn't there; and on an import it can't follow to one of the module's `.mjs` scripts. Each failure says what to do about it. It reads text, not a syntax tree, so an import written in a comment counts. `node test/import-layers.mjs <dir>` checks another checkout of the module |
 
 Every run is `node --import ./unref-timers.mjs --import ./dnd5e-register.mjs <harness>.mjs`, from
 `fvtt/`, with `--import ./slim-check.mjs` under `SLIM_CHECK=1`.
