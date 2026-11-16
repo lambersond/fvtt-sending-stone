@@ -10,9 +10,10 @@ import { availableProfiles, canTake, effectsOf, endable, goingAway, listedOn, ow
  * Enchanting from the Sending Stone app: using an enchant activity, such as Magic Weapon on a
  * longsword, Shillelagh on a club or quarterstaff, or a Flame Tongue's Engulf in Flames on itself,
  * as dnd5e uses it, with the profile and item the player chose, as dnd5e's usage dialog would have
- * them chosen; and ending an enchantment on an item of theirs, as the ⟲ on dnd5e's card does. What
- * may be enchanted, and with what, is as the sheet says it, from sheet-enchant.mjs, and the game
- * checks it again as it applies it: what the player chose is never taken on trust.
+ * them chosen (the use itself is made in command-uses.mjs); and ending an enchantment on an item of
+ * theirs, as the ⟲ on dnd5e's card does. What may be enchanted, and with what, is as the sheet says
+ * it, from sheet-enchant.mjs, and the game checks it again as it applies it: what the player chose
+ * is never taken on trust.
  *
  * Every use posts dnd5e's card, with its tray, as in Foundry. Where the player chose an item, the
  * enchantment is applied to it here, as the tray would apply it, tied to the concentration the card

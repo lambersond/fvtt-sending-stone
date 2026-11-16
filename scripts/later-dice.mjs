@@ -287,10 +287,10 @@ function dnd5e5() {
 
 /**
  * Set up asking for later dice, on a Gamemaster's client, once, after the dice plans: dnd5e's roll
- * and consumption hooks; the hello's list of open asks (bridge.mjs, which never imports this file);
- * and where Midi-QOL is active and has them, its bonus damage's macros and rolls, and its check of a
- * workflow's other activity's consumption, wrapped through libWrapper where it's active. Under any
- * system but dnd5e 5 nothing is set up, and the hello says why.
+ * and consumption hooks; the hello's list of open asks (dice-plan.mjs, which never imports this
+ * file); and where Midi-QOL is active and has them, its bonus damage's macros and rolls, and its
+ * check of a workflow's other activity's consumption, wrapped through libWrapper where it's active.
+ * Under any system but dnd5e 5 nothing is set up, and the hello says why.
  * @returns {void}
  */
 export function installLaterDice() {
