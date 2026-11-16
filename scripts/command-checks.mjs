@@ -6,14 +6,14 @@ import { HIT_POINT_OPS, MOST_HIT_POINTS } from "./constants.mjs";
  * whether a value is a plain object, or an id as the app sends one. And one kind's check whole, with
  * its two tables: hit points', which command-hit-points.mjs sets from the app.
  *
- * command-rolls.mjs holds `checkCommand`, and beside it each kind's own check, with the tables it
- * alone reads. Two kinds' can't stand there with the rest: a move's, a note's and hit points' each
- * read a table named `FIELDS`, and a spell prepared's and hit points' one named `OTHERS`, and a
- * file holds one of a name. So a note's check is in journals.mjs, which keeps what a note is, and
- * hit points' is here.
+ * command-rolls.mjs holds `checkCommand`, and beside it most kinds' own checks, each with the
+ * tables it alone reads. Two kinds' can't stand there with the rest: a move's, a note's and hit
+ * points' each read a table named `FIELDS`, and a spell prepared's and hit points' one named
+ * `OTHERS`, and a file holds one of a name. So a note's check is in journals.mjs, which keeps what
+ * a note is, and hit points' is here.
  *
  * Both of those files are below command-rolls.mjs, which asks them their checks. So what those two
- * checks ask in their turn, as every kind's does, is here as well, in a file importing only
+ * checks ask in their turn, as other kinds' do, is here as well, in a file importing only
  * constants.mjs: asked of command-rolls.mjs, each of the two would import the file that imports
  * it. (Whether a value is a plain object, a note's check asks journals.mjs's own `isObject`, the
  * same test as the one here.)
