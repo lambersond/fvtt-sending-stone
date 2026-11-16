@@ -9,17 +9,31 @@
 //   - an import of a script in a higher layer;
 //   - a script that is in no layer, or in two, and a script LAYERS lists that isn't there;
 //   - an import it can't follow to one of the module's .mjs scripts: of a file that isn't there or
-//     isn't an .mjs, by a path that isn't relative, or an `import(` holding anything but one plain
-//     string in quotes.
+//     isn't an .mjs, by a path that isn't relative or is written with a backslash, or an `import(`
+//     holding anything but one plain string in quotes.
 //
 // Each failure says what to do about it. Where there is none, this prints nothing.
 //
 // It reads the text, not a syntax tree, so that it needs nothing but Node, and where it can't tell
-// it fails. Each script is read twice, as written and with its comments taken out, so that a comment
-// between an import's words hides nothing. So an import written in a comment counts as one, a JSDoc
-// type's `import("./x.mjs")` among them, and one written in a string may; and the word `import`
-// before a bracket, in prose or as a method's name, fails as an `import(` that can't be followed
-// (`import()` with nothing in it, which is no code, is let be).
+// it fails. It reads on from every `import` and `export` in a script, wherever the word stands and
+// whatever stands above it, and takes white space and comments between an import's words as
+// JavaScript does: so nothing that Node 22 reads as an import is passed over. And so text counts
+// that makes no import. These fail by design, though nothing is imported:
+//
+//   - an import written out in a comment (a line commented out, a JSDoc type's
+//     `import("./x.mjs")`, an `@import` tag), in a string, a template or a regular expression, or
+//     in prose (`import them from "./x.mjs"`), where the script it names is higher, closes a loop
+//     or can't be followed. Not every one is read as an import: not one in a string that has its
+//     own quotes escaped, nor one commented out over several lines of `//`;
+//   - the word `import` before a bracket that holds anything but one plain string, which is an
+//     `import(` that can't be followed: in prose or a message (`can't import (…)`), in a regular
+//     expression (`/import(ed)?/`), and as the name a method is declared by;
+//   - the word where JavaScript has a property of that name, unless its dot stands directly
+//     before it: after a dot on the line above (`tool.`, then `import(…)`), or after a `#`
+//     (`this.#import(…)`). It is read as the two above are.
+//
+// Let be: `import()` with nothing in it, which is no code, and a property with its dot directly
+// before it (`tool.import(…)`).
 //
 //   node test/import-layers.mjs              the checkout this file is in
 //   node test/import-layers.mjs <dir>        another checkout of the module, the folder holding its
@@ -101,7 +115,7 @@ const LAYERS = [
       'journals.mjs',
       'tidy-journal.mjs',
       'creature-sync.mjs',
-      'creature-initiative.mjs',
+      'creature-initiative.mjs',    // posts nothing: sets companions after their characters, asking creatures.mjs
       'dish-card.mjs',
       'character-sync.mjs',
       'combat.mjs',
@@ -145,7 +159,7 @@ const LAYERS = [
       'apps/settings-window.mjs',
       'apps/help-window.mjs',
       'bridge.mjs',
-      'settings.mjs',
+      'settings.mjs',               // registers them: imports both windows and bridge.mjs; config.mjs reads them
       'module.mjs',
     ],
   },
@@ -162,24 +176,47 @@ const describe = layer => `layer ${layer + 1} (${LAYERS[layer].name})`
 
 // ---- Reading a script's imports ----
 
-// How an import is written, as text. WORD keeps the end of a longer name (`reimport`) and a property
-// (`tool.import`) from being read as the word. A name in braces may be a string, which may hold a
-// brace. An import needs no space after the word, as `import{a}from"./a.mjs"` has none.
-const WORD = String.raw`(?<![\p{ID_Continue}$.])`
-const NAME = String.raw`[\p{ID_Continue}$]+`
-const STRING = String.raw`"[^"\n]*"|'[^'\n]*'`
-const BRACES = String.raw`\{(?:${STRING}|[^}])*\}`
-const QUOTED = String.raw`(?<quote>["'])(?<specifier>(?:(?!\k<quote>)[^\n])+)\k<quote>`
-const CLAUSE = String.raw`(?:${NAME}\s*,\s*)?(?:${BRACES}|\*\s*as\s+${NAME}|${NAME})`
-const STATIC = new RegExp(String.raw`${WORD}import(?:\s+|(?=[{*]))${CLAUSE}\s*from\s*${QUOTED}`, 'gu')
-const BARE = new RegExp(String.raw`${WORD}import\s*${QUOTED}`, 'gu')
-const EXPORTED = String.raw`\*(?:\s*as\s+(?:${NAME}|${STRING}))?|${BRACES}`
-const REEXPORT = new RegExp(String.raw`${WORD}export\s*(?:${EXPORTED})\s*from\s*${QUOTED}`, 'gu')
-const DYNAMIC = new RegExp(String.raw`${WORD}import\s*\((?<inside>[^)]*)\)`, 'gu')
-const LITERAL = new RegExp(String.raw`^\s*${QUOTED}\s*$`, 'u')
-// Strings and comments, to read a script without its comments too. A string is found first and kept,
-// so that a `//` or `/*` inside one (a URL, say) isn't taken for a comment's start.
-const STRING_OR_COMMENT = /"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g
+// How an import is written, as text. Each of the four patterns takes the word alone, `import` or
+// `export`, and looks ahead of it for the rest. So every such word in a script is read from, each
+// on its own: what one reading took in is read again from the next word, and what stands above a
+// word, a regular expression or a string or a comment left open, changes nothing of how it is read.
+//
+// Only what stands directly before a word says whether it is the word at all: WORD keeps the end of
+// a longer name (`reimport`) and a property (`tool.import`) from being read as one, and after three
+// dots it is no property (`...import("./a.mjs")`). A name's letters are JavaScript's (ID), and any
+// may be written as an escape (`\u0061`). Between an import's words white space and comments may
+// stand (GAP), or nothing, as `import{a}from"./a.mjs"` has none. A comment is read as JavaScript
+// reads one, to its line's end or to its `*/`. What braces hold is taken a piece at a time: a
+// comment, a string or an escape whole, so that a brace in one doesn't close them, and anything
+// else by the letter. And a backslash in a string takes the next letter with it, a line's end among
+// them.
+//
+// No pattern can read one stretch of text two ways. A line comment can't stop short of its line's
+// end, nor a block comment run past its first `*/` (one that has none runs to the script's end,
+// once); and a piece in braces, once taken, is not taken another way (a look ahead finds it and a
+// reference back takes it, as JavaScript has no other way to say so). So the work of a reading that
+// comes to nothing is in proportion to what it read, and none tries one reading after another of a
+// long list. What is left is the number of words: each reads on as far as its own comment or list
+// runs, so thousands of them in one script that each run on to its end take as many passes over it.
+const ID = String.raw`[\p{ID_Continue}$\u200c\u200d]`
+const WORD = String.raw`(?<!${ID})(?<!(?<!\.\.)\.)`
+const ESCAPE = String.raw`\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\}`
+const NAME = String.raw`(?:${ID}|${ESCAPE})+`
+const ESCAPED = String.raw`\\(?:\r\n|[\s\S])`
+const STRING = String.raw`"(?:${ESCAPED}|[^"\\\n\r])*"|'(?:${ESCAPED}|[^'\\\n\r])*'`
+const IN_LINE = String.raw`[^\n\r\u2028\u2029]`
+const COMMENT = String.raw`/\*(?:[^*]|\*(?!/))*(?:\*/|$)|//${IN_LINE}*(?!${IN_LINE})`
+const GAP = String.raw`(?:\s|${COMMENT})`
+const BRACES = String.raw`\{(?:(?=(?<piece>${COMMENT}|${STRING}|${ESCAPE}|[^}]))\k<piece>)*\}`
+const QUOTED = String.raw`(?<quote>["'])(?<specifier>(?:${ESCAPED}|(?!\k<quote>)[^\\\n\r])+)\k<quote>`
+const CLAUSE = String.raw`(?:${NAME}${GAP}*,${GAP}*)?(?:${BRACES}|\*${GAP}*as${GAP}+${NAME}|${NAME})`
+const EXPORTED = String.raw`\*(?:${GAP}*as(?:${GAP}+${NAME}|${GAP}*(?:${STRING})))?|${BRACES}`
+const FROM = String.raw`${GAP}*from${GAP}*${QUOTED}`
+const STATIC = new RegExp(String.raw`${WORD}import(?=(?:${GAP}+|(?=[{*]))${CLAUSE}${FROM})`, 'gu')
+const BARE = new RegExp(String.raw`${WORD}import(?=${GAP}*${QUOTED})`, 'gu')
+const REEXPORT = new RegExp(String.raw`${WORD}export(?=${GAP}*(?:${EXPORTED})${FROM})`, 'gu')
+// An `import(`, and what it holds if that is nothing, or one plain string.
+const DYNAMIC = new RegExp(String.raw`${WORD}import(?=${GAP}*\((?:(?<nothing>\s*\))|${GAP}*${QUOTED}${GAP}*\))?)`, 'gu')
 
 /**
  * Every .mjs under a directory, as paths from SCRIPTS with forward slashes, sorted.
@@ -195,35 +232,27 @@ function scriptsIn(dir) {
 }
 
 /**
- * What a script's text imports, by either reading of it: each import as what it names, where it
- * stands and how it is written, in the order they stand in; and where each `import(` stands that
- * neither reading found one plain string in.
+ * What a script's text imports: each import as what it names, where its word stands and how it is
+ * written, in the order the words stand in; and where each `import(` stands that holds something
+ * other than one plain string.
  * @param {string} text
  * @returns {{found: {specifier: string, index: number, how: string}[], unfollowed: number[]}}
  */
 function importsIn(text) {
-  // Each comment becomes spaces, its line breaks kept, so that every index is the same place in both.
-  const blank = comment => comment.replace(/[^\n]/g, ' ')
-  const withoutComments = text.replace(STRING_OR_COMMENT, part => part.startsWith('/') ? blank(part) : part)
   const found = []
-  // Where an `import(` stands, and whether either reading found one plain string in it.
-  const followed = new Map()
-  for (const reading of [text, withoutComments]) {
-    const note = (how, match) => found.push({ specifier: match.groups.specifier, index: match.index, how })
-    for (const match of reading.matchAll(STATIC)) note('import', match)
-    for (const match of reading.matchAll(BARE)) note('import', match)
-    for (const match of reading.matchAll(REEXPORT)) note('export … from', match)
-    for (const match of reading.matchAll(DYNAMIC)) {
-      // `import()` with nothing in it is no code: a comment may say it.
-      if (!match.groups.inside.trim()) continue
-      const literal = LITERAL.exec(match.groups.inside)
-      if (literal) found.push({ specifier: literal.groups.specifier, index: match.index, how: 'import()' })
-      followed.set(match.index, Boolean(literal) || (followed.get(match.index) ?? false))
-    }
+  const unfollowed = []
+  const note = (how, match) => found.push({ specifier: match.groups.specifier, index: match.index, how })
+  for (const match of text.matchAll(STATIC)) note('import', match)
+  for (const match of text.matchAll(BARE)) note('import', match)
+  for (const match of text.matchAll(REEXPORT)) note('export … from', match)
+  for (const match of text.matchAll(DYNAMIC)) {
+    // `import()` with nothing in it is no code: a comment may say it.
+    if (match.groups.nothing !== undefined) continue
+    if (match.groups.specifier !== undefined) note('import()', match)
+    else unfollowed.push(match.index)
   }
   found.sort((a, b) => a.index - b.index)
-  const unfollowed = [...followed].filter(([, wasRead]) => !wasRead).map(([index]) => index)
-  return { found, unfollowed: unfollowed.sort((a, b) => a - b) }
+  return { found, unfollowed }
 }
 
 if (!existsSync(SCRIPTS)) {
@@ -237,7 +266,7 @@ const known = new Set(files)
  * @type {Map<string, Map<string, {line: number, how: string}>>}
  */
 const imports = new Map(files.map(file => [file, new Map()]))
-// What can't be followed to a script. A Set: a script is read twice, and each is said once.
+// What can't be followed to a script. A Set: what is to be said twice of one line is said once.
 const unread = new Set()
 
 for (const file of files) {
@@ -249,7 +278,9 @@ for (const file of files) {
     const target = posix.join(posix.dirname(file), specifier)
     const refuse = why => unread.add(`${shown(file)}:${line} imports ${specifier}${why}`)
     const ownOnly = 'a script imports only the module\'s own scripts'
-    if (!/^\.\.?\//.test(specifier)) {
+    if (specifier.includes('\\')) {
+      refuse(', a path written with a backslash, which this doesn\'t read as JavaScript would: write it out plainly')
+    } else if (!/^\.\.?\//.test(specifier)) {
       refuse(`: ${ownOnly}, each by a relative path, which this can follow`)
     } else if (known.has(target)) {
       if (!imports.get(file).has(target)) imports.get(file).set(target, { line, how })
@@ -287,13 +318,15 @@ LAYERS.forEach((layer, index) => {
 const placed = file => layerOf.has(file) && !twice.has(file)
 
 /**
- * The lines of this file that list a script in LAYERS, as `test/import-layers.mjs:41`.
+ * The lines of this file that hold a script's name in quotes, as `test/import-layers.mjs:41`: the
+ * lines that list it in LAYERS, whichever quotes it is in, as nothing else here quotes one.
  * @param {string} file
  * @returns {string[]}
  */
 function listedAt(file) {
   const lines = readFileSync(SELF, 'utf8').split('\n')
-  return lines.flatMap((line, i) => line.trimStart().startsWith(`'${file}'`) ? [`${GUARD}:${i + 1}`] : [])
+  const listed = line => ['\'', '"', '`'].some(quote => line.includes(quote + file + quote))
+  return lines.flatMap((line, i) => listed(line) ? [`${GUARD}:${i + 1}`] : [])
 }
 
 /**
@@ -302,21 +335,38 @@ function listedAt(file) {
  * @returns {{advice: string, open: boolean}}  What to do, and whether any layer can take it as it is.
  */
 function whereToList(file) {
-  const below = [...imports.get(file).keys()].filter(placed).map(target => layerOf.get(target))
-  const importers = files.filter(other => placed(other) && imports.get(other).has(file))
-  const lowest = Math.max(0, ...below)
-  const highest = Math.min(LAYERS.length - 1, ...importers.map(other => layerOf.get(other)))
+  const imported = [...imports.get(file).keys()].filter(other => other !== file)
+  const importers = files.filter(other => (other !== file) && imports.get(other).has(file))
+  const lowest = Math.max(0, ...imported.filter(placed).map(other => layerOf.get(other)))
+  const highest = Math.min(LAYERS.length - 1, ...importers.filter(placed).map(other => layerOf.get(other)))
   if (lowest > highest) {
     const why = `what it imports reaches ${describe(lowest)}, and a script of ${describe(highest)} imports it`
     return { open: false, advice: `no layer can take it as it is: ${why}` }
   }
+  // A script with no one layer couldn't be counted above: it is in none yet, or listed twice.
+  const state = other => twice.has(other) ? 'listed twice' : 'in no layer yet'
+  // One this imports may yet raise its lowest layer: so that one comes first, and a loop of the
+  // two before it.
+  const first = imported.filter(other => !placed(other))
+  if (first.length) {
+    const looped = loops.some(group => group.includes(file) && first.some(other => group.includes(other)))
+    const settle = first.some(other => twice.has(other)) ? 'put that right' : `list ${first.length > 1 ? 'those' : 'that'}`
+    const names = first.map(other => `${other}, ${state(other)}`).join(' and ')
+    return { open: true, advice: `it imports ${names}: ${looped ? 'undo the loop it is in' : settle} first, then run this again` }
+  }
   const where = `add it to LAYERS in ${GUARD}, in the lowest layer that holds everything it imports, ${describe(lowest)}`
   if (lowest === highest) return { open: true, advice: `${where}: no higher one is open to it` }
-  const upTo = importers.length ? `, up to ${describe(highest)}, where a script imports it` : ''
+  const upTo = importers.some(placed) ? `, up to ${describe(highest)}, where a script imports it` : ''
   const higher = `or in a higher one if that says better what it is for${upTo}`
-  return { open: true, advice: `${where}, ${higher}. CLAUDE.md says what each layer is for` }
+  // One that imports this may yet lower its highest layer: so much is said of it.
+  const later = importers.filter(other => !placed(other))
+    .map(other => `. ${other}, which imports it, is ${state(other)}, and can go no lower than this one does`)
+  return { open: true, advice: `${where}, ${higher}. CLAUDE.md says what each layer is for${later.join('')}` }
 }
 
+// The scripts that import one another in a loop, group by group: found here, as where to list a
+// new script may wait on one, and said below.
+const loops = loopsOf()
 const listing = []
 // A script no layer can take has an import that reaches up, whichever layer it is put in: the same advice.
 let noneOpen = false
@@ -418,7 +468,6 @@ function wayRound(group) {
 // ---- Saying what is wrong, and what to do about it ----
 
 const said = []
-const loops = loopsOf()
 for (const group of loops) {
   const inside = new Set(group)
   const within = file => [...imports.get(file).keys()].filter(target => inside.has(target)).length
@@ -439,13 +488,14 @@ if (loops.length || ups.length || noneOpen) {
   said.push(
     'What to do about an import that reaches up or closes a loop: move the declaration it imports down, to the',
     'importing script\'s layer or a lower one; or split the script that holds two things, and put each part in its',
-    'own layer; or, as a last resort, have a higher script hand the function down at set-up. Never import back up,',
-    'and never write the import as import() to slip past this.')
+    'own layer; or, as a last resort, have module.mjs hand the function down as it loads, which CLAUDE.md calls a',
+    'seam. Never import back up, and never write the import as import() to slip past this.')
 }
 if (said.length) {
   said.push(
     'The rule: a script imports from its own layer or a lower one, and never its way back to itself, by',
-    'import, export … from or import(). CLAUDE.md, at the repository\'s root, says what each layer is for.')
+    'import, export … from or import(). CLAUDE.md, at the repository\'s root, says what each layer is for.',
+    'If an import named here is only written in a comment, a JSDoc type or a string, reword it there: this reads text.')
   console.error(said.join('\n'))
   process.exit(1)
 }
