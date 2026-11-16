@@ -100,6 +100,8 @@ const sequences = new Map();
  */
 const lastSent = new Map();
 
+// The outcome of recent deliveries, which this file counts into, is in delivery-status.mjs, which
+// tells whatever shows it; still exported from here, where the harness reads it.
 export { status };
 
 /* -------------------------------------------- */
