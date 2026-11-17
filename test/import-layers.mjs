@@ -29,10 +29,10 @@
 //   - an import written out in a comment (a line commented out, a JSDoc type's
 //     `import("./x.mjs")`, an `@import` tag), in a string, a template or a regular expression, or
 //     in prose (`import them from "./x.mjs"`), where the script it names is higher, closes a loop
-//     or can't be followed. Not every one is read as an import: not an `import … from` or an
-//     `import "…"` in a string that has its own quotes escaped, nor one commented out over
-//     several lines of `//` with its path below its word; an `import(` written in either way
-//     fails as the next kind;
+//     or can't be followed. Not every one is read as an import: not an `import … from`, an
+//     `import "…"` or an `export … from` in a string that has its own quotes escaped, nor one
+//     commented out over several lines of `//` with its path below its word; an `import(` written
+//     in either way fails as the next kind, unless its word is let be;
 //   - the word `import` before a bracket that holds anything but one plain string, which is an
 //     `import(` that can't be followed: in prose or a message (`can't import (…)`), in a regular
 //     expression (`/import(ed)?/`), and as the name a method is declared by;
@@ -53,8 +53,8 @@
 // Where a failure names a script's line, it is the line, counted by line feeds, of the word its
 // reading began at. That can be in a comment above the import: an import with braces, commented
 // out over several lines of `//`, is read with the next import or `export … from` below it that
-// has braces, where no other `}` stands between, and that one may then be named at the line of
-// the word commented out.
+// has braces, where no other `}` stands between outside a comment or a string, and that one may
+// then be named at the line of the word commented out.
 //
 //   node test/import-layers.mjs              the checkout this file is in
 //   node test/import-layers.mjs <dir>        another checkout of the module, the folder holding its
@@ -68,9 +68,9 @@ import { fileURLToPath } from 'node:url'
 
 // The layers, bottom to top, and every script of the module in one of them: one script to a line, as
 // a failure names the line. A new script goes in the lowest layer that holds everything it imports,
-// or in a higher one if that says better what it is for; a failure says which layers are open to it.
-// The order inside a layer is for the reader, and means nothing here. Where a script's name alone
-// wouldn't tell its layer, a comment says why it is there.
+// or in a higher one if that says better what it is for; a failure says which layers are open to
+// it, or which script to list first. The order inside a layer is for the reader, and means nothing
+// here. Where a script's name alone wouldn't tell its layer, a comment says why it is there.
 const LAYERS = [
   {
     name: 'Ground',
@@ -303,7 +303,7 @@ for (const file of files) {
   for (const { specifier, index, how } of found) {
     const line = lineOf(index)
     const target = posix.join(posix.dirname(file), specifier)
-    const refuse = why => unread.add(`${shown(file)}:${line} imports ${specifier}${why}`)
+    const refuse = why => unread.add(`${shown(file)}:${line} imports ${specifier || 'an empty path'}${why}`)
     const ownOnly = 'a script imports only the module\'s own scripts'
     if (specifier.includes('\\')) {
       refuse(', a path written with a backslash, which this doesn\'t read as JavaScript would: write it out plainly')
