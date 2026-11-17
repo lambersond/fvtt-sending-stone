@@ -539,9 +539,10 @@ coins and a companion's aren't changed this way.
   coins pay, the largest first: 5 gp from 2 gp and 40 sp leaves 10 sp. Only an amount worth more
   than all the character's coins is refused. The line says the coins asked for; the app says which
   others went. The rates are dnd5e's own; a coin your world gave no rate is never broken, never pays
-  for another and never comes back as change. Every sum is made in whole coins, so where your
-  world's own rates don't divide one another, as coins of 4 and of 6 to the gp, an amount the coins
-  are worth can be refused too; dnd5e's own rates always divide.
+  for another and never comes back as change, and one your world made worth the same as another pays
+  for it one for one. Every sum is made in whole coins, so where your world's own rates don't divide
+  one another, as coins of 4 and of 6 to the gp, an amount the coins are worth can be refused too;
+  dnd5e's own rates always divide.
 - **Pay with other coins when a character is short of one**, beside it, is on by default too: untick
   it, and taking away more of a coin than the character holds is refused.
 - **What's written.** Only the coins that change, in one update, so dnd5e 6's fraction of a coin

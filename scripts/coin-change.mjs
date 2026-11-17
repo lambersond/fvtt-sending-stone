@@ -26,6 +26,10 @@
  * it only where the one is worth a whole number of the other, as each of dnd5e's own is of every
  * smaller one. In a world whose own rates don't divide one another, a payment the coins are worth can
  * so be refused; worth is never made or lost.
+ *
+ * A world's own coin may be worth the same as another, neither larger nor smaller. It pays for the
+ * other as a smaller coin does, in step 6, one for one, so that coins worth enough are never refused
+ * for it; and the last of the change, in step 5, is in the coin paid, never in its like.
  */
 
 /**
@@ -175,7 +179,8 @@ function breakLarger(left, owed, mine, rates) {
 /**
  * Step 5: give back the change from the last coin broken, in the fewest coins: from the largest coin
  * below the one broken down to the coin paid, never in a coin of NEVER_CHANGE unless it's the coin
- * paid, nor in one the coin paid doesn't divide evenly.
+ * paid, nor in one the coin paid doesn't divide evenly, nor in another coin worth the same as the
+ * coin paid, so that the last of it is in the coin paid itself.
  * @param {Record<string, number>} left   The coins left, which this adds to.
  * @param {number} due                    The change due, counted in the coin paid.
  * @param {string} coin                   The coin paid.
@@ -187,7 +192,7 @@ function breakLarger(left, owed, mine, rates) {
 function giveChange(left, due, coin, mine, last, rates) {
   for ( const { key, conversion } of rates ) {
     if ( (conversion <= last) || (conversion > mine) ) continue;
-    if ( (key !== coin) && NEVER_CHANGE.includes(key) ) continue;
+    if ( (key !== coin) && (NEVER_CHANGE.includes(key) || (conversion === mine)) ) continue;
     const worth = whole(mine / conversion);
     if ( !worth ) continue;
     const count = Math.floor(due / worth);
@@ -199,8 +204,10 @@ function giveChange(left, due, coin, mine, last, rates) {
 
 /**
  * Step 6: pay what no larger coin covers in smaller coins, the largest of them first, as many of
- * each as fit. Counted in the smallest coin with a rate, in whole numbers; a coin that isn't worth a
- * whole number of those pays nothing, and what's owed of one that isn't stays owed.
+ * each as fit; another coin worth the same as the coin paid, as a world's own may be, pays with
+ * them, first, one for one. (Of the coin paid itself none is left by now: step 2 took them all.)
+ * Counted in the smallest coin with a rate, in whole numbers; a coin that isn't worth a whole number
+ * of those pays nothing, and what's owed of one that isn't stays owed.
  * @param {Record<string, number>} left   The coins left, which this takes from.
  * @param {number} owed                   How many of the coin paid are owed.
  * @param {number} mine                   The rate of the coin paid.
@@ -213,7 +220,7 @@ function paySmaller(left, owed, mine, rates) {
   if ( unitOf(mine) === null ) return owed;
   let due = owed * unitOf(mine);
   for ( const { key, conversion } of rates ) {
-    if ( conversion <= mine ) continue;
+    if ( conversion < mine ) continue;
     const unit = unitOf(conversion);
     if ( !unit || !((left[key] ?? 0) >= 1) ) continue;
     const count = Math.min(left[key], Math.floor(due / unit));

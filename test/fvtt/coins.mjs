@@ -1,14 +1,15 @@
 // Coins added to a character and taken away (module 0.48.0): the rule of paying in coins
 // (coin-change.mjs) on its own, by worked cases and many random ones, in whole numbers, at dnd5e's
-// rates and at a world's own that don't divide one another; the hello's
-// `features.coins` and each coin's rate in a sheet; fetching for coins alone; the `coins` command's
-// check, who it's made for, what it writes, its line, its sheet and its result; what the campaign's
-// setting off does, and its switch, for the Gamemaster's changes too; a coin with no rate; dnd5e 6's
-// fraction of a coin; coins waiting in the line of moves, and for their own character's rolls; and the
-// campaign read again as a change's turn comes. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real module and its language
-// file, dnd5e 5.3.3's real dice classes for its self-test, a stand-in Foundry core and app; the
-// actors' coins as stored and as prepared, 5.3.3's or with DND5E6=1 6.0.5's, whose coins may be
-// fractional. Run with SLIM_CHECK=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
+// rates, at a world's own that don't divide one another and with a coin worth the same as another;
+// the hello's `features.coins` and each coin's rate in a sheet; fetching for coins alone; the
+// `coins` command's check, who it's made for, what it writes, its line, its sheet and its result;
+// what the campaign's setting off does, and its switch, for the Gamemaster's changes too; a coin
+// with no rate; dnd5e 6's fraction of a coin; coins waiting in the line of moves, and for their own
+// character's rolls; and the campaign read again as a change's turn comes. On a copy of sends.mjs's
+// stand-ins, with dnd5e's rates: the real module and its language file, dnd5e 5.3.3's real dice
+// classes for its self-test, a stand-in Foundry core and app; the actors' coins as stored and as
+// prepared, 5.3.3's or with DND5E6=1 6.0.5's, whose coins may be fractional. Run with SLIM_CHECK=1
+// and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { settings, user, users, actors } from './stub.mjs'
@@ -637,6 +638,79 @@ okay(`the rule, by ${TABLE.length} worked cases: the coins asked for paid from t
   okay(`with a world's own rates that don't divide one another (coins of 1, 4 and 6 to the gp), every sum is still made in whole coins: 3 gp from 1 gp and 26 of the coin of 4, worth 7.5 gp, is \`short\`, where 26 of the coin of 6 pay; and by ${CASES.toLocaleString('en')} random cases, the same each run (${paid.toLocaleString('en')} paid, ${worthIt.toLocaleString('en')} refused though the coins were worth it), no worth is made or lost and no coin goes below none`)
 }
 
+// A world's own coin worth the same as another: a crown, 1 to the gp, listed after gp or before it.
+// Neither larger nor smaller, it pays for gold as a smaller coin does, one for one, and gold for it,
+// once no larger coin is left; the last of the change is in the coin paid, never in its like. And
+// wherever each coin is worth a whole number of every coin worth less, two of the same worth among
+// them, a payment is refused exactly where the coins together are worth too little: with the crown,
+// whichever of the two the world lists first, and at rates wholly a world's own, coins of 0.01,
+// 0.05, 1, 3, 12, 12 and 60 to the gp. The same cases each run.
+{
+  const dnd5es = CONFIG.DND5E.currencies
+  const CROWNS = { pp: 0.1, gp: 1, crown: 1, ep: 2, sp: 10, cp: 100 }
+  const WORLDS = [
+    [['pp', 'gp', 'crown', 'ep', 'sp', 'cp'], CROWNS, 'crown listed after gp'],
+    [['pp', 'crown', 'gp', 'ep', 'sp', 'cp'], CROWNS, 'crown listed before gp'],
+    [['mithril', 'star', 'gp', 'third', 'groat', 'penny', 'mite'], { mithril: 0.01, star: 0.05, gp: 1, third: 3, groat: 12, penny: 12, mite: 60 }, "a world's own rates"],
+  ]
+  let cases = 0
+  let paid = 0
+  let refused = 0
+  let alike = 0
+  for (const [KEYS, RATE, why] of WORLDS) {
+    CONFIG.DND5E.currencies = Object.fromEntries(KEYS.map(key => [key, { label: key, abbreviation: key, conversion: RATE[key] }]))
+    const own = coinRates()
+    assert.deepEqual(own.map(rate => rate.key), KEYS, 'as the world lists them, the largest first')
+    // Each coin's worth in the smallest, a whole number, and a whole number of every coin worth less.
+    const smallest = Math.max(...Object.values(RATE))
+    const UNITS = Object.fromEntries(KEYS.map(key => [key, Math.round(smallest / RATE[key])]))
+    assert.ok(KEYS.every(a => KEYS.every(b => (UNITS[a] < UNITS[b]) || Number.isInteger(UNITS[a] / UNITS[b]))), `${why}: each a whole number of every coin worth less`)
+    const all = coins => Object.fromEntries(KEYS.map(key => [key, coins[key] ?? 0]))
+    const worth = coins => KEYS.reduce((sum, key) => sum + ((coins[key] ?? 0) * UNITS[key]), 0)
+    if (RATE === CROWNS) {
+      const pays = (held, pay, options) => { const out = payCoins(all(held), pay, own, options); return out.refusal ? out.refusal : [some(out.left), out.used] }
+      assert.deepEqual(pays({ crown: 5 }, { gp: 1 }), [{ crown: 4 }, { crown: 1 }], `a crown pays for a gp: ${why}`)
+      assert.deepEqual(pays({ gp: 5 }, { crown: 2 }), [{ gp: 3 }, { gp: 2 }], `and gp for crowns: ${why}`)
+      assert.deepEqual(pays({ pp: 1 }, { gp: 5 }), [{ gp: 5 }, { pp: 1 }], `change in the coin paid, never in crowns: ${why}`)
+      assert.deepEqual(pays({ pp: 1 }, { crown: 5 }), [{ crown: 5 }, { pp: 1 }], `nor in gp where crowns are paid: ${why}`)
+      assert.deepEqual(pays({ pp: 1, crown: 3 }, { gp: 5 }), [{ gp: 5, crown: 3 }, { pp: 1 }], `a larger coin is broken first: ${why}`)
+      assert.deepEqual(pays({ crown: 3, sp: 50 }, { gp: 2 }), [{ crown: 1, sp: 50 }, { crown: 2 }], `crowns before smaller coins: ${why}`)
+      assert.deepEqual(pays({ crown: 3, sp: 25 }, { gp: 5 }), [{ sp: 5 }, { crown: 3, sp: 20 }], `then the smaller ones: ${why}`)
+      assert.deepEqual(pays({ pp: 1 }, { gp: 1, crown: 1 }), [{ gp: 8 }, { pp: 1 }], `both paid from one platinum: ${why}`)
+      assert.deepEqual(pays({ crown: 1, sp: 9 }, { gp: 2 }), 'short', `worth 1.9 gp: ${why}`)
+      assert.deepEqual(pays({ crown: 5 }, { gp: 1 }, { change: false }), 'short', `other coins not paying: ${why}`)
+    }
+    let seed = 0xc0195 + WORLDS.findIndex(world => world[0] === KEYS)
+    const random = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+    const below = max => Math.floor(random() * max)
+    for (let i = 0; i < 50_000; i++) {
+      const held = Object.fromEntries(KEYS.map(key => [key, below(3) ? below(below(4) ? 6 : 200) : 0]))
+      const pay = Object.fromEntries(KEYS.map(key => [key, below(3) ? 0 : 1 + below(below(5) ? 30 : 600)]).filter(([, n]) => n))
+      if (!Object.keys(pay).length) continue
+      cases++
+      const before = { ...held }
+      const out = payCoins(held, pay, own)
+      const said = () => `${why}: ${JSON.stringify([before, pay, out])}`
+      assert.deepEqual(held, before, `what's held is changed, ${said()}`)
+      assert.equal(!out.refusal, worth(held) >= worth(pay), `refused, or not, against what the coins are worth, ${said()}`)
+      if (out.refusal) { refused++; continue }
+      paid++
+      assert.equal(worth(out.left) + worth(pay), worth(held), `worth made or lost, ${said()}`)
+      assert.ok(KEYS.every(key => Number.isInteger(out.left[key]) && (out.left[key] >= 0)), `a coin below none, or no whole number, ${said()}`)
+      for (const key of KEYS) assert.equal(out.used[key] ?? 0, Math.max(held[key] - out.left[key] - (pay[key] ?? 0), 0), `used isn't what was held, less what's left, less what was paid, ${said()}`)
+      // One coin paid alone: no other coin worth the same comes back as change.
+      const [only, more] = Object.keys(pay)
+      const likes = more ? [] : KEYS.filter(key => (key !== only) && (RATE[key] === RATE[only]))
+      if (likes.length) alike++
+      for (const like of likes) assert.ok(out.left[like] <= held[like], `change in a coin worth the same as the one paid, ${said()}`)
+    }
+  }
+  CONFIG.DND5E.currencies = dnd5es
+  assert.deepEqual(coinRates(), rates, "dnd5e's own again")
+  assert.ok((paid > 30_000) && (refused > 30_000) && (alike > 2_000), `enough of each: ${paid} paid, ${refused} refused, ${alike} of one of two alike alone`)
+  okay(`a world's own coin worth the same as another, a crown of 1 to the gp, listed after gp or before it: crowns pay for gold one for one and gold for crowns, once no larger coin is left and ahead of smaller ones; the last of the change is in the coin paid, never in its like; and by ${cases.toLocaleString('en')} random cases, the same each run (${paid.toLocaleString('en')} paid, ${refused.toLocaleString('en')} refused), with the crown and at rates wholly a world's own that divide one another, two of them the same, a payment is refused exactly where the coins are worth too little, with no worth made or lost and no coin below none`)
+}
+
 /* -------------------------------------------- */
 /*  The hello and the sheet                     */
 /* -------------------------------------------- */
@@ -873,6 +947,21 @@ assert.equal(lineOf(made), 'Thorin paid 1 sp and 2 zz')
 assert.deepEqual(made.after.find(e => e.type === 'character.updated').data.character.sheet.inventory.currency.at(-1), { id: 'zz', label: 'Zed', abbreviation: 'zz', value: 1, conversion: null })
 delete CONFIG.DND5E.currencies.zz
 okay("a world's own coin with no rate: taken away only from its own coins, no other paying for it; never paying for another, nor coming back as change; its `conversion` in the sheet null")
+
+// And one worth the same as gold, a crown: it pays for gold he's short of, one for one.
+CONFIG.DND5E.currencies.crown = { label: 'Crown', abbreviation: 'cr', conversion: 1 }
+stock(thorin, [], { gp: 1, crown: 5 })
+await settle()
+at = writes.length
+made = await changed('thorin', 'remove', { gp: 3 })
+assert.deepEqual([made.result.status, purse(thorin), made.result.coins], ['done', { crown: 3 }, { op: 'remove', currency: { gp: 3 }, used: { crown: 2 } }], JSON.stringify(made.result))
+assert.deepEqual([lineOf(made), writes.slice(at)], ['Thorin paid 3 gp', [['updateActor', 'thorin', { 'system.currency.gp': 0, 'system.currency.crown': 3 }]]])
+assert.deepEqual(made.after.find(e => e.type === 'character.updated').data.character.sheet.inventory.currency.at(-1), { id: 'crown', label: 'Crown', abbreviation: 'cr', value: 3, conversion: 1 })
+stock(thorin, [], { pp: 1 })
+made = await changed('thorin', 'remove', { gp: 4 })
+assert.deepEqual([made.result.status, purse(thorin), made.result.coins.used], ['done', { gp: 6 }, { pp: 1 }], 'the change in gold, the coin paid, none of it in crowns')
+delete CONFIG.DND5E.currencies.crown
+okay("a world's own coin worth the same as gold pays for gold the character is short of, one for one: 3 gp from 1 gp and 5 crowns leaves 3 crowns, `used: { crown: 2 }`, in one write of the two; and a platinum broken for gold gives its change in gold, none in crowns")
 
 /* -------------------------------------------- */
 /*  A fraction of a coin                        */

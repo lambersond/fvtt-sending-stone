@@ -3737,12 +3737,20 @@ A coin with no rate, as a world's own may have, is paid from its own coins alone
 and never comes back as change. With the setting off, step 2 is all: more of a coin than the
 character holds is `"short"`.
 
+A world's own coin may be worth the same as another, neither larger nor smaller. It then pays for
+the other in step 5, with the smaller coins and ahead of them, one for one: 3 gp from 1 gp and 5 of
+a coin of 1 to the gp leaves 3 of that coin, `used` 2 of it. And the last of the change (step 4) is
+in the coin paid, never in its like: 4 gp from 1 pp leaves 6 gp, whichever of the two the world
+lists first.
+
 Every sum is made in whole coins. A larger coin is broken (step 3), and change given in a coin (step
 4), only where it's worth a whole number of the coin paid; and smaller coins pay (step 5) only where
 the coin paid, and each of them, is worth a whole number of the smallest coin with a rate. At
 dnd5e's own rates each coin is worth a whole number of every smaller one, so all of that always
-holds. In a world whose own rates don't divide one another it may not, and a payment the coins are
-worth can then be `"short"` too: with coins of 1, 4 and 6 to the gp, 3 gp from 1 gp and 26 of the
+holds, as it does in any world whose coins are each worth a whole number of every coin worth less,
+two of the same worth among them: a payment is then `"short"` exactly where the coins together are
+worth too little. In a world whose own rates don't divide one another it may not, and a payment the
+coins are worth can then be `"short"` too: with coins of 1, 4 and 6 to the gp, 3 gp from 1 gp and 26 of the
 coin of 4, worth 7.5 gp together, is refused. Worth is never made or lost, whatever the rates. A
 listener that works out beforehand whether a payment can be made should leave such rates to the
 game.
