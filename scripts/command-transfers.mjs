@@ -1,7 +1,7 @@
 import { REMOVE_KINDS, TRANSFER_KINDS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { activeForm } from "./characters.mjs";
-import { heldCoins } from "./coin-change.mjs";
+import { activeForm, characterPlayers } from "./characters.mjs";
+import { coinUpdate, heldCoins, takenCoins } from "./coin-change.mjs";
 import { postLine } from "./command-charges.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
@@ -63,6 +63,12 @@ import { inventoryTypes, localize } from "./sheet-values.mjs";
  * it's made one at a time with the moves, so an item on its way is never also removed. Part of a
  * stack is never taken for all of it: a removal names how many the app's sheet showed, and is
  * refused where the stack holds any other number now.
+ *
+ * Since 0.48.0 a character's coins may be handed out: so many of each coin to each of the campaign's
+ * characters picked, the total taken from the giver as coins taken away are (coin-change.mjs), other
+ * coins paying where it's short of one, unless the campaign's Gamemaster has turned that off. No line
+ * for everyone: each one given is whispered what they received, "Vex received 200 pp and 50 gp from
+ * Thorin", and the Gamemasters what was handed out, in one message.
  */
 
 /**
@@ -110,19 +116,23 @@ export function transfersOn(campaign) {
  * moves are made here, and if not, why not, the Gamemaster not letting its players, or another
  * system. Since 0.32.0, wherever they're made, that a party's things may be sent elsewhere by its
  * Owner, party to party too (`partySends`), and a party's coin distributed among its characters
- * (`distribute`).
+ * (`distribute`). Since 0.48.0, wherever they're made, that a character's coins may be handed out to
+ * the characters picked (`handOut`), and whether its other coins pay where it's short of one
+ * (`change`), as the campaign's Gamemaster has set it.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: "off"|"system"|null, partySends: boolean,
- *   distribute: boolean}}
+ *   distribute: boolean, handOut: boolean, change: boolean}}
  */
 export function transferFeatures(campaign) {
-  if ( campaign.transfers !== true ) {
-    return { enabled: false, kinds: [], reason: "off", partySends: false, distribute: false };
-  }
-  if ( game.system?.id !== "dnd5e" ) {
-    return { enabled: false, kinds: [], reason: "system", partySends: false, distribute: false };
-  }
-  return { enabled: true, kinds: [...TRANSFER_KINDS], reason: null, partySends: true, distribute: true };
+  const off = reason => ({
+    enabled: false, kinds: [], reason, partySends: false, distribute: false, handOut: false, change: false
+  });
+  if ( campaign.transfers !== true ) return off("off");
+  if ( game.system?.id !== "dnd5e" ) return off("system");
+  return {
+    enabled: true, kinds: [...TRANSFER_KINDS], reason: null, partySends: true, distribute: true,
+    handOut: true, change: campaign.coinChange === true
+  };
 }
 
 /**
@@ -155,7 +165,8 @@ export function transferReader(campaignId) {
 /**
  * Make a move fetched from the app, once every move before it has been made, whoever made it.
  * @param {object} command      `{transfer: {from, to, items?, currency?}}`, or since 0.32.0 a
- *                              distribution's `{transfer: {from, among, currency}}`, as fetched.
+ *                              distribution's `{transfer: {from, among, currency}}`, or since 0.48.0
+ *                              a hand-out's `{transfer: {from, each, currency}}`, as fetched.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @returns {Promise<CommandResult>}
  */
@@ -182,7 +193,7 @@ export function afterMoves(run) {
  * Make a move now, if it may be made: who may move what (`whoMoves`), then what there is to move,
  * as both ends now are (`plansOf`), before anything is written; then the coins, then each item; the
  * line that says what moved; and both sheets as they then stand, ahead of the result. A
- * distribution is made by `distributeNow`.
+ * distribution is made by `distributeNow`, and a hand-out by `handOutNow`.
  * @param {object} command
  * @param {Campaign} passed     The campaign as it was when fetched, which may be a queue's wait old.
  * @returns {Promise<CommandResult>}
@@ -196,6 +207,7 @@ async function transferNow(command, passed) {
   if ( invalid ) return failed("invalid", invalid);
   const ends = whoMoves(command, campaign);
   if ( ends.refusal ) return failed(ends.refusal);
+  if ( ends.each.length ) return handOutNow(command, campaign, ends);
   if ( !ends.to ) return distributeNow(command, campaign, ends);
   const { from, to, mover } = ends;
   const plans = await plansOf(command.transfer, from, to);
@@ -258,10 +270,13 @@ async function transferNow(command, passed) {
  * they only observe is `not-owner`, and one they can't see `unknown`, as one not there. The
  * Gamemaster moves anything between them, party to party too. A distribution is shared among
  * exactly the party's characters, as Foundry now has them (`members`). Since 0.40.0 nothing moves
- * to, from or by a character transformed, as by Wild Shape (`shaped`).
+ * to, from or by a character transformed, as by Wild Shape (`shaped`). Since 0.48.0 a hand-out's
+ * characters are read as a distribution's are, any of the campaign's (`unknown`), none of them
+ * transformed (`shaped`); it's a character's own coins, made as that character, the Gamemaster's too,
+ * and never a party's, which a player is told only of a party they own (`not-yours`).
  * @param {object} command
  * @param {Campaign} campaign
- * @returns {{refusal: string}|{from: MoveEnd, to: MoveEnd|null, among: Actor[], mover: Actor}}
+ * @returns {{refusal: string}|{from: MoveEnd, to: MoveEnd|null, among: Actor[], each: Actor[], mover: Actor}}
  */
 function whoMoves(command, campaign) {
   const { transfer } = command;
@@ -279,17 +294,19 @@ function whoMoves(command, campaign) {
     return (actor && !groups.has(id) && campaign.characters.has(id)) ? actor : null;
   };
   const sharing = Array.isArray(transfer.among);
+  const handing = Array.isArray(transfer.each);
   const from = endOf(transfer.from);
-  const to = sharing ? null : endOf(transfer.to);
+  const to = (sharing || handing) ? null : endOf(transfer.to);
   const among = sharing ? transfer.among.map(characterOf) : [];
-  if ( !from || (!sharing && !to) || among.includes(null) ) return { refusal: "unknown" };
+  const each = handing ? transfer.each.map(characterOf) : [];
+  if ( !from || (!sharing && !handing && !to) || among.includes(null) || each.includes(null) ) return { refusal: "unknown" };
 
   // A character's things are moved only as one of the move's ends, the Gamemaster's too.
   const mover = campaign.characters.has(command.actorId) && !groups.has(command.actorId)
     ? (game.actors.get(command.actorId) ?? null) : null;
   // Since 0.40.0 nothing moves to, from or by a character while she's transformed: her things aren't
   // on her form, which dnd5e gives none of them.
-  const characters = [from, to].filter(end => end && !end.group).map(end => end.actor).concat(among, mover ?? []);
+  const characters = [from, to].filter(end => end && !end.group).map(end => end.actor).concat(among, each, mover ?? []);
   if ( characters.some(actor => activeForm(actor)) ) return { refusal: "shaped" };
   if ( !mover ) return { refusal: "not-yours" };
   if ( !from.group && ![from, to].some(end => end?.actor.id === mover.id) ) return { refusal: "not-yours" };
@@ -306,12 +323,16 @@ function whoMoves(command, campaign) {
     }
   }
 
+  // A hand-out is a character's own coins, never a party's: said once a player's party is known to
+  // be one they own, so that it says nothing of a party they can't see.
+  if ( handing && from.group ) return { refusal: "not-yours" };
+
   if ( sharing ) {
     const members = new Set(campaignMembers(from.actor, campaign).map(actor => actor.id));
     const named = new Set(among.map(actor => actor.id));
     if ( (members.size !== named.size) || [...named].some(id => !members.has(id)) ) return { refusal: "members" };
   }
-  return { from, to, among, mover };
+  return { from, to, among, each, mover };
 }
 
 /**
@@ -401,6 +422,110 @@ async function distributeNow(command, campaign, { from, among, mover }) {
     rolls: [],
     transfer
   };
+}
+
+/* -------------------------------------------- */
+/*  A hand-out                                  */
+/* -------------------------------------------- */
+
+/**
+ * Hand out a character's coins, since 0.48.0: so many of each coin to each of the characters picked.
+ * The total, each count times how many are picked, is taken from the giver as coins taken away are
+ * (coin-change.mjs's `takenCoins`), its other coins paying where it's short of one unless the
+ * campaign's setting is off, refused where they can't (`short`). The giver's one update first:
+ * refused, nothing is written, said or sent. Then each one's, in the order named, adding its coins
+ * to what it stores. Where one's fails, what wasn't given goes back to the giver in one update, in
+ * the coins handed out, and no more are given; where that fails too, those coins are lost, never
+ * made twice. Then the whispers, of those given alone (`handOutLines`); the giver's sheet and each
+ * one's given, ahead of the result, which says what each was given, never the total, and to whom.
+ * @param {object} command
+ * @param {Campaign} campaign
+ * @param {{from: MoveEnd, each: Actor[], mover: Actor}} ends
+ * @returns {Promise<CommandResult>}
+ */
+async function handOutNow(command, campaign, { from, each }) {
+  const failed = (reason, error=null) => failedResult(command, reason, error);
+  const giver = from.actor;
+  // What each is given, in dnd5e's order, as the messages say it and the result repeats it.
+  const given = Object.fromEntries(Object.keys(CONFIG.DND5E?.currencies ?? {})
+    .filter(key => Object.hasOwn(command.transfer.currency, key)).map(key => [key, command.transfer.currency[key]]));
+  const times = n => Object.fromEntries(Object.entries(given).map(([key, count]) => [key, count * n]));
+  const plan = takenCoins(giver, times(each.length), { change: campaign.coinChange === true });
+  if ( plan.refusal ) return failed(plan.refusal);
+
+  try {
+    await updated(giver, coinUpdate(giver, plan.by));
+  } catch (err) {
+    return failed("error", messageOf(err));
+  }
+  const credited = [];
+  let error = null;
+  for ( const actor of each ) {
+    try {
+      await updated(actor, coinUpdate(actor, given));
+      credited.push(actor);
+    } catch (err) {
+      // What wasn't given goes back to the giver, in one write, in the coins handed out.
+      try {
+        await putBack(err, () => updated(giver, coinUpdate(giver, times(each.length - credited.length))));
+      } catch (thrown) {
+        error = messageOf(thrown);
+      }
+      break;
+    }
+  }
+
+  const line = credited.length ? await handOutLines(command, giver, credited, given, times(credited.length)) : null;
+  sheetFirst(giver);
+  for ( const actor of credited ) sheetFirst(actor);
+  const transfer = {
+    from: giver.id,
+    to: null,
+    items: [],
+    currency: given,
+    each: credited.map(actor => actor.id),
+    used: ((error === null) && Object.keys(plan.used).length) ? plan.used : null
+  };
+  if ( error !== null ) {
+    const result = failed("error", error);
+    return credited.length ? { ...result, transfer } : result;
+  }
+  return {
+    id: command.id, status: "done", reason: null, error: null,
+    messageId: line?.id ?? null,
+    visible: line ? visibleTo(line, giver, campaign) : true,
+    rolls: [],
+    transfer
+  };
+}
+
+/**
+ * Say what a character handed out, to those it concerns alone, never to everyone: each one given
+ * coins that has a player is whispered what it received, to that character's own players
+ * (`characterPlayers`), "Vex received 200 pp and 50 gp from Thorin", one with no player none; then
+ * the Gamemasters, in one message, what was handed out, to whom and how much in all, "Thorin handed
+ * out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all". Each is spoken by the
+ * giver and written by its player, as every line of a character's is, who so reads them all, while
+ * the Gamemasters are sent the one. Every name is escaped.
+ * @param {object} command
+ * @param {Actor} giver
+ * @param {Actor[]} credited               Those given their coins, in order.
+ * @param {Record<string, number>} given   What each was given.
+ * @param {Record<string, number>} total   What they were given in all.
+ * @returns {Promise<ChatMessage|null>}    The Gamemasters' message.
+ */
+async function handOutLines(command, giver, credited, given, total) {
+  const things = coinsWords(given);
+  for ( const actor of credited ) {
+    const text = game.i18n.format("SENDINGSTONE.Chat.ReceivedFrom", {
+      name: escape(actor.name), things, giver: escape(giver.name)
+    });
+    await postLine(command, giver, text, characterPlayers(actor).map(user => user.id));
+  }
+  const text = game.i18n.format("SENDINGSTONE.Chat.HandsOut", {
+    name: escape(giver.name), each: things, names: listOf(credited.map(actor => escape(actor.name))), total: coinsWords(total)
+  });
+  return postLine(command, giver, text, game.users.filter(user => user.isGM).map(user => user.id));
 }
 
 /* -------------------------------------------- */

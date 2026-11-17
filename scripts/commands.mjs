@@ -619,7 +619,8 @@ class Poller {
  * them: so a form set to 0 hit points ends once the setting is done. Since 0.44.0 an answer to a
  * dice ask is made at once, as a Midi prompt's answer is: the roll it answers is waiting on it.
  * Since 0.48.0 coins added or taken away wait for their character's earlier commands, as a removal
- * does, and their next ones for them.
+ * does, and their next ones for them; and a character's coins handed out wait for every character
+ * given them, as a distribution does, and theirs for it.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}
@@ -651,7 +652,8 @@ function take(command, campaign) {
     if ( isId(command.turn?.combatId) ) keys = [...keys, `turn:${command.turn.combatId}`];
   } else if ( command.kind === "transfer" ) {
     keys = [...new Set([String(command.actorId), keyOf(command.transfer?.from), keyOf(command.transfer?.to),
-      ...(Array.isArray(command.transfer?.among) ? command.transfer.among.map(keyOf) : [])].filter(Boolean))];
+      ...(Array.isArray(command.transfer?.among) ? command.transfer.among.map(keyOf) : []),
+      ...(Array.isArray(command.transfer?.each) ? command.transfer.each.map(keyOf) : [])].filter(Boolean))];
   } else if ( (command.kind === "wildShape") && (command.wildShape?.op === "forms") ) {
     keys = [`forms:${command.actorId}`];
   }

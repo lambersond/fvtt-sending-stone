@@ -113,4 +113,8 @@ for v in X=1 "X=1 DND5E6=1" MIDI=1 "MIDI=1 DND5E6=1" "MIDI=1 LIBWRAPPER=1" OLD_A
 # Module 0.48.0: coins added to a character and taken away, the rule of paying in coins by worked and
 # random cases, fetched with every other switch off (dnd5e 5.3.3 and 6.0.5 stand-ins).
 for v in X=1 "X=1 DND5E6=1"; do run coins $v SLIM_CHECK=1; done
+# Module 0.48.0: a character's coins handed out to the characters picked, each whispered what they
+# received and the Gamemasters all of it, and what a failure part way leaves (dnd5e 5.3.3 and 6.0.5
+# stand-ins).
+for v in X=1 "X=1 DND5E6=1"; do run handouts $v SLIM_CHECK=1; done
 exit $fail

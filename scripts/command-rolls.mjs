@@ -716,17 +716,20 @@ function namesTurn({ turn }) {
 
 /**
  * The fields a move names what it moves by; since 0.32.0, `among` for a distribution, in place of
- * `to`.
+ * `to`; and since 0.48.0, `each` for a character's coins handed out, in place of either.
  * @type {ReadonlySet<string>}
  */
-const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among"]));
+const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among", "each"]));
 
 /**
  * Why a fetched move isn't one to make, if it isn't: it names its two ends, which differ, and what
  * moves, items by id with how many of each, each once, and coins by their keys with how many; at
  * least one of them, and nothing a roll names, and throws no dice. Since 0.32.0 a distribution names
  * the characters it shares among in place of the end it goes to: from one to MOST_AMONG of them,
- * each once, never the party itself, and coins of one kind alone, no items.
+ * each once, never the party itself, and coins of one kind alone, no items. Since 0.48.0 a hand-out
+ * names the characters each given the coins, `each`, in place of either: from one to MOST_AMONG of
+ * them, each once, never the giver, and coins as a move names them, no items. Exactly one of `to`,
+ * `among` and `each` is named.
  * @param {object} command
  * @returns {string|null}
  */
@@ -736,14 +739,18 @@ export function checkTransferCommand(command) {
   if ( namesRollFields(command) || !isObject(transfer) ) return "transfer";
   if ( Object.keys(transfer).some(key => !FIELDS.has(key)) ) return "transfer";
   if ( !isId(transfer.from) ) return "transfer";
-  if ( given(transfer.to) === given(transfer.among) ) return "transfer";
+  if ( ["to", "among", "each"].filter(key => given(transfer[key])).length !== 1 ) return "transfer";
   if ( given(transfer.to) ) {
     if ( !isId(transfer.to) || (transfer.from === transfer.to) ) return "transfer";
     if ( !given(transfer.items) && !given(transfer.currency) ) return "transfer";
-  } else {
+  } else if ( given(transfer.among) ) {
     if ( !isAmong(transfer.among, transfer.from) ) return "among";
     if ( given(transfer.items) ) return "items";
     if ( !isCoins(transfer.currency) || (Object.keys(transfer.currency).length !== 1) ) return "currency";
+  } else {
+    if ( !isAmong(transfer.each, transfer.from) ) return "each";
+    if ( given(transfer.items) ) return "items";
+    if ( !isCoins(transfer.currency) ) return "currency";
   }
   if ( given(transfer.items) && !isItemList(transfer.items) ) return "items";
   if ( given(transfer.currency) && !isCoins(transfer.currency) ) return "currency";
@@ -751,8 +758,8 @@ export function checkTransferCommand(command) {
 }
 
 /**
- * Are these the characters a distribution shares among: from one to MOST_AMONG ids, each once, none
- * the party it's from?
+ * Are these the characters a distribution shares among, or since 0.48.0 those a hand-out gives to:
+ * from one to MOST_AMONG ids, each once, none the party, or the character, it's from?
  * @param {unknown} among
  * @param {string} from
  * @returns {boolean}

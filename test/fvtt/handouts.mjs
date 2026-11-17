@@ -1,0 +1,850 @@
+// A character's coins handed out to the characters picked (module 0.48.0): the hello's
+// `features.transfers.handOut` and `.change`; the `transfer` command's `each`, its check and who may
+// make it; the total paid as coins taken away are, exactly and with other coins, and what the
+// campaign's setting off does; the writes and their order, and what a failure leaves; the whispers,
+// one to each character given coins that has a player and one to the Gamemasters, none for everyone,
+// and who the app is told may read each; the sheets ahead of the result; and hand-outs and rolls
+// waiting for one another. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real module and
+// its language file, dnd5e 5.3.3's real dice classes for its self-test, a stand-in Foundry core and
+// app; 5.3.3's coins or with DND5E6=1 6.0.5's, which may be fractional. Run with SLIM_CHECK=1 and
+// --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { settings, user, users, actors } from './stub.mjs'
+
+const MODULE = process.env.MODULE_DIR
+const DND5E6 = Boolean(process.env.DND5E6)
+import { DND5E5, DND5E6 as DND5E6_ROOT } from './paths.mjs'
+const D = DND5E6 ? `${DND5E6_ROOT}/module` : `${DND5E5}/module`
+const DICE = `${DND5E5}/module/dice`
+const ok = message => console.log('ok -', message)
+let oks = 0
+const okay = message => { oks++; ok(message) }
+
+// ---- Foundry ----
+const registry = new Map()
+globalThis.Hooks = {
+  on(name, fn) { if (!registry.has(name)) registry.set(name, []); registry.get(name).push(fn); return fn },
+  once(name, fn) {
+    const once = (...args) => { this.off(name, once); return fn(...args) }
+    return this.on(name, once)
+  },
+  off(name, fn) { registry.set(name, (registry.get(name) ?? []).filter(f => f !== fn)) },
+  call(name, ...args) {
+    for (const fn of registry.get(name) ?? []) if (fn(...args) === false) return false
+    return true
+  },
+  callAll(name, ...args) { return Promise.all((registry.get(name) ?? []).map(fn => fn(...args))).then(() => true) },
+}
+const realSetTimeout = globalThis.setTimeout
+globalThis.setTimeout = (fn, ms = 0, ...args) => realSetTimeout(fn, ms >= 1000 ? ms / 100 : ms, ...args)
+const wait = ms => new Promise(resolve => realSetTimeout(resolve, ms))
+globalThis.document ??= { hidden: false }
+CONST.DOCUMENT_OWNERSHIP_LEVELS = { INHERIT: -1, NONE: 0, LIMITED: 1, OBSERVER: 2, OWNER: 3 }
+game.documentTypes = { Actor: ['character', 'npc', 'vehicle', 'group', 'encounter'], Item: ['weapon', 'equipment', 'consumable', 'tool', 'loot', 'container', 'feat'] }
+if (DND5E6) game.system.version = '6.0.5'
+
+const { messages } = await import('./dice-core.mjs')
+const { default: BasicDie } = await import(`${DICE}/basic-die.mjs`)
+const { default: BasicRoll } = await import(`${DICE}/basic-roll.mjs`)
+const { default: D20Die } = await import(`${DICE}/d20-die.mjs`)
+const { default: D20Roll } = await import(`${DICE}/d20-roll.mjs`)
+Object.assign(CONFIG.Dice, { BasicDie, BasicRoll, D20Die, D20Roll })
+CONFIG.Dice.terms.d = BasicDie
+CONFIG.DND5E = {
+  skills: { prc: { label: 'Perception', ability: 'wis' } },
+  tools: {},
+  abilities: Object.fromEntries(['str', 'dex', 'con', 'int', 'wis', 'cha'].map(key => [key, { label: key.toUpperCase(), abbreviation: key }])),
+  defaultAbilities: { initiative: 'dex' },
+  spellcasting: { spell: { exclusive: { spells: false, slots: false } }, pact: { exclusive: { spells: false, slots: false } } },
+  damageTypes: { fire: { label: 'Fire' } },
+  healingTypes: { healing: { label: 'Healing' } },
+  // dnd5e's coins, in its order, each with its abbreviation as the sheet shows it and its rate, how
+  // many make one gp (config.mjs, `conversion`, the same in 5.3.3 and 6.0.5).
+  currencies: Object.fromEntries(Object.entries({ pp: 0.1, gp: 1, ep: 2, sp: 10, cp: 100 })
+    .map(([id, conversion]) => [id, { label: `DND5E.Currency${id.toUpperCase()}`, abbreviation: id, conversion }])),
+  weightUnits: { lb: { abbreviation: 'lb' } },
+}
+globalThis.dnd5e = { settings: { rulesVersion: 'modern' } }
+settings.set('messageMode', 'public')
+settings.set('criticalDamageModifiers', false)
+settings.set('criticalDamageMaxDice', false)
+
+// The module's own words, from its language file, as Foundry's i18n gives them.
+const flat = (object, prefix = '') => Object.entries(object).flatMap(([key, value]) => (typeof value === 'object')
+  ? flat(value, `${prefix}${key}.`) : [[`${prefix}${key}`, value]])
+const words = Object.fromEntries(flat(JSON.parse(readFileSync(`${MODULE}/lang/en.json`, 'utf8'))))
+game.i18n.localize = key => words[key] ?? key
+game.i18n.has = key => Object.hasOwn(words, key)
+game.i18n.format = (key, data = {}) => (words[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => String(data[name] ?? ''))
+// Foundry's escapeHTML (common/utils/helpers.mjs) and deleteProperty (common/utils/helpers.mjs).
+foundry.utils.escapeHTML = value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' })[ch])
+foundry.utils.deleteProperty = (object, key) => {
+  const parts = key.split('.')
+  const parent = parts.slice(0, -1).reduce((o, part) => o?.[part], object)
+  if (!parent || !(parts.at(-1) in parent)) return false
+  delete parent[parts.at(-1)]
+  return true
+}
+foundry.applications.ux.TextEditor = { implementation: { async enrichHTML(html) { return html } } }
+
+/* -------------------------------------------- */
+/*  Embedded items, as Foundry's documents      */
+/* -------------------------------------------- */
+
+export class Collection extends Map {
+  /** As Foundry's: its values, not its entries. */
+  [Symbol.iterator]() { return this.values() }
+  get contents() { return [...this.values()] }
+  find(fn) { return this.contents.find(fn) }
+  filter(fn) { return this.contents.filter(fn) }
+  map(fn) { return this.contents.map(fn) }
+  some(fn) { return this.contents.some(fn) }
+  reduce(fn, start) { return this.contents.reduce(fn, start) }
+  first() { return this.contents[0] }
+}
+
+/** Every write made, in order: [what, actor or item id, changes or ids], and the switches that make one fail or wait. */
+const writes = []
+const faults = { failCreate: null, failDelete: null, failUpdate: null, hold: null, refuse: null }
+const fault = (kind, target, changes) => {
+  if (faults[kind]?.(target, changes)) throw new Error(`${kind} of ${target.id} refused`)
+}
+/**
+ * Does a module's pre-hook refuse this write, as `refuse('create'|'update'|'delete', document, entry)`
+ * says? Foundry then leaves it out without throwing: a create or delete makes the rest, an update
+ * resolves to nothing, and no hook after fires for it.
+ */
+const refused = (what, target, entry) => faults.refuse?.(what, target, entry) === true
+const holding = async (target, changes) => {
+  const hold = faults.hold
+  if (hold?.when(target, changes)) { faults.hold = null; hold.held = true; await hold.until }
+}
+/** Hold the next write this matches until let go. */
+function hold(when) {
+  let release
+  faults.hold = { when, until: new Promise(resolve => { release = resolve }) }
+  const held = faults.hold
+  return { release: () => release(), get held() { return held.held === true } }
+}
+const clearFaults = () => Object.assign(faults, { failCreate: null, failDelete: null, failUpdate: null, hold: null, refuse: null })
+const turn = () => new Promise(resolve => setImmediate(resolve))
+
+/** An item a character or group holds, as Foundry's Item with dnd5e's data prepared: its name unidentified as dnd5e names it (identifiable.mjs:58-62), its uses' value, a container's contents. */
+class HarnessItem {
+  constructor(data, parent) {
+    this.parent = parent
+    this._source = structuredClone(data)
+    this.prepare()
+  }
+  get id() { return this._source._id }
+  get _id() { return this._source._id }
+  get documentName() { return 'Item' }
+  get uuid() { return `${this.parent.uuid}.Item.${this.id}` }
+  get actor() { return this.parent }
+  get isEmbedded() { return true }
+  get pack() { return null }
+  prepare() {
+    const source = this._source
+    const item = this
+    this.type = source.type
+    this.img = source.img ?? `${source._id}.webp`
+    this.sort = source.sort ?? 0
+    this.flags = structuredClone(source.flags ?? {})
+    this._stats = structuredClone(source._stats ?? {})
+    this.effects = new Collection((source.effects ?? []).map(effect => [effect._id, structuredClone(effect)]))
+    const system = structuredClone(source.system ?? {})
+    system.properties = new Set(source.system?.properties ?? [])
+    if (system.uses) Object.defineProperty(system.uses, 'value', { get() { return Math.max((this.max ?? 0) - (this.spent ?? 0), 0) } })
+    if (source.type === 'container') {
+      // container.mjs:107-140: what it holds, from its actor's items, and all of it at any depth.
+      Object.defineProperty(system, 'contents', {
+        get: () => new Collection(item.parent.items.filter(other => other.system.container === item.id).map(other => [other.id, other])),
+      })
+      Object.defineProperty(system, 'allContainedItems', {
+        get() {
+          return this.contents.reduce((all, inner) => {
+            all.set(inner.id, inner)
+            if (inner.type === 'container') inner.system.allContainedItems.forEach(deeper => all.set(deeper.id, deeper))
+            return all
+          }, new Collection())
+        },
+      })
+    }
+    this.system = system
+    this.name = ((system.identified === false) && system.unidentified?.name) ? system.unidentified.name : source.name
+    this.labels = { properties: [] }
+  }
+  toObject() { return structuredClone(this._source) }
+  getFlag(scope, key) { return foundry.utils.getProperty(this.flags?.[scope] ?? {}, key) }
+  async update(changes) {
+    writes.push(['updateItem', this.id, changes])
+    await holding(this, changes)
+    await turn()
+    fault('failUpdate', this, changes)
+    if (refused('update', this, changes)) return undefined
+    for (const [path, value] of Object.entries(changes)) foundry.utils.setProperty(this._source, path, value)
+    this.prepare()
+    await Hooks.callAll('updateItem', this, foundry.utils.expandObject(changes), {}, 'gm')
+    return this
+  }
+}
+globalThis.Item = HarnessItem
+
+/** dnd5e's Item5e, as far as moving uses it: its own createWithContents, read from its source. */
+const PhysicalItemTemplate = { MAX_DEPTH: 5 }
+const itemSource = readFileSync(`${D}/documents/item.mjs`, 'utf8').split('\n')
+const [first, last] = DND5E6 ? [1303, 1335] : [1278, 1310]
+const method = itemSource.slice(first - 1, last).join('\n')
+assert.match(method, /^\s*static async createWithContents\(items, \{ container, keepId=false, transformAll, transformFirst \}=\{\}\) \{/)
+const Item5e = new Function('Item', 'PhysicalItemTemplate', `return class Item5e extends Item {\n${method}\n}`)(HarnessItem, PhysicalItemTemplate)
+CONFIG.Item = { documentClass: Item5e }
+const copiedBy = []
+const createWithContents = Item5e.createWithContents
+Item5e.createWithContents = function (items, options) {
+  copiedBy.push(items.map(item => item.id))
+  return createWithContents.call(this, items, options)
+}
+// Foundry's WorldCollection#fromCompendium, as createWithContents calls it [core, unverified: what it keeps]:
+// the document's data, its id, sort and ownership kept as asked.
+game.items = {
+  fromCompendium(document, { keepId = false, clearSort = true, clearOwnership = true } = {}) {
+    const data = document.toObject()
+    if (!keepId) delete data._id
+    if (clearSort) delete data.sort
+    if (clearOwnership) delete data.ownership
+    return data
+  },
+}
+
+/**
+ * An actor's items and writes, as Foundry's: each write recorded, a create or delete as one call
+ * with its ids, firing createItem, deleteItem or updateActor, as each client would.
+ */
+function embed(actor, items = []) {
+  actor.items = new Collection()
+  for (const data of items) actor.items.set(data._id, new HarnessItem(data, actor))
+  actor._source ??= {}
+  actor._source.name = actor.name
+  actor._source.system = { currency: { pp: 0, gp: 0, ep: 0, sp: 0, cp: 0, ...actor.coins } }
+  delete actor.coins
+  actor.prepareCurrency = function () {
+    // dnd5e 6 rounds a coin down for the sheet, its source keeping the fraction (D6 data/shared/currency.mjs:43-47).
+    this.system.currency = Object.fromEntries(Object.entries(this._source.system.currency).map(([key, value]) => [key, DND5E6 ? Math.floor(value) : value]))
+  }
+  actor.prepareCurrency()
+  actor.update = async function (changes) {
+    writes.push(['updateActor', this.id, changes])
+    await holding(this, changes)
+    await turn()
+    fault('failUpdate', this, changes)
+    if (refused('update', this, changes)) return undefined
+    for (const [path, value] of Object.entries(changes)) foundry.utils.setProperty(this._source, path, value)
+    for (const [path, value] of Object.entries(changes)) if (!path.startsWith('system.currency.')) foundry.utils.setProperty(this, path, value)
+    this.prepareCurrency()
+    await Hooks.callAll('updateActor', this, foundry.utils.expandObject(changes), {}, 'gm')
+    return this
+  }
+  actor.createEmbeddedDocuments = async function (type, data, options = {}) {
+    writes.push(['create', this.id, data.map(entry => entry._id ?? null), { keepId: options.keepId === true }])
+    await holding(this, data)
+    await turn()
+    fault('failCreate', this, data)
+    const made = data.filter(entry => !refused('create', this, entry)).map(entry => {
+      const source = structuredClone(entry)
+      source._id = (options.keepId && source._id) ? source._id : foundry.utils.randomID()
+      const item = new HarnessItem(source, this)
+      this.items.set(item.id, item)
+      return item
+    })
+    for (const item of made) await Hooks.callAll('createItem', item, options, 'gm')
+    return made
+  }
+  actor.deleteEmbeddedDocuments = async function (type, ids) {
+    writes.push(['delete', this.id, [...ids]])
+    await holding(this, ids)
+    await turn()
+    fault('failDelete', this, ids)
+    // As Foundry's: one that isn't there refuses the whole call.
+    const missing = ids.find(id => !this.items.has(id))
+    if (missing) throw new Error(`Item ${missing} does not exist`)
+    const gone = ids.map(id => this.items.get(id)).filter(item => !refused('delete', this, item))
+    for (const item of gone) this.items.delete(item.id)
+    for (const item of gone) await Hooks.callAll('deleteItem', item, {}, 'gm')
+    return gone
+  }
+  return actor
+}
+
+/* -------------------------------------------- */
+/*  The world                                   */
+/* -------------------------------------------- */
+
+const { Actor5e } = await import('./actor5e.mjs')
+const { equip } = await import('./activity5e.mjs')
+users.activeGM = user('gm', 'Gamemaster', true)
+users.get('gm').targets = new Set()
+for (const [id, name] of [['alice', 'Alice'], ['bob', 'Bob'], ['carol', 'Carol'], ['eve', 'Eve']]) user(id, name)
+
+/** A character, as dnd5e's, with its items and coins. */
+function character(id, name, owners, { items = [], coins = {}, npc = null } = {}) {
+  const actor = new Actor5e({ id, name, owners, npc })
+  equip(actor, { items: [] })
+  actor.documentName = 'Actor'
+  actor.coins = coins
+  actors.set(id, embed(actor, items))
+  return actor
+}
+/** A Group actor's members, as dnd5e 5.3.3 prepares them (data/actor/group.mjs:148-172). */
+function membersOf(members) {
+  const list = members.map(member => ({ actor: member }))
+  Object.defineProperty(list, 'ids', { value: new Set(members.map(member => member.id)), enumerable: false })
+  return list
+}
+/** A Group actor, with its items and coins. */
+function group(id, name, { members = [], ownership = {}, items = [], coins = {} } = {}) {
+  const g = {
+    documentName: 'Actor', id, name, type: 'group', uuid: `Actor.${id}`, img: `${id}.webp`, flags: {},
+    ownership: { default: 0, ...ownership },
+    system: { members: membersOf(members), description: { full: '', summary: '' } },
+    coins,
+    getUserLevel(u) { return u.isGM ? 3 : (this.ownership[u.id] ?? this.ownership.default ?? 0) },
+    testUserPermission(u, level) { return this.getUserLevel(u) >= CONST.DOCUMENT_OWNERSHIP_LEVELS[level] },
+  }
+  actors.set(id, embed(g, items))
+  return g
+}
+
+let serial = 0
+const nextId = prefix => `${prefix}${String(++serial).padStart(16 - prefix.length, '0')}`
+const POTION = 'Compendium.dnd5e.items.Item.phb-potion'
+/** An item's data as Foundry stores it. */
+const itemData = (name, type, system = {}, { id, source, effects = [], ...fields } = {}) => ({
+  _id: id ?? nextId(name.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8) || 'item'),
+  name, type, img: 'icons/item.webp', sort: 0, flags: {},
+  _stats: source ? { compendiumSource: source } : {}, effects,
+  system: { quantity: 1, identified: true, description: { value: '' }, weight: { value: 1, units: 'lb' }, ...system },
+  ...fields,
+})
+const potion = (quantity, options = {}) => itemData('Potion of Healing', 'consumable',
+  { quantity, uses: { max: 1, spent: 0, recovery: [] } }, { source: POTION, ...options })
+
+// Thorin (Alice), Vex (Bob), Bram (Carol) and Lia, whom no player owns: the campaign's characters.
+// Grumble, an NPC, is a member of the Company but none of the campaign's characters. Ash (Eve) is one
+// of the campaign's characters but no member of any party, so that a distribution naming as many
+// characters as the Company has, but not the same ones, can be told from one naming its own.
+const thorin = character('thorin', 'Thorin', ['alice'], { coins: { gp: 40 } })
+const vex = character('vex', 'Vex', ['bob'], { coins: { gp: 12 } })
+const bram = character('bram', 'Bram', ['carol'])
+const lia = character('lia', 'Lia', [])
+const grumble = character('grumble', 'Grumble', [], { npc: { max: 2, spent: 0, denomination: 'd8' } })
+const stranger = character('stranger', 'Stranger', ['eve'], { coins: { gp: 5 } })
+const ash = character('ash', 'Ash', ['eve'])
+// The Company's coins: dnd5e 6 keeps a fraction of a coin, its sheet showing it rounded down.
+const COMPANY_GP = DND5E6 ? 103.5 : 103
+const companyStock = () => [
+  itemData('Rope', 'loot', { quantity: 2 }, { id: 'rope000000000001' }),
+  potion(3, { id: 'potc000000000001' }),
+  itemData('Backpack', 'container', {}, { id: 'pack000000000001' }),
+  itemData('Bedroll', 'loot', { container: 'pack000000000001' }, { id: 'bedr000000000001' }),
+]
+const COMPANY_COINS = { pp: 4, gp: COMPANY_GP, sp: 8, cp: 3 }
+const party = group('party', 'The Iron Company', {
+  members: [thorin, vex, bram, lia, grumble], ownership: { alice: 3, bob: 2 },
+  items: companyStock(), coins: COMPANY_COINS,
+})
+const wardens = group('wardens', 'Wardens of the Vale', {
+  members: [thorin, vex], ownership: { alice: 3, bob: 3 }, items: [potion(1, { id: 'potw000000000001' })], coins: { gp: 10 },
+})
+const silent = group('silent', 'The Silent Order', { members: [vex], items: [], coins: { gp: 30 } })
+Object.defineProperty(actors, 'party', { get: () => actors.get('party') ?? null, configurable: true })
+users.get('alice').character = thorin
+users.get('bob').character = vex
+users.get('carol').character = bram
+
+/* -------------------------------------------- */
+/*  The app                                     */
+/* -------------------------------------------- */
+
+const app = { events: [], polls: [], waiting: new Map(), wake: null, features: { commands: true, transfers: 1, groups: 1, coins: 1 } }
+const json = body => ({ ok: true, status: 200, statusText: 'OK', headers: new Headers({ 'content-type': 'application/json' }), json: async () => body })
+globalThis.fetch = async (url, init) => {
+  const body = JSON.parse(init.body)
+  if (String(url).endsWith('/api/events')) {
+    app.events.push(body)
+    const announcing = ['bridge.hello', 'bridge.heartbeat'].includes(body.type)
+    return announcing ? json({ features: app.features }) : { ok: true, status: 204, statusText: 'No Content', headers: new Headers() }
+  }
+  if (String(url).endsWith('/api/bridge/commands')) {
+    app.polls.push({ at: performance.now(), body })
+    const id = body.campaign.id
+    if (!app.waiting.get(id)?.length) {
+      await new Promise(resolve => {
+        const timer = realSetTimeout(resolve, 30)
+        app.wake = () => { clearTimeout(timer); resolve() }
+        init.signal?.addEventListener('abort', resolve, { once: true })
+      })
+    }
+    const commands = app.waiting.get(id) ?? []
+    app.waiting.set(id, [])
+    return json({ commands })
+  }
+  throw new TypeError(`Unexpected fetch of ${url}`)
+}
+async function until(test, what, ms = 4000) {
+  const end = Date.now() + ms
+  while (!test()) {
+    if (Date.now() > end) throw new Error(`Timed out waiting for ${what}`)
+    await wait(5)
+  }
+}
+const resultsOf = id => app.events.filter(e => (e.type === 'command.result') && (e.data.id === id)).map(e => e.data)
+const resultIndex = id => app.events.findIndex(e => (e.type === 'command.result') && (e.data.id === id))
+let ids = 0
+/** A move as the app hands it over. */
+const move = (actorId, transfer, fields = {}) => ({
+  id: `move-${++ids}`, actorId, kind: 'transfer', transfer, mode: 0, explicit: false, extras: [], dice: [], ...fields,
+})
+/** Hand the module commands in one fetch; resolve once each has its result, with what was posted meanwhile and the line it made. */
+async function fetched(...commands) {
+  const from = app.events.length
+  const madeBefore = messages.size
+  app.waiting.set('camp-a', [...(app.waiting.get('camp-a') ?? []), ...commands])
+  app.wake?.()
+  await until(() => commands.every(command => resultIndex(command.id) >= 0), `the result of ${commands.map(c => c.id).join(', ')}`)
+  const lines = [...messages.values()].slice(madeBefore)
+  return commands.map(command => {
+    const index = resultIndex(command.id)
+    return {
+      command, result: app.events[index].data, after: app.events.slice(from, index),
+      line: lines.find(line => line.flags?.['sending-stone']?.request === command.id) ?? null,
+    }
+  })
+}
+const sent = async (...args) => (await fetched(move(...args)))[0]
+const refusal = ({ result }) => [result.status, result.reason, result.error]
+/** The sheets a move sent between its fetch and its result. */
+const sheetsIn = ({ after }) => after.filter(e => ['group.updated', 'character.updated'].includes(e.type)).map(e => [e.type, (e.data.group ?? e.data.character).id])
+const lineOf = made => made.line?.content?.replace(/^<p>|<\/p>$/g, '') ?? null
+
+// ---- Start-up ----
+await import(`${MODULE}/scripts/module.mjs`)
+await Hooks.callAll('init')
+settings.set('listenerUrl', 'https://stone.example')
+settings.set('chatEvents', true)
+settings.set('campaignSecrets', { 'camp-a': 'ashlands-secret' })
+const CAMPAIGN = { id: 'camp-a', title: 'Ashlands', characters: ['thorin', 'vex', 'bram', 'lia', 'ash'], groups: ['party', 'wardens', 'silent'], rolls: false, attacks: false, transfers: true }
+const campaignAs = (change = {}) => settings.set('campaigns', [{ ...CAMPAIGN, ...change }])
+campaignAs()
+await Hooks.callAll('ready')
+const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)
+const { announce } = await import(`${MODULE}/scripts/bridge.mjs`)
+const { getCampaigns } = await import(`${MODULE}/scripts/campaigns.mjs`)
+await until(() => app.events.some(e => e.type === 'bridge.hello'), 'the hello')
+await wait(60)
+assert.equal(diceStatus.ready, true, `self-test: ${diceStatus.error}`)
+okay('the self-test still passes')
+
+/** Give an actor these items, and these coins, in place of what it had. */
+function stock(actor, items = [], coins = null) {
+  actor.items.clear()
+  for (const data of items) actor.items.set(data._id, new HarnessItem(data, actor))
+  if (coins) {
+    actor._source.system.currency = { pp: 0, gp: 0, ep: 0, sp: 0, cp: 0, ...coins }
+    actor.prepareCurrency()
+  }
+}
+/** Everyone as the world began. */
+function restock() {
+  stock(party, companyStock(), COMPANY_COINS)
+  stock(wardens, [potion(1, { id: 'potw000000000001' })], { gp: 10 })
+  stock(silent, [], { gp: 30 })
+  stock(thorin, [], { gp: 40 })
+  stock(vex, [], { gp: 12 })
+  stock(bram, [], {})
+  stock(lia, [], {})
+  stock(ash, [], {})
+  party.system.members = membersOf([thorin, vex, bram, lia, grumble])
+}
+const holds = actor => actor.items.map(item => [item.name, item._source.system.quantity, item._source.system.container ?? null])
+const coinsOf = actor => ({ ...actor._source.system.currency })
+const settle = () => wait(320)
+const helloOf = () => app.events.filter(e => (e.type === 'bridge.hello') && (e.campaign.id === 'camp-a')).at(-1)
+const { transferFeatures } = await import(`${MODULE}/scripts/command-transfers.mjs`)
+/** The campaign's hello sent afresh, as a change to its settings sends it, and answered. */
+async function hello() {
+  const hellos = () => app.events.filter(e => e.type === 'bridge.hello').length
+  const before = hellos()
+  announce()
+  await until(() => hellos() > before, 'the hello')
+  await wait(60)
+}
+/** A hand-out as the app hands it over: so many of each coin to each of these, from the character it's made as. */
+const handOut = (actorId, each, currency, fields = {}) => move(actorId, { from: actorId, each, currency }, fields)
+const handed = async (...args) => (await fetched(handOut(...args)))[0]
+/** Coins taken away, as the app hands the command over. */
+const taking = (actorId, currency) => ({ id: `coins-${++ids}`, actorId, kind: 'coins', coins: { op: 'remove', currency }, mode: 0, explicit: false, extras: [], dice: [] })
+/** The coins an actor stores, those it has any of. */
+const purse = actor => Object.fromEntries(Object.entries(coinsOf(actor)).filter(([, n]) => n))
+/** Every message a command made, in the order made, and what each says, to whom, as whom and by whom. */
+const saidBy = made => [...messages.values()].filter(message => message.flags?.['sending-stone']?.request === made.command.id)
+const told = message => [message.content.replace(/^<p>|<\/p>$/g, ''), [...message.whisper], message.speaker.actor, message.author.id]
+/** The chat event the app was sent for a message, if it was sent one. */
+const chatOf = id => app.events.find(e => (e.type === 'chat.message.created') && (e.data.message.id === id))
+const THREE = ['vex', 'bram', 'lia']
+const RICH = { pp: 700, gp: 20 }
+const EACH = { pp: 200, gp: 50 }
+
+/* -------------------------------------------- */
+/*  The hello                                   */
+/* -------------------------------------------- */
+
+const ON = { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true, handOut: true, change: true }
+const off = reason => ({ enabled: false, kinds: [], reason, partySends: false, distribute: false, handOut: false, change: false })
+const KEYS = ['enabled', 'kinds', 'reason', 'partySends', 'distribute', 'handOut', 'change']
+assert.deepEqual(helloOf().data.features.transfers, ON)
+assert.deepEqual(Object.keys(helloOf().data.features.transfers), KEYS, 'ending with handOut and change')
+const [campaign] = getCampaigns()
+assert.deepEqual(transferFeatures({ ...campaign, coinChange: false }), { ...ON, change: false })
+assert.deepEqual(transferFeatures({ ...campaign, coins: false }), ON, "whatever the switch for coins added and taken away")
+assert.deepEqual([transferFeatures({ ...campaign, transfers: false }), Object.keys(transferFeatures({ ...campaign, transfers: false }))], [off('off'), KEYS])
+game.system.id = 'pf2e'
+assert.deepEqual([transferFeatures(campaign), Object.keys(transferFeatures(campaign))], [off('system'), KEYS])
+game.system.id = 'dnd5e'
+campaignAs({ coinChange: false })
+await hello()
+assert.deepEqual(helloOf().data.features.transfers, { ...ON, change: false })
+campaignAs()
+await hello()
+okay("the hello's features.transfers ends with `handOut`, true wherever moves are made, and `change`, the campaign's Pay with other coins there; both false while moves are off or under another system, whatever the switch for coins added and taken away")
+
+/* -------------------------------------------- */
+/*  The command                                 */
+/* -------------------------------------------- */
+
+restock()
+await settle()
+let unchanged = writes.length
+let lines = messages.size
+const shaped = transfer => move('thorin', transfer)
+for (const [command, error, why] of [
+  [shaped({ from: 'thorin', each: ['vex'], to: 'bram', currency: { gp: 1 } }), 'transfer', 'each with to'],
+  [shaped({ from: 'thorin', each: ['vex'], among: ['bram'], currency: { gp: 1 } }), 'transfer', 'each with among'],
+  [shaped({ from: 'thorin', each: ['vex'], to: 'bram', among: ['lia'], currency: { gp: 1 } }), 'transfer', 'all three'],
+  [shaped({ from: 'thorin', each: ['vex'], currency: { gp: 1 }, extra: true }), 'transfer', 'a field of its own besides'],
+  [handOut('thorin', ['vex'], { gp: 1 }, { target: 'vex' }), 'transfer', "a roll's field beside it"],
+  [handOut('thorin', [], { gp: 1 }), 'each', 'no one'],
+  [handOut('thorin', Array.from({ length: 21 }, (_, n) => `char${String(n).padStart(12, '0')}`), { gp: 1 }), 'each', '21 of them'],
+  [handOut('thorin', ['vex', 'bram', 'vex'], { gp: 1 }), 'each', 'one twice'],
+  [handOut('thorin', ['vex', 'thorin'], { gp: 1 }), 'each', 'the giver among them'],
+  [handOut('thorin', ['vex', ''], { gp: 1 }), 'each', 'an id that is none'],
+  [handOut('thorin', 'vex', { gp: 1 }), 'each', 'no list'],
+  [shaped({ from: 'thorin', each: ['vex'], currency: { gp: 1 }, items: [{ id: 'rope000000000001', quantity: 1 }] }), 'items', 'with items'],
+  [shaped({ from: 'thorin', each: ['vex'] }), 'currency', 'no coins'],
+  [handOut('thorin', ['vex'], {}), 'currency', 'no coin'],
+  [handOut('thorin', ['vex'], { zz: 1 }), 'currency', 'a coin dnd5e has not'],
+  [handOut('thorin', ['vex'], { gp: 0 }), 'currency', 'none of a coin'],
+  [handOut('thorin', ['vex'], { gp: 1.5 }), 'currency', 'a fraction of a coin'],
+  [handOut('thorin', ['vex'], { gp: 10_000_001 }), 'currency', 'more than 10,000,000 of a coin'],
+  [handOut('thorin', ['vex'], { gp: 1 }, { dice: [{ faces: 20, results: [3] }] }), 'dice', 'dice'],
+  [handOut('thorin', ['vex'], { gp: 1 }, { of: 'thorin' }), 'of', "a companion's"],
+  [handOut('thorin', ['vex'], { gp: 1 }, { by: 'player' }), 'by', 'by anyone but the Gamemaster'],
+]) {
+  assert.deepEqual(refusal((await fetched(command))[0]), ['failed', 'invalid', error], why)
+}
+// Twenty is no more than a hand-out names: these twenty are no one's, which the check doesn't ask.
+assert.deepEqual(refusal(await handed('thorin', Array.from({ length: 20 }, (_, n) => `char${String(n).padStart(12, '0')}`), { gp: 1 })), ['failed', 'unknown', null], 'twenty are taken')
+assert.deepEqual([writes.length, messages.size], [unchanged, lines], 'nothing written or posted')
+okay('refuses a hand-out with `to` or `among` too, a field of its own besides, or a roll\'s field, `transfer`; `each` empty, of 21, with one twice, the giver, one not an id, or no list, `each`; with items, `items`; without 1 or more of dnd5e\'s coins, each a whole number from 1 to 10,000,000, `currency`; `dice`, `of` and `by` as every move\'s; twenty are taken')
+
+/* -------------------------------------------- */
+/*  Who may                                     */
+/* -------------------------------------------- */
+
+restock()
+stock(ash, [], { gp: 9 })
+// A form of Ash's, as dnd5e's transformInto makes one.
+const form = character('ashform', 'Ash (Wolf)', ['eve'], { coins: { gp: 3 } })
+await settle()
+unchanged = writes.length
+lines = messages.size
+const one = { gp: 1 }
+for (const [actorId, transfer, fields, reason, why, before] of [
+  ['thorin', { from: 'vex', each: ['bram'], currency: one }, {}, 'not-yours', "from another's character"],
+  ['vex', { from: 'thorin', each: ['bram'], currency: one }, { by: 'gm' }, 'not-yours', "the Gamemaster's, made as another than the giver"],
+  ['thorin', { from: 'party', each: ['vex'], currency: one }, {}, 'not-yours', 'from a party its player owns'],
+  ['thorin', { from: 'party', each: ['vex'], currency: one }, { by: 'gm' }, 'not-yours', "the Gamemaster's from a party"],
+  ['vex', { from: 'party', each: ['bram'], currency: one }, {}, 'not-owner', 'from a party its player observes'],
+  ['thorin', { from: 'silent', each: ['vex'], currency: one }, {}, 'unknown', "from a party its player can't see"],
+  ['thorin', { from: 'thorin', each: ['vex', 'party'], currency: one }, {}, 'unknown', 'a party among those picked'],
+  ['thorin', { from: 'thorin', each: ['vex', 'silent'], currency: one }, {}, 'unknown', "a party its player can't see among them"],
+  ['thorin', { from: 'thorin', each: ['vex', 'stranger'], currency: one }, {}, 'unknown', 'an actor outside the campaign among them'],
+  ['thorin', { from: 'thorin', each: ['vex', 'grumble'], currency: one }, {}, 'unknown', 'an NPC among them'],
+  ['thorin', { from: 'thorin', each: ['vex', 'nobody'], currency: one }, {}, 'unknown', 'one that is none among them'],
+  ['stranger', { from: 'stranger', each: ['vex'], currency: one }, {}, 'unknown', 'from an actor outside the campaign'],
+  ['thorin', { from: 'thorin', each: ['vex', 'ash'], currency: one }, {}, 'shaped', 'to a character transformed', () => { form.flags.dnd5e = { isPolymorphed: true, originalActor: 'ash' } }],
+  ['ash', { from: 'ash', each: ['vex'], currency: one }, {}, 'shaped', 'from a character transformed'],
+  ['thorin', { from: 'thorin', each: ['vex', 'ashform'], currency: one }, {}, 'unknown', 'to her form'],
+]) {
+  before?.()
+  const made = (await fetched(move(actorId, transfer, fields)))[0]
+  assert.deepEqual([refusal(made), sheetsIn(made)], [['failed', reason, null], []], why)
+}
+assert.deepEqual([writes.length, messages.size, purse(thorin), purse(vex), coinsOf(party).gp], [unchanged, lines, { gp: 40 }, { gp: 12 }, COMPANY_GP], 'nothing written or posted')
+actors.delete('ashform')
+campaignAs({ transfers: false })
+assert.deepEqual([refusal(await handed('thorin', ['vex'], one)), writes.length], [['failed', 'transfers-off', null], unchanged], 'moves off')
+campaignAs({ coins: false })
+let made = await handed('thorin', ['vex'], one)
+assert.equal(made.result.status, 'done', 'made with coins added and taken away off: it follows Players move items and coins')
+campaignAs()
+okay("refuses a hand-out from another's character, or the Gamemaster's made as another than the giver, `not-yours`; from a party, `not-yours` where its player owns it and for the Gamemaster, `not-owner` where they observe it, `unknown` where they can't see it; with a party, an actor outside the campaign, an NPC or no one among those picked, `unknown`; to or from a character transformed, `shaped`; with moves off, `transfers-off`: none writes, posts or sends a sheet; and it's made whatever the switch for coins added and taken away")
+
+/* -------------------------------------------- */
+/*  Handed out exactly                          */
+/* -------------------------------------------- */
+
+restock()
+await settle()
+let at = writes.length
+lines = messages.size
+made = await handed('thorin', ['vex', 'bram'], { gp: 10 })
+assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+assert.deepEqual([purse(thorin), purse(vex), purse(bram)], [{ gp: 20 }, { gp: 22 }, { gp: 10 }])
+assert.deepEqual(writes.slice(at), [
+  ['updateActor', 'thorin', { 'system.currency.gp': 20 }],
+  ['updateActor', 'vex', { 'system.currency.gp': 22 }], ['updateActor', 'bram', { 'system.currency.gp': 10 }],
+], "the giver's first, in one write, then each one's in the order named")
+let said = saidBy(made)
+assert.deepEqual(said.map(told), [
+  ['Vex received 10 gp from Thorin', ['bob'], 'thorin', 'alice'],
+  ['Bram received 10 gp from Thorin', ['carol'], 'thorin', 'alice'],
+  ['Thorin handed out 10 gp each to Vex and Bram: 20 gp in all', ['gm'], 'thorin', 'alice'],
+])
+assert.equal(messages.size, lines + 3, 'and no other')
+assert.ok(said.every(message => (message.whisper.length > 0) && (message.blind === false)), 'none for everyone')
+assert.ok(said.every(message => JSON.stringify(message.flags['sending-stone']) === JSON.stringify({ request: made.command.id })))
+assert.deepEqual(made.result, {
+  id: made.command.id, status: 'done', reason: null, error: null, messageId: said.at(-1).id, visible: true, rolls: [],
+  transfer: { from: 'thorin', to: null, items: [], currency: { gp: 10 }, each: ['vex', 'bram'], used: null },
+})
+assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ['character.updated', 'vex'], ['character.updated', 'bram']], "the giver's, then each one's given, in order")
+okay('Thorin hands out 10 gp each to Vex and Bram: 20 gp taken from him in one write, then 10 added to each in the order named; "Vex received 10 gp from Thorin" whispered to Bob, "Bram received 10 gp from Thorin" to Carol, and "Thorin handed out 10 gp each to Vex and Bram: 20 gp in all" to the Gamemaster, each as Thorin, by Alice, none for everyone; his sheet, then theirs, ahead of the result, whose `transfer` says what each was given, `each` and `used` null, its message the Gamemaster\'s')
+
+/* -------------------------------------------- */
+/*  With other coins                            */
+/* -------------------------------------------- */
+
+restock()
+stock(thorin, [], RICH)
+await settle()
+at = writes.length
+lines = messages.size
+made = await handed('thorin', THREE, { gp: 50, pp: 200 })
+assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+assert.deepEqual([purse(thorin), purse(vex), purse(bram), purse(lia)], [{ pp: 87 }, { pp: 200, gp: 62 }, { pp: 200, gp: 50 }, { pp: 200, gp: 50 }])
+assert.deepEqual(writes.slice(at), [
+  ['updateActor', 'thorin', { 'system.currency.pp': 87, 'system.currency.gp': 0 }],
+  ['updateActor', 'vex', { 'system.currency.pp': 200, 'system.currency.gp': 62 }],
+  ['updateActor', 'bram', { 'system.currency.pp': 200, 'system.currency.gp': 50 }],
+  ['updateActor', 'lia', { 'system.currency.pp': 200, 'system.currency.gp': 50 }],
+])
+said = saidBy(made)
+assert.deepEqual(said.map(told), [
+  ['Vex received 200 pp and 50 gp from Thorin', ['bob'], 'thorin', 'alice'],
+  ['Bram received 200 pp and 50 gp from Thorin', ['carol'], 'thorin', 'alice'],
+  ['Thorin handed out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all', ['gm'], 'thorin', 'alice'],
+], 'none for Lia, whom no player owns, though the Gamemaster is told of her')
+assert.equal(messages.size, lines + 3)
+assert.ok([...messages.values()].slice(-3).every(message => message.whisper.length > 0), 'none for everyone')
+assert.deepEqual([Object.keys(made.result.transfer.currency), made.result.transfer], [['pp', 'gp'], { from: 'thorin', to: null, items: [], currency: EACH, each: THREE, used: { pp: 13 } }], 'what each was given, never the total')
+assert.deepEqual([made.result.messageId, made.result.visible], [said.at(-1).id, true])
+assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ...THREE.map(id => ['character.updated', id])])
+// Who the app is told may read each: the one given and the giver, whose player wrote it; the Gamemasters' message, the giver alone.
+assert.deepEqual(said.map(message => { const { audience } = chatOf(message.id).data.message; return [audience.public, audience.gmOnly, [...audience.users].sort(), [...audience.characters].sort()] }), [
+  [false, false, ['alice', 'bob'], ['thorin', 'vex']], [false, false, ['alice', 'carol'], ['bram', 'thorin']], [false, false, ['alice'], ['thorin']],
+])
+okay("700 pp and 20 gp, 200 pp and 50 gp each to three: 13 pp broken for the gold, 87 pp left, `used: { pp: 13 }`; each written what they're given, in dnd5e's order however the app named the coins; a whisper to each one with a player and none for Lia, who has none, the Gamemaster told of all three and \"600 pp and 150 gp in all\"; the app told each whisper's readers are the one given and the giver, the Gamemaster's the giver alone")
+
+restock()
+stock(thorin, [], { gp: 10_000 })
+made = await handed('thorin', THREE, { pp: 200 })
+assert.deepEqual([made.result.status, purse(thorin), purse(lia), made.result.transfer.used], ['done', { gp: 4000 }, { pp: 200 }, { gp: 6000 }])
+okay('10,000 gp, 200 pp each to three: with no platinum of his own, 6,000 gp pay for it, 4,000 left')
+
+/* -------------------------------------------- */
+/*  Too little                                  */
+/* -------------------------------------------- */
+
+restock()
+await settle()
+unchanged = writes.length
+lines = messages.size
+made = await handed('thorin', ['vex', 'bram'], { gp: 25 })
+assert.deepEqual([refusal(made), sheetsIn(made), 'transfer' in made.result], [['failed', 'short', null], [], false], '50 gp of 40')
+stock(thorin, [], { pp: 2, gp: 3 })
+campaignAs({ coinChange: false })
+made = await handed('thorin', ['vex', 'bram'], { gp: 2 })
+assert.deepEqual([refusal(made), sheetsIn(made)], [['failed', 'short', null], []], '4 gp of 3, other coins not paying')
+assert.deepEqual([writes.length, messages.size, purse(thorin)], [unchanged, lines, { pp: 2, gp: 3 }], 'nothing written or posted')
+made = await handed('thorin', ['vex', 'bram'], { gp: 1 })
+assert.deepEqual([made.result.status, purse(thorin), made.result.transfer.used], ['done', { pp: 2, gp: 1 }, null], 'an exact one is made')
+campaignAs()
+made = await handed('thorin', ['vex', 'bram'], { gp: 2 })
+assert.deepEqual([made.result.status, purse(thorin), made.result.transfer.used], ['done', { pp: 1, gp: 7 }, { pp: 1 }], 'and with other coins paying, the same hand-out breaks a platinum')
+okay('a total worth more than the giver holds is `short`, with nothing written, posted or sent; with Pay with other coins off, so is a total of more of a coin than he holds, though an exact one is made; on again, the same hand-out breaks a larger coin')
+
+/* -------------------------------------------- */
+/*  Whose players                               */
+/* -------------------------------------------- */
+
+// Ash, owned by Eve and by Bob: both her players are whispered, and no one else.
+restock()
+ash.ownership = { default: 0, eve: 3, bob: 3 }
+await settle()
+made = await handed('thorin', ['ash'], { gp: 1 })
+assert.deepEqual(saidBy(made).map(told), [
+  ['Ash received 1 gp from Thorin', ['bob', 'eve'], 'thorin', 'alice'], ['Thorin handed out 1 gp each to Ash: 1 gp in all', ['gm'], 'thorin', 'alice'],
+])
+// Shared with every player through her default, she's still her own players' alone.
+ash.ownership = { default: 3, eve: 3 }
+made = await handed('thorin', ['ash'], { gp: 1 })
+assert.deepEqual(saidBy(made).map(told)[0], ['Ash received 1 gp from Thorin', ['eve'], 'thorin', 'alice'])
+ash.ownership = { default: 0, eve: 3 }
+// The Gamemaster's, at Thorin's page: each message flagged theirs, and listed in their result.
+made = await handed('thorin', ['vex'], { gp: 1 }, { by: 'gm' })
+said = saidBy(made)
+assert.deepEqual(said.map(told), [['Vex received 1 gp from Thorin', ['bob'], 'thorin', 'alice'], ['Thorin handed out 1 gp each to Vex: 1 gp in all', ['gm'], 'thorin', 'alice']])
+assert.ok(said.every(message => JSON.stringify(message.flags['sending-stone']) === JSON.stringify({ request: made.command.id, by: 'gm' })))
+assert.deepEqual([made.result.messages, made.result.messageId, made.result.visible], [said.map(message => message.id), said.at(-1).id, true])
+// Lia, whom no player owns, hands out: her messages are the bridge's Gamemaster's own, so the one
+// for the Gamemasters is theirs alone, and no player may see it.
+stock(lia, [], { sp: 5 })
+await settle()
+made = await handed('lia', ['vex', 'bram'], { sp: 2 }, { by: 'gm' })
+said = saidBy(made)
+assert.deepEqual(said.map(told), [
+  ['Vex received 2 sp from Lia', ['bob'], 'lia', 'gm'], ['Bram received 2 sp from Lia', ['carol'], 'lia', 'gm'],
+  ['Lia handed out 2 sp each to Vex and Bram: 4 sp in all', ['gm'], 'lia', 'gm'],
+])
+assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, purse(lia)], ['done', said.at(-1).id, false, { sp: 1 }])
+assert.deepEqual(said.slice(0, 2).map(message => { const { audience } = chatOf(message.id).data.message; return [audience.gmOnly, audience.users, audience.characters] }), [[false, ['bob'], ['vex']], [false, ['carol'], ['bram']]])
+assert.equal(chatOf(said.at(-1).id), undefined, "the Gamemasters' own isn't sent to the app")
+okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver no player owns has the bridge's Gamemaster as its author, so the Gamemasters' message is theirs alone, the result's `visible` false, and the app is sent the two whispers but not that")
+
+/* -------------------------------------------- */
+/*  A hand-out that fails                       */
+/* -------------------------------------------- */
+
+const refusing = test => { faults.refuse = test }
+// Bram's refused, the second, as by a module's preUpdateActor hook: what wasn't given goes back to
+// Thorin in one write, in the coins handed out, and Lia is given none.
+restock()
+stock(thorin, [], RICH)
+await settle()
+at = writes.length
+lines = messages.size
+refusing((what, target) => (what === 'update') && (target === bram))
+made = await handed('thorin', THREE, EACH)
+clearFaults()
+assert.deepEqual(refusal(made), ['failed', 'error', 'An update was refused'])
+assert.deepEqual(made.result.transfer, { from: 'thorin', to: null, items: [], currency: EACH, each: ['vex'], used: null })
+assert.deepEqual([purse(thorin), purse(vex), purse(bram), purse(lia)], [{ pp: 487, gp: 100 }, { pp: 200, gp: 62 }, {}, {}], '87 pp and the 400 pp and 100 gp not given')
+assert.deepEqual(writes.slice(at).map(([, id, changes]) => [id, changes]), [
+  ['thorin', { 'system.currency.pp': 87, 'system.currency.gp': 0 }], ['vex', { 'system.currency.pp': 200, 'system.currency.gp': 62 }],
+  ['bram', { 'system.currency.pp': 200, 'system.currency.gp': 50 }], ['thorin', { 'system.currency.pp': 487, 'system.currency.gp': 100 }],
+], 'no write of Lia')
+assert.deepEqual(saidBy(made).map(told), [
+  ['Vex received 200 pp and 50 gp from Thorin', ['bob'], 'thorin', 'alice'],
+  ['Thorin handed out 200 pp and 50 gp each to Vex: 200 pp and 50 gp in all', ['gm'], 'thorin', 'alice'],
+], 'only of those given')
+assert.equal(messages.size, lines + 2)
+assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ['character.updated', 'vex']])
+// The putting back refused too: what wasn't given is lost, never made twice.
+restock()
+stock(thorin, [], RICH)
+await settle()
+let thorinUpdates = 0
+refusing((what, target) => (what === 'update') && ((target === bram) || ((target === thorin) && (++thorinUpdates === 2))))
+made = await handed('thorin', THREE, EACH)
+clearFaults()
+assert.deepEqual(refusal(made), ['failed', 'error', 'An update was refused / An update was refused'])
+assert.deepEqual([made.result.transfer.each, purse(thorin), purse(vex), purse(bram), purse(lia)], [['vex'], { pp: 87 }, { pp: 200, gp: 62 }, {}, {}])
+assert.deepEqual(saidBy(made).map(message => told(message)[0]), ['Vex received 200 pp and 50 gp from Thorin', 'Thorin handed out 200 pp and 50 gp each to Vex: 200 pp and 50 gp in all'])
+// Thorin's own refused: nothing written, said or sent.
+restock()
+stock(thorin, [], RICH)
+await settle()
+lines = messages.size
+refusing((what, target) => (what === 'update') && (target === thorin))
+made = await handed('thorin', THREE, EACH)
+clearFaults()
+assert.deepEqual([refusal(made), 'transfer' in made.result, messages.size, sheetsIn(made), purse(thorin), purse(vex)], [['failed', 'error', 'An update was refused'], false, lines, [], RICH, { gp: 12 }])
+// Vex's refused, the first: all of it goes back, in the coins handed out; no message, and no one given.
+restock()
+stock(thorin, [], RICH)
+await settle()
+lines = messages.size
+faults.failUpdate = target => target === vex
+made = await handed('thorin', THREE, EACH)
+clearFaults()
+assert.deepEqual([refusal(made), 'transfer' in made.result, messages.size, purse(thorin), purse(vex), purse(bram)], [['failed', 'error', 'failUpdate of vex refused'], false, lines, { pp: 687, gp: 150 }, { gp: 12 }, {}])
+assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin']], "his sheet, whose coins are as much but not the same")
+okay('where the second one\'s write is refused, what wasn\'t given goes back to the giver in one write, in the coins handed out (87 pp, then 487 pp and 100 gp), the third given none: `error`, `transfer.each` the first alone, the whisper and the Gamemaster\'s message naming only her; where the put back is refused too, both said and the coins lost, never made twice; where the giver\'s own write is refused, nothing is written, said or sent; where the first one\'s is, all goes back and no message is posted')
+
+/* -------------------------------------------- */
+/*  One at a time                               */
+/* -------------------------------------------- */
+
+// A hand-out waits for a command of one it gives to, and that one's next waits for it: here Bram's
+// spends of a resource, keyed on him, as every roll of his is.
+restock()
+campaignAs({ rolls: true, attacks: true })
+bram.system.resources = { primary: { label: 'Superiority Dice', max: 4, value: 4, sr: true } }
+await settle()
+const spending = hold((target, changes) => (target === bram) && ('system.resources.primary.value' in (changes ?? {})))
+const spend = () => ({ id: `spend-${++ids}`, actorId: 'bram', kind: 'spend', counter: { resource: 'primary' }, count: 1, mode: 0, explicit: false, extras: [], dice: [] })
+const [spendAhead, giving, spendBehind] = [spend(), handOut('thorin', ['vex', 'bram'], { gp: 5 }), spend()]
+const queuedAt = writes.length
+app.waiting.set('camp-a', [spendAhead, giving, spendBehind])
+app.wake?.()
+await until(() => spending.held, "Bram's spend")
+await wait(100)
+assert.ok(!writes.slice(queuedAt).some(([what, id]) => (what === 'updateActor') && (id === 'thorin')), 'the hand-out waits')
+assert.equal(resultsOf(giving.id).length, 0)
+spending.release()
+await until(() => [spendAhead, giving, spendBehind].every(command => resultsOf(command.id).length), 'all three')
+assert.deepEqual([spendAhead, giving, spendBehind].map(command => resultsOf(command.id)[0].status), ['done', 'done', 'done'])
+const givenAt = writes.findLastIndex(([what, id, changes]) => (what === 'updateActor') && (id === 'bram') && ('system.currency.gp' in changes))
+const spentAt = writes.findLastIndex(([what, id, changes]) => (what === 'updateActor') && (id === 'bram') && ('system.resources.primary.value' in changes))
+assert.ok(spentAt > givenAt, "Bram's next spend after his coins")
+assert.ok(resultIndex(spendBehind.id) > resultIndex(giving.id))
+campaignAs()
+// A hand-out and coins taken away of the same gold, fetched together: the second finds what's left.
+restock()
+await settle()
+const [sooner, later] = await fetched(handOut('thorin', ['vex', 'bram'], { gp: 15 }), taking('thorin', { gp: 30 }))
+assert.deepEqual([sooner.result.status, refusal(later), purse(thorin)], ['done', ['failed', 'short', null], { gp: 10 }])
+const [earlier, afterwards] = await fetched(handOut('thorin', ['vex'], { gp: 6 }), handOut('thorin', ['bram'], { gp: 6 }))
+assert.deepEqual([earlier.result.status, refusal(afterwards), purse(thorin)], ['done', ['failed', 'short', null], { gp: 4 }])
+okay("a hand-out waits for a command of a character it gives to, and that one's next waits for it, as it's keyed on each of them; a hand-out and coins taken away of the same gold, or two hand-outs, are made one after the other, the second `short` where too little is left")
+
+/* -------------------------------------------- */
+/*  Names with markup                           */
+/* -------------------------------------------- */
+
+restock()
+await settle()
+thorin.name = 'Thorin <b>&</b>'
+vex.name = 'Vex <i>'
+made = await handed('thorin', ['vex'], { gp: 1 })
+assert.deepEqual(saidBy(made).map(message => told(message)[0]), [
+  'Vex &lt;i&gt; received 1 gp from Thorin &lt;b&gt;&amp;&lt;/b&gt;', 'Thorin &lt;b&gt;&amp;&lt;/b&gt; handed out 1 gp each to Vex &lt;i&gt;: 1 gp in all',
+])
+thorin.name = 'Thorin'
+vex.name = 'Vex'
+okay('every name is escaped in the whispers and the Gamemasters\' message')
+
+// ---- END ----
+console.log(`handouts${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
+process.exit(0)

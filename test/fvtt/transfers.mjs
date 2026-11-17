@@ -455,28 +455,28 @@ const helloOf = () => app.events.filter(e => (e.type === 'bridge.hello') && (e.c
 /*  Features                                    */
 /* -------------------------------------------- */
 
-assert.deepEqual(helloOf().data.features.transfers, { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true })
+assert.deepEqual(helloOf().data.features.transfers, { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true, handOut: true, change: true })
 assert.equal(helloOf().data.features.rolls.enabled, false, "the campaign's rolls are off")
 const [campaign] = getCampaigns()
 assert.equal(campaign.transfers, true)
-assert.deepEqual(transferFeatures({ ...campaign, transfers: false }), { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false })
+assert.deepEqual(transferFeatures({ ...campaign, transfers: false }), { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false, handOut: false, change: false })
 game.system.id = 'pf2e'
-assert.deepEqual(transferFeatures(campaign), { enabled: false, kinds: [], reason: 'system', partySends: false, distribute: false })
+assert.deepEqual(transferFeatures(campaign), { enabled: false, kinds: [], reason: 'system', partySends: false, distribute: false, handOut: false, change: false })
 game.system.id = 'dnd5e'
 // Apart from the rolls and the dice: whatever they are.
 diceStatus.ready = false
-assert.deepEqual(transferFeatures({ ...campaign, rolls: true }), { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true })
+assert.deepEqual(transferFeatures({ ...campaign, rolls: true }), { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true, handOut: true, change: true })
 diceStatus.ready = true
 campaignAs({ transfers: false })
 announce({ campaignId: 'camp-a' })
 await settle()
-assert.deepEqual(helloOf().data.features.transfers, { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false })
+assert.deepEqual(helloOf().data.features.transfers, { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false, handOut: false, change: false })
 campaignAs({ transfers: undefined })
 assert.equal(getCampaigns()[0].transfers, false, 'a campaign saved before 0.31.0: off')
 campaignAs()
 announce({ campaignId: 'camp-a' })
 await settle()
-assert.deepEqual(helloOf().data.features.transfers, { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true })
+assert.deepEqual(helloOf().data.features.transfers, { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true, handOut: true, change: true })
 okay("the hello's features.transfers says whether players' moves are made here: off, under another system, or on, with the kind `transfer`, and since 0.32.0 whether a party's things may be sent and distributed, both with it; apart from the rolls and the dice; a campaign saved before reads as off")
 
 /* -------------------------------------------- */
