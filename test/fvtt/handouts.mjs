@@ -2,14 +2,14 @@
 // `features.transfers.handOut` and `.change`; the `transfer` command's `each`, its check and who may
 // make it; the total paid as coins taken away are, exactly and with other coins, and what the
 // campaign's setting off does; the writes and their order, and what a failure leaves; the whispers,
-// one to each character given coins that has a player and one to the Gamemasters, both of the two at
-// this table, none for everyone, and who the app is told may read each; the sheets ahead of the result; a fraction of a coin the
-// giver or one given stores, and a coin a sheet shows more of than is stored; hand-outs and rolls
-// waiting for one another, and the campaign read again as a hand-out's turn comes. On a copy of
-// sends.mjs's stand-ins, with dnd5e's rates: the real module and
-// its language file, dnd5e 5.3.3's real dice classes for its self-test, a stand-in Foundry core and
-// app; 5.3.3's coins or with DND5E6=1 6.0.5's, which may be fractional and are shown rounded down.
-// Run with SLIM_CHECK=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
+// one to each character given coins that has a player and one to the Gamemasters, both of the two
+// at this table, none for everyone, and who the app is told may read each; the sheets ahead of the
+// result; a fraction of a coin the giver or one given stores, and a coin a sheet shows more of than
+// is stored; hand-outs and rolls waiting for one another, and the campaign read again as a
+// hand-out's turn comes. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real module
+// and its language file, dnd5e 5.3.3's real dice classes for its self-test, a stand-in Foundry core
+// and app; 5.3.3's coins or with DND5E6=1 6.0.5's, which may be fractional and are shown rounded
+// down. Run with SLIM_CHECK=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { settings, user, users, actors } from './stub.mjs'
