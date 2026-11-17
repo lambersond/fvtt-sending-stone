@@ -625,6 +625,7 @@ console.log("ok - 0.44.0: Hit points has its own fieldset on the Player actions 
     ['sending-stone-coins', 'SENDINGSTONE.Config.Actions.CoinsPlayers'], ['sending-stone-coin-change', 'SENDINGSTONE.Config.Actions.CoinChange'],
   ])
   assert.deepEqual([...fieldset().querySelectorAll('.hint')].map(hint => hint.textContent.trim()), ['SENDINGSTONE.Config.Actions.CoinsHint', 'SENDINGSTONE.Config.Actions.CoinChangeHint'])
+  assert.equal(lang.Actions.CoinsHint, "On by default. From the app, a player adds coins to their own character or takes them away, as when they are paid or buy something. You can do the same for any of its characters, at the character's page in the app. Each change posts a line in chat, such as “Thorin paid 5 gp”.")
   assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'no warning under dnd5e, with no app heard from')
   const box = name => find(win, `[name="campaign.${name}"]`)
   assert.deepEqual(['coins', 'coinChange'].map(name => [box(name).checked, box(name).disabled]), [[true, false], [true, false]], 'both ticked, read as on, whatever the rolls')

@@ -184,7 +184,7 @@
         "TransfersApp": "The app this campaign sends to doesn't take moves yet.",
         "Coins": "Coins",
         "CoinsPlayers": "Allow Players to add and take away coins from the app",
-        "CoinsHint": "On by default. From the app, a player adds coins to their own character or takes them away, as when they are paid or buy something, and you can from their page there. Each change posts a line in chat, such as “Thorin paid 5 gp”.",
+        "CoinsHint": "On by default. From the app, a player adds coins to their own character or takes them away, as when they are paid or buy something. You can do the same for any of its characters, at the character's page in the app. Each change posts a line in chat, such as “Thorin paid 5 gp”.",
         "CoinsApp": "The app this campaign sends to doesn't let players change coins yet.",
         "CoinChange": "Pay with other coins when a character is short of one",
         "CoinChangeHint": "On by default. Taking away more of a coin than a character holds breaks a larger coin: 5 gp from 3 gp and 2 pp leaves 1 pp and 8 gp. With no larger coin, smaller coins pay: 5 gp from 2 gp and 40 sp leaves 10 sp. Off: taking away more of a coin than the character holds is refused. Coins a character hands out follow this too.",
