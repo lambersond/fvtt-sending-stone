@@ -19,7 +19,13 @@
  *   5. The change from the last one broken comes back in the fewest coins (`giveChange`), never in a
  *      coin of NEVER_CHANGE unless that's the coin paid.
  *   6. What no larger coin covers is paid in smaller coins, the largest first (`paySmaller`).
- *   7. Anything still owed is refused: the coins together are worth too little.
+ *   7. Anything still owed is refused: at dnd5e's own rates, exactly where the coins together are
+ *      worth too little.
+ *
+ * Every sum is made in whole coins: a coin is broken for another, given as change for it or pays for
+ * it only where the one is worth a whole number of the other, as each of dnd5e's own is of every
+ * smaller one. In a world whose own rates don't divide one another, a payment the coins are worth can
+ * so be refused; worth is never made or lost.
  */
 
 /**

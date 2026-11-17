@@ -1,5 +1,6 @@
 // Coins added to a character and taken away (module 0.48.0): the rule of paying in coins
-// (coin-change.mjs) on its own, by worked cases and many random ones, in whole numbers; the hello's
+// (coin-change.mjs) on its own, by worked cases and many random ones, in whole numbers, at dnd5e's
+// rates and at a world's own that don't divide one another; the hello's
 // `features.coins` and each coin's rate in a sheet; fetching for coins alone; the `coins` command's
 // check, who it's made for, what it writes, its line, its sheet and its result; what the campaign's
 // setting off does, and its switch, for the Gamemaster's changes too; a coin with no rate; dnd5e 6's
@@ -584,6 +585,44 @@ okay(`the rule, by ${TABLE.length} worked cases: a coin paid from its own first;
   }
   assert.ok((paid > 20_000) && (refused > 20_000) && (exact > 1_000), `enough of each: ${paid} paid, ${refused} refused, ${exact} exact`)
   okay(`the rule, by ${CASES.toLocaleString('en')} random cases, the same each run (${paid.toLocaleString('en')} paid, ${refused.toLocaleString('en')} refused, ${exact.toLocaleString('en')} exact): no worth made or lost, never a coin below none or a fraction, nothing counted as used that wasn't held, refused exactly where the coins are worth too little, and with other coins not paying exactly where one coin is short`)
+}
+
+// A world's own rates that don't divide one another: coins of 1, 4 and 6 to the gp. Every sum is made
+// in whole coins, so a coin pays for another only where it's worth a whole number of it, and a
+// payment the coins are worth can be refused; worth is still never made or lost, nor a coin taken
+// below none. The same cases each run.
+{
+  const own = [{ key: 'gp', conversion: 1 }, { key: 'shard', conversion: 4 }, { key: 'bit', conversion: 6 }]
+  const KEYS = own.map(rate => rate.key)
+  // Worth in twelfths of a gp, which both smaller coins are a whole number of.
+  const TWELFTHS = { gp: 12, shard: 3, bit: 2 }
+  const worth = coins => KEYS.reduce((sum, key) => sum + ((coins[key] ?? 0) * TWELFTHS[key]), 0)
+  assert.deepEqual(payCoins({ gp: 1, shard: 26, bit: 0 }, { gp: 3 }, own), { refusal: 'short' }, '3 gp from 1 gp and 26 shards, worth 7.5 gp: a shard is no whole number of bits')
+  assert.deepEqual(payCoins({ gp: 1, shard: 0, bit: 26 }, { gp: 3 }, own), { left: { gp: 0, shard: 0, bit: 14 }, used: { bit: 12 } }, 'bits pay: 6 make a gp')
+  assert.deepEqual(payCoins({ gp: 2, shard: 0, bit: 0 }, { shard: 3 }, own), { left: { gp: 1, shard: 1, bit: 0 }, used: { gp: 1 } }, 'a gp is broken for shards, 4 to it')
+  assert.deepEqual(payCoins({ gp: 0, shard: 5, bit: 0 }, { bit: 3 }, own), { refusal: 'short' }, 'a shard is never broken for bits: it is worth one and a half')
+  let seed = 0xd1ce
+  const random = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+  const below = max => Math.floor(random() * max)
+  const CASES = 50_000
+  let paid = 0
+  let worthIt = 0
+  for (let i = 0; i < CASES; i++) {
+    const held = Object.fromEntries(KEYS.map(key => [key, below(3) ? below(40) : 0]))
+    const pay = Object.fromEntries(KEYS.map(key => [key, below(2) ? 0 : 1 + below(30)]).filter(([, n]) => n))
+    if (!Object.keys(pay).length) continue
+    const before = { ...held }
+    const out = payCoins(held, pay, own)
+    const why = () => JSON.stringify([before, pay, out])
+    assert.deepEqual(held, before, `what's held is changed: ${why()}`)
+    if (out.refusal) { if (worth(held) >= worth(pay)) worthIt++; continue }
+    paid++
+    assert.equal(worth(out.left) + worth(pay), worth(held), `worth made or lost: ${why()}`)
+    assert.ok(KEYS.every(key => Number.isInteger(out.left[key]) && (out.left[key] >= 0)), `a coin below none, or no whole number: ${why()}`)
+    for (const key of KEYS) assert.ok((out.used[key] ?? 0) <= held[key], `more used than held: ${why()}`)
+  }
+  assert.ok((paid > 5_000) && (worthIt > 500), `enough of each: ${paid} paid, ${worthIt} refused though the coins were worth it`)
+  okay(`with a world's own rates that don't divide one another (coins of 1, 4 and 6 to the gp), every sum is still made in whole coins: 3 gp from 1 gp and 26 of the coin of 4, worth 7.5 gp, is \`short\`, where 26 of the coin of 6 pay; and by ${CASES.toLocaleString('en')} random cases, the same each run (${paid.toLocaleString('en')} paid, ${worthIt.toLocaleString('en')} refused though the coins were worth it), no worth is made or lost and no coin goes below none`)
 }
 
 /* -------------------------------------------- */

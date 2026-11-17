@@ -487,7 +487,10 @@ either is missing.
   everyone: each character given coins is whispered what they received, "Vex received 200 pp and 50
   gp from Thorin", you are whispered one message with all of it, "Thorin handed out 200 pp and 50 gp
   each to Vex, Bram, and Lia: 600 pp and 150 gp in all", and the giver's player sees each of them. A
-  character no player owns is whispered nothing, though your message names it.
+  character no player owns is whispered nothing, though your message names it. A giver with no one
+  player of its own, one no player owns, or one several own with none of them having it as their
+  character, is written for by you, as its rolls are: its own players then see none of these
+  messages, only you and each one given.
 - **You** can move anything between the campaign's characters and parties from the app's Gamemaster
   pages, party to party too, distribute any party's coin, and hand out a character's coins at its
   page. The switch counts for your moves too.
@@ -524,8 +527,9 @@ you say "you're paid 5 gp" or "that costs 5 gp": **Add or take away**, on the In
 Currency row, then how many of each coin. **Allow Players to add and take away coins from the app**,
 under **Coins** on the campaign's Player actions tab, is **on by default**, for campaigns saved
 before 0.48.0 too, apart from players' rolls and moves, under D&D Fifth Edition 5 and 6; untick it
-to keep coins yours. You can do the same from a character's page in the app's Gamemaster view. A
-party's coins and a companion's aren't changed this way.
+to keep coins yours. You can do the same from a character's page in the app's Gamemaster view. The
+switch counts for your changes from the app too; in Foundry the sheet is yours as ever. A party's
+coins and a companion's aren't changed this way.
 
 - **A line in chat** for each change, as the character, for everyone: "Thorin received 5 gp",
   "Thorin paid 5 gp"; yours marked "GM".
@@ -535,7 +539,9 @@ party's coins and a companion's aren't changed this way.
   coins pay, the largest first: 5 gp from 2 gp and 40 sp leaves 10 sp. Only an amount worth more
   than all the character's coins is refused. The line says the coins asked for; the app says which
   others went. The rates are dnd5e's own; a coin your world gave no rate is never broken, never pays
-  for another and never comes back as change.
+  for another and never comes back as change. Every sum is made in whole coins, so where your
+  world's own rates don't divide one another, as coins of 4 and of 6 to the gp, an amount the coins
+  are worth can be refused too; dnd5e's own rates always divide.
 - **Pay with other coins when a character is short of one**, beside it, is on by default too: untick
   it, and taking away more of a coin than the character holds is refused.
 - **What's written.** Only the coins that change, in one update, so dnd5e 6's fraction of a coin

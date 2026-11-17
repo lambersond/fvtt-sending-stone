@@ -3487,11 +3487,12 @@ each count times the number named, is taken from the giver exactly as
 [coins taken away](#coins-added-and-taken-away) are, by the same rule and the same setting, the
 hello's `change`: where it's on, a larger coin is broken and smaller coins pay where the giver is
 short of one, so that 700 pp and 20 gp, 200 pp and 50 gp each to three, leaves 87 pp; refused
-`"short"` only where all its coins are worth too little, and with the setting off wherever the total
-is more of a coin than it holds. Each character is given the coins named, never others: handing out
-platinum paid for in gold gives platinum. The giver's coins are written first, in one update of only
-the coins that change, each from what it stores; then each character's in the order named, one
-update each, its coins added to what it stores. Where the giver's update fails, nothing is written
+`"short"` only where all its coins are worth too little, at dnd5e's own rates, as there, and with
+the setting off wherever the total is more of a coin than it holds. Each character is given the
+coins named, never others: handing out platinum paid for in gold gives platinum. The giver's coins
+are written first, in one update of only the coins that change, each from what it stores; then each
+character's in the order named, one update each, its coins added to what it stores, a fraction kept
+as it's written. Where the giver's update fails, nothing is written
 and the move is `"failed"`, `"error"`, with no `transfer`, message or sheet. Where a character's
 fails, what wasn't given, to it and to those after it, is put back on the giver in one update, in the
 coins handed out, and no more is given: `"failed"`, `"error"`, its `transfer` listing those given;
@@ -3502,8 +3503,9 @@ never made twice.
 each of its ends, and each end's next roll waits for it; since module 0.32.0, also for every roll of
 the character it's made as, and a distribution for every roll of each character it's shared among,
 whose next rolls wait for it; since module 0.48.0, so too a hand-out for every roll of each character
-it gives to, and theirs for it, and it stands in one line with coins added and taken away. Two players taking the last potion at once
-are made one after the other, the second refused `"gone"` or `"short"`; two distributions, or a
+it gives to, and theirs for it, and it stands in one line with coins added and taken away. Two
+players taking the last potion at once are made one after the other, the second refused `"gone"` or
+`"short"`; two distributions, or a
 distribution and a send of the same coin, the second refused `"short"` or `"split"` where too little
 is left. A distribution sent again, as after a `"timeout"` or from a second device, carries the
 count its dialog showed, so it's `"short"` once the first has shared the coin; and the party's
@@ -3538,8 +3540,11 @@ and totalling only theirs. Each is spoken by the giver and written by the giver'
 line is, marked on its card, the Gamemaster's `by` `"gm"` and listed in their result's `messages`.
 So the giver's player reads every one of them, as Foundry shows a whisper to who wrote it: a
 [chat message](#chat-message) for each is sent with the giver's character among its readers, beside
-the one given. A giver with no player of its own has the bridge's Gamemaster as its author, and the
-Gamemasters' message is then theirs alone. Where no one was given coins, nothing is posted.
+the one given. A giver with no one player of its own, one no player owns, or one several own with
+none of them having it as their character, has the bridge's Gamemaster as its author, as its
+[rolls](#making-a-roll) have: the Gamemasters' message is then theirs alone, the whispers reach
+only those given, and none of the giver's own players reads any of them, their own hand-out's
+either. Where no one was given coins, nothing is posted.
 
 **The result.** Both ends' sheets as they then stand go first, `from`'s then `to`'s, each in
 [`character.updated`](#characterupdated), or [`group.updated`](#groupupdated) to a listener that
@@ -3552,7 +3557,8 @@ given its share, in order, and none where nothing was written; its `transfer` is
 items: [], currency, among }`, the coins given out and the characters given them, in order. Since
 module 0.48.0, a hand-out's sheets are the giver's, then each character's given coins, in order,
 and none where nothing was written; `messageId` and `visible` are the Gamemasters' message's,
-`visible` `false` where the giver has no player of its own; and its `transfer` is `{ from, to: null,
+`visible` `false` where the giver has no one player of its own, as above, for a player's own
+hand-out too, who then reads nothing of it in chat; and its `transfer` is `{ from, to: null,
 items: [], currency, each, used }`: `currency` what **each** was given, the command's own, in dnd5e's
 order, never the total; `each` the characters given it, in order, every one of them when done; and
 `used`, which of the giver's other coins went beyond those handed out, as a
@@ -3721,11 +3727,22 @@ coins when a character is short of one** is on (`change`), they're paid as follo
 4. The change from the last coin broken comes back in the fewest coins, from the largest coin below
    it down to the coin paid, never in electrum (`ep`) unless electrum is the coin paid.
 5. What no larger coin covers is paid in smaller coins, the largest of them first.
-6. Anything still owed is `"short"`: the character's coins together are worth too little.
+6. Anything still owed is `"short"`: at dnd5e's own rates, exactly where the character's coins
+   together are worth too little.
 
 A coin with no rate, as a world's own may have, is paid from its own coins alone, pays for no other
 and never comes back as change. With the setting off, step 2 is all: more of a coin than the
 character holds is `"short"`.
+
+Every sum is made in whole coins. A larger coin is broken (step 3), and change given in a coin (step
+4), only where it's worth a whole number of the coin paid; and smaller coins pay (step 5) only where
+the coin paid, and each of them, is worth a whole number of the smallest coin with a rate. At
+dnd5e's own rates each coin is worth a whole number of every smaller one, so all of that always
+holds. In a world whose own rates don't divide one another it may not, and a payment the coins are
+worth can then be `"short"` too: with coins of 1, 4 and 6 to the gp, 3 gp from 1 gp and 26 of the
+coin of 4, worth 7.5 gp together, is refused. Worth is never made or lost, whatever the rates. A
+listener that works out beforehand whether a payment can be made should leave such rates to the
+game.
 
 | Holds | Takes away | Left | `used` |
 | --- | --- | --- | --- |

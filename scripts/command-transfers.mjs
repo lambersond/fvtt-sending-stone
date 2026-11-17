@@ -506,7 +506,9 @@ async function handOutNow(command, campaign, { from, each }) {
  * the Gamemasters, in one message, what was handed out, to whom and how much in all, "Thorin handed
  * out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all". Each is spoken by the
  * giver and written by its player, as every line of a character's is, who so reads them all, while
- * the Gamemasters are sent the one. Every name is escaped.
+ * the Gamemasters are sent the one. A giver with no one player of its own, none owning it or several
+ * with none of them having it as their character, is written for by the bridge's Gamemaster
+ * (`authorFor`): its own players then read none of them. Every name is escaped.
  * @param {object} command
  * @param {Actor} giver
  * @param {Actor[]} credited               Those given their coins, in order.
