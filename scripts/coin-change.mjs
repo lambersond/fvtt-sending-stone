@@ -43,8 +43,10 @@
 export const NEVER_CHANGE = Object.freeze(["ep"]);
 
 /**
- * How far from a whole number a coin's worth in another may be and still count as one: dnd5e's
- * rates are fractions, 0.1 for platinum, so 1 ÷ 0.1 isn't exactly 10.
+ * How far from a whole number a coin's worth in another may be and still count as one. A rate is a
+ * fraction, and floating point doesn't always divide one by another exactly: for a world's own
+ * coins of 0.1 and 0.3 to the gp, 0.3 ÷ 0.1 is 2.9999999999999996, not 3. dnd5e's own rates all
+ * divide exactly, so at those it changes nothing.
  * @type {number}
  */
 const NEARLY = 1e-6;

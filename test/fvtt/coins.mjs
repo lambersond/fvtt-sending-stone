@@ -1,15 +1,16 @@
 // Coins added to a character and taken away (module 0.48.0): the rule of paying in coins
 // (coin-change.mjs) on its own, by worked cases and many random ones, in whole numbers, at dnd5e's
-// rates, at a world's own that don't divide one another and with a coin worth the same as another;
-// the hello's `features.coins` and each coin's rate in a sheet; fetching for coins alone; the
-// `coins` command's check, who it's made for, what it writes, its line, its sheet and its result;
-// what the campaign's setting off does, and its switch, for the Gamemaster's changes too; a coin
-// with no rate; dnd5e 6's fraction of a coin; coins waiting in the line of moves, and for their own
-// character's rolls; and the campaign read again as a change's turn comes. On a copy of sends.mjs's
-// stand-ins, with dnd5e's rates: the real module and its language file, dnd5e 5.3.3's real dice
-// classes for its self-test, a stand-in Foundry core and app; the actors' coins as stored and as
-// prepared, 5.3.3's or with DND5E6=1 6.0.5's, whose coins may be fractional. Run with SLIM_CHECK=1
-// and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
+// rates, at a world's own that don't divide one another or that floating point doesn't divide
+// exactly, and with a coin worth the same as another; the hello's `features.coins` and each coin's
+// rate in a sheet; fetching for coins alone; the `coins` command's check, who it's made for, what
+// it writes, its line, its sheet and its result; what the campaign's setting off does, and its
+// switch, for the Gamemaster's changes too; a coin with no rate; dnd5e 6's fraction of a coin;
+// coins waiting in the line of moves, and for their own character's rolls; and the campaign read
+// again as a change's turn comes. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real
+// module and its language file, dnd5e 5.3.3's real dice classes for its self-test, a stand-in
+// Foundry core and app; the actors' coins as stored and as prepared, 5.3.3's or with DND5E6=1
+// 6.0.5's, whose coins may be fractional. Run with SLIM_CHECK=1 and --import ./unref-timers.mjs
+// --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { settings, user, users, actors } from './stub.mjs'
@@ -636,6 +637,17 @@ okay(`the rule, by ${TABLE.length} worked cases: the coins asked for paid from t
   }
   assert.ok((paid > 5_000) && (worthIt > 500), `enough of each: ${paid} paid, ${worthIt} refused though the coins were worth it`)
   okay(`with a world's own rates that don't divide one another (coins of 1, 4 and 6 to the gp), every sum is still made in whole coins: 3 gp from 1 gp and 26 of the coin of 4, worth 7.5 gp, is \`short\`, where 26 of the coin of 6 pay; and by ${CASES.toLocaleString('en')} random cases, the same each run (${paid.toLocaleString('en')} paid, ${worthIt.toLocaleString('en')} refused though the coins were worth it), no worth is made or lost and no coin goes below none`)
+}
+
+// A world's own rates that floating point doesn't divide exactly: coins of 0.1 and 0.3 to the gp, a
+// noble worth three marks, though 0.3 ÷ 0.1 is 2.9999999999999996. A noble is still broken for
+// marks, and marks still pay for a noble.
+{
+  const own = [{ key: 'noble', conversion: 0.1 }, { key: 'mark', conversion: 0.3 }]
+  assert.equal(0.3 / 0.1, 2.9999999999999996, 'what floating point alone makes of it')
+  assert.deepEqual(payCoins({ noble: 1, mark: 0 }, { mark: 2 }, own), { left: { noble: 0, mark: 1 }, used: { noble: 1 } }, 'a noble broken for 2 marks, 1 back as change')
+  assert.deepEqual(payCoins({ noble: 0, mark: 4 }, { noble: 1 }, own), { left: { noble: 0, mark: 1 }, used: { mark: 3 } }, '3 marks pay for a noble')
+  okay("with a world's own rates that floating point doesn't divide exactly, coins of 0.1 and 0.3 to the gp, where 0.3 ÷ 0.1 is 2.9999999999999996, the one is still worth a whole 3 of the other: one broken for 2 of the smaller gives 1 back as change, and 3 of the smaller pay for one")
 }
 
 // A world's own coin worth the same as another: a crown, 1 to the gp, listed after gp or before it.
