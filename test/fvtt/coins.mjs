@@ -4,8 +4,8 @@
 // `features.coins` and each coin's rate in a sheet; fetching for coins alone; the `coins` command's
 // check, who it's made for, what it writes, its line, its sheet and its result; what the campaign's
 // setting off does, and its switch, for the Gamemaster's changes too; a coin with no rate; dnd5e 6's
-// fraction of a coin; coins waiting in the line of moves; and the campaign read again as a change's
-// turn comes. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real module and its language
+// fraction of a coin; coins waiting in the line of moves, and for their own character's rolls; and the
+// campaign read again as a change's turn comes. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real module and its language
 // file, dnd5e 5.3.3's real dice classes for its self-test, a stand-in Foundry core and app; the
 // actors' coins as stored and as prepared, 5.3.3's or with DND5E6=1 6.0.5's, whose coins may be
 // fractional. Run with SLIM_CHECK=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
@@ -748,8 +748,17 @@ for (const [command, error, why] of [
 ]) {
   assert.deepEqual(refusal((await fetched(command))[0]), ['failed', 'invalid', error], why)
 }
+// Every field of a roll's and of another kind's that the protocol names, each beside the coins.
+const ROLLS_OWN = ['item', 'activity', 'target', 'targets', 'self', 'slot', 'enchant', 'prompt', 'text', 'link', 'key']
+const OTHER_KINDS = [
+  'transfer', 'remove', 'typed', 'rerolls', 'favorite', 'note', 'dish', 'effect', 'wildShape', 'spellSlot', 'counter',
+  'count', 'inspiration', 'concentration', 'enchantment', 'prepare', 'turn', 'undo', 'hitPoints',
+]
+const beside = await fetched(...[...ROLLS_OWN, ...OTHER_KINDS].map(key => change('thorin', 'add', { gp: 5 }, { [key]: 1 })))
+assert.deepEqual(beside.map(made => [Object.keys(made.command).find(key => made.command[key] === 1), ...refusal(made)]),
+  [...ROLLS_OWN, ...OTHER_KINDS].map(key => [key, 'failed', 'invalid', 'coins']), "each of a roll's fields and of another kind's beside it")
 assert.deepEqual([writes.length, messages.size, purse(thorin)], [unchanged, lines, { gp: 40 }], 'nothing written or posted')
-okay('refused "invalid" with nothing written: "by" for anyone\'s but the Gamemaster\'s; "of", as no companion\'s coins are changed; "coins" for a body that isn\'t exactly { op: "add" | "remove", currency }, and for a roll\'s field or another kind\'s beside it, hit points\' too; "currency" unless it\'s 1 or more of dnd5e\'s coins, each a whole number from 1 to 10,000,000; "dice" and "plainRoll" as every kind\'s')
+okay('refused "invalid" with nothing written: "by" for anyone\'s but the Gamemaster\'s; "of", as no companion\'s coins are changed; "coins" for a body that isn\'t exactly { op: "add" | "remove", currency }, and for each of a roll\'s fields or another kind\'s beside it, every one the protocol names, hit points\' too; "currency" unless it\'s 1 or more of dnd5e\'s coins, each a whole number from 1 to 10,000,000; "dice" and "plainRoll" as every kind\'s')
 
 /* -------------------------------------------- */
 /*  Coins added                                 */
@@ -1014,7 +1023,13 @@ const silence = Hooks.on('preCreateChatMessage', () => false)
 made = await changed('thorin', 'add', { gp: 5 })
 Hooks.off('preCreateChatMessage', silence)
 assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, made.result.coins, purse(thorin)], ['done', null, true, { op: 'add', currency: { gp: 5 }, used: null }, { gp: 45 }])
-okay("an update a module's hook refuses, or one that throws, is `error` with what went wrong: no line, no sheet, no `coins`, the coins as they were; a line that can't be posted leaves the change made, `messageId` null and `visible` true")
+// A line another module's hook hides from its own author, as a blind whisper to the Gamemaster: the
+// change is made all the same, and the result says its player can't see the line.
+const hiding = Hooks.on('preCreateChatMessage', message => { message.whisper = ['gm']; message.blind = true })
+made = await changed('thorin', 'add', { gp: 5 })
+Hooks.off('preCreateChatMessage', hiding)
+assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, made.line.whisper, purse(thorin)], ['done', made.line.id, false, ['gm'], { gp: 50 }])
+okay("an update a module's hook refuses, or one that throws, is `error` with what went wrong: no line, no sheet, no `coins`, the coins as they were; a line that can't be posted leaves the change made, `messageId` null and `visible` true; and one another module's hook hides from its own author is the result's message still, `visible` false")
 
 /* -------------------------------------------- */
 /*  One at a time                               */
@@ -1066,6 +1081,33 @@ await settle()
 const [given, taken] = await fetched(move('thorin', { from: 'thorin', to: 'vex', currency: { gp: 30 } }), change('thorin', 'remove', { gp: 30 }))
 assert.deepEqual([given.result.status, refusal(taken), purse(thorin), purse(vex)], ['done', ['failed', 'short', null], { gp: 10 }, { gp: 42 }])
 okay("coins stand in the line of moves: a change waits for a move on its way, another character's too, and the next move for it; two changes of the same coins, or a move of them and a change, are made one after the other, the second `short` where too little is left")
+
+// A change waits too for a roll of its own character's on its way, and his next roll for it: here
+// Thorin's spends of a resource, keyed on him as every roll of his is, which stand in no line of moves.
+restock()
+campaignAs({ rolls: true, attacks: true })
+thorin.system.resources = { primary: { label: 'Superiority Dice', max: 4, value: 4, sr: true } }
+await settle()
+const spending = hold((target, changes) => (target === thorin) && ('system.resources.primary.value' in (changes ?? {})))
+const spend = () => ({ id: `spend-${++ids}`, actorId: 'thorin', kind: 'spend', counter: { resource: 'primary' }, count: 1, mode: 0, explicit: false, extras: [], dice: [] })
+const [spendAhead, paying, spendBehind] = [spend(), change('thorin', 'remove', { gp: 5 }), spend()]
+const queuedAt = writes.length
+app.waiting.set('camp-a', [spendAhead, paying, spendBehind])
+app.wake?.()
+await until(() => spending.held, "Thorin's spend")
+await wait(100)
+const coinWrite = ([what, id, changes]) => (what === 'updateActor') && (id === 'thorin') && ('system.currency.gp' in changes)
+assert.ok(!writes.slice(queuedAt).some(coinWrite), 'his coins wait for his spend')
+assert.equal(resultsOf(paying.id).length, 0)
+spending.release()
+await until(() => [spendAhead, paying, spendBehind].every(command => resultsOf(command.id).length), 'all three')
+assert.deepEqual([spendAhead, paying, spendBehind].map(command => resultsOf(command.id)[0].status), ['done', 'done', 'done'])
+const spentAt = writes.findLastIndex(([what, id, changes]) => (what === 'updateActor') && (id === 'thorin') && ('system.resources.primary.value' in changes))
+assert.ok(spentAt > writes.findLastIndex(coinWrite), 'his next spend after his coins')
+assert.ok((resultIndex(spendBehind.id) > resultIndex(paying.id)) && (resultIndex(paying.id) > resultIndex(spendAhead.id)), 'answered in the order handed over')
+assert.deepEqual([purse(thorin), thorin.system.resources.primary.value], [{ gp: 35 }, 2])
+campaignAs()
+okay("a change waits for a roll of its own character's on its way, and his next roll for it: a spend, 5 gp taken away and a spend, handed over together, are made in that order")
 
 // The campaign is read again as a change's turn comes, not as it was when fetched: one waiting in the
 // line of moves while the Gamemaster turns the switch off isn't made, and one waiting while Pay with
