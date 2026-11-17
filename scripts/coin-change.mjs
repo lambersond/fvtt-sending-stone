@@ -37,6 +37,12 @@ export const NEVER_CHANGE = Object.freeze(["ep"]);
 const NEARLY = 1e-6;
 
 /**
+ * The most decimals a stored count is read as written with (`plusWhole`): more than a number holds.
+ * @type {number}
+ */
+const MOST_DIGITS = 20;
+
+/**
  * A coin's rate: how many of it make one gp, as dnd5e's configuration has it.
  * @typedef {object} CoinRate
  * @property {string} key          The coin, such as "gp".
@@ -241,12 +247,32 @@ export function takenCoins(actor, pay, { change=true }={}) {
 /**
  * The update that changes an actor's coins by so many each: only those coins, each from what the
  * actor stores, one it has no key for starting at none, so the fraction of a coin dnd5e 6 stores
- * stays: 10.5 gp less 10 leaves 0.5.
+ * stays, as it's written (`plusWhole`): 10.5 gp less 10 leaves 0.5, and 10.7 gp less 10 leaves 0.7.
  * @param {Actor} actor
  * @param {Record<string, number>} by   By how many each coin goes up, or below none, down.
  * @returns {Record<string, number>}    Each coin's path and what it's then stored as.
  */
 export function coinUpdate(actor, by) {
   const stored = actor?._source?.system?.currency ?? {};
-  return Object.fromEntries(Object.entries(by).map(([key, n]) => [`system.currency.${key}`, (stored[key] ?? 0) + n]));
+  return Object.fromEntries(Object.entries(by).map(([key, n]) => [`system.currency.${key}`, plusWhole(stored[key] ?? 0, n)]));
+}
+
+/**
+ * A count as stored, changed by a whole number, its fraction kept as it's written. Floating point
+ * alone makes 0.6999999999999993 of 10.7 less 10, which dnd5e 6, showing a coin rounded down to the
+ * digits its world gives it (`fractionalDigits`), would show as 0.69: a hundredth lost to no one. So
+ * the sum is rounded to as many decimals as the stored count is written with, the fewest that read
+ * back as the same number: 0.7. A whole count has none, and is changed exactly; one that's no finite
+ * number is added to as it is.
+ * @param {number} stored   The count as the actor stores it.
+ * @param {number} n        A whole number, above or below none.
+ * @returns {number}
+ */
+function plusWhole(stored, n) {
+  const sum = stored + n;
+  if ( !Number.isFinite(sum) ) return sum;
+  for ( let digits = 0; digits <= MOST_DIGITS; digits++ ) {
+    if ( Number(stored.toFixed(digits)) === stored ) return Number(sum.toFixed(digits));
+  }
+  return sum;
 }

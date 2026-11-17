@@ -471,7 +471,7 @@ const coinsOf = actor => ({ ...actor._source.system.currency })
 const settle = () => wait(320)
 const helloOf = () => app.events.filter(e => (e.type === 'bridge.hello') && (e.campaign.id === 'camp-a')).at(-1)
 const { coinFeatures, coinReader } = await import(`${MODULE}/scripts/command-coins.mjs`)
-const { coinRates, heldCoins, NEVER_CHANGE, payCoins } = await import(`${MODULE}/scripts/coin-change.mjs`)
+const { coinRates, coinUpdate, heldCoins, NEVER_CHANGE, payCoins } = await import(`${MODULE}/scripts/coin-change.mjs`)
 const FEATURES = { ...app.features }
 /** The campaign's hello sent afresh, as a change to its settings sends it, and answered. */
 async function hello() {
@@ -842,7 +842,48 @@ assert.deepEqual(refusal(await changed('thorin', 'remove', { gp: 5 })), ['failed
 thorin.system.currency.gp = -3
 assert.equal(heldCoins(thorin).gp, 0, 'never below none')
 thorin.prepareCurrency()
-okay(`a fraction of a coin${DND5E6 ? ', as dnd5e 6 stores one' : ''} stays: 10.5 gp less 10 leaves 0.5, written from what is stored; 10.5 gp and 1 pp less 11 gp leaves 9.5 gp; half a platinum is never broken; a coin the sheet shows more of than is stored counts as what is stored, and never below none`)
+okay(`a fraction of a coin${DND5E6 ? ', as dnd5e 6 stores one,' : ''} stays: 10.5 gp less 10 leaves 0.5, written from what is stored; 10.5 gp and 1 pp less 11 gp leaves 9.5 gp; half a platinum is never broken; a coin the sheet shows more of than is stored counts as what is stored, and never below none`)
+
+// A fraction stays as it's written. Floating point alone makes 0.6999999999999993 of 10.7 less 10,
+// which dnd5e 6 shows as 0.69 in a world that shows two decimals of a coin (its `roundCurrency`
+// rounds down), and 7.5600000000000005 of 0.56 and 7: neither is what is stored.
+assert.deepEqual([10.7 - 10, 0.56 + 7], [0.6999999999999993, 7.5600000000000005], 'what floating point alone makes of them')
+stock(thorin, [], { gp: 10.7, sp: 0.56 })
+at = writes.length
+made = await changed('thorin', 'remove', { gp: 10 })
+assert.deepEqual([made.result.status, writes.slice(at), coinsOf(thorin).gp], ['done', [['updateActor', 'thorin', { 'system.currency.gp': 0.7 }]], 0.7], '10.7 gp less 10 leaves 0.7')
+made = await changed('thorin', 'add', { sp: 7 })
+assert.deepEqual([made.result.status, coinsOf(thorin).sp], ['done', 7.56], '0.56 sp and 7 is 7.56')
+stock(thorin, [], { pp: 1, gp: 20.3 })
+made = await changed('thorin', 'remove', { gp: 25 })
+assert.deepEqual([made.result.status, purse(thorin), made.result.coins.used], ['done', { gp: 5.3 }, { pp: 1 }], '20.3 gp and 1 pp less 25 gp leaves 5.3 gp')
+stock(thorin, [], { gp: 9_999_999.7 })
+made = await changed('thorin', 'remove', { gp: 9_999_999 })
+assert.deepEqual([made.result.status, coinsOf(thorin).gp], ['done', 0.7], 'of nearly 10,000,000 too')
+// By many random cases, the same each run: a count written with up to four decimals, changed by a
+// whole number, is stored as exactly that decimal, and a whole count as exactly the sum.
+{
+  let seed = 0xc01
+  const random = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+  const below = max => Math.floor(random() * max)
+  const CASES = 200_000
+  let noisy = 0
+  let wholes = 0
+  for (let i = 0; i < CASES; i++) {
+    const digits = below(5)
+    const whole = below(below(3) ? 200 : 20_000_000)
+    const fraction = digits ? `.${String(below(10 ** digits)).padStart(digits, '0')}` : ''
+    const stored = Number(`${whole}${fraction}`)
+    const n = below(2) ? below(20_000_000) : -below(whole + 1)
+    const want = Number(`${whole + n}${fraction}`)
+    if (Number.isInteger(stored)) wholes++
+    if ((stored + n) !== want) noisy++
+    assert.equal(coinUpdate({ _source: { system: { currency: { gp: stored } } } }, { gp: n })['system.currency.gp'], want, `${stored} and ${n}`)
+  }
+  assert.ok((noisy > 10_000) && (wholes > 10_000), `enough of each: ${noisy} that floating point alone gets wrong, ${wholes} whole`)
+  assert.deepEqual(coinUpdate({ _source: { system: { currency: {} } } }, { gp: 3 }), { 'system.currency.gp': 3 }, 'a coin with no key starts at none')
+  okay(`a fraction stays as it is written: 10.7 gp less 10 leaves 0.7, never the 0.6999999999999993 of floating point alone, 0.56 sp and 7 is 7.56, 20.3 gp and 1 pp less 25 gp leaves 5.3 gp; and by ${CASES.toLocaleString('en')} random cases, the same each run, a count written with up to four decimals and changed by a whole number is stored as exactly that decimal (${noisy.toLocaleString('en')} of them wrong by floating point alone), a whole count as exactly the sum`)
+}
 
 /* -------------------------------------------- */
 /*  The Gamemaster, and who it's made for       */

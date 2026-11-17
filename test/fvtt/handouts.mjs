@@ -736,6 +736,17 @@ assert.deepEqual(writes.slice(at).map(([, id, changes]) => [id, changes]), [
   ['bram', { 'system.currency.pp': 200, 'system.currency.gp': 50 }], ['thorin', { 'system.currency.pp': 487.5, 'system.currency.gp': 100.5 }],
 ], 'the put back keeps his fractions')
 assert.deepEqual([purse(thorin), purse(vex), purse(bram), purse(lia)], [{ pp: 487.5, gp: 100.5 }, { pp: 200, gp: 62.5 }, {}, {}])
+// A fraction stays as it's written, for the giver and each one given: floating point alone makes
+// 20.700000000000003 of 40.7 less 20.
+restock()
+stock(thorin, [], { gp: 40.7 })
+stock(vex, [], { gp: 0.56 })
+await settle()
+at = writes.length
+made = await handed('thorin', ['vex', 'bram'], { gp: 10 })
+assert.deepEqual([made.result.status, writes.slice(at).map(([, id, changes]) => [id, changes])], ['done', [
+  ['thorin', { 'system.currency.gp': 20.7 }], ['vex', { 'system.currency.gp': 10.56 }], ['bram', { 'system.currency.gp': 10 }],
+]], '40.7 gp less 20 leaves 20.7, and 0.56 gp and 10 is 10.56')
 // Half a platinum is no coin to break: 3 gp and half a platinum can't hand out 4 gp.
 restock()
 stock(thorin, [], { pp: 0.5, gp: 3 })
@@ -744,7 +755,7 @@ unchanged = writes.length
 lines = messages.size
 made = await handed('thorin', ['vex', 'bram'], { gp: 2 })
 assert.deepEqual([refusal(made), writes.length, messages.size, purse(thorin)], [['failed', 'short', null], unchanged, lines, { pp: 0.5, gp: 3 }], 'half a platinum is never broken')
-okay(`a fraction of a coin${DND5E6 ? ', as dnd5e 6 stores one,' : ''} stays in a hand-out: 700.5 pp and 20.5 gp, 200 pp and 50 gp each to three, leaves 87.5 pp and 0.5 gp, and Vex's 12.5 gp becomes 62.5, each written from what is stored; what is put back after a write refused is added to what the giver then stores, 487.5 pp and 100.5 gp; half a platinum is never broken for a hand-out, which is \`short\``)
+okay(`a fraction of a coin${DND5E6 ? ', as dnd5e 6 stores one,' : ''} stays in a hand-out: 700.5 pp and 20.5 gp, 200 pp and 50 gp each to three, leaves 87.5 pp and 0.5 gp, and Vex's 12.5 gp becomes 62.5, each written from what is stored; what is put back after a write refused is added to what the giver then stores, 487.5 pp and 100.5 gp; a fraction stays as it is written, 40.7 gp less 20 leaving 20.7; half a platinum is never broken for a hand-out, which is \`short\``)
 
 // A coin a sheet shows more of than its actor stores, as an effect may add to it, under either
 // release: no more than is stored is handed out, and every write is from what is stored, the giver's,

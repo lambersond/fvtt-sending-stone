@@ -3757,7 +3757,10 @@ far above 10,000,000, as where smaller coins pay for larger ones.
 
 **What's written.** One update of only the coins that change, each from what the actor stores, a
 coin it has no key for starting at none, so a dnd5e 6 fraction stays: 10.5 gp less 10 leaves 0.5,
-and 10.5 gp and 1 pp less 11 gp leaves 9.5 gp. Never dnd5e's own deduction
+and 10.5 gp and 1 pp less 11 gp leaves 9.5 gp. It stays as it's written: the new count is rounded to
+as many decimals as the stored one is written with, so 10.7 gp less 10 leaves 0.7, never the
+0.6999999999999993 floating point alone makes of it, which dnd5e 6 would show as 0.69 in a world
+that shows two decimals of a coin; a whole count is changed exactly. Never dnd5e's own deduction
 (`CurrencyManager.getActorCurrencyUpdates`), which divides in floating point, isn't the same in
 dnd5e 5 and 6, and writes the whole of the prepared coins. An update that throws, or that a module's
 hook refuses, which Foundry leaves out without throwing, is `"failed"`, `"error"`, its `error` what

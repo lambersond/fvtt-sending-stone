@@ -539,8 +539,9 @@ party's coins and a companion's aren't changed this way.
 - **Pay with other coins when a character is short of one**, beside it, is on by default too: untick
   it, and taking away more of a coin than the character holds is refused.
 - **What's written.** Only the coins that change, in one update, so dnd5e 6's fraction of a coin
-  stays. Changes are made one at a time with moves, so coins on their way to another character are
-  never also taken away. Nothing while the character is transformed, as by Wild Shape.
+  stays, as it's written: 10.7 gp less 10 leaves 0.7. Changes are made one at a time with moves, so
+  coins on their way to another character are never also taken away. Nothing while the character is
+  transformed, as by Wild Shape.
 
 ### Favorites
 
