@@ -125,6 +125,7 @@ const LAYERS = [
       'sheet-favorites.mjs',
       'sheet-group.mjs',
       'sheet.mjs',
+      'wild-shape-effects.mjs',     // which of a form's effects come back; wild-shape.mjs writes them
       'wild-shape.mjs',             // a druid's forms, built on sheet-rolls.mjs; sheet-wild-shape.mjs reads it
       'sheet-wild-shape.mjs',
       'creatures.mjs',              // a character's companions, which creature-sync.mjs tells the app of

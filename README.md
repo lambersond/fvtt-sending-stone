@@ -612,8 +612,9 @@ the druid's linked tokens become the form on every scene, not only the one you'r
 line goes to chat. Wild Shape ends as the rules end it: when its hours of world time run out, or the
 form drops to 0 hit points or is Incapacitated, while your Foundry is connected; and on a return,
 from the app or in Foundry, what the druid spent or gained in form, uses, hit dice, spell slots,
-conditions and the like, is kept, on top of anything done to the druid meanwhile, such as a party's
-Long Rest. Only a form dnd5e made of the druid is followed, ended or returned: a player's own actor
+conditions, effects others put on the form and the like, is kept, and an effect taken off the form
+is taken off the druid, on top of anything done to the druid meanwhile, such as a party's Long
+Rest. Only a form dnd5e made of the druid is followed, ended or returned: a player's own actor
 flagged by hand to look like one never is. It's
 off by default, apart from players' rolls, under D&D Fifth Edition 5 and 6. A 2014 druid's Wild Shape
 stays in Foundry, and so does any other transformation, such as Polymorph: the app shows the form,
@@ -924,8 +925,8 @@ Gamemaster-only information switched on.
   not as it was when given; it follows the bard's within a turn in combat.
 - **Two bards' Inspired:** each is offered; the 2024 rule allows one die at a time. Two bards who
   aren't the party's are offered under the same name.
-- **In Wild Shape**, Inspired is offered from the form; removed there, the druid's own Inspired
-  stays and is offered again once the druid changes back: the Gamemaster removes it from both.
+- **In Wild Shape**, Inspired is offered from the form; used or removed there, the druid's own is
+  removed too when Wild Shape ends.
 - **A world on the legacy (2014) rules:** a Bardic Inspiration item that doesn't say its rules
   counts as 2014's and isn't offered; dnd5e's 2024 compendium feature is.
 - **Advantage the game adds as the roll is made**, such as Midi-QOL's from a target, takes Foundry's
@@ -967,10 +968,13 @@ Gamemaster-only information switched on.
 - **Wild Shape from the app is the 2024 Wild Shape only:** a 2014 druid's Wild Shape is used in
   Foundry, and the app follows the form, shown as Wild Shape, but never times, ends or returns it:
   the 2014 rules end it differently (0 hit points or Unconscious), and you return it in Foundry.
-- **Effects gained or ended while shaped**, but conditions and concentration, aren't carried back:
-  dnd5e's return keeps the druid's own effects as they were at the change, so a Bless cast on the
-  wolf ends with the form. Conditions gained in form are put on the druid, and conditions and
-  concentration that ended in form are taken off.
+- **What a druid begins in Wild Shape isn't carried back:** a spell the druid casts as a beast and
+  concentrates on ends with the form, as does an effect one of the form's own features gave it, and
+  anything on the form's items. Effects others put on the form are kept on the druid, and those
+  taken off the form are taken off the druid. One the druid already had that is only changed on the
+  form, turned off, edited, or applied again for longer, stays as it was on the druid.
+  - **An effect you make on the form's own sheet is kept on the druid** when Wild Shape ends: delete
+    it there first if it was only for the form.
 - **Worn gear isn't modelled:** dnd5e gives a form none of the druid's gear, so a ring that should
   work on the form doesn't; you decide.
 - **Bonus Actions are counted only under Midi-QOL's Enforce bonus actions, in a fight:** elsewhere
@@ -1220,6 +1224,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-effects.mjs` | A player's own effects turned off, on and deleted from the app, from 0.39.0, by the campaign's switch under dnd5e: fetching them from an app that takes them; each checked against what `sheet-effects.mjs` says its player may do, written with the mark of the app's own Turn off, and read again; the hook that clears the mark on any other change; nothing posted |
 | `scripts/command-hit-points.mjs` | Hit points and temporary hit points set from the app, from 0.44.0, by the campaign's switch, on by default, under dnd5e: fetching them from an app that takes them; the character's, its form's or a companion's, each field only from the number the app showed, within the maximum the sheet shows, one plain update read again; nothing posted |
 | `scripts/command-plain.mjs` | A plain roll of the app's dice tray, from 0.44.0, wherever players' rolls are made: its formula from the dice and the number added, made by dnd5e's basic roll with the player's dice, its card dnd5e 5's generic roll or dnd5e 6's generic message |
+| `scripts/wild-shape-effects.mjs` | Which of a Wild Shape form's effects come back with the druid, from 0.48.0: those gained in form, told from the creature's own and the form's own doing, and those of the druid's taken off it |
 | `scripts/wild-shape.mjs` | Wild Shape, from 0.40.0, by the 2024 rules: the campaign's switch, under dnd5e, and which apps take it; a druid's Wild Shape and what the rules allow the druid now; the campaign's compendiums, the Beasts the druid may learn and the known forms' summaries; the record written on every form as dnd5e makes it; the character's tokens switched and put back on every scene; what comes back on every return, as sums, and the character's hit points; ending a form, and why one is due; a form deleted by hand, and a player's leftover form |
 | `scripts/wild-shape-hooks.mjs` | Wild Shape's hooks, from 0.40.0, and the watch that ends each form when it's due, on the bridge: as world time moves, as a form or its effects change, when a character's queue of commands settles, and when a browser becomes the one that sends |
 | `scripts/sheet-wild-shape.mjs` | A 2024 druid's `wildShape` block and a transformed character's `form` on the sheet, from 0.40.0 |

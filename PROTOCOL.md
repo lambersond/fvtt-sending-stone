@@ -2504,6 +2504,9 @@ An ask:
   could take, keeping only whether it could be paid, is never asked of the Gamemaster's Manual
   Dice, for an attack from the app or one made in Foundry. A reaction taken spends as ever. A
   listener reads nothing new. A module before 0.48.0 leaves those checks to Midi.
+- Module 0.48.0 keeps on a character the effects gained in [Wild Shape](#wild-shape), and takes off
+  it those taken off the form, with no new event, field or format: a listener reads the character's
+  sheet as before. A module before 0.48.0 carries back conditions and concentration alone.
 
 ## Changes from protocol 1
 
@@ -4999,8 +5002,12 @@ Shape, which the module alone times, ends and returns from the app; `profile` th
 taken as; `request` the command's id, for one from the app; `baseline` what the character had going
 in: hit points and temporary ones, each of the character's items the form keeps with its uses spent
 and each activity's, each class's hit dice spent, Heroic Inspiration, exhaustion and death saves,
-which of the character's own effects the form carries, and each spell slot pool's value. A form made
-from a form, as dnd5e chains them, keeps the first's baseline. The character's active form is the
+which of the character's own effects the form carries, since module 0.48.0 `formEffects`, the ids of
+the effects the form was made with that aren't the character's, the creature's own and dnd5e's
+proficiency override where it adds one, and each spell slot pool's value. A form made from a form,
+as dnd5e chains them, keeps the first's baseline; since module 0.48.0 with the later creature's own
+effects added to `formEffects`, and without those of `effects` that the later change left behind. The
+character's active form is the
 newest of the world actors dnd5e flags as the character's that no later form lists among its
 `previousActorIds`, and only one that looks like a form dnd5e made of the character: never one of a
 campaign's characters, nor a copy of an actor (Foundry's Duplicate), owned by no player who doesn't
@@ -5034,19 +5041,45 @@ character's Wild Shape, `flags.sending-stone.wildShape.ended`, `{ form, why, at,
 `"app"`, `"time"`, `"hp"`, `"incapacitated"` or `"foundry"`, cleared by the next change; a change of
 form while shaped notes none.
 
+Since module 0.48.0, effects too. Each effect gained in form is put on the character as it was on
+the form, with its id: its origin, duration and start, its changes, statuses and every flag, dnd5e's
+`dependentOn` among them, so one a caster's concentration keeps up still ends with it, and one the
+party put there is its player's to turn off or delete
+([A player's own effects](#a-players-own-effects)). Gained in form: on the form's own actor, never on
+its items; none of the effects the form was made with (`baseline.effects` and
+`baseline.formEffects`); and none of: a status effect's own, by its static id, one of
+`CONFIG.statusEffects` or of the fixed ids dnd5e keeps for its own, as Bloodied's (a condition is
+carried as above, exhaustion counted); a concentration; one whose duration has expired; one whose
+origin (`origin`, or dnd5e 6's `system.origin`) or `flags.dnd5e.dependentOn` is relative, a bare id,
+or names an item, effect or activity on the form or an earlier form of its chain, the form's own
+doing; one whose `dependentOn` names an actor's own effect, a concentration, that is no longer
+there. One whose origin is the form's actor itself, as made on its sheet, is carried with the
+character's actor as its origin. Each is created turned off, then turned on where it was on, so that
+dnd5e adds no rider condition and asks nothing; then its start and duration are written again where
+creating it changed them. Where the module ends the form, they are put on the character before
+dnd5e's return, and taken off again if the return is refused. Each effect the form carried from the
+character that is gone from the form, or has expired on it, is deleted from the character; before
+0.48.0 only a condition or a concentration was. Never a status effect's own that is no condition,
+such as Bloodied or Encumbered, which dnd5e keeps from the character's own numbers. A form recorded
+before 0.48.0, with no `formEffects`, has no gained effect carried. One that can't be written is
+logged, and the rest of the return goes on.
+
 **Made in Foundry.** A return made in Foundry, by the character's player or the Gamemaster, is
 carried back by the client that made it and noted `"foundry"`. A form deleted by hand from the
 sidebar, which dnd5e doesn't return, is treated as a return by the bridge once it's settled (two
 seconds), unless a return made it, as its `ended.formId` or the bridge's own return says: the
 character's tokens put back, and hit points, temporary ones, spell slots and what was spent or gained
-in form carried back to the character. An earlier form
+in form carried back to the character, effects among it since module 0.48.0, but one whose
+concentration ended with the form. Where a return did make the deletion, the bridge then takes off
+the character any effect that return put there whose concentration has gone since. An earlier form
 of a chain, deleted with the later one that lists it or before it, is carried on in that later form,
 which was made from it: never carried back itself where the later one is a Wild Shape, which holds
 what it spent; under another kind, as a Polymorph cast on the shaped druid, what it spent is carried
 back, and no hit points, which dnd5e's return of the later one copies. A player's own return in
 Foundry leaves the form in the world, unflagged: the bridge deletes it, as a Gamemaster's return
 does, at once, or where no Gamemaster was connected, once a client becomes the bridge. A Polymorph or any other kind of transformation is followed (`form.kind` `"other"`, no time) and
-returned in Foundry; the module carries nothing back for it.
+returned in Foundry; the module carries nothing back for it; an effect gained or taken off under
+that other kind is not.
 
 **The chat lines**, public, from the character, flagged `flags.sending-stone.wildShape` `{ op, form,
 why }`: "{name} uses Wild Shape and becomes a Wolf.", "{name} uses Wild Shape again and becomes a
