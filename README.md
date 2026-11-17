@@ -485,12 +485,12 @@ either is missing.
   [taken away](#adding-and-taking-away-coins) are, other coins paying where they're short of one,
   unless **Pay with other coins when a character is short of one** is off. No line is posted for
   everyone: each character given coins is whispered what they received, "Vex received 200 pp and 50
-  gp from Thorin", you are whispered one message with all of it, "Thorin handed out 200 pp and 50 gp
-  each to Vex, Bram, and Lia: 600 pp and 150 gp in all", and the giver's player sees each of them. A
-  character no player owns is whispered nothing, though your message names it. A giver with no one
-  player of its own, one no player owns, or one several own with none of them having it as their
-  character, is written for by you, as its rolls are: its own players then see none of these
-  messages, only you and each one given.
+  gp from Thorin", you and any other Gamemaster of the world are whispered one message with all of
+  it, "Thorin handed out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all",
+  and the giver's player sees each of them. A character no player owns is whispered nothing, though
+  your message names it. A giver with no one player of its own, one no player owns, or one several
+  own with none of them having it as their character, is written for by you, as its rolls are: its
+  own players then see none of these messages, only you and each one given.
 - **You** can move anything between the campaign's characters and parties from the app's Gamemaster
   pages, party to party too, distribute any party's coin, and hand out a character's coins at its
   page. The switch counts for your moves too.

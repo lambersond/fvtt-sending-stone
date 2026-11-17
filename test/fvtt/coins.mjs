@@ -501,7 +501,7 @@ const listed = parts => new Intl.ListFormat('en', { type: 'conjunction' }).forma
 const rates = coinRates()
 assert.deepEqual(rates, [{ key: 'pp', conversion: 0.1 }, { key: 'gp', conversion: 1 }, { key: 'ep', conversion: 2 }, { key: 'sp', conversion: 10 }, { key: 'cp', conversion: 100 }])
 assert.deepEqual(NEVER_CHANGE, ['ep'])
-okay("dnd5e's coins with a rate, the largest first; change never comes back in electrum")
+okay("dnd5e's coins with a rate, the largest first; change never comes back in electrum, unless electrum is the coin paid")
 
 // Each row: what's held, what's taken away, what's left and which of the coins held went beyond those
 // asked for; null where it's refused. The dagger rows are those smaller coins pay. The two rows of
