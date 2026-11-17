@@ -503,7 +503,9 @@ assert.deepEqual(NEVER_CHANGE, ['ep'])
 okay("dnd5e's coins with a rate, the largest first; change never comes back in electrum")
 
 // Each row: what's held, what's taken away, what's left and which of the coins held went beyond those
-// asked for; null where it's refused. The dagger rows are those smaller coins pay.
+// asked for; null where it's refused. The dagger rows are those smaller coins pay. The two rows of
+// electrum paid beside another coin are the ones that tell the order of paying: paid the smallest
+// first, the first would leave 8 gp, 1 ep and 9 sp, and the second would use 3 gp.
 const TABLE = [
   [{ pp: 2, gp: 3 }, { gp: 5 }, { pp: 1, gp: 8 }, { pp: 1 }],
   [{ gp: 12 }, { sp: 5 }, { gp: 11, sp: 5 }, { gp: 1 }],
@@ -515,6 +517,8 @@ const TABLE = [
   [{ pp: 1, gp: 1 }, { gp: 1, sp: 1 }, { gp: 9, sp: 9 }, { pp: 1 }],
   [{ pp: 1 }, { gp: 1, sp: 1 }, { gp: 8, sp: 9 }, { pp: 1 }],
   [{ pp: 3, gp: 4, cp: 2 }, { gp: 4, sp: 3, cp: 5 }, { pp: 2, gp: 9, sp: 6, cp: 7 }, { pp: 1 }],
+  [{ pp: 1 }, { ep: 1, sp: 1 }, { gp: 9, sp: 4 }, { pp: 1 }],
+  [{ pp: 8, gp: 3, ep: 1, cp: 7 }, { ep: 3, sp: 7, cp: 5 }, { pp: 8, gp: 1, sp: 3, cp: 2 }, { gp: 2 }],
   [{ pp: 700, gp: 20 }, { pp: 600, gp: 150 }, { pp: 87 }, { pp: 13 }],
   [{ pp: 2, gp: 3, sp: 500 }, { gp: 5 }, { pp: 1, gp: 8, sp: 500 }, { pp: 1 }],
   [{ gp: 2, sp: 40 }, { gp: 5 }, { sp: 10 }, { sp: 30 }],
@@ -539,7 +543,14 @@ for (const [held, pay, left, used] of TABLE) {
 }
 assert.deepEqual(payCoins(whole({ gp: 12, sp: 3 }), { gp: 5, sp: 3 }, rates, { change: false }), { left: whole({ gp: 7 }), used: {} })
 assert.deepEqual(payCoins(whole({ gp: 12 }), { gp: 5 }, rates), { left: whole({ gp: 7 }), used: {} })
-okay(`the rule, by ${TABLE.length} worked cases: a coin paid from its own first; then the nearest larger coin broken, as few as cover it, the change back in the fewest coins and never in electrum unless electrum is paid; then smaller coins, the largest first; refused only where all the coins are worth too little; \`used\` only what was held; and with other coins not paying, every one of them refused, an exact payment made`)
+// The largest coin paid first, however the coins are named: the rule sorts them itself.
+const backwards = coins => Object.fromEntries(Object.entries(coins).reverse())
+assert.deepEqual(Object.keys(backwards({ ep: 1, sp: 1 })), ['sp', 'ep'])
+for (const [held, pay, left, used] of TABLE) {
+  const out = payCoins(whole(held), backwards(pay), rates)
+  assert.deepEqual(left ? [some(out.left), out.used] : out, left ? [left, used] : { refusal: 'short' }, `${say(held)} less ${say(pay)}, named the smallest first`)
+}
+okay(`the rule, by ${TABLE.length} worked cases: the coins asked for paid from the largest to the smallest, however they are named, 1 pp less 1 ep and 1 sp leaving 9 gp and 4 sp; a coin paid from its own first; then the nearest larger coin broken, as few as cover it, the change back in the fewest coins and never in electrum unless electrum is paid; then smaller coins, the largest first; refused only where all the coins are worth too little; \`used\` only what was held; and with other coins not paying, every one of them refused, an exact payment made`)
 
 // Many random cases, the same each run: no worth is made or lost, no coin goes below none or to a
 // fraction, nothing is counted as used that wasn't held, and a payment is refused exactly where the
@@ -563,6 +574,7 @@ okay(`the rule, by ${TABLE.length} worked cases: a coin paid from its own first;
     const out = payCoins(held, pay, rates)
     const why = () => JSON.stringify([before, pay, out])
     assert.deepEqual(held, before, `what's held is changed: ${why()}`)
+    assert.deepEqual(payCoins(held, backwards(pay), rates), out, `paid another way where the coins are named the smallest first: ${why()}`)
     assert.equal(!out.refusal, worth(held) >= worth(pay), `refused, or not, against what the coins are worth: ${why()}`)
     const strict = payCoins(held, pay, rates, { change: false })
     const covered = Object.entries(pay).every(([key, n]) => n <= held[key])
@@ -584,7 +596,7 @@ okay(`the rule, by ${TABLE.length} worked cases: a coin paid from its own first;
     }
   }
   assert.ok((paid > 20_000) && (refused > 20_000) && (exact > 1_000), `enough of each: ${paid} paid, ${refused} refused, ${exact} exact`)
-  okay(`the rule, by ${CASES.toLocaleString('en')} random cases, the same each run (${paid.toLocaleString('en')} paid, ${refused.toLocaleString('en')} refused, ${exact.toLocaleString('en')} exact): no worth made or lost, never a coin below none or a fraction, nothing counted as used that wasn't held, refused exactly where the coins are worth too little, and with other coins not paying exactly where one coin is short`)
+  okay(`the rule, by ${CASES.toLocaleString('en')} random cases, the same each run (${paid.toLocaleString('en')} paid, ${refused.toLocaleString('en')} refused, ${exact.toLocaleString('en')} exact): no worth made or lost, never a coin below none or a fraction, nothing counted as used that wasn't held, refused exactly where the coins are worth too little, paid the same however the coins are named, and with other coins not paying exactly where one coin is short`)
 }
 
 // A world's own rates that don't divide one another: coins of 1, 4 and 6 to the gp. Every sum is made

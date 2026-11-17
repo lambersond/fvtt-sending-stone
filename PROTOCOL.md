@@ -3722,7 +3722,8 @@ never paid, broken or counted.
 coins when a character is short of one** is on (`change`), they're paid as follows, at dnd5e's rates
 ([`conversion`](#character-sheet)), in whole numbers, on a copy, so that a refusal changes nothing:
 
-1. The coins asked for are paid from the largest to the smallest.
+1. The coins asked for are paid from the largest to the smallest, in whatever order `currency`
+   names them.
 2. Each is paid from the character's own coins of it first.
 3. For what's still owed, larger coins are broken, the nearest larger coin first, of each as few as
    cover it or all there are: only a coin worth a whole number of the coin paid.
@@ -3758,6 +3759,8 @@ game.
 | 1 pp, 1 gp | 1 gp, 1 sp | 9 gp, 9 sp | 1 pp |
 | 1 pp | 1 gp, 1 sp | 8 gp, 9 sp | 1 pp |
 | 3 pp, 4 gp, 2 cp | 4 gp, 3 sp, 5 cp | 2 pp, 9 gp, 6 sp, 7 cp | 1 pp |
+| 1 pp | 1 ep, 1 sp | 9 gp, 4 sp | 1 pp |
+| 8 pp, 3 gp, 1 ep, 7 cp | 3 ep, 7 sp, 5 cp | 8 pp, 1 gp, 3 sp, 2 cp | 2 gp |
 | 700 pp, 20 gp | 600 pp, 150 gp | 87 pp | 13 pp |
 | 2 pp, 3 gp, 500 sp | 5 gp | 1 pp, 8 gp, 500 sp | 1 pp |
 | 2 gp, 40 sp | 5 gp | 10 sp | 30 sp |
@@ -3768,6 +3771,12 @@ game.
 | 2 pp, 3 gp | 25 gp | refused `"short"` | |
 | 9 sp, 5 cp | 1 gp | refused `"short"` | |
 | 1 gp, 14 sp | 1 gp, 15 sp | refused `"short"` | |
+
+The two rows that pay electrum beside another coin show step 1. In the first the platinum is broken
+for the electrum, its change 9 gp and 1 ep, and that electrum then for the silver; paid the
+smallest first it would leave 8 gp, 1 ep and 9 sp, and the second row would use 3 gp. At dnd5e's
+own rates the order shows only there, where electrum is paid beside another coin and a coin is
+broken: never in whether a payment is made, nor in what the coins left are worth.
 
 `used` is the character's own coins that went beyond those asked for: of each coin, what it held
 less what's left less what was paid of it, where that's above none. Change that was broken again is
