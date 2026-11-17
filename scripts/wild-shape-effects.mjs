@@ -147,35 +147,49 @@ function asHers(data, chain, uuid) {
  * form's own actor, never its items', that the form wasn't made with (her own it carried, and
  * `formEffects`), that are no status effect's own, no concentration and haven't run out, and that
  * aren't the form's own doing. None where the baseline has no `formEffects`, as one recorded before
- * 0.48.0: without it the creature's own can't be told from what was gained.
+ * 0.48.0: without it the creature's own can't be told from what was gained. Each is read on its
+ * own: one that can't be read, its duration or its data throwing as it is asked, as another module's
+ * might, is left out, and named in `unread` with what it threw, so that it never costs the rest.
  * @param {Actor} form
  * @param {object|null} baseline   The record's.
  * @param {string[]} chain         The form's id, and each earlier form's of its chain.
  * @param {Actor} original         The druid.
- * @returns {object[]}
+ * @returns {{gained: object[], unread: {name: string, err: unknown}[]}}
  */
 export function gainedOf(form, baseline, chain, original) {
-  if ( !Array.isArray(baseline?.formEffects) ) return [];
-  const made = new Set([...(baseline.effects ?? []), ...baseline.formEffects]);
   const gained = [];
+  const unread = [];
+  if ( !Array.isArray(baseline?.formEffects) ) return { gained, unread };
+  const made = new Set([...(baseline.effects ?? []), ...baseline.formEffects]);
   for ( const effect of form?.effects ?? [] ) {
-    if ( made.has(effect.id) || isStatusEffect(effect) || isConcentration(effect) || hasExpired(effect) ) continue;
-    const data = effect.toObject();
-    if ( fromTheForm(data, chain) ) continue;
-    gained.push(asHers(data, chain, original.uuid));
+    try {
+      if ( made.has(effect.id) || isStatusEffect(effect) || isConcentration(effect) || hasExpired(effect) ) continue;
+      const data = effect.toObject();
+      if ( fromTheForm(data, chain) ) continue;
+      gained.push(asHers(data, chain, original.uuid));
+    } catch (err) {
+      unread.push({ name: effect?.name, err });
+    }
   }
-  return gained;
+  return { gained, unread };
 }
 
 /**
  * The ids of an actor's own effects whose duration has run out: a form's, as Wild Shape ends, and
  * the druid's, as a form is made of her, so that one already run out by then is never read as run
- * out in form.
+ * out in form. One whose duration can't be read is taken as not run out, so nothing is taken off
+ * the druid for it.
  * @param {Actor} actor
  * @returns {string[]}
  */
 export function expiredOf(actor) {
-  return Array.from(actor?.effects ?? []).filter(effect => hasExpired(effect)).map(effect => effect.id);
+  return Array.from(actor?.effects ?? []).filter(effect => {
+    try {
+      return hasExpired(effect);
+    } catch {
+      return false;
+    }
+  }).map(effect => effect.id);
 }
 
 /**

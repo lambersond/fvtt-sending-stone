@@ -789,8 +789,9 @@ export async function restoreTokens(ids, original) {
  * counts, conditions, effects and spell slots, her own hit points and spell slots now, the record's
  * baseline, whether dnd5e's return copies the form's slots over hers, and the forms whose tokens go
  * back: this one, and each earlier form of its chain, live or noted as hers when it was deleted.
- * Since module 0.48.0 the effects gained in form too (`gained`, each as the data to put on her) and
- * those run out on it (`expired`), as plain data: the form is gone when a deletion by hand reads it.
+ * Since module 0.48.0 the effects gained in form too (`gained`, each as the data to put on her),
+ * those of them that couldn't be read (`unread`, each by its name, with what it threw) and those run
+ * out on it (`expired`), as plain data: the form is gone when a deletion by hand reads it.
  * @param {Actor} form
  * @param {Actor} original
  * @returns {object}
@@ -803,6 +804,7 @@ export function snapshot(form, original) {
   const effects = ownEffects(form);
   const chain = id => (id !== original.id) && (game.actors.get(id) ? madeForm(game.actors.get(id), original) : (endedForms.get(id) === original.id));
   const ids = [form.id, ...(form.getFlag("dnd5e", "previousActorIds") ?? []).filter(id => id && chain(id))];
+  const { gained, unread } = gainedOf(form, record.baseline ?? null, ids, original);
   return {
     formId: form.id,
     name: record.name ?? form.name,
@@ -820,7 +822,8 @@ export function snapshot(form, original) {
       death: { success: finite(attributes.death?.success) ?? 0, failure: finite(attributes.death?.failure) ?? 0 },
       effects: effects.map(effect => effect.id),
       conditions: effects.map(effect => ({ id: effect.id, status: conditionOf(effect) })).filter(each => each.status),
-      gained: gainedOf(form, record.baseline ?? null, ids, original),
+      gained,
+      unread,
       expired: expiredOf(form),
       spells: slotsOf(form)
     },
@@ -1039,12 +1042,14 @@ async function eachOrAll(original, list, write, failed) {
  * The second and third name only those of them she holds as each is sent. One that couldn't be made
  * is not among them; and one may be gone again by then, ended with its caster's concentration,
  * which is nothing to write and no failure. The first write is sent before anything is awaited, as
- * `carryBack` needs of it.
+ * `carryBack` needs of it. One that couldn't be read on the form (snapshot's `unread`) is logged
+ * here by its name, as one that can't be made is: once for an ending, by whoever keeps the rest.
  * @param {object} kept       snapshot's.
  * @param {Actor} original
  * @returns {Promise<string[]>}   The ids of the effects it made.
  */
 async function putGained(kept, original) {
+  for ( const { name, err } of kept?.form?.unread ?? [] ) console.error(`${MODULE_ID} | Could not keep ${name} on ${original.name}`, err);
   const wanted = Array.from(kept?.form?.gained ?? []).filter(data => data?._id && !ownEffect(original, data._id) && !untied(data));
   if ( !wanted.length ) return [];
   const made = await eachOrAll(original, wanted.map(data => ({ ...data, disabled: true })),
@@ -1158,7 +1163,8 @@ export async function correctSlots(kept, original, { copied=true }={}) {
  * dnd5e didn't make of her (`madeForm`). Since module 0.48.0 the effects gained in form are put on
  * her before dnd5e's return, so that a caster's concentration always has her copy to keep up when
  * the form's goes with the form (Midi-QOL ends one left keeping nothing up); and taken off her
- * again where the return throws, is refused, or is stopped.
+ * again where the return throws, is refused, or is stopped. Whatever is thrown here, the reading of
+ * the form before anything is written too, she is never left marked as ending.
  * @param {Actor} form
  * @param {"app"|"change"|"time"|"hp"|"incapacitated"} why
  * @returns {Promise<boolean>}   Is the form gone?
@@ -1169,9 +1175,9 @@ export async function endWildShape(form, why) {
   // deleted or carried back as a Gamemaster on what a player wrote.
   if ( !original || !madeForm(form, original) || ending.has(original.id) ) return false;
   ending.add(original.id);
-  const kept = snapshot(form, original);
-  for ( const id of kept.ids ) returning.add(id);
   try {
+    const kept = snapshot(form, original);
+    for ( const id of kept.ids ) returning.add(id);
     const put = await putGained(kept, original);
     try {
       await form.revertOriginalForm({ renderSheet: false, sendingStone: why });

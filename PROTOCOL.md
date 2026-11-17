@@ -5071,7 +5071,8 @@ character's own numbers, and as much one put on by hand, as Sleeping, Dodging, H
 another module's, so that one of those put on the form ends with it, and one the character already
 had stays on the character though it was taken off the form. A form recorded before 0.48.0, with no
 `formEffects`, has no gained effect carried, nor has one dnd5e made from such a form, or from a form
-with no record. One that can't be written is logged, and the rest of the return goes on.
+with no record. One that can't be read on the form is not carried, and is logged, as is one that
+can't be written on the character; the rest of the return goes on.
 
 **Made in Foundry.** A return made in Foundry, by the character's player or the Gamemaster, is
 carried back by the client that made it and noted `"foundry"`. A form deleted by hand from the
