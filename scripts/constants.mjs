@@ -678,6 +678,15 @@ export const COST_CHECK = "sendingStoneCheck";
 export const COST_SPENDING = "sendingStoneSpending";
 
 /**
+ * The key of a use's configuration saying, since 0.48.0, that dnd5e has begun spending it, from
+ * `dnd5e.preActivityConsumption` until `dnd5e.activityConsumption`: a dice cost dnd5e rolls with it
+ * is the use's own, never Midi-QOL's check of a reaction it looks for (dice-plan.mjs's
+ * `isReactionLookup`). dnd5e passes it on to a linked activity's spending.
+ * @type {string}
+ */
+export const COST_BEGUN = "sendingStoneBegun";
+
+/**
  * The dice a player can roll in the app.
  * @type {ReadonlySet<number>}
  */

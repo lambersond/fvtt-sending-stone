@@ -2498,6 +2498,12 @@ An ask:
   dnd5e's own `sort`s are written, so Foundry's sheet shows the same order, the old-style resources
   first. A listener before 0.47.0 ignores `orders` and sends no order. A module before 0.47.0 says
   no `orders`, so a listener offers no reordering, and refuses one handed it anyway as `"invalid"`.
+- Module 0.48.0 rolls Midi-QOL's check of each reaction it looks for with Foundry's computer
+  dice, on a Gamemaster's Foundry, with no new event, field or format: the
+  [dice cost](#dice-the-game-rolls-later) Midi works out as it looks for the reactions a creature
+  could take, keeping only whether it could be paid, is never asked of the Gamemaster's Manual
+  Dice, for an attack from the app or one made in Foundry. A reaction taken spends as ever. A
+  listener reads nothing new. A module before 0.48.0 leaves those checks to Midi.
 
 ## Changes from protocol 1
 
@@ -4252,9 +4258,24 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   marks the use it hands Midi as a check until dnd5e begins spending it
   (`dnd5e.preActivityConsumption`), so the cost the use spends is rolled as ever. So, under dnd5e 5,
   is Midi-QOL's own check of the cost of a run's workflow's other activity, which Midi works out and
-  throws away before it spends it. A Gamemaster's own workflow's check is rolled as Midi rolls it,
-  and so are Midi's checks of what other uses would spend, as the reactions it looks for among a
-  run's targets.
+  throws away before it spends it. Since 0.48.0, under dnd5e 5, and under dnd5e 6 where Midi's line
+  for it builds the check as its line for dnd5e 5 does, so is Midi-QOL's check of each reaction it
+  looks for: as a creature is attacked, hit, missed, damaged or healed, or makes a save, Midi works
+  out what each of its reactions would spend, keeps only whether it could be paid, and throws the
+  rest away. On a Gamemaster's Foundry a dice cost rolled for that is Foundry's computer dice, never
+  asked of anyone, for an attack from the app or one made in Foundry with no app in it, in any world
+  the module is active in; so where few uses are left, the computer's roll decides whether the
+  reaction is offered, as the Gamemaster's dice did before. It's told by what dnd5e is given, never
+  by a formula: with Midi-QOL active, an activity a reaction activates, as Midi reads that (its
+  `effectiveActivationType`: a Cast activity's is its spell's, unless it overrides it), with a
+  configuration that creates nothing (`create: false`), which dnd5e hasn't begun spending
+  (`dnd5e.preActivityConsumption`). So a reaction taken spends as ever, its cost rolled with the
+  dice settings of whoever takes it. A Gamemaster's own workflow's check is rolled as Midi rolls it,
+  and so is Midi's check of any other use not from the app, a reaction's own as it's taken among
+  them; so is a reaction looked for in a player's own Foundry, as they attack there. The one roll
+  that may be taken wrongly is a check another module makes just as Midi makes this one: where that
+  module then spends what it worked out itself, without dnd5e's own spending, the cost it spends was
+  Foundry's computer dice.
 - **A die thrown again** (`"again"`). A die of a typed roll's own, of any kind, or of a roll asked,
   that Foundry throws again: an explosion (`x`, `xo`), or a reroll (`r`, `rr`) where the roll wasn't
   sent [`rerolls`](#fetching-rolls) `"kept"`, as a Halfling's of a 1. It's asked one die at a time,
@@ -4275,7 +4296,8 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   module's self-test failed (`features.rolls.diceAsks` `false`, `diceAsksReason` `"self-test"`), no
   run is opened and nothing is asked: the game's later dice are rolled as before 0.44.0, a dice
   cost, say, with the Gamemaster's own dice settings, their Manual Dice window among them, though
-  never the module's own check of it beforehand, nor Midi-QOL's as its use begins.
+  never the module's own check of it beforehand, nor Midi-QOL's as its use begins, nor, since
+  0.48.0, Midi's of a reaction it looks for.
 - **The wait** is a minute. Then the ask closes `"expired"` and Foundry's computer dice roll it; and
   so it does, looked at after each fetch and every 5 seconds, before its minute is out, once the
   character is no longer open, the campaign no longer asks, as with its rolls or Manual Dice turned
@@ -4342,7 +4364,8 @@ paired: it's a use of its own from the app, typed already. The optional bonuses 
 are theirs. Midi's internals were read from its source, not at a table: a workflow the module can't
 find on a roll leaves that roll to the rule without one, a Midi with no bonus damage macros to
 wrap leaves their dice to Foundry, and one with no check of its other activity's consumption to wrap
-leaves that activity's dice costs to Foundry too.
+leaves that activity's dice costs to Foundry too, and one that looks for reactions another way than
+the source read does leaves their checks to roll as Midi rolls them, as before 0.48.0.
 
 dnd5e passes a use's spending to each cost it rolls through its consumption targets'
 `resolveCost`: where a dnd5e has none the module can follow, dice costs aren't asked, and they, and
@@ -4350,9 +4373,10 @@ the module's own check of them and Midi-QOL's, are rolled as before 0.44.0.
 
 **Under dnd5e 6**, `features.rolls.diceAsks` is `false`, `diceAsksReason` `"system"`, and nothing
 is asked, nor any run opened: the game's later dice are Foundry's, as before 0.44.0, but for the
-module's own check of a cost, and Midi-QOL's as its use from the app begins, Foundry's computer dice
-there too. dnd5e 6 and Midi-QOL's line for it
-are to be supported apart.
+module's own check of a cost, Midi-QOL's as its use from the app begins, and since 0.48.0 Midi's
+of a reaction it looks for, Foundry's computer dice there too. dnd5e 6 and Midi-QOL's line for it
+are to be supported apart: how that line looks for reactions was not read, and one that builds the
+check another way leaves it to roll as Midi rolls it.
 
 **Older.** A listener before 0.44.0 never answers `"diceAsks": 1`: it's asked nothing, and the
 later rolls of its players' runs are thrown by Foundry's computer dice. A module before 0.44.0 says

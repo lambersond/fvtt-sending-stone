@@ -10,7 +10,9 @@
 // callMacros and rollBonusDamage, one after another, and a homebrew macro rolling more as Midi
 // finishes the roll (midi.postActiveEffects); a companion of Thorin's and a Wild Shape form of his;
 // Mira, another player's character, whose use spends what Thorin's charm does, and whose dagger
-// rolls Midi's bonus damage beside his; a stand-in
+// rolls Midi's bonus damage beside his; since module 0.48.0 a goblin's hide and wand, whose
+// reactions spend 1d4 of their charges, for Midi-QOL's look for reactions, and Midi's Cast
+// activity; a stand-in
 // app that answers asks, says which characters are open, and whether it reads asks (OLD_APP=1: an
 // app before them), and may be slow to answer fetches of commands; a DialogV2 for the Gamemaster's window, who rolls their own dice with Manual
 // Dice; and a clock run a hundred times as fast, timers and Date.now alike, so that a minute's wait
@@ -92,8 +94,8 @@ globalThis._loc ??= (key, data) => (data ? game.i18n.format(key, data) : game.i1
 foundry.utils.escapeHTML ??= value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' })[ch])
 
 const { Actor5e } = await import('./actor5e.mjs')
-const { Activity, AttackActivity, SaveActivity, DamageActivity, HealActivity, ConsumptionTarget, equip } = await import('./activity5e.mjs')
-const { midi, placeables, installMidi } = await import('./midi-fake.mjs')
+const { Activity, AttackActivity, SaveActivity, DamageActivity, HealActivity, ConsumptionTarget, activityTypes, equip } = await import('./activity5e.mjs')
+const { midi, placeables, installMidi, MidiCastActivity } = await import('./midi-fake.mjs')
 globalThis.dnd5e = {
   settings: { rulesVersion: 'modern' },
   dice: { DamageRoll },
@@ -152,6 +154,8 @@ users.get('gm').targets = new Set()
 const alice = user('alice', 'Alice', false, 2)
 if (MIDI) {
   installMidi()
+  // Since module 0.48.0: Midi's Cast activity, which reads its activation from its spell.
+  activityTypes.cast = MidiCastActivity
   midi.settings.defaultOtherActivity = 'auto'
   midi.ammunitionActivities = true
 }
@@ -257,7 +261,24 @@ const place = actor => {
 }
 const goblin = add(new Actor5e({ id: 'goblin', name: 'Goblin', mods: {}, hp: { value: 40, max: 40, temp: 0 } }))
 goblin.type = 'npc'
-equip(goblin, { ac: 12, items: [{ id: 'club', name: 'Club', type: 'weapon', system: { properties: [], quantity: 1 }, activities: [{ id: 'club-hit', damage: [{ number: 1, denomination: 4, types: ['slashing'] }] }] }] })
+equip(goblin, { ac: 12, items: [
+  // Since module 0.48.0, for Midi-QOL's look for reactions: a hide whose reaction spends 1d4 of its
+  // charges; and a wand of two spells dnd5e keeps for it, each cast for 1d4 of its charges. Its
+  // Shield is a reaction's spell cast by an activity whose own activation says an action's, as
+  // dnd5e's Cast activities do unless they override it; its Light is the other way round.
+  { id: 'hide', name: 'Spiked Hide', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 500, spent: 0 } }, activities: [
+    { id: 'hide-spikes', name: 'Spikes', type: 'utility', affects: 'self', activation: { type: 'reaction', value: 1 }, consumption: [{ type: 'itemUses', value: '1d4' }] },
+  ] },
+  { id: 'wand', name: 'Wand of Shielding', type: 'equipment', system: { properties: [], quantity: 1, uses: { max: 500, spent: 0 } }, activities: [
+    { id: 'wand-shield', type: 'cast', activation: { type: 'action', value: 1 }, spell: { level: 1 }, consumption: [{ type: 'itemUses', value: '1d4' }] },
+    { id: 'wand-light', type: 'cast', activation: { type: 'reaction', value: 1 }, spell: { level: 0 }, consumption: [{ type: 'itemUses', value: '1d4' }] },
+  ] },
+  { id: 'shield', name: 'Shield', type: 'spell', flags: { dnd5e: { cachedFor: '.Item.wand.Activity.wand-shield' } }, system: { level: 1, method: 'spell', properties: [] },
+    activities: [{ id: 'shield-up', name: 'Shield', type: 'utility', affects: 'self', activation: { type: 'reaction', value: 1 } }] },
+  { id: 'light', name: 'Light', type: 'spell', flags: { dnd5e: { cachedFor: '.Item.wand.Activity.wand-light' } }, system: { level: 0, method: 'spell', properties: [] },
+    activities: [{ id: 'light-on', name: 'Light', type: 'utility', affects: 'self', activation: { type: 'action', value: 1 } }] },
+  { id: 'club', name: 'Club', type: 'weapon', system: { properties: [], quantity: 1 }, activities: [{ id: 'club-hit', damage: [{ number: 1, denomination: 4, types: ['slashing'] }] }] },
+] })
 const tokens = { thorin: place(thorin), goblin: place(goblin) }
 if (MIDI) canvas.scene.tokens.size = placeables.size
 const fight = combat('fight')
@@ -380,6 +401,101 @@ const rollsOf = id => helloOf(id).data.features.rolls
 // Neither self-test asks the Gamemaster's manual dice at start-up: since module 0.44.0 not even
 // dice-plan.mjs's roll made earlier, which it throws away (bugs-found.md, 049-typed-mod fix 3).
 assert.deepEqual(prompts.splice(0), [], "the self-tests never ask the Gamemaster's manual dice")
+
+/* -------------------------------------------- */
+/*  Midi-QOL's checks of the reactions it looks for */
+/* -------------------------------------------- */
+
+// Since module 0.48.0, with the Gamemaster's Manual Dice on: a dice cost asked of them is '0 + 1d4'
+// among `prompts`, and the stand-in's manual die gives its highest face, 4.
+{
+  const of = (item, id) => goblin.items.get(item).system.activities.get(id)
+  const spikes = () => of('hide', 'hide-spikes')
+  const spentOf = item => goblin.items.get(item).system.uses.spent
+  const costAsked = () => prompts.splice(0).filter(formula => formula === '0 + 1d4')
+  // What Midi's look makes of an activity: its cost worked out, and only whether it could be paid kept.
+  const lookup = (activity, usage) => activity._prepareUsageUpdates(activity._prepareUsageConfig(usage), { returnErrors: true })
+  if (MIDI) {
+    midi.settings.gmDoReactions = 'all'
+    const gmAttack = async () => {
+      canvas.tokens.setTargets(['tok-goblin'])
+      const made = midi.made.length
+      await mira.items.get('mira-dagger').system.activities.get('mira-stab').use(
+        { midiOptions: { workflowOptions: { autoRollAttack: true, fastForwardAttack: true, autoRollDamage: 'always', fastForwardDamage: true, forceCompletion: true } } }, { configure: false }, { create: true })
+      const workflow = midi.made[made]
+      await until(() => workflow.aborted || (workflow.currentAction === workflow.WorkflowState_Completed), "the Gamemaster's dagger workflow")
+    }
+    const looked = from => midi.reactionChecks.slice(from).map(each => each.activity)
+    const both = ['hide-spikes', 'wand-shield', 'hide-spikes', 'wand-shield']
+
+    // 1. An attack made in Foundry, with no app in it: each reaction looked for as the goblin is
+    // attacked, then as it's hit or missed, the wand's Shield as Midi reads it, never its Light.
+    prompts.splice(0)
+    let from = midi.reactionChecks.length
+    let spent = [spentOf('hide'), spentOf('wand')]
+    await gmAttack()
+    assert.deepEqual([looked(from), costAsked(), spentOf('hide') - spent[0], spentOf('wand') - spent[1]], [both, [], 0, 0], "the Gamemaster's own attack")
+    ok("Midi-QOL's look for reactions, the Gamemaster's own attack in Foundry: each looked for twice, its dice cost never asked, nothing spent")
+
+    // 2. An attack from the app, typed: the same, and nothing asked of its player either.
+    from = midi.reactionChecks.length
+    const asks = () => app.events.filter(e => e.type === 'roll.dice.asked').length
+    const asked = asks()
+    const hit = await make({ actorId: 'thorin', mode: 0, explicit: false, extras: [], typed: true, id: 'atk-look', kind: 'attack', item: 'dagger', activity: 'dagger-stab', target: { combatId: 'fight', combatantId: 'cb-gob' }, dice: [{ faces: 20, results: [15] }] })
+    assert.equal(hit.status, 'done', JSON.stringify(hit))
+    await until(() => midi.reactionChecks.length - from >= 4, "the look for the typed attack's target's reactions")
+    assert.deepEqual([looked(from), costAsked(), asks() - asked, spentOf('hide') - spent[0], spentOf('wand') - spent[1]], [both, [], 0, 0, 0], 'an attack from the app')
+    const dealt = await make({ actorId: 'thorin', mode: 0, explicit: false, extras: [], typed: true, id: 'dmg-look', kind: 'damage', use: hit.id, dice: [{ faces: 4, results: [2] }] })
+    assert.equal(dealt.status, 'done', JSON.stringify(dealt))
+    prompts.splice(0)
+    ok("Midi-QOL's look for reactions, an attack from the app: each looked for twice, its dice cost asked of no one, nothing spent")
+
+    // 3. The reaction taken: its own cost is the Gamemaster's dice, once, and spent.
+    midi.reactions.set('tok-goblin', 'hide-spikes')
+    spent = [spentOf('hide'), spentOf('wand')]
+    await gmAttack()
+    assert.deepEqual([costAsked(), spentOf('hide') - spent[0], spentOf('wand') - spent[1]], [['0 + 1d4'], 4, 0], 'the reaction taken')
+    ok('a reaction taken: its own dice cost asked of the Gamemaster once, and spent')
+
+    // 4. dnd5e's own spending with a configuration that creates nothing is no look: asked, spent,
+    // and the configuration says nothing of the module's once dnd5e has worked it out.
+    spent = [spentOf('hide'), spentOf('wand')]
+    const own = spikes()._prepareUsageConfig({ create: false })
+    await spikes().consume(own, { data: {} })
+    assert.deepEqual([costAsked(), spentOf('hide') - spent[0], 'sendingStoneBegun' in own], [['0 + 1d4'], 4, false], 'spent with create false')
+    ok('a use dnd5e spends with a configuration that creates nothing: asked, spent, and no mark left on it')
+
+    // 5. A spell a reaction casts from an item: dnd5e works out its Cast activity's cost with a copy
+    // of the configuration it has begun spending. Asked, spent, and no mark left.
+    const shieldUp = of('shield', 'shield-up')
+    const cast = shieldUp._prepareUsageConfig({ create: false })
+    await shieldUp.consume(cast, { data: {} })
+    assert.deepEqual([costAsked(), spentOf('wand') - spent[1], 'sendingStoneBegun' in cast], [['0 + 1d4'], 4, false], 'a linked Cast activity')
+    ok("a spell cast from an item by a reaction: its Cast activity's dice cost asked, spent, and no mark left")
+
+    // 6. Any other check is rolled as it was: one whose configuration creates, and one of an
+    // activity no reaction activates.
+    await lookup(spikes(), {})
+    assert.deepEqual(costAsked(), ['0 + 1d4'], 'a check that creates')
+    await lookup(thorin.items.get('charm').system.activities.get('charm-zap'), { create: false })
+    assert.deepEqual(costAsked(), ['0 + 1d4'], "a check of an action's activity")
+    ok("any other check, one that creates or of an activity no reaction activates: asked as before")
+
+    // 8. Which activities a reaction activates is read as Midi reads it: a Cast activity by its
+    // spell's activation, not by its own, either way round.
+    await lookup(of('wand', 'wand-shield'), { create: false })
+    assert.deepEqual(costAsked(), [], "a Cast activity of a reaction's spell")
+    await lookup(of('wand', 'wand-light'), { create: false })
+    assert.deepEqual(costAsked(), ['0 + 1d4'], "a Cast activity of an action's spell")
+    ok("a Cast activity is a reaction's by its spell's activation, as Midi-QOL reads it, never by its own")
+    midi.settings.gmDoReactions = 'none'
+  } else {
+    // 7. Without Midi-QOL nothing looks for reactions so: the same check is rolled as it was.
+    await lookup(spikes(), { create: false })
+    assert.deepEqual(costAsked(), ['0 + 1d4'], 'without Midi-QOL')
+    ok("without Midi-QOL, a check that creates nothing of a reaction's activity: asked as before")
+  }
+}
 
 /* -------------------------------------------- */
 /*  The hello, and where nothing is asked       */

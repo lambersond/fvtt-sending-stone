@@ -228,9 +228,14 @@ while the roll is being made.
   check of what a use from the app would spend, which it throws away, rolls a dice cost with
   Foundry's computer dice, never your Manual Dice; so do Midi-QOL's own check of it as Midi's use
   begins, its check of the cost of a player's typed run's other activity, under dnd5e 5, and the
-  module's dice self-test as it starts. The cost the use spends is rolled as ever: your own dice
-  settings, or a typing player's dice. Midi's checks of other uses, as the reactions it looks for
-  among the targets, are rolled as Midi rolls them.
+  module's dice self-test as it starts. Since 0.48.0 so do the checks Midi-QOL makes as it looks for
+  reactions: as a creature is attacked, hit, missed or damaged, or makes a save, Midi works out what
+  each of its reactions would spend and keeps only whether it could be paid. A dice cost rolled for
+  that in your Foundry is Foundry's computer dice, never your Manual Dice, whether the attack came
+  from the app or you made it in Foundry. The cost the use spends is rolled as ever: your own dice
+  settings, or a typing player's dice. A reaction that's taken still rolls its cost with the dice
+  settings of whoever takes it. Midi's check of a use you make in Foundry yourself is rolled as Midi
+  rolls it.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -1221,7 +1226,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-dishes.mjs` | Dishes from the Magical Recipe Book, from 0.38.0: whether a campaign takes them, by its own switch under dnd5e 5, and what its hello says of them; each dish command posted once as its card, answered again from its card or its tombstone |
 | `scripts/dish-card.mjs` | A dish's card, whispered to the Gamemasters and the campaign's players: its words, its buttons for Gamemasters, what became of it for anyone, the dialog of who ate it, serving it and setting it aside; which apps take dishes, and telling them what was decided, again after a drop and after every hello; deleted cards' tombstones; one dish effect per character |
 | `scripts/dish-effects.mjs` | A dish's Active Effect: its changes on dnd5e 5.3.3's paths, its one-offs, its duration and flags; whether the system is one dishes are taken under, dnd5e 5; cookbook strings made inert for enrichers; dish effects ended once their time has passed; the long rest's top-up |
-| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.44.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one, and Midi-QOL's of a use from the app, Foundry's computer dice; and what lists a campaign's open dice asks for its hello, once `later-dice.mjs` registers it |
+| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.44.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one, and Midi-QOL's of a use from the app, Foundry's computer dice; from 0.48.0, so is Midi-QOL's check of a reaction it looks for; and what lists a campaign's open dice asks for its hello, once `later-dice.mjs` registers it |
 | `scripts/later-dice.mjs` | From 0.44.0, under dnd5e 5, the dice the game rolls later asked of a player typing theirs: a typed roll's run, bound to its Midi-QOL workflow; which rolls are its, by their subject, workflow, a use's own spending (its consumption hooks, and Midi's check of a workflow's other activity's consumption) and Midi's bonus damage; one ask per step, or per die thrown again, a minute's wait, the Gamemaster's window with Roll it now, the answers and their refusals, what the watchdog doesn't count, the hello's list, and its self-test |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster; and from 0.39.0 the links to the module's issue forms at the end of its side |
 | `scripts/apps/help-window.mjs` | From 0.39.0, Configure Settings' Report a bug or request a feature, which any user may open: the links to the module's issue forms |
