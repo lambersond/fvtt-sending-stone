@@ -45,9 +45,9 @@ without the others, and the order they load in comes to matter.
   what it is for, never above a script that imports it. A new declaration goes in the script it
   plainly belongs to, no higher than what reads it. Give a new script its row in README.md's Layout.
 - **The guard reads text, not syntax.** An import written in a comment can count, and the word
-  `import` before a bracket that holds something other than one quoted path fails, in prose, in a
-  string or as the name a method is declared by: word it otherwise. It also fails on any import but
-  one of the module's own `.mjs` scripts, by a relative path.
+  `import` before a bracket that holds something other than one quoted path can fail, in prose, in
+  a string or as the name a method is declared by: word it otherwise. It also fails on any import
+  but one of the module's own `.mjs` scripts, by a relative path.
 
 ## 3. When a lower script needs something of a higher one
 
