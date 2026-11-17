@@ -3703,8 +3703,9 @@ roll's fields (`item`, `activity`, `target`, `targets`, `self`, `slot`, `enchant
 A change refused for what it is is `"invalid"`, with `error` `"by"`, `"of"` (a companion's coins
 aren't changed), `"coins"` (no `coins`, or one that's no object of `op` and `currency` alone, or
 whose `op` is neither; a roll's field or another kind's beside it), `"currency"` (not 1 to 10 of
-dnd5e's coins, each a whole number from 1 to 10,000,000) or `"dice"`. Everything is checked before
-anything is written, as the character now is, in this order:
+dnd5e's coins, each a whole number from 1 to 10,000,000), `"plainRoll"` and `"effectDice"` as for
+any kind, or `"dice"`. Everything is checked before anything is written, as the character now is,
+in this order:
 
 | `reason` | When |
 | --- | --- |

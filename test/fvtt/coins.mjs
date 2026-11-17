@@ -843,6 +843,7 @@ for (const [command, error, why] of [
   [change('thorin', 'add', { gp: 5 }, { mode: 1 }), 'dice', 'advantage'],
   [change('thorin', 'add', { gp: 5 }, { extras: [{ faces: 4, count: 1, results: [2] }] }), 'dice', 'something added'],
   [change('thorin', 'add', { gp: 5 }, { plainRoll: { terms: [{ faces: 6, count: 1 }] } }), 'plainRoll', 'a plain roll beside it'],
+  [change('thorin', 'add', { gp: 5 }, { effectDice: [{ faces: 4, sign: 1, results: [2] }] }), 'effectDice', "a typed roll's effect dice beside it"],
 ]) {
   assert.deepEqual(refusal((await fetched(command))[0]), ['failed', 'invalid', error], why)
 }
@@ -856,7 +857,7 @@ const beside = await fetched(...[...ROLLS_OWN, ...OTHER_KINDS].map(key => change
 assert.deepEqual(beside.map(made => [Object.keys(made.command).find(key => made.command[key] === 1), ...refusal(made)]),
   [...ROLLS_OWN, ...OTHER_KINDS].map(key => [key, 'failed', 'invalid', 'coins']), "each of a roll's fields and of another kind's beside it")
 assert.deepEqual([writes.length, messages.size, purse(thorin)], [unchanged, lines, { gp: 40 }], 'nothing written or posted')
-okay('refused "invalid" with nothing written: "by" for anyone\'s but the Gamemaster\'s; "of", as no companion\'s coins are changed; "coins" for a body that isn\'t exactly { op: "add" | "remove", currency }, and for each of a roll\'s fields or another kind\'s beside it, every one the protocol names, hit points\' too; "currency" unless it\'s 1 or more of dnd5e\'s coins, each a whole number from 1 to 10,000,000; "dice" and "plainRoll" as every kind\'s')
+okay('refused "invalid" with nothing written: "by" for anyone\'s but the Gamemaster\'s; "of", as no companion\'s coins are changed; "coins" for a body that isn\'t exactly { op: "add" | "remove", currency }, and for each of a roll\'s fields or another kind\'s beside it, every one the protocol names, hit points\' too; "currency" unless it\'s 1 or more of dnd5e\'s coins, each a whole number from 1 to 10,000,000; "dice", "plainRoll" and "effectDice" as every kind\'s')
 
 /* -------------------------------------------- */
 /*  Coins added                                 */
