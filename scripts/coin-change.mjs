@@ -96,8 +96,8 @@ function whole(ratio) {
 
 /**
  * Pay coins out of those held: what's left, and which of the coins held went beyond those asked
- * for; or that they're worth too little, `short`. Read alone: `held` isn't changed, and a refusal
- * leaves nothing half paid.
+ * for; or that they can't be paid, `short`. Read alone: `held` isn't changed, and a refusal leaves
+ * nothing half paid.
  *
  * `used` is the holder's own coins that went beyond those asked for: of each coin, what was held
  * less what's left less what was paid of it, where that's above none. So a platinum broken for gold

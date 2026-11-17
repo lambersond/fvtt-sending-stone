@@ -16,8 +16,8 @@ import { campaignGroups } from "./groups.mjs";
  *
  * Taking away more of a coin than the character holds is paid with its other coins, by the rule
  * coin-change.mjs keeps: a larger coin broken, the change given back, smaller coins paying where no
- * larger one is left; refused only where all its coins are worth too little, or, where the
- * campaign's Gamemaster has turned that off, wherever it's short of a coin.
+ * larger one is left; refused, at dnd5e's own rates, only where all its coins are worth too little,
+ * or, where the campaign's Gamemaster has turned that off, wherever it's short of a coin.
  *
  * dnd5e posts nothing for coins changed on its sheet, so each change posts a line in chat, for
  * everyone, as the character: "Thorin received 5 gp", "Thorin paid 5 gp", by the coins asked for,
@@ -109,8 +109,8 @@ export function runCoinsCommand(command, campaign) {
  * character as it now is. Coins taken away are paid as coin-change.mjs's `takenCoins` pays them,
  * refused where they can't be (`short`). Then one update of only the coins that change, each from
  * what the actor stores (`coinUpdate`); one that throws, or that a module's hook refuses, is an
- * `error`, with nothing posted and no sheet. Then the line, the sheet as it then stands, and the result, which says what was asked
- * and which of the character's other coins went for it (`used`).
+ * `error`, with nothing posted and no sheet. Then the line, the sheet as it then stands, and the
+ * result, which says what was asked and which of the character's other coins went for it (`used`).
  * @param {object} command
  * @param {Campaign} passed     The campaign as it was when fetched, which may be a queue's wait old.
  * @returns {Promise<CommandResult>}
