@@ -4267,15 +4267,17 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   the module is active in; so where few uses are left, the computer's roll decides whether the
   reaction is offered, as the Gamemaster's dice did before. It's told by what dnd5e is given, never
   by a formula: with Midi-QOL active, an activity a reaction activates, as Midi reads that (its
-  `effectiveActivationType`: a Cast activity's is its spell's, unless it overrides it), with a
-  configuration that creates nothing (`create: false`), which dnd5e hasn't begun spending
-  (`dnd5e.preActivityConsumption`). So a reaction taken spends as ever, its cost rolled with the
-  dice settings of whoever takes it. A Gamemaster's own workflow's check is rolled as Midi rolls it,
-  and so is Midi's check of any other use not from the app, a reaction's own as it's taken among
-  them; so is a reaction looked for in a player's own Foundry, as they attack there. The one roll
-  that may be taken wrongly is a check another module makes just as Midi makes this one: where that
-  module then spends what it worked out itself, without dnd5e's own spending, the cost it spends was
-  Foundry's computer dice.
+  `effectiveActivationType`: a Cast activity's is its spell's, unless it overrides it; the
+  activity's own activation where it isn't one of Midi's, and so has none; and any activation with
+  `reaction` in its name, Midi's older `reactiondamage`, `reactionmanual` and `reactionpreattack`
+  among them), with a configuration that creates nothing (`create: false`), which dnd5e hasn't begun
+  spending (`dnd5e.preActivityConsumption`). So a reaction taken spends as ever, its cost rolled
+  with the dice settings of whoever takes it. A Gamemaster's own workflow's check is rolled as Midi
+  rolls it, and so is Midi's check of any other use not from the app, a reaction's own as it's taken
+  among them; so is a reaction looked for in a player's own Foundry, as they attack there. The one
+  roll that may be taken wrongly is a check another module makes just as Midi makes this one: where
+  that module then spends what it worked out itself, without dnd5e's own spending, the cost it
+  spends was Foundry's computer dice.
 - **A die thrown again** (`"again"`). A die of a typed roll's own, of any kind, or of a roll asked,
   that Foundry throws again: an explosion (`x`, `xo`), or a reroll (`r`, `rr`) where the roll wasn't
   sent [`rerolls`](#fetching-rolls) `"kept"`, as a Halfling's of a 1. It's asked one die at a time,

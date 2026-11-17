@@ -35,9 +35,10 @@ import { COST_BEGUN, COST_CHECK, CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MOD
  * costs dnd5e rolls for the module's own check of what a use would spend, which it throws away, are
  * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6, as are those of
  * Midi-QOL's own check of a use the module hands it (`checkedUntilSpent`), and, since 0.48.0, of
- * its check of a reaction it looks for (`isReactionLookup`), and, under dnd5e 5, of Midi's check of
- * a typed roll's run's other activity: told by dnd5e's consumption targets' `resolveCost`, which is
- * passed the use's configuration, and which tells later-dice.mjs of each dice cost a run spends.
+ * its check of a reaction it looks for, where it looks as its line for dnd5e 5 does
+ * (`isReactionLookup`), and, under dnd5e 5, of Midi's check of a typed roll's run's other activity:
+ * told by dnd5e's consumption targets' `resolveCost`, which is passed the use's configuration, and
+ * which tells later-dice.mjs of each dice cost a run spends.
  */
 
 /**
@@ -445,11 +446,14 @@ function spendingWorkedOut(activity, usageConfig) {
  * reactions a creature could take, attacked, hit, missed, damaged, healed or making a save, it works
  * out what each would spend, keeps only whether that could be paid, and throws the rest away (its
  * `doReactions`): for each activity a reaction activates, as Midi reads that (its
- * `effectiveActivationType`, a Cast activity's being its spell's), with a configuration that creates
- * nothing, never handed to dnd5e's own spending. Told by exactly that, with Midi-QOL active: so a
- * reaction taken, whose configuration dnd5e has begun spending (`spendingBegins`), a linked
- * activity's among it, is rolled as ever, and so is any other check, Midi's or anyone's. A Midi-QOL
- * that looks otherwise is left to roll as it does.
+ * `effectiveActivationType`, a Cast activity's being its spell's, or the activity's own activation
+ * where it isn't one of Midi's and has none; by any activation with "reaction" in its name, Midi's
+ * older "reactiondamage", "reactionmanual" and "reactionpreattack" among them), with a configuration
+ * that creates nothing, never handed to dnd5e's own spending. Told by exactly that, with Midi-QOL
+ * active: so a reaction taken, whose configuration dnd5e has begun spending (`spendingBegins`), a
+ * linked activity's among it, is rolled as ever, and so is any other check, Midi's or anyone's, a
+ * cost rolled with no configuration among them. A Midi-QOL that looks otherwise, as its line for
+ * dnd5e 6 may, is left to roll as it does.
  * @param {Activity} activity   The consumption target's.
  * @param {object} [config]     The configuration dnd5e's roll of the cost was given.
  * @returns {boolean}

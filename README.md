@@ -229,13 +229,14 @@ while the roll is being made.
   Foundry's computer dice, never your Manual Dice; so do Midi-QOL's own check of it as Midi's use
   begins, its check of the cost of a player's typed run's other activity, under dnd5e 5, and the
   module's dice self-test as it starts. Since 0.48.0 so do the checks Midi-QOL makes as it looks for
-  reactions: as a creature is attacked, hit, missed or damaged, or makes a save, Midi works out what
-  each of its reactions would spend and keeps only whether it could be paid. A dice cost rolled for
-  that in your Foundry is Foundry's computer dice, never your Manual Dice, whether the attack came
-  from the app or you made it in Foundry. The cost the use spends is rolled as ever: your own dice
-  settings, or a typing player's dice. A reaction that's taken still rolls its cost with the dice
-  settings of whoever takes it. Midi's check of a use you make in Foundry yourself is rolled as Midi
-  rolls it.
+  reactions: as a creature is attacked, hit, missed, damaged or healed, or makes a save, Midi works
+  out what each of its reactions would spend and keeps only whether it could be paid. A dice cost
+  rolled for that in your Foundry is Foundry's computer dice, never your Manual Dice, whether the
+  attack came from the app or you made it in Foundry. Under dnd5e 6 that holds where Midi-QOL's
+  line for it looks for reactions as its line for dnd5e 5 does; where it doesn't, those checks are
+  rolled as Midi rolls them. The cost the use spends is rolled as ever: your own dice settings, or
+  a typing player's dice. A reaction that's taken still rolls its cost with the dice settings of
+  whoever takes it. Midi's check of a use you make in Foundry yourself is rolled as Midi rolls it.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
