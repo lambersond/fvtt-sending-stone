@@ -3,11 +3,13 @@
 // make it; the total paid as coins taken away are, exactly and with other coins, and what the
 // campaign's setting off does; the writes and their order, and what a failure leaves; the whispers,
 // one to each character given coins that has a player and one to the Gamemasters, none for everyone,
-// and who the app is told may read each; the sheets ahead of the result; and hand-outs and rolls
-// waiting for one another. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real module and
+// and who the app is told may read each; the sheets ahead of the result; a fraction of a coin the
+// giver or one given stores, and a coin a sheet shows more of than is stored; hand-outs and rolls
+// waiting for one another, and the campaign read again as a hand-out's turn comes. On a copy of
+// sends.mjs's stand-ins, with dnd5e's rates: the real module and
 // its language file, dnd5e 5.3.3's real dice classes for its self-test, a stand-in Foundry core and
-// app; 5.3.3's coins or with DND5E6=1 6.0.5's, which may be fractional. Run with SLIM_CHECK=1 and
-// --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
+// app; 5.3.3's coins or with DND5E6=1 6.0.5's, which may be fractional and are shown rounded down.
+// Run with SLIM_CHECK=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { settings, user, users, actors } from './stub.mjs'
@@ -594,11 +596,12 @@ assert.deepEqual([writes.length, messages.size, purse(thorin), purse(vex), coins
 actors.delete('ashform')
 campaignAs({ transfers: false })
 assert.deepEqual([refusal(await handed('thorin', ['vex'], one)), writes.length], [['failed', 'transfers-off', null], unchanged], 'moves off')
+assert.deepEqual([refusal(await handed('thorin', ['vex'], one, { by: 'gm' })), writes.length, messages.size], [['failed', 'transfers-off', null], unchanged, lines], "moves off, the Gamemaster's too")
 campaignAs({ coins: false })
 let made = await handed('thorin', ['vex'], one)
 assert.equal(made.result.status, 'done', 'made with coins added and taken away off: it follows Players move items and coins')
 campaignAs()
-okay("refuses a hand-out from another's character, or the Gamemaster's made as another than the giver, `not-yours`; from a party, `not-yours` where its player owns it and for the Gamemaster, `not-owner` where they observe it, `unknown` where they can't see it; with a party, an actor outside the campaign, an NPC or no one among those picked, `unknown`; to or from a character transformed, `shaped`; with moves off, `transfers-off`: none writes, posts or sends a sheet; and it's made whatever the switch for coins added and taken away")
+okay("refuses a hand-out from another's character, or the Gamemaster's made as another than the giver, `not-yours`; from a party, `not-yours` where its player owns it and for the Gamemaster, `not-owner` where they observe it, `unknown` where they can't see it; with a party, an actor outside the campaign, an NPC or no one among those picked, `unknown`; to or from a character transformed, `shaped`; with moves off, `transfers-off`, the Gamemaster's too: none writes, posts or sends a sheet; and it's made whatever the switch for coins added and taken away")
 
 /* -------------------------------------------- */
 /*  Handed out exactly                          */
@@ -686,13 +689,96 @@ stock(thorin, [], { pp: 2, gp: 3 })
 campaignAs({ coinChange: false })
 made = await handed('thorin', ['vex', 'bram'], { gp: 2 })
 assert.deepEqual([refusal(made), sheetsIn(made)], [['failed', 'short', null], []], '4 gp of 3, other coins not paying')
+made = await handed('thorin', ['vex', 'bram'], { gp: 2 }, { by: 'gm' })
+assert.deepEqual([refusal(made), sheetsIn(made)], [['failed', 'short', null], []], "nor for the Gamemaster's")
 assert.deepEqual([writes.length, messages.size, purse(thorin)], [unchanged, lines, { pp: 2, gp: 3 }], 'nothing written or posted')
 made = await handed('thorin', ['vex', 'bram'], { gp: 1 })
 assert.deepEqual([made.result.status, purse(thorin), made.result.transfer.used], ['done', { pp: 2, gp: 1 }, null], 'an exact one is made')
 campaignAs()
 made = await handed('thorin', ['vex', 'bram'], { gp: 2 })
 assert.deepEqual([made.result.status, purse(thorin), made.result.transfer.used], ['done', { pp: 1, gp: 7 }, { pp: 1 }], 'and with other coins paying, the same hand-out breaks a platinum')
-okay('a total worth more than the giver holds is `short`, with nothing written, posted or sent; with Pay with other coins off, so is a total of more of a coin than he holds, though an exact one is made; on again, the same hand-out breaks a larger coin')
+okay('a total worth more than the giver holds is `short`, with nothing written, posted or sent; with Pay with other coins off, so is a total of more of a coin than he holds, the Gamemaster\'s hand-out too, though an exact one is made; on again, the same hand-out breaks a larger coin')
+
+/* -------------------------------------------- */
+/*  A fraction of a coin                        */
+/* -------------------------------------------- */
+
+const refusing = test => { faults.refuse = test }
+// dnd5e 6 stores a fraction of a coin and shows the coin rounded down: a hand-out is written from what
+// each actor stores, so the giver's fraction and those of the ones given stay. Under 5.3.3 the
+// stand-in shows what it stores, so these writes are the same from either.
+restock()
+stock(thorin, [], { pp: 700.5, gp: 20.5 })
+stock(vex, [], { gp: 12.5 })
+await settle()
+at = writes.length
+made = await handed('thorin', THREE, EACH)
+assert.deepEqual([made.result.status, made.result.transfer.used], ['done', { pp: 13 }], JSON.stringify(made.result))
+assert.deepEqual(writes.slice(at), [
+  ['updateActor', 'thorin', { 'system.currency.pp': 87.5, 'system.currency.gp': 0.5 }],
+  ['updateActor', 'vex', { 'system.currency.pp': 200, 'system.currency.gp': 62.5 }],
+  ['updateActor', 'bram', { 'system.currency.pp': 200, 'system.currency.gp': 50 }],
+  ['updateActor', 'lia', { 'system.currency.pp': 200, 'system.currency.gp': 50 }],
+], "the giver's half a platinum and half a gold, and Vex's half a gold, stay")
+assert.deepEqual([purse(thorin), purse(vex)], [{ pp: 87.5, gp: 0.5 }, { pp: 200, gp: 62.5 }])
+// What's put back after a write refused is added to what the giver then stores, its fraction with it.
+restock()
+stock(thorin, [], { pp: 700.5, gp: 20.5 })
+stock(vex, [], { gp: 12.5 })
+await settle()
+at = writes.length
+refusing((what, target) => (what === 'update') && (target === bram))
+made = await handed('thorin', THREE, EACH)
+clearFaults()
+assert.deepEqual([refusal(made), made.result.transfer.each], [['failed', 'error', 'An update was refused'], ['vex']])
+assert.deepEqual(writes.slice(at).map(([, id, changes]) => [id, changes]), [
+  ['thorin', { 'system.currency.pp': 87.5, 'system.currency.gp': 0.5 }], ['vex', { 'system.currency.pp': 200, 'system.currency.gp': 62.5 }],
+  ['bram', { 'system.currency.pp': 200, 'system.currency.gp': 50 }], ['thorin', { 'system.currency.pp': 487.5, 'system.currency.gp': 100.5 }],
+], 'the put back keeps his fractions')
+assert.deepEqual([purse(thorin), purse(vex), purse(bram), purse(lia)], [{ pp: 487.5, gp: 100.5 }, { pp: 200, gp: 62.5 }, {}, {}])
+// Half a platinum is no coin to break: 3 gp and half a platinum can't hand out 4 gp.
+restock()
+stock(thorin, [], { pp: 0.5, gp: 3 })
+await settle()
+unchanged = writes.length
+lines = messages.size
+made = await handed('thorin', ['vex', 'bram'], { gp: 2 })
+assert.deepEqual([refusal(made), writes.length, messages.size, purse(thorin)], [['failed', 'short', null], unchanged, lines, { pp: 0.5, gp: 3 }], 'half a platinum is never broken')
+okay(`a fraction of a coin${DND5E6 ? ', as dnd5e 6 stores one,' : ''} stays in a hand-out: 700.5 pp and 20.5 gp, 200 pp and 50 gp each to three, leaves 87.5 pp and 0.5 gp, and Vex's 12.5 gp becomes 62.5, each written from what is stored; what is put back after a write refused is added to what the giver then stores, 487.5 pp and 100.5 gp; half a platinum is never broken for a hand-out, which is \`short\``)
+
+// A coin a sheet shows more of than its actor stores, as an effect may add to it, under either
+// release: no more than is stored is handed out, and every write is from what is stored, the giver's,
+// each one's given and the put back, so the coins the sheet adds are never made real.
+/** Have an actor's sheet show so many more of each coin than it stores, until the function returned is called. */
+function showing(actor, more) {
+  const prepare = actor.prepareCurrency
+  actor.prepareCurrency = function () {
+    prepare.call(this)
+    for (const [key, n] of Object.entries(more)) this.system.currency[key] += n
+  }
+  actor.prepareCurrency()
+  return () => { actor.prepareCurrency = prepare; actor.prepareCurrency() }
+}
+restock()
+const shown = [showing(thorin, { gp: 5 }), showing(vex, { gp: 5 })]
+assert.deepEqual([thorin.system.currency.gp, coinsOf(thorin).gp, vex.system.currency.gp, coinsOf(vex).gp], [45, 40, 17, 12], 'each sheet shows 5 gp more than is stored')
+await settle()
+unchanged = writes.length
+made = await handed('thorin', ['bram'], { gp: 45 })
+assert.deepEqual([refusal(made), writes.length], [['failed', 'short', null], unchanged], '45 gp shown, 40 stored: 45 are not his to hand out')
+at = writes.length
+refusing((what, target) => (what === 'update') && (target === bram))
+made = await handed('thorin', ['vex', 'bram', 'lia'], { gp: 10 })
+clearFaults()
+assert.deepEqual([refusal(made), made.result.transfer.each], [['failed', 'error', 'An update was refused'], ['vex']])
+assert.deepEqual(writes.slice(at).map(([, id, changes]) => [id, changes]), [
+  ['thorin', { 'system.currency.gp': 10 }], ['vex', { 'system.currency.gp': 22 }],
+  ['bram', { 'system.currency.gp': 10 }], ['thorin', { 'system.currency.gp': 30 }],
+], "30 gp taken from the 40 he stores, 10 added to the 12 Vex stores, 20 put back on the 10 he then stores")
+assert.deepEqual([coinsOf(thorin).gp, thorin.system.currency.gp, coinsOf(vex).gp, vex.system.currency.gp], [30, 35, 22, 27], 'and each sheet still shows 5 gp more')
+for (const restore of shown) restore()
+assert.deepEqual([thorin.system.currency.gp, vex.system.currency.gp], [30, 22])
+okay("a coin a sheet shows more of than its actor stores is handed out only as far as it is stored, and the giver's write, each one's given and the put back are all from what is stored, under either release")
 
 /* -------------------------------------------- */
 /*  Whose players                               */
@@ -706,6 +792,15 @@ made = await handed('thorin', ['ash'], { gp: 1 })
 assert.deepEqual(saidBy(made).map(told), [
   ['Ash received 1 gp from Thorin', ['bob', 'eve'], 'thorin', 'alice'], ['Thorin handed out 1 gp each to Ash: 1 gp in all', ['gm'], 'thorin', 'alice'],
 ])
+// Ash herself, still owned by both and neither's own character, hands out, as a player's own: with
+// no one player to write for her, her messages are the bridge's Gamemaster's, so neither of her
+// players reads any of them, and the result says so.
+stock(ash, [], { gp: 9 })
+made = await handed('ash', ['bram'], { gp: 2 })
+said = saidBy(made)
+assert.deepEqual(said.map(told), [['Bram received 2 gp from Ash', ['carol'], 'ash', 'gm'], ['Ash handed out 2 gp each to Bram: 2 gp in all', ['gm'], 'ash', 'gm']])
+assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, coinsOf(ash).gp, coinsOf(bram).gp], ['done', said.at(-1).id, false, 7, 2])
+assert.deepEqual([chatOf(said[0].id).data.message.audience.users, chatOf(said[0].id).data.message.audience.characters, chatOf(said[1].id)], [['carol'], ['bram'], undefined], "Bram's player alone is told of the whisper, and no one of the Gamemasters' message")
 // Shared with every player through her default, she's still her own players' alone.
 ash.ownership = { default: 3, eve: 3 }
 made = await handed('thorin', ['ash'], { gp: 1 })
@@ -730,13 +825,12 @@ assert.deepEqual(said.map(told), [
 assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, purse(lia)], ['done', said.at(-1).id, false, { sp: 1 }])
 assert.deepEqual(said.slice(0, 2).map(message => { const { audience } = chatOf(message.id).data.message; return [audience.gmOnly, audience.users, audience.characters] }), [[false, ['bob'], ['vex']], [false, ['carol'], ['bram']]])
 assert.equal(chatOf(said.at(-1).id), undefined, "the Gamemasters' own isn't sent to the app")
-okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver no player owns has the bridge's Gamemaster as its author, so the Gamemasters' message is theirs alone, the result's `visible` false, and the app is sent the two whispers but not that")
+okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver with no one player of its own, none owning it or two with neither having it as their character, has the bridge's Gamemaster as its author, so the Gamemasters' message is theirs alone, the result's `visible` false, a player's own hand-out too, and the app is sent the whispers but not that")
 
 /* -------------------------------------------- */
 /*  A hand-out that fails                       */
 /* -------------------------------------------- */
 
-const refusing = test => { faults.refuse = test }
 // Bram's refused, the second, as by a module's preUpdateActor hook: what wasn't given goes back to
 // Thorin in one write, in the coins handed out, and Lia is given none.
 restock()
@@ -828,6 +922,34 @@ assert.deepEqual([sooner.result.status, refusal(later), purse(thorin)], ['done',
 const [earlier, afterwards] = await fetched(handOut('thorin', ['vex'], { gp: 6 }), handOut('thorin', ['bram'], { gp: 6 }))
 assert.deepEqual([earlier.result.status, refusal(afterwards), purse(thorin)], ['done', ['failed', 'short', null], { gp: 4 }])
 okay("a hand-out waits for a command of a character it gives to, and that one's next waits for it, as it's keyed on each of them; a hand-out and coins taken away of the same gold, or two hand-outs, are made one after the other, the second `short` where too little is left")
+
+// The campaign is read again as a hand-out's turn comes, not as it was when fetched: one waiting in
+// the line of moves behind another's move while the Gamemaster turns Pay with other coins off is
+// made by the setting as it then is, and with moves turned off meanwhile it isn't made.
+for (const [change, reason, why] of [[{ coinChange: false }, 'short', 'Pay with other coins turned off'], [{ transfers: false }, 'transfers-off', 'moves turned off']]) {
+  restock()
+  stock(thorin, [], { pp: 2, gp: 3 })
+  stock(ash, [], { gp: 10 })
+  await settle()
+  const ahead = hold(target => target === ash)
+  const [moving, waiting] = [move('ash', { from: 'ash', to: 'lia', currency: { gp: 1 } }), handOut('thorin', ['vex', 'bram'], { gp: 2 })]
+  unchanged = writes.length
+  lines = messages.size
+  app.waiting.set('camp-a', [moving, waiting])
+  app.wake?.()
+  await until(() => ahead.held, "the move ahead's write")
+  await wait(100)
+  assert.equal(resultsOf(waiting.id).length, 0, 'the hand-out waits')
+  campaignAs(change)
+  ahead.release()
+  await until(() => resultsOf(waiting.id).length, "the hand-out's result")
+  assert.deepEqual([resultsOf(moving.id)[0].status, refusal({ result: resultsOf(waiting.id)[0] }), purse(thorin), purse(vex)], ['done', ['failed', reason, null], { pp: 2, gp: 3 }, { gp: 12 }], why)
+  assert.ok(!writes.slice(unchanged).some(([, id]) => ['thorin', 'vex', 'bram'].includes(id)) && (messages.size === lines + 1), 'nothing of it written or posted')
+  campaignAs()
+}
+made = await handed('thorin', ['vex', 'bram'], { gp: 2 })
+assert.deepEqual([made.result.status, purse(thorin)], ['done', { pp: 1, gp: 9 }], 'and made as before once both are on again')
+okay("the campaign is read again as a hand-out's turn comes: one that needs another coin, waiting behind a move while Pay with other coins is turned off, is `short`, and one waiting while moves are turned off `transfers-off`, with nothing written or posted")
 
 /* -------------------------------------------- */
 /*  Names with markup                           */

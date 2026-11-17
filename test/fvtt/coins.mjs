@@ -2,8 +2,9 @@
 // (coin-change.mjs) on its own, by worked cases and many random ones, in whole numbers; the hello's
 // `features.coins` and each coin's rate in a sheet; fetching for coins alone; the `coins` command's
 // check, who it's made for, what it writes, its line, its sheet and its result; what the campaign's
-// setting off does; a coin with no rate; dnd5e 6's fraction of a coin; and coins waiting in the line
-// of moves. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real module and its language
+// setting off does, and its switch, for the Gamemaster's changes too; a coin with no rate; dnd5e 6's
+// fraction of a coin; coins waiting in the line of moves; and the campaign read again as a change's
+// turn comes. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real module and its language
 // file, dnd5e 5.3.3's real dice classes for its self-test, a stand-in Foundry core and app; the
 // actors' coins as stored and as prepared, 5.3.3's or with DND5E6=1 6.0.5's, whose coins may be
 // fractional. Run with SLIM_CHECK=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
@@ -781,15 +782,17 @@ for (const [held, pay] of [[{ pp: 2, gp: 3 }, { gp: 5 }], [{ gp: 2, sp: 40 }, { 
   made = await changed('thorin', 'remove', pay)
   assert.deepEqual([refusal(made), sheetsIn(made), purse(thorin)], [['failed', 'short', null], [], held], `${say(held)} less ${say(pay)}`)
 }
-assert.deepEqual([writes.length, messages.size], [unchanged, lines], 'nothing written or posted')
 stock(thorin, [], { pp: 2, gp: 3 })
+made = await changed('thorin', 'remove', { gp: 5 }, { by: 'gm' })
+assert.deepEqual([refusal(made), sheetsIn(made), purse(thorin)], [['failed', 'short', null], [], { pp: 2, gp: 3 }], "the Gamemaster's too")
+assert.deepEqual([writes.length, messages.size], [unchanged, lines], 'nothing written or posted')
 made = await changed('thorin', 'remove', { pp: 1, gp: 3 })
 assert.deepEqual([made.result.status, purse(thorin), made.result.coins.used], ['done', { pp: 1 }, null], 'an exact payment is still made')
 made = await changed('thorin', 'add', { cp: 4 })
 assert.deepEqual([made.result.status, purse(thorin)], ['done', { pp: 1, cp: 4 }], 'and coins still added')
 campaignAs()
 await hello()
-okay("with Pay with other coins off, more of a coin than the character holds is `short`, a larger coin never broken and smaller ones never paying, nothing written or posted; an exact payment and an addition are made as before")
+okay("with Pay with other coins off, more of a coin than the character holds is `short`, a larger coin never broken and smaller ones never paying, the Gamemaster's change too, nothing written or posted; an exact payment and an addition are made as before")
 
 /* -------------------------------------------- */
 /*  A coin with no rate                         */
@@ -884,14 +887,20 @@ made = await changed('thorin', 'add', { gp: 1 })
 assert.deepEqual([refusal(made), writes.length], [['failed', 'off', null], unchanged], 'the switch off')
 made = await fetched({ ...change('thorin', 'add', { gp: 1 }), coins: null })
 assert.deepEqual(refusal(made[0]), ['failed', 'off', null], '"off" before "invalid"')
+// The switch counts for the Gamemaster's own changes from the app too.
+for (const op of ['add', 'remove']) {
+  made = await changed('thorin', op, { gp: 1 }, { by: 'gm' })
+  assert.deepEqual([refusal(made), sheetsIn(made), writes.length, messages.size, purse(thorin)], [['failed', 'off', null], [], unchanged, lines, { gp: 40 }], `the Gamemaster's ${op}, the switch off`)
+}
 // Under another system nothing is fetched for coins: one handed over by a fetch already on its way.
 campaignAs()
 await hello()
 game.system.id = 'pf2e'
-assert.deepEqual([refusal(await changed('thorin', 'add', { gp: 1 })), writes.length], [['failed', 'off', null], unchanged], 'another system')
+const elsewhere = await fetched(change('thorin', 'add', { gp: 1 }), change('thorin', 'add', { gp: 1 }, { by: 'gm' }))
+assert.deepEqual([...elsewhere.map(refusal), writes.length, messages.size], [['failed', 'off', null], ['failed', 'off', null], unchanged, lines], "another system, the Gamemaster's too")
 game.system.id = 'dnd5e'
 await hello()
-okay("refused, with nothing written, posted or sent: a party's coins, an actor outside the campaign, one that's none and an NPC, `unknown`; a character transformed, `shaped`, and her form `unknown`; and with the switch off, or under another system, `off`, before `invalid`")
+okay("refused, with nothing written, posted or sent: a party's coins, an actor outside the campaign, one that's none and an NPC, `unknown`; a character transformed, `shaped`, and her form `unknown`; and with the switch off, or under another system, `off`, before `invalid`, the Gamemaster's own changes too")
 
 /* -------------------------------------------- */
 /*  A write that fails                          */
@@ -965,6 +974,38 @@ await settle()
 const [given, taken] = await fetched(move('thorin', { from: 'thorin', to: 'vex', currency: { gp: 30 } }), change('thorin', 'remove', { gp: 30 }))
 assert.deepEqual([given.result.status, refusal(taken), purse(thorin), purse(vex)], ['done', ['failed', 'short', null], { gp: 10 }, { gp: 42 }])
 okay("coins stand in the line of moves: a change waits for a move on its way, another character's too, and the next move for it; two changes of the same coins, or a move of them and a change, are made one after the other, the second `short` where too little is left")
+
+// The campaign is read again as a change's turn comes, not as it was when fetched: one waiting in the
+// line of moves while the Gamemaster turns the switch off isn't made, and one waiting while Pay with
+// other coins is turned off is paid by the setting as it then is.
+for (const [setting, pay, reason, left, why] of [
+  [{ coins: false }, { gp: 1 }, 'off', { pp: 2, gp: 3 }, 'the switch turned off'],
+  [{ coinChange: false }, { gp: 5 }, 'short', { pp: 2, gp: 2 }, 'Pay with other coins turned off'],
+]) {
+  restock()
+  stock(bram, [], { gp: 10 })
+  stock(thorin, [], { pp: 2, gp: 3 })
+  await settle()
+  waiting = hold(target => target === bram)
+  const [moving, queued, exact] = [move('bram', { from: 'bram', to: 'lia', currency: { gp: 1 } }), change('thorin', 'remove', pay), change('thorin', 'remove', { gp: 1 })]
+  at = writes.length
+  lines = messages.size
+  app.waiting.set('camp-a', [moving, queued, exact])
+  app.wake?.()
+  await until(() => waiting.held, "the move ahead's write")
+  await wait(100)
+  assert.deepEqual([resultsOf(queued.id).length, resultsOf(exact.id).length], [0, 0], 'both changes wait')
+  campaignAs(setting)
+  waiting.release()
+  await until(() => resultsOf(exact.id).length, 'their results')
+  assert.deepEqual([resultsOf(moving.id)[0].status, refusal({ result: resultsOf(queued.id)[0] })], ['done', ['failed', reason, null]], why)
+  // With the switch off the exact change behind it isn't made either; with Pay with other coins off it is.
+  assert.deepEqual([resultsOf(exact.id)[0].status, purse(thorin)], [(reason === 'off') ? 'failed' : 'done', left], why)
+  assert.equal(writes.slice(at).filter(([, id]) => id === 'thorin').length, (reason === 'off') ? 0 : 1, 'nothing of the one refused written')
+  assert.equal(messages.size, lines + ((reason === 'off') ? 1 : 2), 'nor posted')
+  campaignAs()
+}
+okay("the campaign is read again as a change's turn comes: one waiting behind a move while the switch is turned off is `off`, and one that needs another coin, waiting while Pay with other coins is turned off, is `short`, an exact one behind it still made; nothing of the one refused is written or posted")
 
 /* -------------------------------------------- */
 /*  A name with markup                          */
