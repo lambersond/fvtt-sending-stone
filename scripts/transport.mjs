@@ -4,7 +4,7 @@ import {
 } from "./constants.mjs";
 import { describeCampaign } from "./campaigns.mjs";
 import { eventsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
-import { noteDelivered, noteFailed, REASONS } from "./delivery-status.mjs";
+import { inMegabytes, noteDelivered, noteFailed, REASONS, status } from "./delivery-status.mjs";
 
 /**
  * Delivering events to the listener.
@@ -100,18 +100,9 @@ const sequences = new Map();
  */
 const lastSent = new Map();
 
-/**
- * The outcome of recent deliveries from this browser.
- * @type {{state: "idle"|"ok"|"error", delivered: number, dropped: number,
- *         lastDelivered: number|null, lastError: {message: string, at: number}|null}}
- */
-export const status = {
-  state: "idle",
-  delivered: 0,
-  dropped: 0,
-  lastDelivered: null,
-  lastError: null
-};
+// The outcome of recent deliveries, which this file counts into, is in delivery-status.mjs, which
+// tells whatever shows it; still exported from here, where the harness reads it.
+export { status };
 
 /* -------------------------------------------- */
 
@@ -284,17 +275,6 @@ function termsIn(features) {
     slimSheets: (Number.isInteger(slimSheets) && (slimSheets >= 1)) ? SLIM_SHEETS : null,
     maxBytes: (Number.isInteger(maxBytes) && (maxBytes >= DEFAULT_MAX_BYTES)) ? maxBytes : DEFAULT_MAX_BYTES
   };
-}
-
-/**
- * A size in megabytes, to one decimal, as the Gamemaster and the app are told it.
- * @param {number} bytes
- * @param {(n: number) => number} round   Up for a post's size, down for a limit, so that a post
- *                                        over the limit always reads as larger.
- * @returns {string}                      Such as "1.1 MB".
- */
-export function inMegabytes(bytes, round) {
-  return `${(round(bytes / 100_000) / 10).toFixed(1)} MB`;
 }
 
 /**

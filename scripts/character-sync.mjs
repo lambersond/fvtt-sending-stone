@@ -1,16 +1,13 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
-import { canSend, resendHello } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm, campaignActors, noteFormDeleted, originalOf, rosterEntry, transformed } from "./characters.mjs";
 import {
   companionsDelivered, companionTermsChanged, creatureChanged, forgetListed, listingDropped, listsChanged,
   resendCompanion, toldCompanions
 } from "./creature-sync.mjs";
-import { noteSheetSent, noteWithheld } from "./delivery-status.mjs";
-import { dishReader } from "./command-dishes.mjs";
-import { aloneReader } from "./command-alone.mjs";
-import { wildShapeReader } from "./command-wildshape.mjs";
-import { resendDishDecisions, resendLostDish } from "./dish-card.mjs";
+import { inMegabytes, noteSheetSent, noteWithheld } from "./delivery-status.mjs";
+import { dishReader, resendDishDecisions, resendLostDish } from "./dish-card.mjs";
 import { campaignGroups, groupEntry, groupReader, groupsListing } from "./groups.mjs";
 import { forgetBooks, journalOwnershipChanged, sendBooks } from "./journals.mjs";
 import { groupSheet } from "./sheet-group.mjs";
@@ -19,9 +16,9 @@ import { formBlock, wildShapeBlock } from "./sheet-wild-shape.mjs";
 import { slimSheet } from "./sheet-slim.mjs";
 import { forgetSent, sendTexts, SheetTexts, takeUnsent } from "./sheet-texts.mjs";
 import { sendTidyAll, tidyAfresh } from "./tidy-journal.mjs";
-import { buildEnvelope, helloPending, inMegabytes, post, send, termsOf } from "./transport.mjs";
+import { buildEnvelope, helloPending, post, send, termsOf } from "./transport.mjs";
 import { typesDice } from "./typed-dice.mjs";
-import { recheckCharacter } from "./wild-shape.mjs";
+import { recheckCharacter, wildShapeReader } from "./wild-shape.mjs";
 
 /**
  * Keeping each campaign's copy of its characters current. Since 0.22.0 a bridge.hello lists a
@@ -135,6 +132,24 @@ const CRITICAL_SETTINGS = new Set([
   "dnd5e.criticalDamageModifiers", "dnd5e.criticalDamageMaxDice", "midi-qol.ConfigSettings"
 ]);
 
+/**
+ * What sends a campaign its hello again, bridge.mjs's `resendHello`, once module.mjs hands it over
+ * as it loads (`registerHelloResend`), so that this file never imports bridge.mjs, which imports it.
+ * It does nothing until then, when nothing can have been lost: a lost post is noted on a hook, which
+ * module.mjs registers only afterwards.
+ * @type {(campaignId: string) => void}
+ */
+let resendHello = () => {};
+
+/**
+ * Let module.mjs hand over what sends a campaign its hello again: registered once, as it loads.
+ * @param {(campaignId: string) => void} resend
+ * @returns {void}
+ */
+export function registerHelloResend(resend) {
+  resendHello = resend;
+}
+
 /* -------------------------------------------- */
 
 /**
@@ -143,6 +158,45 @@ const CRITICAL_SETTINGS = new Set([
  * @type {string[]}
  */
 const USER_KEYS = ["role", "character", "permissions"];
+
+/* -------------------------------------------- */
+/*  The app's choices                           */
+/* -------------------------------------------- */
+
+/**
+ * The campaigns whose app reads damage on its own's choices, by id, as their latest answer to a hello
+ * or heartbeat said: `aloneChoices` 1 or later, since 0.41.0.
+ * @type {Set<string>}
+ */
+const readers = new Set();
+
+/**
+ * Note whether a campaign's app reads damage on its own's choices, since 0.41.0: `features.aloneChoices`,
+ * 1 or later, whose sheets then carry each damaging row's plans at its other levels, modes and
+ * ammunition and what it would spend. One that says nothing of it, as an older app, is sent its
+ * sheets without them. An answer to a heartbeat that changes it sends the campaign's sheets again; a
+ * hello's are sent after it anyway.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @param {string} [type]   The event answered.
+ * @returns {void}
+ */
+export function noteAloneReader(campaignId, features, type) {
+  const format = features?.aloneChoices;
+  const was = readers.has(campaignId);
+  if ( Number.isInteger(format) && (format >= 1) ) readers.add(campaignId);
+  else readers.delete(campaignId);
+  if ( (was !== readers.has(campaignId)) && (type !== EVENTS.HELLO) ) aloneTermsChanged(campaignId);
+}
+
+/**
+ * Does a campaign's app read damage on its own's choices?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function aloneReader(campaignId) {
+  return readers.has(campaignId);
+}
 
 /* -------------------------------------------- */
 
@@ -155,7 +209,7 @@ export function registerCharacterHooks() {
   Hooks.on("updateActor", (actor, changes) => characterChanged(actor, changes));
   Hooks.on("deleteActor", actor => actorDeleted(actor));
   // Since 0.40.0 a form made or deleted sends its character, and the combats it's in, again: a
-  // deleted one noted first as hers (wild-shape.mjs notes it too, later), so a combatant still
+  // deleted one noted first as hers (wild-shape-hooks.mjs notes it too, later), so a combatant still
   // naming it is hers as the combats are checked.
   Hooks.on("createActor", actor => formChanged(actor));
   Hooks.on("deleteActor", actor => {
@@ -376,6 +430,28 @@ export function sheetTermsChanged(campaignId) {
   forgetBooks(campaign.id);
   sendBooks(campaign);
   tidyAfresh(campaign.id);
+}
+
+/**
+ * Describe a character for the listener, sheet included.
+ * @param {Actor} actor
+ * @param {SheetTexts} [texts]  Collects the descriptions its sheet refers to.
+ * @returns {object}
+ */
+export function summarizeCharacter(actor, texts) {
+  return { ...rosterEntry(actor), sheet: characterSheet(actor, texts) };
+}
+
+/**
+ * Every character in a campaign, as its roster lists them: since 0.22.0, a bridge.hello's
+ * characters, their sheets following it, each in a post of its own. Since 0.26.0 each says whether
+ * its player may enter its dice results in the app, `manualDice`; since 0.32.0 that's so where the
+ * campaign lets its players and its primary player has Make Manual Rolls (typed-dice.mjs).
+ * @param {Campaign} campaign
+ * @returns {object[]}
+ */
+export function roster(campaign) {
+  return campaignActors(campaign).map(actor => ({ ...rosterEntry(actor), manualDice: typesDice(actor, campaign) }));
 }
 
 /**

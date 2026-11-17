@@ -59,7 +59,8 @@ CONFIG.DND5E = {
 const window = new JSDOM('').window
 const unescape = globalThis.unescape
 
-const { normaliseLinks, cleanLinks, readLink, findLink, originOf, MOST_LINKS } = await import(`${MODULE}/scripts/sheet-links.mjs`)
+const { normaliseLinks, cleanLinks, readLink, originOf, MOST_LINKS } = await import(`${MODULE}/scripts/sheet-links.mjs`)
+const { findLink } = await import(`${MODULE}/scripts/command-links.mjs`)
 const { SheetTexts, textOf, hiddenDCsOf, textHash } = await import(`${MODULE}/scripts/sheet-texts.mjs`)
 
 // What a normalised description holds: its spans of the app's, and its text.

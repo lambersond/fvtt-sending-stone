@@ -4,16 +4,16 @@ import {
 import { getCampaigns, manualDiceOn } from "../campaigns.mjs";
 import { candidateActors, playerOwners } from "../characters.mjs";
 import { transferReader } from "../command-transfers.mjs";
-import { dishReader, dishSystem } from "../command-dishes.mjs";
 import { effectReader } from "../command-effects.mjs";
 import { hitPointReader } from "../command-hit-points.mjs";
-import { wildShapeReader } from "../command-wildshape.mjs";
-import { attacksUnavailable } from "../command-uses.mjs";
+import { attacksUnavailable } from "../command-rolls.mjs";
 import { commandsOffered } from "../commands.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
 import { getDestination, getSecret, isMixedContent, parseDestination } from "../config.mjs";
 import { campaignStatus, describeProblem } from "../delivery-status.mjs";
 import { diceStatus } from "../dice-plan.mjs";
+import { dishReader } from "../dish-card.mjs";
+import { dishSystem } from "../dish-effects.mjs";
 import { WATCHED_SETTINGS } from "../foundry-settings.mjs";
 import { candidateGroups, groupEntry, groupsAvailable, memberCount, primaryPartyId } from "../groups.mjs";
 import { issueLinks } from "../issue-links.mjs";
@@ -21,6 +21,7 @@ import { midiPromptStatus } from "../midi-prompts.mjs";
 import { resultsVerdict } from "../results.mjs";
 import { buildEnvelope, deliver, DeliveryError } from "../transport.mjs";
 import { typedDiceState } from "../typed-dice.mjs";
+import { wildShapeReader } from "../wild-shape.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const { FormDataExtended } = foundry.applications.ux;

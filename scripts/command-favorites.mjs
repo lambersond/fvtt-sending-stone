@@ -1,10 +1,8 @@
-import {
-  EFFECT_ID, FAVORITE_KINDS, FAVORITE_OPS, FAVORITE_ORDER, FAVORITE_TYPES, MOST_FAVORITE_ORDER
-} from "./constants.mjs";
+import { FAVORITE_KINDS, FAVORITE_ORDER } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
-import { checkCommand, failedResult, isKey, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
+import { checkCommand, failedResult, favoriteKey } from "./command-rolls.mjs";
 import { campaignGroups } from "./groups.mjs";
 import { listedFavorite, storedFavorites } from "./sheet-favorites.mjs";
 
@@ -37,12 +35,6 @@ const DENSITY = 100_000;
  * @type {Set<string>}
  */
 const favorers = new Set();
-
-/**
- * An id dnd5e gives an item, an activity or an effect.
- * @type {RegExp}
- */
-const ID = /^[A-Za-z0-9]{1,64}$/;
 
 /* -------------------------------------------- */
 /*  Whether favorites are made here             */
@@ -93,62 +85,6 @@ export function favoriteReader(campaignId) {
 /* -------------------------------------------- */
 /*  A favorite                                  */
 /* -------------------------------------------- */
-
-/**
- * Why a fetched favorite isn't one to make, if it isn't: it adds or removes one favorite, of a type
- * dnd5e keeps, named by its id as the sheet names it, and an activity by its item's too, or since
- * 0.47.0 puts them in order (`validOrder`); and names nothing else, nothing a roll names, no move,
- * removal or anything typed in, and throws no dice. Only its player adds or removes one from the
- * app: it posts nothing, so would leave no mark of the Gamemaster's.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkFavoriteCommand(command) {
-  if ( command.by === "gm" ) return "by";
-  const favorite = command.favorite;
-  const given = value => (value !== undefined) && (value !== null);
-  if ( namesRollFields(command) || given(command.transfer) || given(command.remove) || given(command.typed)
-    || !isObject(favorite) ) return "favorite";
-  const valid = (favorite.op === FAVORITE_ORDER) ? validOrder(favorite)
-    : (FAVORITE_OPS.includes(favorite.op) && namesFavorite(favorite, ["op"]));
-  if ( !valid ) return "favorite";
-  return throwsNoDice(command) ? null : "dice";
-}
-
-/**
- * Is this a favorite as the sheet names one: an object of `type` and `id`, `item` beside them for
- * an activity alone, and the other fields given; one of dnd5e's types, its ids as `validId` has
- * them?
- * @param {unknown} favorite
- * @param {string[]} [more]   Its other fields, such as `op`.
- * @returns {boolean}
- */
-function namesFavorite(favorite, more=[]) {
-  if ( !isObject(favorite) ) return false;
-  const { type, id, item } = favorite;
-  if ( !FAVORITE_TYPES.includes(type) ) return false;
-  const fields = [...((type === "activity") ? ["id", "item", "type"] : ["id", "type"]), ...more].sort().join();
-  if ( Object.keys(favorite).sort().join() !== fields ) return false;
-  return validId(type, id) && ((type !== "activity") || isText(ID, item));
-}
-
-/**
- * Is this an order of the favorites, since 0.47.0: `{op: "order", order, was}` and nothing else,
- * `was` the favorites the app showed, in their order, and `order` the same in the order wanted;
- * each 1 to `MOST_FAVORITE_ORDER` favorites as the sheet names them, none twice.
- * @param {object} favorite
- * @returns {boolean}
- */
-function validOrder(favorite) {
-  if ( Object.keys(favorite).sort().join() !== "op,order,was" ) return false;
-  const { order, was } = favorite;
-  const listed = list => Array.isArray(list) && (list.length > 0) && (list.length <= MOST_FAVORITE_ORDER)
-    && list.every(each => namesFavorite(each));
-  if ( !listed(order) || !listed(was) || (order.length !== was.length) ) return false;
-  const shown = new Set(was.map(favoriteKey));
-  return (shown.size === was.length) && order.every(each => shown.has(favoriteKey(each)))
-    && (new Set(order.map(favoriteKey)).size === order.length);
-}
 
 /**
  * Add a favorite to a character's, or remove one, fetched from the app: every check before any
@@ -248,16 +184,6 @@ function sheetName({ type, id, itemId }) {
 }
 
 /**
- * A favorite's key, as the sheet names it: an activity's by its item's id too, as two items may
- * hold activities of one id.
- * @param {{type: string, id: string, item?: string}} favorite
- * @returns {string}
- */
-function favoriteKey({ type, id, item }) {
-  return (type === "activity") ? `activity:${item}.${id}` : `${type}:${id}`;
-}
-
-/**
  * The id dnd5e keeps a favorite by, built as its sheet's menus build it: an item, an activity and an
  * effect by its relative UUID, `.Item.<id>`, `.Item.<item>.Activity.<id>`, `.ActiveEffect.<id>` or
  * `.Item.<item>.ActiveEffect.<id>`; a skill, a tool or a pool of spell slots by its key. The same
@@ -275,30 +201,6 @@ function storedId({ type, id, item }) {
     }
     default: return id;
   }
-}
-
-/**
- * Is this a favorite's id as the sheet names one of its type: an item's or an activity's own id, an
- * effect's as `effectIdOf` names it, a skill's, a tool's or a pool's key? Never `resources.<key>`,
- * which dnd5e's `removeFavorite` would take for an old-style resource, and zero its maximum.
- * @param {string} type
- * @param {unknown} id
- * @returns {boolean}
- */
-function validId(type, id) {
-  if ( (type === "item") || (type === "activity") ) return isText(ID, id);
-  if ( type === "effect" ) return isText(EFFECT_ID, id);
-  return isKey(id);
-}
-
-/**
- * Is this a string the pattern matches?
- * @param {RegExp} pattern
- * @param {unknown} value
- * @returns {boolean}
- */
-function isText(pattern, value) {
-  return (typeof value === "string") && pattern.test(value);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { CHAT_SCOPES, EVENTS, MODULE_ID } from "./constants.mjs";
 import { chatEnabled, chatScope } from "./config.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { speakerCharacterId } from "./characters.mjs";
 import { chatAudience, isAudienceShared, serializeMessage } from "./chat-data.mjs";

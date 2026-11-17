@@ -1,28 +1,25 @@
 import {
-  ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, EFFECT_DICE_KINDS, ENCHANT_KINDS,
-  MODULE_ID, MOST_EFFECT_DICE, MOST_HIT_DICE, MOST_PLAIN_BONUS, MOST_PLAIN_DICE, MOST_SPENT, ROLL_KINDS, ROLL_TAG,
-  SPELL_SLOT_OPS, TURN_KINDS
+  ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, DISH_OUTCOMES, DISH_VERSIONS,
+  EFFECT_DICE_KINDS, EFFECT_ID, EFFECT_OPS, ENCHANT_KINDS, FAVORITE_OPS, FAVORITE_ORDER, FAVORITE_TYPES, FORM_UUID,
+  MODULE_ID, MOST_AMONG, MOST_DISH_CHANGES, MOST_DISH_INGREDIENTS, MOST_EFFECT_DICE, MOST_FAVORITE_ORDER, MOST_HIT_DICE,
+  MOST_MOVED, MOST_MOVED_ITEMS, MOST_PLAIN_BONUS, MOST_PLAIN_DICE, MOST_SPENT, PREPARE_OPS, PROFILE_ID, ROLL_KINDS,
+  ROLL_TAG, SPELL_SLOT_OPS, TURN_KINDS, WILD_SHAPE_OPS
 } from "./constants.mjs";
 import { characterPlayers, originalOf, seatActor, standingFor } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
-import { checkItemDamageCommand, checkRechargeCommand } from "./command-alone.mjs";
-import { checkFavoriteCommand } from "./command-favorites.mjs";
-import { checkDishCommand } from "./command-dishes.mjs";
-import { checkEffectCommand } from "./command-effects.mjs";
-import { checkHitPointsCommand } from "./command-hit-points.mjs";
-import { checkWildShapeCommand } from "./command-wildshape.mjs";
-import { checkPrepareCommand } from "./command-prepare.mjs";
-import { checkNoteCommand } from "./command-notes.mjs";
+import { checkHitPointsCommand, isId, isObject, namesRollFields, throwsNoDice } from "./command-checks.mjs";
+import { findLink } from "./command-links.mjs";
+import { midiIntegration } from "./config.mjs";
 import { commandActor, companionPart, ownedByPlayers } from "./creatures.mjs";
-import { checkRemoveCommand, checkTransferCommand } from "./command-transfers.mjs";
-import { checkEndTurnCommand, checkUndoTurnCommand } from "./command-turn.mjs";
 import { diceStatus, formulaRoll, matchesDice, plannedDice, readModifiers, withPlan } from "./dice-plan.mjs";
+import { checkNoteCommand } from "./journals.mjs";
+import { midiActivities } from "./midi-economy.mjs";
 import {
   claimMidiPrompt, midiAnswerAuthor, midiAnswerConfig, midiAnswerFailed, midiAnswerFlags, midiOutcome,
   midiPromptAnswered
 } from "./midi-prompts.mjs";
 import { findPrompt, outcomeOf } from "./prompts.mjs";
-import { findLink, MOST_LINKS } from "./sheet-links.mjs";
+import { MOST_LINKS } from "./sheet-links.mjs";
 import { castSpellOf, checkOf, forwardTarget, shownActivity } from "./sheet-rolls.mjs";
 import { castFrom } from "./sheet-spells.mjs";
 
@@ -237,6 +234,36 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   // The hit points dnd5e gave the character for a hit die: none where a module kept it from it.
   if ( command.kind === "hitDie" ) result.healed = Math.max((actor.system.attributes?.hp?.value ?? hp) - hp, 0);
   return result;
+}
+
+/**
+ * Why players' attacks can't be made here, if they can't: not until the self-test has shown that
+ * their damage takes the player's dice; nor where Midi-QOL makes items' uses and the Gamemaster has
+ * turned off making attacks through it.
+ * @returns {"pending"|"self-test"|"midi-off"|null}
+ */
+export function attacksUnavailable() {
+  if ( diceStatus.reason === "pending" ) return "pending";
+  if ( !diceStatus.attacks ) return "self-test";
+  if ( midiActivities() && !midiIntegration() ) return "midi-off";
+  return null;
+}
+
+/**
+ * Why a use, or its damage, or the end of an enchantment, isn't to be made, before looking at the
+ * character.
+ * @param {object} command
+ * @param {Campaign} campaign
+ * @returns {{reason: string, error?: string}|null}
+ */
+export function commandRefusal(command, campaign) {
+  if ( !campaign.rolls || !diceStatus.ready ) return { reason: "off" };
+  if ( !campaign.attacks ) return { reason: "attacks-off" };
+  const unavailable = attacksUnavailable();
+  if ( unavailable ) return { reason: (unavailable === "pending") ? "off" : unavailable };
+  const invalid = checkCommand(command);
+  if ( invalid ) return { reason: "invalid", error: invalid };
+  return null;
 }
 
 /**
@@ -558,35 +585,6 @@ function checkEnchantCommand(command) {
 }
 
 /**
- * The fields a command names its item, activity, targets, prompt or link by, none of which ending
- * a concentration, spending charges or Heroic Inspiration names, nor a move of items and coins.
- * @type {string[]}
- */
-const ROLL_FIELDS = [
-  "enchant", "item", "activity", "target", "targets", "self", "slot", "prompt", "text", "link", "key"
-];
-
-/**
- * Does a command name anything it's no roll at, as ROLL_FIELDS has them?
- * @param {object} command
- * @returns {boolean}
- */
-export function namesRollFields(command) {
-  return ROLL_FIELDS.some(field => (command[field] !== undefined) && (command[field] !== null));
-}
-
-/**
- * Is a command one that throws no dice: with no advantage, nothing added and no dice?
- * @param {object} command
- * @returns {boolean}
- */
-export function throwsNoDice(command) {
-  if ( (command.mode !== 0) || (command.explicit !== false) ) return false;
-  const none = list => (list === undefined) || (list === null) || (Array.isArray(list) && !list.length);
-  return none(command.extras) && none(command.dice);
-}
-
-/**
  * Why a fetched end of a concentration isn't one to make, if it isn't: it names the concentration's
  * effect, and nothing a roll names, and throws no dice. Only its player ends one from the app: it
  * posts nothing, so would leave no mark of the Gamemaster's.
@@ -646,6 +644,478 @@ function checkSpellSlotCommand(command) {
 }
 
 /**
+ * The fields a turn is named by, as the app was shown it.
+ * @type {string[]}
+ */
+const TURN_FIELDS = ["combatId", "round", "combatantId"];
+
+/**
+ * The fields of other commands an end of a turn never names, beside those a roll names its item,
+ * targets or link by; and `undo`, the End Turn that taking a turn back names, and nothing else does.
+ * @type {string[]}
+ */
+const NOT_TURN_FIELDS = ["combatId", "use", "types", "modifiers", "critical", "undo"];
+
+/**
+ * An End Turn's request id, as the app makes one: 1 to 64 letters, digits, `_` or `-`.
+ * @type {RegExp}
+ */
+const REQUEST_ID = /^[\w-]{1,64}$/;
+
+/**
+ * Why a fetched end of a turn isn't one to make, if it isn't: it names the turn, as the app was
+ * shown it, and nothing a roll names, and throws no dice. Only its player ends one from the app: it
+ * posts nothing, so would leave no mark of the Gamemaster's.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkEndTurnCommand(command) {
+  if ( command.by === "gm" ) return "by";
+  if ( namesOtherFields(command) || !namesTurn(command) ) return "turn";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Why a fetched taking back of a turn isn't one to make, if it isn't: it names the End Turn it takes
+ * back, by its id, and the turn as the app shows it now, where that End Turn left the combat, and
+ * nothing a roll names, and throws no dice. Only the player who ended the turn takes it back.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkUndoTurnCommand(command) {
+  if ( command.by === "gm" ) return "by";
+  if ( namesOtherFields(command, ["undo"]) ) return "turn";
+  if ( (typeof command.undo !== "string") || !REQUEST_ID.test(command.undo) ) return "undo";
+  if ( !namesTurn(command) ) return "turn";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Does a command name anything an end of a turn never names, but the fields its own kind names?
+ * @param {object} command
+ * @param {string[]} [own]   Those of NOT_TURN_FIELDS its kind names, as `undo` for taking a turn back.
+ * @returns {boolean}
+ */
+function namesOtherFields(command, own=[]) {
+  const given = field => !own.includes(field) && (command[field] !== undefined) && (command[field] !== null);
+  return namesRollFields(command) || NOT_TURN_FIELDS.some(given);
+}
+
+/**
+ * Does a command name a turn as the app is shown one: a combat, its round, 1 or more, and its
+ * current combatant, and nothing else?
+ * @param {object} command
+ * @returns {boolean}
+ */
+function namesTurn({ turn }) {
+  if ( !isObject(turn) || (Object.keys(turn).length !== TURN_FIELDS.length)
+    || !TURN_FIELDS.every(field => Object.hasOwn(turn, field)) ) return false;
+  return isId(turn.combatId) && Number.isInteger(turn.round) && (turn.round >= 1) && isId(turn.combatantId);
+}
+
+/**
+ * The fields a move names what it moves by; since 0.32.0, `among` for a distribution, in place of
+ * `to`.
+ * @type {ReadonlySet<string>}
+ */
+const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among"]));
+
+/**
+ * Why a fetched move isn't one to make, if it isn't: it names its two ends, which differ, and what
+ * moves, items by id with how many of each, each once, and coins by their keys with how many; at
+ * least one of them, and nothing a roll names, and throws no dice. Since 0.32.0 a distribution names
+ * the characters it shares among in place of the end it goes to: from one to MOST_AMONG of them,
+ * each once, never the party itself, and coins of one kind alone, no items.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkTransferCommand(command) {
+  const transfer = command.transfer;
+  const given = value => (value !== undefined) && (value !== null);
+  if ( namesRollFields(command) || !isObject(transfer) ) return "transfer";
+  if ( Object.keys(transfer).some(key => !FIELDS.has(key)) ) return "transfer";
+  if ( !isId(transfer.from) ) return "transfer";
+  if ( given(transfer.to) === given(transfer.among) ) return "transfer";
+  if ( given(transfer.to) ) {
+    if ( !isId(transfer.to) || (transfer.from === transfer.to) ) return "transfer";
+    if ( !given(transfer.items) && !given(transfer.currency) ) return "transfer";
+  } else {
+    if ( !isAmong(transfer.among, transfer.from) ) return "among";
+    if ( given(transfer.items) ) return "items";
+    if ( !isCoins(transfer.currency) || (Object.keys(transfer.currency).length !== 1) ) return "currency";
+  }
+  if ( given(transfer.items) && !isItemList(transfer.items) ) return "items";
+  if ( given(transfer.currency) && !isCoins(transfer.currency) ) return "currency";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Are these the characters a distribution shares among: from one to MOST_AMONG ids, each once, none
+ * the party it's from?
+ * @param {unknown} among
+ * @param {string} from
+ * @returns {boolean}
+ */
+function isAmong(among, from) {
+  if ( !Array.isArray(among) || !among.length || (among.length > MOST_AMONG) ) return false;
+  return among.every(id => isId(id) && (id !== from)) && (new Set(among).size === among.length);
+}
+
+/**
+ * Is this the items a move names: from one to MOST_MOVED_ITEMS, each `{id, quantity}` and nothing
+ * else, by distinct ids?
+ * @param {unknown} items
+ * @returns {boolean}
+ */
+function isItemList(items) {
+  if ( !Array.isArray(items) || !items.length || (items.length > MOST_MOVED_ITEMS) ) return false;
+  const ids = new Set();
+  for ( const entry of items ) {
+    if ( !isObject(entry) || (Object.keys(entry).sort().join() !== "id,quantity") ) return false;
+    if ( !isId(entry.id) || !isMoved(entry.quantity) || ids.has(entry.id) ) return false;
+    ids.add(entry.id);
+  }
+  return true;
+}
+
+/**
+ * Is this the coins a move names: from one to MOST_MOVED_ITEMS kinds, each one dnd5e has, of a
+ * whole number from 1 to MOST_MOVED?
+ * @param {unknown} currency
+ * @returns {boolean}
+ */
+function isCoins(currency) {
+  if ( !isObject(currency) ) return false;
+  const keys = Object.keys(currency);
+  if ( !keys.length || (keys.length > MOST_MOVED_ITEMS) ) return false;
+  const known = CONFIG.DND5E?.currencies ?? {};
+  return keys.every(key => Object.hasOwn(known, key) && isMoved(currency[key]));
+}
+
+/**
+ * Is this how many of something may be moved at once: a whole number from 1 to MOST_MOVED?
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isMoved(value) {
+  return Number.isInteger(value) && (value >= 1) && (value <= MOST_MOVED);
+}
+
+/**
+ * The fields a removal names what it removes by, since 0.33.0, every one of them: the item, how
+ * many, and how many the app's sheet showed.
+ * @type {readonly string[]}
+ */
+const REMOVE_FIELDS = Object.freeze(["held", "item", "quantity"]);
+
+/**
+ * Why a fetched removal isn't one to make, if it isn't: it names one item by id, how many of it to
+ * remove, and how many the app's sheet showed, from 1 to that many, or none of a stack of none;
+ * and nothing else, nothing a roll names, no move, nothing typed in, and throws no dice.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkRemoveCommand(command) {
+  const remove = command.remove;
+  const given = value => (value !== undefined) && (value !== null);
+  if ( namesRollFields(command) || given(command.transfer) || given(command.typed) || !isObject(remove) ) return "remove";
+  if ( (Object.keys(remove).sort().join() !== REMOVE_FIELDS.join()) || !isId(remove.item) ) return "remove";
+  const { quantity: n, held } = remove;
+  const count = value => Number.isInteger(value) && (value >= 0) && (value <= MOST_MOVED);
+  if ( !count(n) || !count(held) || (n > held) || ((n === 0) && (held !== 0)) ) return "quantity";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * An id dnd5e gives an item, an activity or an effect.
+ * @type {RegExp}
+ */
+const ID = /^[A-Za-z0-9]{1,64}$/;
+
+/**
+ * Why a fetched favorite isn't one to make, if it isn't: it adds or removes one favorite, of a type
+ * dnd5e keeps, named by its id as the sheet names it, and an activity by its item's too, or since
+ * 0.47.0 puts them in order (`validOrder`); and names nothing else, nothing a roll names, no move,
+ * removal or anything typed in, and throws no dice. Only its player adds or removes one from the
+ * app: it posts nothing, so would leave no mark of the Gamemaster's.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkFavoriteCommand(command) {
+  if ( command.by === "gm" ) return "by";
+  const favorite = command.favorite;
+  const given = value => (value !== undefined) && (value !== null);
+  if ( namesRollFields(command) || given(command.transfer) || given(command.remove) || given(command.typed)
+    || !isObject(favorite) ) return "favorite";
+  const valid = (favorite.op === FAVORITE_ORDER) ? validOrder(favorite)
+    : (FAVORITE_OPS.includes(favorite.op) && namesFavorite(favorite, ["op"]));
+  if ( !valid ) return "favorite";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Is this a favorite as the sheet names one: an object of `type` and `id`, `item` beside them for
+ * an activity alone, and the other fields given; one of dnd5e's types, its ids as `validId` has
+ * them?
+ * @param {unknown} favorite
+ * @param {string[]} [more]   Its other fields, such as `op`.
+ * @returns {boolean}
+ */
+function namesFavorite(favorite, more=[]) {
+  if ( !isObject(favorite) ) return false;
+  const { type, id, item } = favorite;
+  if ( !FAVORITE_TYPES.includes(type) ) return false;
+  const fields = [...((type === "activity") ? ["id", "item", "type"] : ["id", "type"]), ...more].sort().join();
+  if ( Object.keys(favorite).sort().join() !== fields ) return false;
+  return validId(type, id) && ((type !== "activity") || isText(ID, item));
+}
+
+/**
+ * Is this an order of the favorites, since 0.47.0: `{op: "order", order, was}` and nothing else,
+ * `was` the favorites the app showed, in their order, and `order` the same in the order wanted;
+ * each 1 to `MOST_FAVORITE_ORDER` favorites as the sheet names them, none twice.
+ * @param {object} favorite
+ * @returns {boolean}
+ */
+function validOrder(favorite) {
+  if ( Object.keys(favorite).sort().join() !== "op,order,was" ) return false;
+  const { order, was } = favorite;
+  const listed = list => Array.isArray(list) && (list.length > 0) && (list.length <= MOST_FAVORITE_ORDER)
+    && list.every(each => namesFavorite(each));
+  if ( !listed(order) || !listed(was) || (order.length !== was.length) ) return false;
+  const shown = new Set(was.map(favoriteKey));
+  return (shown.size === was.length) && order.every(each => shown.has(favoriteKey(each)))
+    && (new Set(order.map(favoriteKey)).size === order.length);
+}
+
+/**
+ * A favorite's key, as the sheet names it: an activity's by its item's id too, as two items may
+ * hold activities of one id.
+ * @param {{type: string, id: string, item?: string}} favorite
+ * @returns {string}
+ */
+export function favoriteKey({ type, id, item }) {
+  return (type === "activity") ? `activity:${item}.${id}` : `${type}:${id}`;
+}
+
+/**
+ * Is this a favorite's id as the sheet names one of its type: an item's or an activity's own id, an
+ * effect's as `effectIdOf` names it, a skill's, a tool's or a pool's key? Never `resources.<key>`,
+ * which dnd5e's `removeFavorite` would take for an old-style resource, and zero its maximum.
+ * @param {string} type
+ * @param {unknown} id
+ * @returns {boolean}
+ */
+function validId(type, id) {
+  if ( (type === "item") || (type === "activity") ) return isText(ID, id);
+  if ( type === "effect" ) return isText(EFFECT_ID, id);
+  return isKey(id);
+}
+
+/**
+ * Is this a string the pattern matches?
+ * @param {RegExp} pattern
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isText(pattern, value) {
+  return (typeof value === "string") && pattern.test(value);
+}
+
+/**
+ * Why a fetched dish isn't one to take, if it isn't: it names nothing a roll names, no move, removal,
+ * anything typed in, note or favorite, and isn't the Gamemaster's; its body is a version this reads,
+ * of a dish with an id, a recipe and an outcome, a cook and a message; a boon or bane has an effect,
+ * with a name for it, at most 20 ingredients, a duration of whole seconds that doesn't stack, and at
+ * most 100 changes, each with a kind, whose own fields are checked as each is mapped; a standard dish
+ * has none; and it throws no dice.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkDishCommand(command) {
+  const given = value => (value !== undefined) && (value !== null);
+  const text = (value, most) => (typeof value === "string") && (value.length >= 1) && (value.length <= most);
+  if ( namesRollFields(command) || ["transfer", "remove", "typed", "note", "favorite"].some(key => given(command[key])) ) {
+    return "dish";
+  }
+  if ( given(command.by) ) return "by";
+  const { dish } = command;
+  if ( !isObject(dish) || !(Number.isInteger(dish.queuedAt) && (dish.queuedAt > 0)) || !isObject(dish.body) ) return "dish";
+  const { body } = dish;
+  if ( !DISH_VERSIONS.includes(body.version) ) return "version";
+  const about = body.dish;
+  if ( !isObject(about) || !isId(about.id) || !text(about.recipe, 200) || !DISH_OUTCOMES.includes(about.outcome) ) return "body.dish";
+  if ( !isObject(body.cook) || (typeof body.cook.name !== "string") ) return "body.cook";
+  if ( typeof body.message !== "string" ) return "body.message";
+  const effect = body.effect;
+  if ( about.outcome === "standard" ) return (effect === null) ? (throwsNoDice(command) ? null : "dice") : "body.effect";
+  const ingredient = i => isObject(i) && (typeof i.name === "string") && (typeof i.text === "string");
+  // An effect's name may not be blank, or every character's create would fail.
+  if ( !isObject(effect) || !text(effect.name, 300) || !Array.isArray(effect.ingredients)
+    || (effect.ingredients.length > MOST_DISH_INGREDIENTS) || !effect.ingredients.every(ingredient)
+    || !(Number.isInteger(effect.duration?.seconds) && (effect.duration.seconds > 0)) || (effect.stacks !== false) ) {
+    return "body.effect";
+  }
+  if ( !Array.isArray(effect.changes) || (effect.changes.length > MOST_DISH_CHANGES)
+    || !effect.changes.every(change => isObject(change) && (typeof change.type === "string")) ) return "body.changes";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Why a fetched change to an effect isn't one to make, if it isn't: it names one effect, by its id
+ * as the sheet names it, and the state wanted of it, off, on or gone; and nothing else, nothing a
+ * roll names, no move, removal, anything typed in, favorite, note or dish, and throws no dice. Only
+ * its player changes one from the app: it posts nothing, so would leave no mark of the Gamemaster's.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkEffectCommand(command) {
+  if ( command.by === "gm" ) return "by";
+  const given = value => (value !== undefined) && (value !== null);
+  const others = ["transfer", "remove", "typed", "favorite", "note", "dish"];
+  const effect = command.effect;
+  if ( namesRollFields(command) || others.some(key => given(command[key])) || !isObject(effect) ) return "effect";
+  if ( (Object.keys(effect).sort().join() !== "id,op") || !EFFECT_OPS.includes(effect.op)
+    || (typeof effect.id !== "string") || !EFFECT_ID.test(effect.id) ) return "effect";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * Why a fetched Wild Shape isn't one to make, if it isn't: exactly one of a change into a known form
+ * by its profile's id, a return, a Beast learned by its compendium uuid in an empty place or in place
+ * of a known form, or the Beasts to learn listed; nothing else, nothing a roll names, no move,
+ * removal, anything typed in, favorite, note, dish or effect; and it throws no dice. Only its player
+ * makes one from the app.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkWildShapeCommand(command) {
+  if ( command.by === "gm" ) return "by";
+  const given = value => (value !== undefined) && (value !== null);
+  const others = ["transfer", "remove", "typed", "favorite", "note", "dish", "effect"];
+  const shape = command.wildShape;
+  if ( namesRollFields(command) || others.some(key => given(command[key])) || !isObject(shape) ) return "wildShape";
+  if ( !WILD_SHAPE_OPS.includes(shape.op) ) return "wildShape";
+  const keys = Object.keys(shape).sort().join();
+  const id = value => (typeof value === "string") && PROFILE_ID.test(value);
+  const valid = {
+    transform: () => (keys === "form,op") && id(shape.form),
+    revert: () => keys === "op",
+    learn: () => (keys === "op,replace,uuid") && (typeof shape.uuid === "string") && FORM_UUID.test(shape.uuid)
+      && ((shape.replace === null) || id(shape.replace)),
+    forms: () => keys === "op"
+  }[shape.op];
+  if ( !valid() ) return "wildShape";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * The fields of other kinds a spell prepared or unprepared never names, beside those a roll names:
+ * a move, a removal, anything typed in, a favorite, a note, a dish, an effect, Wild Shape, a spell
+ * slot, charges, Heroic Inspiration, a concentration, a turn and the End Turn a turn taken back names.
+ * @type {string[]}
+ */
+const OTHERS = [
+  "transfer", "remove", "typed", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter", "count",
+  "inspiration", "concentration", "turn", "undo"
+];
+
+/**
+ * A spell's id as the sheet names it: its item's, 1 to 64 letters and digits.
+ * @type {RegExp}
+ */
+const SPELL_ID = /^[A-Za-z0-9]{1,64}$/;
+
+/**
+ * Why a fetched spell prepared or unprepared isn't one to make, if it isn't: it names one spell, by
+ * its id as the sheet names it, and the state wanted of it, prepared or not; and nothing else,
+ * nothing a roll names nor another kind's field, and throws no dice. Only its player prepares one
+ * from the app: it posts nothing, so would leave no mark of the Gamemaster's.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkPrepareCommand(command) {
+  if ( command.by === "gm" ) return "by";
+  const given = value => (value !== undefined) && (value !== null);
+  const prepare = command.prepare;
+  if ( namesRollFields(command) || OTHERS.some(key => given(command[key])) || !isObject(prepare) ) return "prepare";
+  if ( (Object.keys(prepare).sort().join() !== "id,op") || !PREPARE_OPS.includes(prepare.op)
+    || (typeof prepare.id !== "string") || !SPELL_ID.test(prepare.id) ) return "prepare";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
+ * What a roll names that damage on its own never does: a use, its targets, a description's link,
+ * an enchantment, a key, a combat or a prompt. Since 0.41.0 it may name a spell slot, an attack mode
+ * and ammunition, and ask to spend what it uses.
+ * @type {string[]}
+ */
+const NOT_ALONE = ["use", "targets", "target", "text", "link", "enchant", "key", "combatId", "prompt"];
+
+/**
+ * Why a fetched action's damage on its own isn't one to make, if it isn't: it names the item and
+ * the activity, and none of what a use names; since 0.41.0 a spell slot, an attack mode and
+ * ammunition, each a key or an id, and `consume`, true; it's thrown as it is; it may be a critical
+ * hit's; and it has the dice the activity throws, which are checked against them when it's made,
+ * and the kind of damage chosen for each of its rolls, as a use's damage has.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkItemDamageCommand(command) {
+  if ( !isId(command.item) || !isId(command.activity) ) return "item";
+  if ( NOT_ALONE.some(field => given(command[field])) ) return "item";
+  if ( !isOptional(command.slot, isKey) ) return "slot";
+  if ( !isOptional(command.attackMode, isKey) ) return "attack-mode";
+  if ( !isOptional(command.ammunition, isId) ) return "ammo";
+  if ( !isOptional(command.consume, consume => consume === true) ) return "consume";
+  if ( !plain(command) ) return "mode";
+  if ( !isOptional(command.critical, critical => critical === true) ) return "critical";
+  const { dice, types } = command;
+  if ( !Array.isArray(dice) || !dice.length || (dice.length > 20) || !dice.every(isRolled) ) return "dice";
+  if ( given(types) && (!Array.isArray(types) || (types.length > 20) || !types.every(type => (type === null) || isKey(type))) ) {
+    return "types";
+  }
+  return null;
+}
+
+/**
+ * What a roll names that a recharge never does.
+ * @type {string[]}
+ */
+const NOT_RECHARGE = [
+  "key", "combatId", "use", "targets", "target", "types", "modifiers", "critical", "text", "link", "prompt", "slot",
+  "enchant"
+];
+
+/**
+ * Why a fetched recharge isn't one to make, if it isn't: it names the item, and the activity whose
+ * own uses recharge, if it's an activity's, each an id; it's one d6, thrown as it is; and it names
+ * nothing else a roll does.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkRechargeCommand(command) {
+  if ( !isId(command.item) ) return "item";
+  if ( given(command.activity) && !isId(command.activity) ) return "item";
+  const { dice } = command;
+  const one = Array.isArray(dice) && (dice.length === 1) && isRolled(dice[0]) && (dice[0].faces === 6)
+    && (dice[0].results.length === 1);
+  if ( !one ) return "dice";
+  if ( !plain(command) ) return "mode";
+  if ( NOT_RECHARGE.some(field => given(command[field])) ) return "item";
+  return null;
+}
+
+/**
+ * Does a command throw its dice as they are, with no advantage and nothing added?
+ * @param {object} command
+ * @returns {boolean}
+ */
+function plain(command) {
+  return (command.mode === 0) && (command.explicit === false) && Array.isArray(command.extras) && !command.extras.length;
+}
+
+/**
  * Is this a counter as the sheet names one: an item's uses, `{item}`, one of its activities',
  * `{item, activity}`, or an old-style resource, `{resource}`, and nothing else?
  * @param {unknown} counter
@@ -663,15 +1133,6 @@ function isCounter(counter) {
 }
 
 /**
- * Is this a plain object, rather than null or an array?
- * @param {unknown} value
- * @returns {boolean}
- */
-export function isObject(value) {
-  return Boolean(value) && (typeof value === "object") && !Array.isArray(value);
-}
-
-/**
  * Is this the enchantment a use applies, as the player chose it: its profile, and the item they
  * chose, if any?
  * @param {unknown} value
@@ -683,21 +1144,21 @@ function isEnchant(value) {
 }
 
 /**
- * Is this the id of a document, as the app sends it?
- * @param {unknown} value
- * @returns {boolean}
- */
-export function isId(value) {
-  return (typeof value === "string") && (value.length > 0) && (value.length <= 64);
-}
-
-/**
  * Is this a key dnd5e names something by, such as a spell slot's or a damage type's?
  * @param {unknown} value
  * @returns {boolean}
  */
 export function isKey(value) {
   return (typeof value === "string") && /^[A-Za-z][\w-]{0,31}$/.test(value);
+}
+
+/**
+ * Is this given, rather than left out?
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function given(value) {
+  return (value !== undefined) && (value !== null);
 }
 
 /**

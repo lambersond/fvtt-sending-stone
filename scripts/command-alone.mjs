@@ -1,8 +1,6 @@
-import { EVENTS, MODULE_ID, ROLL_TAG } from "./constants.mjs";
-import { aloneTermsChanged } from "./character-sync.mjs";
+import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import {
-  appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, isId, isKey, isOptional, isRolled,
-  PUBLIC
+  appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, given, PUBLIC
 } from "./command-rolls.mjs";
 import { defaultSlot, offersTypes, scaleAsUsed } from "./command-uses.mjs";
 import { commandActor } from "./creatures.mjs";
@@ -10,6 +8,7 @@ import {
   changesDamage, costCheck, diceStatus, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable,
   withPlan
 } from "./dice-plan.mjs";
+import { dnd5eGeneration } from "./dnd5e-generation.mjs";
 import {
   markMidiBonusAction, markMidiReaction, midiActivities, midiBonusActionUsed, midiReactionUsed
 } from "./midi-economy.mjs";
@@ -36,122 +35,14 @@ import { finite, localize } from "./sheet-values.mjs";
  */
 
 /**
- * What a roll names that damage on its own never does: a use, its targets, a description's link,
- * an enchantment, a key, a combat or a prompt. Since 0.41.0 it may name a spell slot, an attack mode
- * and ammunition, and ask to spend what it uses.
- * @type {string[]}
- */
-const NOT_ALONE = ["use", "targets", "target", "text", "link", "enchant", "key", "combatId", "prompt"];
-
-/**
- * What a roll names that a recharge never does.
- * @type {string[]}
- */
-const NOT_RECHARGE = [
-  "key", "combatId", "use", "targets", "target", "types", "modifiers", "critical", "text", "link", "prompt", "slot",
-  "enchant"
-];
-
-/**
  * What damage on its own may spend, in the order the app is told it.
  * @type {string[]}
  */
 const SPENDS = ["slot", "uses", "ammunition", "thrown"];
 
-/**
- * The campaigns whose app reads damage on its own's choices, by id, as their latest answer to a hello
- * or heartbeat said: `aloneChoices` 1 or later, since 0.41.0.
- * @type {Set<string>}
- */
-const readers = new Set();
-
-/**
- * Is this given, rather than left out?
- * @param {unknown} value
- * @returns {boolean}
- */
-function given(value) {
-  return (value !== undefined) && (value !== null);
-}
-
-/**
- * Does a command throw its dice as they are, with no advantage and nothing added?
- * @param {object} command
- * @returns {boolean}
- */
-function plain(command) {
-  return (command.mode === 0) && (command.explicit === false) && Array.isArray(command.extras) && !command.extras.length;
-}
-
-/**
- * dnd5e's generation, as its version's first number has it: 5 for 5.3.3, 6 for 6.0.5.
- * @returns {number}
- */
-export function dnd5eGeneration() {
-  return Number.parseInt(String(game.system.version ?? ""));
-}
-
-/* -------------------------------------------- */
-/*  The app's choices                           */
-/* -------------------------------------------- */
-
-/**
- * Note whether a campaign's app reads damage on its own's choices, since 0.41.0: `features.aloneChoices`,
- * 1 or later, whose sheets then carry each damaging row's plans at its other levels, modes and
- * ammunition and what it would spend. One that says nothing of it, as an older app, is sent its
- * sheets without them. An answer to a heartbeat that changes it sends the campaign's sheets again; a
- * hello's are sent after it anyway.
- * @param {string} campaignId
- * @param {object|null} features
- * @param {string} [type]   The event answered.
- * @returns {void}
- */
-export function noteAloneReader(campaignId, features, type) {
-  const format = features?.aloneChoices;
-  const was = readers.has(campaignId);
-  if ( Number.isInteger(format) && (format >= 1) ) readers.add(campaignId);
-  else readers.delete(campaignId);
-  if ( (was !== readers.has(campaignId)) && (type !== EVENTS.HELLO) ) aloneTermsChanged(campaignId);
-}
-
-/**
- * Does a campaign's app read damage on its own's choices?
- * @param {string} campaignId
- * @returns {boolean}
- */
-export function aloneReader(campaignId) {
-  return readers.has(campaignId);
-}
-
 /* -------------------------------------------- */
 /*  Damage on its own                           */
 /* -------------------------------------------- */
-
-/**
- * Why a fetched action's damage on its own isn't one to make, if it isn't: it names the item and
- * the activity, and none of what a use names; since 0.41.0 a spell slot, an attack mode and
- * ammunition, each a key or an id, and `consume`, true; it's thrown as it is; it may be a critical
- * hit's; and it has the dice the activity throws, which are checked against them when it's made,
- * and the kind of damage chosen for each of its rolls, as a use's damage has.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkItemDamageCommand(command) {
-  if ( !isId(command.item) || !isId(command.activity) ) return "item";
-  if ( NOT_ALONE.some(field => given(command[field])) ) return "item";
-  if ( !isOptional(command.slot, isKey) ) return "slot";
-  if ( !isOptional(command.attackMode, isKey) ) return "attack-mode";
-  if ( !isOptional(command.ammunition, isId) ) return "ammo";
-  if ( !isOptional(command.consume, consume => consume === true) ) return "consume";
-  if ( !plain(command) ) return "mode";
-  if ( !isOptional(command.critical, critical => critical === true) ) return "critical";
-  const { dice, types } = command;
-  if ( !Array.isArray(dice) || !dice.length || (dice.length > 20) || !dice.every(isRolled) ) return "dice";
-  if ( given(types) && (!Array.isArray(types) || (types.length > 20) || !types.every(type => (type === null) || isKey(type))) ) {
-    return "types";
-  }
-  return null;
-}
 
 /**
  * Roll an action's damage or healing on its own, with the player's dice, as dnd5e's sheet and chat
@@ -502,25 +393,6 @@ function modeLabel(item, attackMode) {
 /* -------------------------------------------- */
 /*  Recharges                                   */
 /* -------------------------------------------- */
-
-/**
- * Why a fetched recharge isn't one to make, if it isn't: it names the item, and the activity whose
- * own uses recharge, if it's an activity's, each an id; it's one d6, thrown as it is; and it names
- * nothing else a roll does.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkRechargeCommand(command) {
-  if ( !isId(command.item) ) return "item";
-  if ( given(command.activity) && !isId(command.activity) ) return "item";
-  const { dice } = command;
-  const one = Array.isArray(dice) && (dice.length === 1) && isRolled(dice[0]) && (dice[0].faces === 6)
-    && (dice[0].results.length === 1);
-  if ( !one ) return "dice";
-  if ( !plain(command) ) return "mode";
-  if ( NOT_RECHARGE.some(field => given(command[field])) ) return "item";
-  return null;
-}
 
 /**
  * Roll a spent recharge, as dnd5e's own `rollRecharge` rolls one, with the player's d6: an item's

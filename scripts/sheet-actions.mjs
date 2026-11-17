@@ -2,11 +2,11 @@ import { TIDY } from "./constants.mjs";
 import { enchantmentsOf } from "./sheet-enchant.mjs";
 import { usesOf } from "./sheet-features.mjs";
 import {
-  ACTION_KINDS, activationTypeOf, activityName, activityUses, castCopy, castSpellOf, ownLabels, rangeOf,
+  ACTION_KINDS, activationTypeOf, activityName, activityUses, castSpellOf, ownLabels, rangeOf,
   REACTIONS, rollsOf, visibleActivities
 } from "./sheet-rolls.mjs";
 import { castFrom } from "./sheet-spells.mjs";
-import { finite, localize } from "./sheet-values.mjs";
+import { castCopy, finite, localize } from "./sheet-values.mjs";
 
 /**
  * What a character can do in a fight, listed as Tidy 5e's Actions tab lists it, by default:

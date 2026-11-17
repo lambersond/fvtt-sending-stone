@@ -1,6 +1,6 @@
 import { MOST_COMPANIONS, MOST_COMPANIONS_EACH } from "./constants.mjs";
 import { activeForm, campaignActors, characterPlayers, transformed } from "./characters.mjs";
-import { wildShapeReader } from "./command-wildshape.mjs";
+import { wildShapeReader } from "./wild-shape.mjs";
 
 /**
  * A campaign's characters' companions, since 0.36.0: the creatures each summoned in Foundry, whose

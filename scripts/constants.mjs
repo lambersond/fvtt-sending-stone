@@ -231,6 +231,12 @@ export const EVENTS = Object.freeze({
 });
 
 /**
+ * How long a prompt waits for its player, in milliseconds.
+ * @type {number}
+ */
+export const PROMPT_LIFETIME = 10 * 60_000;
+
+/**
  * The rolls a player can have made here from the app, with the dice they rolled there: a skill
  * check, a tool check, an ability check, a saving throw, a death saving throw, or initiative; a hit
  * die spent, or several, of one size or more, at once, offered once the self-test has checked a hit

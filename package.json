@@ -3,7 +3,7 @@
   "type": "module",
   "homepage": "https://github.com/lambersond/fvtt-sending-stone",
   "scripts": {
-    "test": "sh test/harness-all.sh",
+    "test": "node test/import-layers.mjs && sh test/harness-all.sh",
     "harness:one": "sh test/run.sh",
     "test:setup": "sh test/dnd5e.sh && sh test/old-module.sh",
     "fixture:slim": "sh test/slim-fixture.sh"

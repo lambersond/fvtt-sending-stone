@@ -1,7 +1,7 @@
 import { enchantmentsOf } from "./sheet-enchant.mjs";
 import { usesOf } from "./sheet-features.mjs";
 import { rollsIfAny, usageOf } from "./sheet-rolls.mjs";
-import { finite, localize } from "./sheet-values.mjs";
+import { finite, inventorySections, localize } from "./sheet-values.mjs";
 
 /**
  * A character's inventory, as dnd5e's Inventory tab shows it to the character's player: items by
@@ -11,19 +11,6 @@ import { finite, localize } from "./sheet-values.mjs";
  * only from players: its description, price, rarity, uses and properties. Those are concealed
  * here as for a player.
  */
-
-/**
- * The inventory's sections, in dnd5e's order, for its item types that have none of their own:
- * their type, section id and label key. Containers are listed apart.
- * @type {[string, string, string][]}
- */
-const SECTIONS = [
-  ["weapon", "weapons", "TYPES.Item.weaponPl"],
-  ["equipment", "equipment", "TYPES.Item.equipmentPl"],
-  ["consumable", "consumables", "TYPES.Item.consumablePl"],
-  ["tool", "tool", "TYPES.Item.toolPl"],
-  ["loot", "loot", "TYPES.Item.lootPl"]
-];
 
 /**
  * How deep containers within containers are followed.
@@ -72,28 +59,6 @@ export function inventoryOf(actor, texts, { usable=true }={}) {
       ? { value: finite(attributes.attunement.value) ?? 0, max: finite(attributes.attunement.max) }
       : null
   };
-}
-
-/**
- * The kinds of item the Inventory tab lists: those of its sections, and containers.
- * @returns {Set<string>}
- */
-export function inventoryTypes() {
-  return new Set([...inventorySections().map(({ type }) => type), "container"]);
-}
-
-/**
- * The inventory's sections, in order: from each item type's own section where dnd5e defines one,
- * as it does from 4.0, otherwise from its 4.0 to 6.0 defaults.
- * @returns {{type: string, id: string, label: string}[]}
- */
-function inventorySections() {
-  const models = Object.entries(CONFIG.Item?.dataModels ?? {})
-    .filter(([type, model]) => (type !== "container") && model?.inventorySection)
-    .map(([type, model]) => ({ type, ...model.inventorySection }))
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  if ( models.length ) return models.map(({ type, id, label }) => ({ type, id, label: localize(label) }));
-  return SECTIONS.map(([type, id, label]) => ({ type, id, label: localize(label) }));
 }
 
 /* -------------------------------------------- */

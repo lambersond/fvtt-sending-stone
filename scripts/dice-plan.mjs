@@ -330,6 +330,24 @@ export function registerLaterDice(later) {
 }
 
 /**
+ * Since 0.44.0, what lists a campaign's open dice asks for its hello, once later-dice.mjs registers
+ * it as it's set up (`registerDiceAsks`), so that this file never imports it: none until then, as
+ * under dnd5e 6, where none is ever asked.
+ * @type {(campaign: Campaign) => object[]}
+ */
+export let diceAsksOf = () => [];
+
+/**
+ * Let later-dice.mjs list a campaign's open dice asks in its hello, since 0.44.0: registered once,
+ * as it's set up.
+ * @param {(campaign: Campaign) => object[]} reader
+ * @returns {void}
+ */
+export function registerDiceAsks(reader) {
+  diceAsksOf = reader;
+}
+
+/**
  * Is a roll one of its plan's own step, since 0.44.0: the first rolls dnd5e built for a player's
  * roll, as a damage's own, never a later roll of its run?
  * @param {Roll} roll

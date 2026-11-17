@@ -1,12 +1,11 @@
-import { PREPARE_OPS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
-import { checkCommand, failedResult, isObject, namesRollFields, throwsNoDice } from "./command-rolls.mjs";
+import { checkCommand, failedResult } from "./command-rolls.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { campaignGroups } from "./groups.mjs";
-import { castCopy } from "./sheet-rolls.mjs";
 import { hiddenCopy, preparedOf } from "./sheet-spells.mjs";
+import { castCopy } from "./sheet-values.mjs";
 
 /**
  * Preparing and unpreparing a character's spells from the Sending Stone app, since module 0.42.1, as
@@ -16,41 +15,6 @@ import { hiddenCopy, preparedOf } from "./sheet-spells.mjs";
  * Offered with the charges, wherever the Gamemaster lets the campaign's players attack and cast from
  * the app.
  */
-
-/**
- * The fields of other kinds a spell prepared or unprepared never names, beside those a roll names:
- * a move, a removal, anything typed in, a favorite, a note, a dish, an effect, Wild Shape, a spell
- * slot, charges, Heroic Inspiration, a concentration, a turn and the End Turn a turn taken back names.
- * @type {string[]}
- */
-const OTHERS = [
-  "transfer", "remove", "typed", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter", "count",
-  "inspiration", "concentration", "turn", "undo"
-];
-
-/**
- * A spell's id as the sheet names it: its item's, 1 to 64 letters and digits.
- * @type {RegExp}
- */
-const SPELL_ID = /^[A-Za-z0-9]{1,64}$/;
-
-/**
- * Why a fetched spell prepared or unprepared isn't one to make, if it isn't: it names one spell, by
- * its id as the sheet names it, and the state wanted of it, prepared or not; and nothing else,
- * nothing a roll names nor another kind's field, and throws no dice. Only its player prepares one
- * from the app: it posts nothing, so would leave no mark of the Gamemaster's.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkPrepareCommand(command) {
-  if ( command.by === "gm" ) return "by";
-  const given = value => (value !== undefined) && (value !== null);
-  const prepare = command.prepare;
-  if ( namesRollFields(command) || OTHERS.some(key => given(command[key])) || !isObject(prepare) ) return "prepare";
-  if ( (Object.keys(prepare).sort().join() !== "id,op") || !PREPARE_OPS.includes(prepare.op)
-    || (typeof prepare.id !== "string") || !SPELL_ID.test(prepare.id) ) return "prepare";
-  return throwsNoDice(command) ? null : "dice";
-}
 
 /**
  * Prepare one of a character's spells, or unprepare it, fetched from the app: every check before the

@@ -1561,7 +1561,7 @@ if (MIDI) {
   ok("module 0.46.0: Orla's roster names no owner; a dish's card is whispered to the Gamemaster alone; and a hall Bob owns and Carol observes isn't hers to see")
 
   // Item 40: under "Hide all", Alice's card's DC isn't her player's own.
-  const { showsChallenge } = await import(`${MODULE}/scripts/prompts.mjs`)
+  const { showsChallenge } = await import(`${MODULE}/scripts/results.mjs`)
   settings.set('challengeVisibility', 'none')
   assert.equal(showsChallenge({ author: alice }, orla), false, "Alice's card's DC")
   settings.delete('challengeVisibility')

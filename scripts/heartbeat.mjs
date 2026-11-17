@@ -1,5 +1,5 @@
 import { EVENTS } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
+import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { resendLost } from "./character-sync.mjs";
 import { send, sinceLastSent } from "./transport.mjs";

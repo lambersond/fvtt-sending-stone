@@ -1,7 +1,5 @@
 import { durationOf, hiddenFromPlayer } from "./sheet-effects.mjs";
-import { inventoryTypes } from "./sheet-inventory.mjs";
-import { castCopy } from "./sheet-rolls.mjs";
-import { finite } from "./sheet-values.mjs";
+import { castCopy, finite, inventoryTypes } from "./sheet-values.mjs";
 
 /**
  * What a character's sheet says of enchantments: which of their enchant activities can be used
@@ -10,7 +8,8 @@ import { finite } from "./sheet-values.mjs";
  * carry, their own and anyone else's, with which of them they may end. One that's a choice made
  * once, as an Eldritch Invocation's, or a magic item's template, such as a Shield's +1, +2 or +3,
  * is left to Foundry. dnd5e's own rules decide which items may take one, as its usage dialog and
- * card's tray have them; see command-enchant.mjs for how one is used and ended.
+ * card's tray have them; see command-uses.mjs and command-enchant.mjs for how one is used and
+ * ended.
  *
  * Every reference to dnd5e's enchantments goes through these, so that the same works under dnd5e
  * 5.x and 6.x.

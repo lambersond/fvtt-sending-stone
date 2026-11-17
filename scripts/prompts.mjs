@@ -1,14 +1,15 @@
-import { EVENTS, MODULE_ID } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
-import { getCampaigns } from "./campaigns.mjs";
-import { campaignCharacterId, characterPlayers, endedForms, originalOf } from "./characters.mjs";
+import { EVENTS, MODULE_ID, PROMPT_LIFETIME } from "./constants.mjs";
+import { canSend } from "./bridge-role.mjs";
+import { getCampaigns, prompting } from "./campaigns.mjs";
+import { campaignCharacterId, endedForms, originalOf } from "./characters.mjs";
 import { askedSave, chatAudience } from "./chat-data.mjs";
 import { resultsAlways } from "./config.mjs";
-import { midiActivities } from "./command-uses.mjs";
 import { companionOfActor, companionPart, creatureKey } from "./creatures.mjs";
 import { companionPromptReader, onCompanionPromptReader, onCompanionsLeft, toldList } from "./creature-sync.mjs";
-import { diceStatus } from "./dice-plan.mjs";
+import { midiActivities } from "./midi-economy.mjs";
 import { findMidiPrompt, midiCompanionPrompts, midiOpenPrompts, releaseCompanionPrompts } from "./midi-prompts.mjs";
+import { showsChallenge } from "./results.mjs";
+import { concentratingOn, ownConcentrationAbility } from "./sheet-effects.mjs";
 import { send } from "./transport.mjs";
 
 /**
@@ -27,12 +28,6 @@ import { send } from "./transport.mjs";
  * Since 0.41.0 a listed companion's too, to an app that reads them, filed under its key, its own
  * token's or actor's id in the prompt's (round 0.41.0 §3).
  */
-
-/**
- * How long a prompt waits for its player, in milliseconds.
- * @type {number}
- */
-export const PROMPT_LIFETIME = 10 * 60_000;
 
 /**
  * A saving throw the game asks of one of a campaign's characters, or since 0.41.0 of a companion.
@@ -79,16 +74,6 @@ export function registerPromptHooks() {
   // first says it reads them.
   onCompanionsLeft(closeCompanionPrompts);
   onCompanionPromptReader(resendCompanionPrompts);
-}
-
-/**
- * Does a campaign ask its players for their saves now: its Gamemaster lets it, and its players'
- * rolls can be made here?
- * @param {Campaign} campaign
- * @returns {boolean}
- */
-export function prompting(campaign) {
-  return campaign.rolls && campaign.prompts && diceStatus.ready;
 }
 
 /**
@@ -266,41 +251,6 @@ function describePrompt(message, save, { actor, part, actorId }) {
 }
 
 /**
- * The ability a character's concentration check is rolled with where its card names none: the
- * character's own, as dnd5e rolls it.
- * @param {Actor} actor
- * @returns {string}
- */
-export function ownConcentrationAbility(actor) {
-  const own = actor.system.attributes?.concentration?.ability;
-  return (own in CONFIG.DND5E.abilities) ? own : (CONFIG.DND5E.defaultAbilities?.concentration ?? "con");
-}
-
-/**
- * May a character's player see a card's DC, and whether they saved against it? As dnd5e shows
- * them: on their own card, and on others' as its Challenge Visibility has it. Since 0.46.0 a card is
- * their own where its author is one of the character's players (`characterPlayers`), a form's
- * character's for a form, as Midi-QOL's concentration card speaks for it; so a character shared with
- * every player through its default isn't shown every player's DC.
- * @param {ChatMessage} message
- * @param {Actor} actor   The creature asked: a character, its form, or a companion.
- * @returns {boolean}
- */
-export function showsChallenge(message, actor) {
-  const author = message.author;
-  if ( author && characterPlayers(originalOf(actor) ?? actor).some(user => user.id === author.id) ) return true;
-  let visibility;
-  try {
-    visibility = game.settings.get("dnd5e", "challengeVisibility");
-  } catch {
-    return false;
-  }
-  if ( visibility === "all" ) return true;
-  if ( visibility === "player" ) return author?.isGM === false;
-  return false;
-}
-
-/**
  * What asks a character for a save: the spell or feature whose card it is, or what they're
  * concentrating on.
  * @param {ChatMessage} message
@@ -318,16 +268,6 @@ function labelOf(message, save, actor) {
     }
   }
   return (save.type === "concentration") ? concentratingOn(actor) : null;
-}
-
-/**
- * What a character is concentrating on, as a prompt's label: the names of the items, or null.
- * @param {Actor} actor
- * @returns {string|null}
- */
-export function concentratingOn(actor) {
-  const names = Array.from(actor.concentration?.items ?? [], item => item.name).filter(Boolean);
-  return names.length ? names.join(", ") : null;
 }
 
 /**

@@ -1,8 +1,8 @@
 import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
-import { dnd5eGeneration } from "./command-alone.mjs";
 import { appFlags, authorFor, checkCommand, describeResult, failedResult, findMessage, PUBLIC } from "./command-rolls.mjs";
 import { commandActor } from "./creatures.mjs";
 import { diceStatus, withPlan } from "./dice-plan.mjs";
+import { dnd5eGeneration } from "./dnd5e-generation.mjs";
 
 /**
  * A plain roll of dice from the Sending Stone app's dice tray, since module 0.44.0: any mix of d4s,

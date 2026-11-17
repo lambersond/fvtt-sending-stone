@@ -1,7 +1,7 @@
 import { enchantmentsOf } from "./sheet-enchant.mjs";
 import { usesOf } from "./sheet-features.mjs";
-import { castCopy, rollsIfAny } from "./sheet-rolls.mjs";
-import { finite, localize } from "./sheet-values.mjs";
+import { rollsIfAny } from "./sheet-rolls.mjs";
+import { castCopy, finite, localize } from "./sheet-values.mjs";
 
 /**
  * A character's spellcasting and spellbook, as dnd5e's Spells tab shows them: sections built the

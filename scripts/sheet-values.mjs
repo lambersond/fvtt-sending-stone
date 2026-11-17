@@ -118,6 +118,15 @@ export function spendsDirectly(item) {
 }
 
 /**
+ * Is this the copy of a spell dnd5e keeps for an item that casts it, such as a wand's?
+ * @param {Item} spell
+ * @returns {boolean}
+ */
+export function castCopy(spell) {
+  return (spell.type === "spell") && Boolean(spell.getFlag?.("dnd5e", "cachedFor") ?? spell.flags?.dnd5e?.cachedFor);
+}
+
+/**
  * Join words as a list in the game's language, such as "Short Rest, Long Rest".
  * @param {string[]} words
  * @returns {string}
@@ -128,4 +137,39 @@ function listFormat(words) {
   } catch {
     return words.join(", ");
   }
+}
+
+/**
+ * The inventory's sections, in dnd5e's order, for its item types that have none of their own:
+ * their type, section id and label key. Containers are listed apart.
+ * @type {[string, string, string][]}
+ */
+const SECTIONS = [
+  ["weapon", "weapons", "TYPES.Item.weaponPl"],
+  ["equipment", "equipment", "TYPES.Item.equipmentPl"],
+  ["consumable", "consumables", "TYPES.Item.consumablePl"],
+  ["tool", "tool", "TYPES.Item.toolPl"],
+  ["loot", "loot", "TYPES.Item.lootPl"]
+];
+
+/**
+ * The kinds of item the Inventory tab lists: those of its sections, and containers.
+ * @returns {Set<string>}
+ */
+export function inventoryTypes() {
+  return new Set([...inventorySections().map(({ type }) => type), "container"]);
+}
+
+/**
+ * The inventory's sections, in order: from each item type's own section where dnd5e defines one,
+ * as it does from 4.0, otherwise from its 4.0 to 6.0 defaults.
+ * @returns {{type: string, id: string, label: string}[]}
+ */
+export function inventorySections() {
+  const models = Object.entries(CONFIG.Item?.dataModels ?? {})
+    .filter(([type, model]) => (type !== "container") && model?.inventorySection)
+    .map(([type, model]) => ({ type, ...model.inventorySection }))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  if ( models.length ) return models.map(({ type, id, label }) => ({ type, id, label: localize(label) }));
+  return SECTIONS.map(([type, id, label]) => ({ type, id, label: localize(label) }));
 }

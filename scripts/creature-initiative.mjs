@@ -1,5 +1,5 @@
 import { COMPANION_INITIATIVE, FOLLOW_GAP, MODULE_ID } from "./constants.mjs";
-import { isBridge } from "./bridge.mjs";
+import { isBridge } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { standingFor } from "./characters.mjs";
 import { companionKeyOf, companionsOf } from "./creatures.mjs";

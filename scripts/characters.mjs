@@ -1,7 +1,5 @@
 import { MODULE_ID } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { characterSheet } from "./sheet.mjs";
-import { typesDice } from "./typed-dice.mjs";
 
 /**
  * Player characters, as campaigns see them.
@@ -263,28 +261,6 @@ export function rosterEntry(actor) {
     type: actor.type,
     owners: characterPlayers(actor).map(user => ({ id: user.id, name: user.name }))
   };
-}
-
-/**
- * Describe a character for the listener, sheet included.
- * @param {Actor} actor
- * @param {SheetTexts} [texts]  Collects the descriptions its sheet refers to.
- * @returns {object}
- */
-export function summarizeCharacter(actor, texts) {
-  return { ...rosterEntry(actor), sheet: characterSheet(actor, texts) };
-}
-
-/**
- * Every character in a campaign, as its roster lists them: since 0.22.0, a bridge.hello's
- * characters, their sheets following it, each in a post of its own. Since 0.26.0 each says whether
- * its player may enter its dice results in the app, `manualDice`; since 0.32.0 that's so where the
- * campaign lets its players and its primary player has Make Manual Rolls (typed-dice.mjs).
- * @param {Campaign} campaign
- * @returns {object[]}
- */
-export function roster(campaign) {
-  return campaignActors(campaign).map(actor => ({ ...rosterEntry(actor), manualDice: typesDice(actor, campaign) }));
 }
 
 /**

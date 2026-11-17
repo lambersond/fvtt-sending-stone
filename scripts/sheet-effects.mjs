@@ -88,6 +88,27 @@ export function concentrationOf(actor) {
 }
 
 /**
+ * What a character is concentrating on, as a prompt's label: the names of the items, or null.
+ * @param {Actor} actor
+ * @returns {string|null}
+ */
+export function concentratingOn(actor) {
+  const names = Array.from(actor.concentration?.items ?? [], item => item.name).filter(Boolean);
+  return names.length ? names.join(", ") : null;
+}
+
+/**
+ * The ability a character's concentration check is rolled with where its card names none: the
+ * character's own, as dnd5e rolls it.
+ * @param {Actor} actor
+ * @returns {string}
+ */
+export function ownConcentrationAbility(actor) {
+  const own = actor.system.attributes?.concentration?.ability;
+  return (own in CONFIG.DND5E.abilities) ? own : (CONFIG.DND5E.defaultAbilities?.concentration ?? "con");
+}
+
+/**
  * How the game describes a status, from CONFIG.statusEffects: a list under dnd5e 5, and an
  * object keyed by id under dnd5e 6.
  * @param {string} id

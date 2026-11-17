@@ -217,7 +217,7 @@ const campaigns = [{ id: 'camp-a', title: 'Ashlands', characters: ['thorin'], ro
 settings.set('campaigns', campaigns)
 await Hooks.callAll('ready')
 const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)
-const { attacksUnavailable } = await import(`${MODULE}/scripts/command-uses.mjs`)
+const { attacksUnavailable } = await import(`${MODULE}/scripts/command-rolls.mjs`)
 const { characterSheet } = await import(`${MODULE}/scripts/sheet.mjs`)
 const { slimSheet } = await import(`${MODULE}/scripts/sheet-slim.mjs`)
 await until(() => app.events.some(e => e.type === 'bridge.hello'), 'the hello')

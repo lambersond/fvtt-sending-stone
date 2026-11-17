@@ -109,6 +109,16 @@ export function manualDiceOn(campaign) {
 }
 
 /**
+ * Does a campaign ask its players for their saves now: its Gamemaster lets it, and its players'
+ * rolls can be made here?
+ * @param {Campaign} campaign
+ * @returns {boolean}
+ */
+export function prompting(campaign) {
+  return campaign.rolls && campaign.prompts && diceStatus.ready;
+}
+
+/**
  * How a campaign is named in each envelope sent to it.
  * @param {Campaign} campaign
  * @returns {{id: string, title: string}}

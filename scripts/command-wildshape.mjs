@@ -1,17 +1,14 @@
-import { ENDING_STATUSES, EVENTS, FORM_UUID, MODULE_ID, PROFILE_ID, WILD_SHAPE_KINDS, WILD_SHAPE_OPS } from "./constants.mjs";
+import { ENDING_STATUSES, MODULE_ID, WILD_SHAPE_KINDS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
-import { wildShapeTermsChanged } from "./character-sync.mjs";
 import { activeForm } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
-import {
-  appFlags, authorFor, checkCommand, failedResult, isObject, namesRollFields, throwsNoDice, visibleTo
-} from "./command-rolls.mjs";
+import { appFlags, authorFor, checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
 import { campaignGroups } from "./groups.mjs";
 import { markMidiBonusAction, midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
 import { finite } from "./sheet-values.mjs";
 import {
   beastsFor, eligible, endWildShape, entryOf, forgetTokenData, formName, inPool, knownProfiles, recheckCharacter,
-  switchTokens, wildShapeItemOf, wildShapeRules
+  switchTokens, wildShapeItemOf, wildShapeOn, wildShapeRules
 } from "./wild-shape.mjs";
 
 /**
@@ -35,12 +32,6 @@ import {
  */
 
 /**
- * The campaigns whose app takes Wild Shape, by id, as their latest answer to a hello or heartbeat said.
- * @type {Set<string>}
- */
-const readers = new Set();
-
-/**
  * What the module's own writes carry, so its hooks know them.
  * @type {string}
  */
@@ -49,15 +40,6 @@ const OWN = "wildShape";
 /* -------------------------------------------- */
 /*  Whether Wild Shape is used here             */
 /* -------------------------------------------- */
-
-/**
- * May a campaign's players use Wild Shape from the app: by its own switch, under dnd5e.
- * @param {Campaign} campaign
- * @returns {boolean}
- */
-export function wildShapeOn(campaign) {
-  return (campaign?.wildShape === true) && (game.system?.id === "dnd5e");
-}
 
 /**
  * What a campaign tells the app of Wild Shape in its hello, beside its rolls: whether its players may
@@ -71,65 +53,9 @@ export function wildShapeFeatures(campaign) {
   return { enabled: true, kinds: [...WILD_SHAPE_KINDS], reason: null };
 }
 
-/**
- * Note whether a campaign's app takes Wild Shape: `features.wildShape`, 1 or later. One that says
- * nothing of it, as an older or rolled back app, is fetched from for it no longer, and is sent its
- * characters' own sheets. An answer to a heartbeat that changes it sends the campaign's sheets again,
- * with or without their forms; a hello's are sent after it anyway.
- * @param {string} campaignId
- * @param {object|null} features
- * @param {string} [type]   The event answered.
- * @returns {void}
- */
-export function noteWildShapeReader(campaignId, features, type) {
-  const format = features?.wildShape;
-  const was = readers.has(campaignId);
-  if ( Number.isInteger(format) && (format >= 1) ) readers.add(campaignId);
-  else readers.delete(campaignId);
-  if ( (was !== readers.has(campaignId)) && (type !== EVENTS.HELLO) ) wildShapeTermsChanged(campaignId);
-}
-
-/**
- * Does a campaign's app take Wild Shape, and a shaped character's sheet?
- * @param {string} campaignId
- * @returns {boolean}
- */
-export function wildShapeReader(campaignId) {
-  return readers.has(campaignId);
-}
-
 /* -------------------------------------------- */
 /*  A command                                   */
 /* -------------------------------------------- */
-
-/**
- * Why a fetched Wild Shape isn't one to make, if it isn't: exactly one of a change into a known form
- * by its profile's id, a return, a Beast learned by its compendium uuid in an empty place or in place
- * of a known form, or the Beasts to learn listed; nothing else, nothing a roll names, no move,
- * removal, anything typed in, favorite, note, dish or effect; and it throws no dice. Only its player
- * makes one from the app.
- * @param {object} command
- * @returns {string|null}
- */
-export function checkWildShapeCommand(command) {
-  if ( command.by === "gm" ) return "by";
-  const given = value => (value !== undefined) && (value !== null);
-  const others = ["transfer", "remove", "typed", "favorite", "note", "dish", "effect"];
-  const shape = command.wildShape;
-  if ( namesRollFields(command) || others.some(key => given(command[key])) || !isObject(shape) ) return "wildShape";
-  if ( !WILD_SHAPE_OPS.includes(shape.op) ) return "wildShape";
-  const keys = Object.keys(shape).sort().join();
-  const id = value => (typeof value === "string") && PROFILE_ID.test(value);
-  const valid = {
-    transform: () => (keys === "form,op") && id(shape.form),
-    revert: () => keys === "op",
-    learn: () => (keys === "op,replace,uuid") && (typeof shape.uuid === "string") && FORM_UUID.test(shape.uuid)
-      && ((shape.replace === null) || id(shape.replace)),
-    forms: () => keys === "op"
-  }[shape.op];
-  if ( !valid() ) return "wildShape";
-  return throwsNoDice(command) ? null : "dice";
-}
 
 /**
  * Make a Wild Shape fetched from the app: every check before any write, as the character is now,

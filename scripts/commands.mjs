@@ -1,21 +1,21 @@
 import {
-  ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, CONCENTRATION_KINDS, DICE_KINDS, ENCHANT_KINDS, EVENTS, MODULE_ID,
-  PREPARE_KINDS, PROTOCOL_VERSION, ROLL_KINDS, TURN_KINDS
+  ALONE_KINDS, ATTACK_KINDS, CHARGE_KINDS, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DICE_KINDS, ENCHANT_KINDS, EVENTS,
+  MODULE_ID, PREPARE_KINDS, PROTOCOL_VERSION, ROLL_KINDS, TURN_KINDS
 } from "./constants.mjs";
-import { canSend } from "./bridge.mjs";
-import { describeCampaign, getCampaigns, manualDiceOn } from "./campaigns.mjs";
+import { canSend } from "./bridge-role.mjs";
+import { describeCampaign, getCampaigns, manualDiceOn, prompting } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
 import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
-import { noteAloneReader, runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
+import { runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
 import { runInspirationCommand, runSpellSlotCommand, runSpendCommand } from "./command-charges.mjs";
 import { favoriteReader, favoritesOn, noteFavoriteReader, runFavoriteCommand } from "./command-favorites.mjs";
-import { dishesOn, dishInFlight, dishReader, noteDishReader, runDishCommand } from "./command-dishes.mjs";
+import { dishesOn, dishInFlight, runDishCommand } from "./command-dishes.mjs";
 import { effectReader, effectsOn, noteEffectReader, runEffectCommand } from "./command-effects.mjs";
 import { hitPointReader, hitPointsOn, noteHitPointReader, runHitPointsCommand } from "./command-hit-points.mjs";
 import { runPlainRollCommand } from "./command-plain.mjs";
-import { noteWildShapeReader, runWildShapeCommand, wildShapeOn, wildShapeReader } from "./command-wildshape.mjs";
+import { runWildShapeCommand } from "./command-wildshape.mjs";
 import { runPrepareCommand } from "./command-prepare.mjs";
 import { runEndTurnCommand, runUndoTurnCommand } from "./command-turn.mjs";
 import {
@@ -23,12 +23,15 @@ import {
   transferReader, transfersOn
 } from "./command-transfers.mjs";
 import { noteInFlight, runNoteCommand } from "./command-notes.mjs";
-import { attacksUnavailable, runDamageCommand, runUseCommand } from "./command-uses.mjs";
-import { failedResult, HIT_DICE_KINDS, isId, runRollCommand } from "./command-rolls.mjs";
+import { runDamageCommand, runUseCommand } from "./command-uses.mjs";
+import { isId } from "./command-checks.mjs";
+import { attacksUnavailable, failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
+import { noteAloneReader } from "./character-sync.mjs";
 import { gmRollOf } from "./chat-data.mjs";
 import { noteCompanionReader } from "./creature-sync.mjs";
 import { diceStatus } from "./dice-plan.mjs";
+import { dishReader, noteDishReader } from "./dish-card.mjs";
 import { noteSettingsReader } from "./foundry-settings.mjs";
 import { noteGroupReader } from "./groups.mjs";
 import {
@@ -36,11 +39,11 @@ import {
 } from "./later-dice.mjs";
 import { noteNotesReader, notesOn, notesReader } from "./journals.mjs";
 import { answersMidiPrompt, midiPromptsOffered, noteMidiReader, noteOpen } from "./midi-prompts.mjs";
-import { prompting } from "./prompts.mjs";
 import { effectDiceSystem } from "./sheet-effect-dice.mjs";
 import { checksOffered } from "./sheet-rolls.mjs";
 import { noteTidyReader } from "./tidy-journal.mjs";
 import { currentSession, DeliveryError, refusalError, send } from "./transport.mjs";
+import { noteWildShapeReader, wildShapeOn, wildShapeReader } from "./wild-shape.mjs";
 
 /**
  * Fetching what players ask the game to do from the Sending Stone app: their rolls, their attacks,
@@ -241,6 +244,22 @@ export function rollFeatures(campaign) {
     keptRerolls: manualDiceOn(campaign) && diceStatus.keptRerolls,
     diceAsks: asks.diceAsks,
     diceAsksReason: asks.diceAsksReason
+  };
+}
+
+/**
+ * What a campaign's hello says of its companions' rolls, `features.companions`: the kinds a
+ * companion's command may be, as the campaign takes them now, those of its rolls but what an NPC
+ * has none of, what isn't asked and what edits it; none where its rolls are off. And since the
+ * Gamemaster chooses it per campaign, how its companions enter initiative, whether or not its rolls
+ * are made here: each its own roll, or right after its character (creature-initiative.mjs).
+ * @param {Campaign} campaign
+ * @returns {{kinds: string[], initiative: string}}
+ */
+export function companionFeatures(campaign) {
+  return {
+    kinds: rollFeatures(campaign).kinds.filter(kind => !COMPANION_UNTAKEN.includes(kind)),
+    initiative: campaign.companionInitiative
   };
 }
 
@@ -586,7 +605,7 @@ class Poller {
  * an effect turned off, on or deleted waits for its character's earlier commands, as a favorite does,
  * and their next ones for it. Since 0.40.0 Wild Shape waits for its character's earlier commands, as an
  * effect does, but for a list of Beasts, which writes nothing, and waits on a queue of its own; and a
- * queue settling checks whether a Wild Shape of that character's is due to end (wild-shape.mjs).
+ * queue settling checks whether a Wild Shape of that character's is due to end (wild-shape-hooks.mjs).
  * Since 0.44.0 hit points set, and a plain roll of the dice tray, wait for their character's earlier
  * commands, as a roll does, a companion's hit points its character's too, and their next ones for
  * them: so a form set to 0 hit points ends once the setting is done. Since 0.44.0 an answer to a
