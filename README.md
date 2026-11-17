@@ -1184,7 +1184,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
 | `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player, and what it concentrates on, as a prompt's label too, with the ability its own concentration check is rolled with; from 0.39.0, what its player may do to each effect from the app |
 | `scripts/sheet-effect-dice.mjs` | From 0.42.0, the dice a character's effects add to its d20 rolls, as dnd5e will add them, named by the spell or item they come from, for a player typing in their dice; from 0.42.1, the Bardic Inspiration an effect offers |
-| `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
+| `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, from 0.48.0 each coin with its rate, encumbrance and attunement |
 | `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it, and the pool a slot is spent or restored from; from 0.42.1, each class's count of prepared spells, and whether a spell is prepared, as the app may change it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |

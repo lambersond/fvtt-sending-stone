@@ -46,7 +46,12 @@ const plain = (key, label, order) => ({ key, order, getAvailableLevels: () => []
 CONFIG.DND5E = {
   abilities: { int: { label: 'DND5E.AbilityInt', abbreviation: 'int' }, cha: { label: 'DND5E.AbilityCha', abbreviation: 'cha' } },
   skills: {},
-  currencies: { pp: { label: 'DND5E.CurrencyPP', abbreviation: 'DND5E.CurrencyAbbrPP' }, gp: { label: 'DND5E.CurrencyGP', abbreviation: 'DND5E.CurrencyAbbrGP' } },
+  // Each with its rate, how many make one gp, as dnd5e's configuration has it (config.mjs, `conversion`);
+  // and three of a world's own, with no rate, a rate of none, and one that's no number.
+  currencies: {
+    pp: { label: 'DND5E.CurrencyPP', abbreviation: 'DND5E.CurrencyAbbrPP', conversion: 0.1 }, gp: { label: 'DND5E.CurrencyGP', abbreviation: 'DND5E.CurrencyAbbrGP', conversion: 1 },
+    zz: {}, yy: { conversion: 0 }, xx: { conversion: '5' },
+  },
   weightUnits: { lb: { label: 'Pounds', abbreviation: 'DND5E.WeightUnitsLb' } },
   movementUnits: { ft: { label: 'Feet', abbreviation: 'DND5E.DistFtAbbr' } },
   encumbrance: { baseUnits: { default: { imperial: 'lb', metric: 'kg' } } },
@@ -236,10 +241,14 @@ assert.deepEqual(pack.contents[1].contents.map(c => [c.name, c.quantity]), [['Ol
 assert.deepEqual([box.capacity, box.contents], [null, null])
 assert.deepEqual([sack.capacity, sack.contents], [null, []])
 ok('containers hold their contents, containers within them too, with how full they are; an unidentified one with secret contents shows none')
-assert.deepEqual(inv.currency, [{ id: 'pp', label: 'Platinum', abbreviation: 'PP', value: 2 }, { id: 'gp', label: 'Gold', abbreviation: 'GP', value: 41.5 }])
+assert.deepEqual(inv.currency, [
+  { id: 'pp', label: 'Platinum', abbreviation: 'PP', value: 2, conversion: 0.1 }, { id: 'gp', label: 'Gold', abbreviation: 'GP', value: 41.5, conversion: 1 },
+  { id: 'zz', label: 'zz', abbreviation: 'ZZ', value: 0, conversion: null }, { id: 'yy', label: 'yy', abbreviation: 'YY', value: 0, conversion: null },
+  { id: 'xx', label: 'xx', abbreviation: 'XX', value: 0, conversion: null },
+])
 assert.deepEqual(inv.encumbrance, { value: 62.5, max: 255, units: 'lb', encumbered: 85, heavilyEncumbered: 170 })
 assert.deepEqual(inv.attunement, { value: 1, max: 3 })
-ok('currency, encumbrance with where the variant rule encumbers, and attunement')
+ok('currency, each coin with its rate, `conversion`, null for one with none, with 0 or with no number; encumbrance with where the variant rule encumbers, and attunement')
 
 // ---- spells ----
 assert.deepEqual(sheet.spellcasting, { ability: 'Intelligence', dc: 14, attack: 6, classes: [

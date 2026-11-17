@@ -459,7 +459,7 @@ character's own actor's sheet, without either.
 | `inventory.sections[].items` | In the order the player keeps them in Foundry. `weight` is the item's and its quantity's together, in its `units`, or `null` for none; `price` dnd5e's label for it, such as `"15 GP"`; `equipped` whether it is, or `null` for a type that never is; `attunement` whether it is `"required"` or `"optional"`, with `attuned`; `uses` as on a feature; `rarity` and `properties` dnd5e's labels. An item that rolls or is used through anything, such as a weapon, a potion or a wand, also has [what it rolls](#what-an-item-rolls), with its `activation`, `range`, `target` and `concentration`, as an action's, whether it's equipped or not. |
 | `inventory.containers` | Each container the character holds, in no other container, as an item with `capacity`, `{ value, max, units }` by count or weight, `null` without a limit, and `contents`: the items in it, containers among them with their own contents. |
 | `identified` | `false` for an item not identified yet, which shows as dnd5e shows it to players: its unidentified name and description, and no price, rarity, uses, properties or attunement. An unidentified container whose contents are secret has `capacity` and `contents` `null`. |
-| `inventory.currency` | Each currency, in dnd5e's order, with its `label`, `abbreviation` and `value`. |
+| `inventory.currency` | Each currency, in dnd5e's order, with its `label`, `abbreviation` and `value`. Since module 0.48.0 also `conversion`, its rate: how many of the coin make one gp, as dnd5e's configuration has it (`CONFIG.DND5E.currencies`: `0.1` for pp, `1` for gp, `2` for ep, `10` for sp, `100` for cp), a number above 0, or `null` for a coin with none, as a world's own may have. Sent to every listener, a group's sheet too; one before 0.48.0 ignores it. |
 | `inventory.encumbrance` | `{ value, max, units, encumbered, heavilyEncumbered }`: what the character carries of the most it can, and, under the variant encumbrance rule, where being encumbered and heavily encumbered begin, otherwise `null`. `null` when encumbrance isn't tracked. |
 | `inventory.attunement` | `{ value, max }`: items attuned, and how many may be. |
 | `spellcasting` | `{ ability, dc, attack, classes }`: the spellcasting ability, spell save DC and spell attack bonus, and each spellcasting class's. `null` for a character with no spells and no spellcasting class. Since module 0.42.1 a class may have `prepared`, `{ value, max }`, as dnd5e's sheet shows "Prepared 5 / 6" for it: `value` how many of the character's spells of that class are prepared, as dnd5e counts them (leveled, prepared, not always prepared, and come from that class or its subclass), and `max` how many it may prepare, by its prepared formula, `0` where it gives none; each a whole number from 0. `value` may be above `max`, as dnd5e lets it be; nothing caps it. Left out where both are `0`, as for a 2014 caster who knows their spells, where dnd5e's sheet shows nothing, or where dnd5e gives no numbers. The class's own, or its subclass's where that has a spellcasting progression of its own, as dnd5e's sheet reads it. A slim sheet keeps it. |
@@ -2507,6 +2507,10 @@ An ask:
 - Module 0.48.0 keeps on a character the effects gained in [Wild Shape](#wild-shape), and takes off
   it those taken off the form, with no new event, field or format: a listener reads the character's
   sheet as before. A module before 0.48.0 carries back conditions and concentration alone.
+- Module 0.48.0 says each coin's rate in a sheet's [`inventory.currency`](#character-sheet),
+  `conversion`: how many of the coin make one gp, as dnd5e's configuration has it, or `null` where
+  it has none; a group's sheet too, to every listener. A listener before 0.48.0 ignores it. A module
+  before 0.48.0 sends none: read a coin without one as a coin with no rate.
 
 ## Changes from protocol 1
 
