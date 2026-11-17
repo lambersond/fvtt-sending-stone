@@ -633,8 +633,9 @@ okay("refuses `gone`, nothing written: a spell Thorin lacks, his Longsword, Ligh
 const shaped = field => ({ ...prepare('witch'), prepare: field })
 // Each field another kind names (§P.2.1), alone beside it, refused whatever its value, 0 too: only a
 // field undefined or null isn't given.
+// Module 0.48.0: and `coins`, added or taken away.
 const OTHER_FIELDS = ['transfer', 'remove', 'typed', 'favorite', 'note', 'dish', 'effect', 'wildShape', 'spellSlot', 'counter', 'count',
-  'inspiration', 'concentration', 'turn', 'undo']
+  'inspiration', 'concentration', 'turn', 'undo', 'coins']
 for (const [command, error, why] of [
   [{ ...prepare('witch'), prepare: undefined }, 'prepare', 'no prepare'],
   [shaped(null), 'prepare', 'prepare null'],

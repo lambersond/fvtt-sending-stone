@@ -110,4 +110,7 @@ for v in X=1 "X=1 DND5E6=1" MIDI=1 LIBWRAPPER=1; do run plain $v; done
 # before them asked nothing, and a core whose die doesn't await its fulfillment failing the self-test,
 # with dnd5e alone and Midi-QOL's stand-ins, whose own check of a use's cost stays on computer dice.
 for v in X=1 "X=1 DND5E6=1" MIDI=1 "MIDI=1 DND5E6=1" "MIDI=1 LIBWRAPPER=1" OLD_APP=1 BREAK_ASK=1 "MIDI=1 BREAK_ASK=1"; do run later-dice $v; done
+# Module 0.48.0: coins added to a character and taken away, the rule of paying in coins by worked and
+# random cases, fetched with every other switch off (dnd5e 5.3.3 and 6.0.5 stand-ins).
+for v in X=1 "X=1 DND5E6=1"; do run coins $v SLIM_CHECK=1; done
 exit $fail

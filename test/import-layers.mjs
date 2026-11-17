@@ -104,6 +104,7 @@ const LAYERS = [
       'combat-data.mjs',
       'campaign-combats.mjs',
       'dish-effects.mjs',           // what a dish does to the characters it is served to
+      'coin-change.mjs',            // imports nothing: the rule of paying in coins, which the coins' commands read
     ],
   },
   {
@@ -170,6 +171,7 @@ const LAYERS = [
       'command-wildshape.mjs',
       'command-alone.mjs',
       'command-transfers.mjs',
+      'command-coins.mjs',
       'command-turn.mjs',
       'commands.mjs',
     ],

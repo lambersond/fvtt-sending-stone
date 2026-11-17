@@ -324,6 +324,26 @@
         </div>
     </fieldset>
 
+    <fieldset class="sending-stone-coins">
+        <legend>{{localize "SENDINGSTONE.Config.Actions.Coins"}}</legend>
+        <div class="form-group">
+            <label for="sending-stone-coins">{{localize "SENDINGSTONE.Config.Actions.CoinsPlayers"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-coins" name="campaign.coins" {{#if campaign.coins}}checked{{/if}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.CoinsHint"}}</p>
+            {{#if campaign.coinsUnavailable}}<p class="hint sending-stone-warning">{{campaign.coinsUnavailable}}</p>{{/if}}
+            {{#if campaign.coinsApp}}<p class="hint sending-stone-warning">{{localize "SENDINGSTONE.Config.Actions.CoinsApp"}}</p>{{/if}}
+        </div>
+        <div class="form-group">
+            <label for="sending-stone-coin-change">{{localize "SENDINGSTONE.Config.Actions.CoinChange"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-coin-change" name="campaign.coinChange" {{#if campaign.coinChange}}checked{{/if}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.CoinChangeHint"}}</p>
+        </div>
+    </fieldset>
+
     <fieldset class="sending-stone-dishes">
         <legend>{{localize "SENDINGSTONE.Config.Actions.Dishes"}}</legend>
         <div class="form-group">

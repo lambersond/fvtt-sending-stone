@@ -1,6 +1,7 @@
 import { REMOVE_KINDS, TRANSFER_KINDS } from "./constants.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm } from "./characters.mjs";
+import { heldCoins } from "./coin-change.mjs";
 import { postLine } from "./command-charges.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
@@ -84,7 +85,8 @@ const readers = new Set();
 const removers = new Set();
 
 /**
- * The latest move, which the next waits for; since 0.33.0 a removal too, in the same line.
+ * The latest move, which the next waits for; since 0.33.0 a removal too, in the same line, and
+ * since 0.48.0 coins added or taken away (`afterMoves`).
  * @type {Promise<void>}
  */
 let chain = Promise.resolve();
@@ -158,9 +160,22 @@ export function transferReader(campaignId) {
  * @returns {Promise<CommandResult>}
  */
 export function runTransferCommand(command, campaign) {
-  const run = chain.then(() => transferNow(command, campaign));
-  chain = run.then(() => {}, () => {});
-  return run;
+  return afterMoves(() => transferNow(command, campaign));
+}
+
+/**
+ * Make something once every move and removal before it has been made, whoever made them, and have
+ * the next wait for it: the one line they stand in. Since 0.48.0 coins added to a character or taken
+ * away stand in it too (command-coins.mjs), so that coins on their way elsewhere are never also
+ * taken away. The line is kept here, where it's changed.
+ * @template T
+ * @param {() => Promise<T>} run   What to make, once its turn has come.
+ * @returns {Promise<T>}
+ */
+export function afterMoves(run) {
+  const made = chain.then(run);
+  chain = made.then(() => {}, () => {});
+  return made;
 }
 
 /**
@@ -329,7 +344,7 @@ async function distributeNow(command, campaign, { from, among, mover }) {
   const [[key, n]] = Object.entries(command.transfer.currency);
   const k = among.length;
   const stored = actor => actor._source?.system?.currency?.[key] ?? 0;
-  const held = Math.min(Math.floor(party.system?.currency?.[key] ?? 0), stored(party));
+  const held = heldCoins(party)[key] ?? 0;
   if ( n > held ) return failed("short");
   if ( n < k ) return failed("split");
   const share = Math.floor(n / k);
@@ -441,9 +456,7 @@ export function removalReader(campaignId) {
  * @returns {Promise<CommandResult>}
  */
 export function runRemoveCommand(command, campaign) {
-  const run = chain.then(() => removeNow(command, campaign));
-  chain = run.then(() => {}, () => {});
-  return run;
+  return afterMoves(() => removeNow(command, campaign));
 }
 
 /**
@@ -555,9 +568,9 @@ async function plansOf(transfer, from, to) {
   const coins = Object.keys(CONFIG.DND5E?.currencies ?? {})
     .filter(key => Object.hasOwn(transfer.currency ?? {}, key))
     .map(key => [key, transfer.currency[key]]);
-  const held = key => Math.min(Math.floor(giver.system?.currency?.[key] ?? 0), giver._source?.system?.currency?.[key] ?? 0);
+  const held = heldCoins(giver);
   for ( const part of items ) part.q = quantityOf(part.item);
-  if ( items.some(({ n, q }) => n > q) || coins.some(([key, n]) => n > held(key)) ) return { refusal: "short" };
+  if ( items.some(({ n, q }) => n > q) || coins.some(([key, n]) => n > (held[key] ?? 0)) ) return { refusal: "short" };
 
   if ( items.some(({ item, n, q }) => (n < q) && holdsAnything(item)) ) return { refusal: "container" };
 
@@ -790,7 +803,7 @@ async function moveItem(from, to, plan, written) {
  * @returns {Promise<void>}
  * @throws {Error}   Where it was refused, or failed.
  */
-async function updated(document, changes) {
+export async function updated(document, changes) {
   if ( !await document.update(changes) ) throw new Error("An update was refused");
 }
 
@@ -829,7 +842,7 @@ async function putBack(err, undo) {
  * @param {unknown} err
  * @returns {string}
  */
-function messageOf(err) {
+export function messageOf(err) {
   return (err instanceof Error) ? err.message : String(err);
 }
 
@@ -903,6 +916,19 @@ function coinsText(key, n) {
 }
 
 /**
+ * Coins of several kinds, as a line says them, since 0.48.0: "2 pp, 5 gp, and 3 sp", each by
+ * `coinsText`, in dnd5e's order whatever order they're given in, listed as the language lists them.
+ * A coin dnd5e hasn't, or none of one, is left out.
+ * @param {Record<string, number>} coins   How many of each, by key.
+ * @returns {string}
+ */
+export function coinsWords(coins) {
+  return listOf(Object.keys(CONFIG.DND5E?.currencies ?? {})
+    .filter(key => (coins?.[key] ?? 0) > 0)
+    .map(key => coinsText(key, coins[key])));
+}
+
+/**
  * Parts listed as the language lists them, "a, b, and c", or with commas where it can't.
  * @param {string[]} parts
  * @returns {string}
@@ -920,6 +946,6 @@ function listOf(parts) {
  * @param {unknown} text
  * @returns {string}
  */
-function escape(text) {
+export function escape(text) {
   return foundry.utils.escapeHTML(String(text ?? ""));
 }

@@ -4,6 +4,7 @@ import { canSend, isBridge } from "./bridge-role.mjs";
 import { forgetCombats, noteCombatSent } from "./campaign-combats.mjs";
 import { forgetTold, roster } from "./character-sync.mjs";
 import { getCampaigns } from "./campaigns.mjs";
+import { coinFeatures } from "./command-coins.mjs";
 import { favoriteFeatures } from "./command-favorites.mjs";
 import { dishFeatures } from "./command-dishes.mjs";
 import { effectFeatures } from "./command-effects.mjs";
@@ -85,6 +86,9 @@ const resent = new Map();
  * whether its players may use Wild Shape from the app, `features.wildShape`, by its own switch under
  * D&D Fifth Edition. Since 0.44.0, whether its players may set their hit points from the app,
  * `features.hitPoints`, by its own switch, on until turned off, under D&D Fifth Edition. Since
+ * 0.48.0, whether its players may add coins to their characters and take them away from the app,
+ * and whether their other coins pay where they're short of one, `features.coins`, by its own switch,
+ * on until turned off, under D&D Fifth Edition. Since
  * 0.44.0 too, under D&D Fifth Edition, what of Tidy 5e Sheets' journal its characters hold, and
  * whether Tidy is active, `features.notes.tidy` (tidy-journal.mjs); and it lists the dice asks
  * waiting on its players, `diceAsks`, so that a hello sent again, as when the settings change,
@@ -129,7 +133,7 @@ export function announce({ campaignId }={}) {
         notes: { ...noteFeatures(campaign), ...tidyHello(campaign) }, companions: companionFeatures(campaign),
         favorites: favoriteFeatures(),
         dishes: dishFeatures(campaign), effects: effectFeatures(campaign), wildShape: wildShapeFeatures(campaign),
-        hitPoints: hitPointFeatures(campaign)
+        hitPoints: hitPointFeatures(campaign), coins: coinFeatures(campaign)
       },
       sheetsApart: true,
       characters: roster(campaign),

@@ -93,6 +93,14 @@ export function registerSettings() {
       // May its players set their hit points from the app, since 0.44.0? On until the Gamemaster turns
       // it off, apart from its rolls, under dnd5e; a campaign saved before has none, read as on.
       hitPoints: new BooleanField({ initial: true }),
+      // May its players add coins to their characters and take them away from the app, since 0.48.0?
+      // On until the Gamemaster turns it off, apart from its rolls and moves, under dnd5e; a campaign
+      // saved before has none, read as on.
+      coins: new BooleanField({ initial: true }),
+      // Do a character's other coins pay where it's short of one, since 0.48.0: a larger coin broken,
+      // then smaller ones? On until the Gamemaster turns it off; a campaign saved before has none,
+      // read as on. Coins taken away follow it.
+      coinChange: new BooleanField({ initial: true }),
       // The compendiums its druids learn Beasts from, since 0.40.0.
       wildShapePacks: new ArrayField(new StringField({ blank: false }), { initial: () => [...WILD_SHAPE_PACKS] }),
       // How its characters' companions enter initiative, since 0.36.0: each its own roll, or right

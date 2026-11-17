@@ -1,5 +1,5 @@
 import {
-  ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, DISH_OUTCOMES, DISH_VERSIONS,
+  ATTACK_KINDS, COIN_OPS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, DISH_OUTCOMES, DISH_VERSIONS,
   EFFECT_DICE_KINDS, EFFECT_ID, EFFECT_OPS, ENCHANT_KINDS, FAVORITE_OPS, FAVORITE_ORDER, FAVORITE_TYPES, FORM_UUID,
   MODULE_ID, MOST_AMONG, MOST_DISH_CHANGES, MOST_DISH_INGREDIENTS, MOST_EFFECT_DICE, MOST_FAVORITE_ORDER, MOST_HIT_DICE,
   MOST_MOVED, MOST_MOVED_ITEMS, MOST_PLAIN_BONUS, MOST_PLAIN_DICE, MOST_SPENT, PREPARE_OPS, PROFILE_ID, ROLL_KINDS,
@@ -283,7 +283,7 @@ export function commandRefusal(command, campaign) {
  * `effectDice`. And since 0.42.1 a spell slot spent or restored: which, how, and the count it was
  * made from. And since 0.42.1 a spell prepared or unprepared, which and how. And since 0.44.0 hit
  * points set, to what and from what; and a plain roll of the dice tray, its dice and what it adds,
- * which no other kind names.
+ * which no other kind names. And since 0.48.0 coins added or taken away, which and how many.
  * @param {object} command
  * @returns {string|null}
  */
@@ -310,6 +310,7 @@ export function checkCommand(command) {
   if ( command.kind === "wildShape" ) return checkWildShapeCommand(command);
   if ( command.kind === "prepare" ) return checkPrepareCommand(command);
   if ( command.kind === "hitPoints" ) return checkHitPointsCommand(command);
+  if ( command.kind === "coins" ) return checkCoinsCommand(command);
   if ( command.kind === "plainRoll" ) return checkPlainRollCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
@@ -802,6 +803,34 @@ function isMoved(value) {
 }
 
 /**
+ * What else a command may name, none of which coins added or taken away name: another kind's own
+ * fields, as hit points' check has them (command-checks.mjs), and hit points themselves.
+ * @type {string[]}
+ */
+const COIN_OTHERS = [
+  "transfer", "remove", "typed", "rerolls", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter",
+  "count", "inspiration", "concentration", "enchantment", "prepare", "turn", "undo", "hitPoints"
+];
+
+/**
+ * Why fetched coins added or taken away aren't ones to make, if they aren't, since 0.48.0: the
+ * command names exactly `{ op, currency }`, `op` to add or to remove, and `currency` the coins as a
+ * move names them, by dnd5e's keys, each a whole number from 1 to MOST_MOVED; and nothing else,
+ * nothing a roll names nor any other kind's field, and throws no dice. The Gamemaster's is taken, as
+ * its line in chat is marked theirs.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkCoinsCommand(command) {
+  const coins = command.coins;
+  const given = value => (value !== undefined) && (value !== null);
+  if ( namesRollFields(command) || COIN_OTHERS.some(key => given(command[key])) ) return "coins";
+  if ( !isObject(coins) || (Object.keys(coins).sort().join() !== "currency,op") || !COIN_OPS.includes(coins.op) ) return "coins";
+  if ( !isCoins(coins.currency) ) return "currency";
+  return throwsNoDice(command) ? null : "dice";
+}
+
+/**
  * The fields a removal names what it removes by, since 0.33.0, every one of them: the item, how
  * many, and how many the app's sheet showed.
  * @type {readonly string[]}
@@ -1012,12 +1041,13 @@ export function checkWildShapeCommand(command) {
 /**
  * The fields of other kinds a spell prepared or unprepared never names, beside those a roll names:
  * a move, a removal, anything typed in, a favorite, a note, a dish, an effect, Wild Shape, a spell
- * slot, charges, Heroic Inspiration, a concentration, a turn and the End Turn a turn taken back names.
+ * slot, charges, Heroic Inspiration, a concentration, a turn and the End Turn a turn taken back names,
+ * and since 0.48.0 coins added or taken away.
  * @type {string[]}
  */
 const OTHERS = [
   "transfer", "remove", "typed", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter", "count",
-  "inspiration", "concentration", "turn", "undo"
+  "inspiration", "concentration", "turn", "undo", "coins"
 ];
 
 /**
