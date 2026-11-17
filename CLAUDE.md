@@ -70,10 +70,10 @@ those too. The module's only two, `findLink`'s in `command-links.mjs`, point dow
 
 ## 4. State stays whole
 
-- **A `let`, a `Map` or a `Set` of state and every function that changes it are in one script:** an
-  import can't be assigned, and state written from two scripts has no one place that says how it
-  changes. Others only read it: through its functions, as `dishReader` answers for `dish-card.mjs`'s
-  `readers`, or by importing it where it is exported, as `endedForms` and `diceStatus` are.
+- **A `let`, a `Map`, a `Set` or an object of state and every function that changes it are in one
+  script:** an import can't be assigned, and state written from two scripts has no one place that
+  says how it changes. Others reach it through its functions, as `dishReader` answers for
+  `dish-card.mjs`'s `readers`, or read it where exported, as `endedForms` and `diceStatus` are.
 - **The one exception:** `transport.mjs` counts into `status`, the tally of deliveries that
   `delivery-status.mjs` keeps, and says so. Don't add a second.
 
