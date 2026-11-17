@@ -5004,9 +5004,11 @@ in: hit points and temporary ones, each of the character's items the form keeps 
 and each activity's, each class's hit dice spent, Heroic Inspiration, exhaustion and death saves,
 which of the character's own effects the form carries, since module 0.48.0 `formEffects`, the ids of
 the effects the form was made with that aren't the character's, the creature's own and dnd5e's
-proficiency override where it adds one, and each spell slot pool's value. A form made from a form,
-as dnd5e chains them, keeps the first's baseline; since module 0.48.0 with the later creature's own
-effects added to `formEffects`, and without those of `effects` that the later change left behind. The
+proficiency override where it adds one, and `expired`, the ids of those of the character's own
+effects it carries whose duration had already expired, and each spell slot pool's value. A form made
+from a form, as dnd5e chains them, keeps the first's baseline; since module 0.48.0 with the later
+creature's own effects added to `formEffects`, where the first has that list, and without those of
+`effects` that the later change left behind. The
 character's active form is the
 newest of the world actors dnd5e flags as the character's that no later form lists among its
 `previousActorIds`, and only one that looks like a form dnd5e made of the character: never one of a
@@ -5056,13 +5058,18 @@ doing; one whose `dependentOn` names an actor's own effect, a concentration, tha
 there. One whose origin is the form's actor itself, as made on its sheet, is carried with the
 character's actor as its origin. Each is created turned off, then turned on where it was on, so that
 dnd5e adds no rider condition and asks nothing; then its start and duration are written again where
-creating it changed them. Where the module ends the form, they are put on the character before
-dnd5e's return, and taken off again if the return is refused. Each effect the form carried from the
-character that is gone from the form, or has expired on it, is deleted from the character; before
-0.48.0 only a condition or a concentration was. Never a status effect's own that is no condition,
-such as Bloodied or Encumbered, which dnd5e keeps from the character's own numbers. A form recorded
-before 0.48.0, with no `formEffects`, has no gained effect carried. One that can't be written is
-logged, and the rest of the return goes on.
+creating it or turning it on changed them; neither is written for one the character no longer holds
+by then, as one whose concentration ended meanwhile. Where the module ends the form, they are put
+on the character before dnd5e's return, and taken off again if that return throws, is refused or is
+stopped. Each effect the form carried from the character that is gone from the form is deleted from
+the character, and so is one that has expired on the form and hadn't as the form was made: one
+`baseline.expired` names, expired already then, is left as it was, and where a record has no such
+list, as one from before 0.48.0, none is deleted for having expired. Before 0.48.0 only a condition
+or a concentration was taken off, and those two are still taken off only where gone from the form.
+Never a status effect's own that is no condition, such as Bloodied or Encumbered, which dnd5e keeps
+from the character's own numbers. A form recorded before 0.48.0, with no `formEffects`, has no
+gained effect carried, nor has one dnd5e made from such a form, or from a form with no record. One
+that can't be written is logged, and the rest of the return goes on.
 
 **Made in Foundry.** A return made in Foundry, by the character's player or the Gamemaster, is
 carried back by the client that made it and noted `"foundry"`. A form deleted by hand from the

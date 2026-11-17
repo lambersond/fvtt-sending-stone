@@ -971,8 +971,9 @@ Gamemaster-only information switched on.
 - **What a druid begins in Wild Shape isn't carried back:** a spell the druid casts as a beast and
   concentrates on ends with the form, as does an effect one of the form's own features gave it, and
   anything on the form's items. Effects others put on the form are kept on the druid, and those
-  taken off the form are taken off the druid. One the druid already had that is only changed on the
-  form, turned off, edited, or applied again for longer, stays as it was on the druid.
+  taken off the form, or run out on it, are taken off the druid. One the druid already had that is
+  only changed on the form, turned off, edited, or applied again for longer, stays as it was on the
+  druid, as does one that had already run out before Wild Shape.
   - **An effect you make on the form's own sheet is kept on the druid** when Wild Shape ends: delete
     it there first if it was only for the form.
 - **Worn gear isn't modelled:** dnd5e gives a form none of the druid's gear, so a ring that should

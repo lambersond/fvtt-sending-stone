@@ -38,10 +38,10 @@ export function formEffectsOf(host, data) {
 }
 
 /**
- * The baseline a form made from a form carries on: the earlier form's, with the later creature's own
- * effects added to `formEffects`, where the earlier one has that list (one recorded before 0.48.0
- * has none, and gets none); and without those of `effects` that the earlier form still holds and
- * the later change left behind, by its settings, which were never taken off.
+ * The baseline a form made from a form carries on: the earlier form's, its `expired` among it, with
+ * the later creature's own effects added to `formEffects`, where the earlier one has that list (one
+ * recorded before 0.48.0 has none, and gets none); and without those of `effects` that the earlier
+ * form still holds and the later change left behind, by its settings, which were never taken off.
  * @param {object} base   The earlier form's baseline.
  * @param {Actor} host    The earlier form.
  * @param {object} data   The later form's creation data.
@@ -166,12 +166,14 @@ export function gainedOf(form, baseline, chain, original) {
 }
 
 /**
- * The ids of a form's own effects whose duration has run out on it.
- * @param {Actor} form
+ * The ids of an actor's own effects whose duration has run out: a form's, as Wild Shape ends, and
+ * the druid's, as a form is made of her, so that one already run out by then is never read as run
+ * out in form.
+ * @param {Actor} actor
  * @returns {string[]}
  */
-export function expiredOf(form) {
-  return Array.from(form?.effects ?? []).filter(effect => hasExpired(effect)).map(effect => effect.id);
+export function expiredOf(actor) {
+  return Array.from(actor?.effects ?? []).filter(effect => hasExpired(effect)).map(effect => effect.id);
 }
 
 /**

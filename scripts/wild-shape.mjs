@@ -548,8 +548,9 @@ function profileOf(original, uuid) {
  * wherever: what it is, when it began, how long the rules give it where they time it, the profile
  * and command it was made for, and what she had going in, which a form made from a form inherits;
  * since module 0.48.0 with `formEffects`, the effects the form is made with that aren't hers, each
- * later creature's own added along a chain (`chainedBaseline`). A form made from a form that has
- * no record gets her baseline as it stands, with no `formEffects`.
+ * later creature's own added along a chain (`chainedBaseline`), and `expired`, those of her effects
+ * it carries that had already run out. A form made from a form that has no record gets her baseline
+ * as it stands, with neither.
  * @param {Actor} host       The actor transformed: she, or a form of hers.
  * @param {Actor} source     What it's transformed into.
  * @param {object} data      The creation data, mutated.
@@ -565,8 +566,12 @@ export function record(host, source, data, settings, options) {
   const earlier = chained ? host.getFlag(MODULE_ID, "form") : null;
   const now = game.time?.worldTime ?? 0;
   let baseline = null;
-  if ( !chained ) baseline = { ...baselineOf(original, data), formEffects: formEffectsOf(host, data) };
-  else baseline = earlier?.baseline ? chainedBaseline(earlier.baseline, host, data) : baselineOf(original, data);
+  if ( chained ) baseline = earlier?.baseline ? chainedBaseline(earlier.baseline, host, data) : baselineOf(original, data);
+  else {
+    const hers = baselineOf(original, data);
+    const ranOut = new Set(expiredOf(original));
+    baseline = { ...hers, formEffects: formEffectsOf(host, data), expired: hers.effects.filter(id => ranOut.has(id)) };
+  }
   data.flags ??= {};
   data.flags[MODULE_ID] = { ...(data.flags[MODULE_ID] ?? {}), form: {
     kind: wild ? "wildShape" : "other",
@@ -585,7 +590,7 @@ export function record(host, source, data, settings, options) {
  * What she had going in, for the carry-back's sums: her hit points and temporary ones; each of her
  * items the form keeps, its uses spent and each activity's; each class's hit dice spent; her Heroic
  * Inspiration, exhaustion and death saves; which of her own effects the form carries; and each of
- * her spell slot pools' value. `record` adds `formEffects` to it, since module 0.48.0.
+ * her spell slot pools' value. `record` adds `formEffects` and `expired` to it, since module 0.48.0.
  * @param {Actor} original
  * @param {object} data   The form's creation data.
  * @returns {object}
@@ -881,10 +886,14 @@ const clamp = (value, min, max=Infinity) => Math.min(Math.max(value, min), Numbe
  * hook, and the write must go ahead of dnd5e's deletion of the form, so that a caster's
  * concentration never finds itself keeping nothing up. And each of her effects the form carried
  * that is gone from it, or has run out on it, is deleted from her, where before only a condition or
- * a concentration was: but a status effect's own that is no condition, as Exhaustion's, which is
- * counted, or Bloodied's and Encumbered's, which dnd5e keeps from her own numbers. Each is read
- * again as its turn comes, as ending a concentration deletes what it kept up on her, and deleted on
- * its own, so one that can't be never stops the next.
+ * a concentration was, which are still taken off only where gone: but a status effect's own that
+ * is no condition, as Exhaustion's, which is counted, or Bloodied's and Encumbered's, which dnd5e
+ * keeps from her own numbers. Run out on it means in form: one that had already run out as the form
+ * was made, which the baseline's `expired` names, is left as it was, nothing having happened to it;
+ * and where a baseline has no such list, as one recorded before 0.48.0, none is deleted for having
+ * run out, as which ran out in form can't be told. Each is read again as its turn comes, as ending
+ * a concentration deletes what it kept up on her, and deleted on its own, so one that can't be
+ * never stops the next.
  * @param {object} kept       snapshot's.
  * @param {Actor} original
  * @param {object} [options]
@@ -944,9 +953,11 @@ export async function carryBack(kept, original, { gained=true }={}) {
   for ( const { id, status } of f.conditions ?? [] ) {
     if ( !hers().has(id) ) await original.toggleStatusEffect(status, { active: true });
   }
-  // Her effects taken off in form: those the form had from her and has no longer, or that ran out on it.
+  // Her effects taken off in form: those the form had from her and has no longer, or that ran out
+  // on it, which one that had already run out as the form was made did not.
   const still = new Set(f.effects ?? []);
-  const expired = new Set(f.expired ?? []);
+  const before = Array.isArray(b.expired) ? new Set(b.expired) : null;
+  const ranOut = new Set(before ? Array.from(f.expired ?? []).filter(id => !before.has(id)) : []);
   for ( const id of b.effects ?? [] ) {
     const effect = ownEffect(original, id);
     if ( !effect ) continue;
@@ -956,7 +967,7 @@ export async function carryBack(kept, original, { gained=true }={}) {
       if ( gone ) await original.toggleStatusEffect(status, { active: false });
     } else if ( effect.statuses?.has?.("concentrating") ) {
       if ( gone ) await original.endConcentration(effect);
-    } else if ( !isStatusEffect(effect) && (gone || expired.has(id)) ) {
+    } else if ( !isStatusEffect(effect) && (gone || ranOut.has(id)) ) {
       try {
         await effect.delete(options);
       } catch (err) {
