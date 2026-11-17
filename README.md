@@ -925,8 +925,10 @@ Gamemaster-only information switched on.
   not as it was when given; it follows the bard's within a turn in combat.
 - **Two bards' Inspired:** each is offered; the 2024 rule allows one die at a time. Two bards who
   aren't the party's are offered under the same name.
-- **In Wild Shape**, Inspired is offered from the form; used or removed there, the druid's own is
-  removed too when Wild Shape ends.
+- **In Wild Shape**, Inspired is offered from the form. A die used there leaves Inspired on the
+  form, as the app may not remove a shaped druid's effect: once the Gamemaster removes it from the
+  form, the druid's own is removed too when Wild Shape ends; left on the form, it stays on the
+  druid.
 - **A world on the legacy (2014) rules:** a Bardic Inspiration item that doesn't say its rules
   counts as 2014's and isn't offered; dnd5e's 2024 compendium feature is.
 - **Advantage the game adds as the roll is made**, such as Midi-QOL's from a target, takes Foundry's
