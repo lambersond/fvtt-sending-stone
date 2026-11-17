@@ -749,18 +749,20 @@ for (const line of [
 ]) assert.ok(characterSheetSource.includes(line), `dnd5e's character sheet has: ${line}`)
 await settle()
 // Thorin's favorites as dnd5e stores them: the Veiled Gift, which the sheet leaves out, among them,
-// and Perception and his 1st-level slots of one sort, in the order stored.
+// Perception and his 1st-level slots of one sort, in the order stored, and his Thieves' Tools, a
+// tool, as the app moves one from its own menu (the app's ROADMAP item 47).
 thorin.system.favorites = [
   { type: 'item', id: '.Item.sword', sort: 100 }, { type: 'item', id: '.Item.veiled', sort: 150 },
   { type: 'activity', id: '.Item.staff.Activity.fireball', sort: 200 }, { type: 'skill', id: 'prc', sort: 300 },
-  { type: 'slots', id: 'spell1', sort: 300 }, { type: 'effect', id: '.ActiveEffect.bless', sort: 400 },
+  { type: 'slots', id: 'spell1', sort: 300 }, { type: 'tool', id: 'thief', sort: 350 }, { type: 'effect', id: '.ActiveEffect.bless', sort: 400 },
 ]
 const SWORD = { type: 'item', id: 'sword' }
 const FIREBALL = { type: 'activity', id: 'fireball', item: 'staff' }
 const PERCEPTION = { type: 'skill', id: 'prc' }
 const SLOTS = { type: 'slots', id: 'spell1' }
 const BLESS = { type: 'effect', id: 'bless' }
-const SHOWN = [SWORD, FIREBALL, PERCEPTION, SLOTS, BLESS]
+const TOOL = { type: 'tool', id: 'thief' }
+const SHOWN = [SWORD, FIREBALL, PERCEPTION, SLOTS, TOOL, BLESS]
 const listed = list => [['resource', 'primary', null], ...list.map(({ type, id, item }) => [type, id, item ?? null])]
 assert.deepEqual(characterSheet(thorin).favorites.map(f => [f.type, f.id, f.itemId ?? null]), listed(SHOWN), 'Ki, then by sort, those of one sort as stored, the Veiled Gift left out')
 const ordering = (order, was, fields) => ({ id: `favorite-${++ids}`, ...BASE, favorite: { op: 'order', order, was }, ...fields })
@@ -768,20 +770,20 @@ const ordering = (order, was, fields) => ({ id: `favorite-${++ids}`, ...BASE, fa
 const writes = []
 const update = thorin.update
 thorin.update = async function (changes) { writes.push(changes); return update.call(this, changes) }
-const WANTED = [BLESS, PERCEPTION, SWORD, SLOTS, FIREBALL]
+const WANTED = [BLESS, TOOL, PERCEPTION, SWORD, SLOTS, FIREBALL]
 lines = messages.size
 it = await made(ordering(WANTED, SHOWN))
 assert.deepEqual(it.result, { id: it.command.id, ...DONE }, 'done, with no `favorited`')
 assert.deepEqual(stored(), [
-  ['effect', '.ActiveEffect.bless', 100000], ['item', '.Item.veiled', 200000], ['skill', 'prc', 300000],
-  ['item', '.Item.sword', 400000], ['slots', 'spell1', 500000], ['activity', '.Item.staff.Activity.fireball', 600000],
+  ['effect', '.ActiveEffect.bless', 100000], ['item', '.Item.veiled', 200000], ['tool', 'thief', 300000], ['skill', 'prc', 400000],
+  ['item', '.Item.sword', 500000], ['slots', 'spell1', 600000], ['activity', '.Item.staff.Activity.fireball', 700000],
 ], 'those listed in the order sent, in the places they held; the Veiled Gift in its own; every sort afresh')
 assert.equal(writes.length, 1, 'one update')
 assert.deepEqual(Object.keys(writes[0]), ['system.favorites'], "of dnd5e's favorites alone")
 assert.deepEqual(sheetsIn(it), [['character.updated', 'thorin']], 'the sheet before the result')
 assert.deepEqual(sentFavorites(it), listed(WANTED), 'Ki first, then in the order sent')
 assert.equal(messages.size, lines, 'no chat message')
-okay("an order of Thorin's favorites puts those the sheet lists in the order sent, in the places they held among dnd5e's, the Veiled Gift, left out of the sheet, in its own, every `sort` written afresh in one update of `system.favorites`, as dnd5e's sheet sorts them; Ki stays first; the sheet ahead of the result, `done`, no `favorited`, nothing posted")
+okay("an order of Thorin's favorites puts those the sheet lists, a skill, his slots and a tool among them, in the order sent, in the places they held among dnd5e's, the Veiled Gift, left out of the sheet, in its own, every `sort` written afresh in one update of `system.favorites`, as dnd5e's sheet sorts them; Ki stays first; the sheet ahead of the result, `done`, no `favorited`, nothing posted")
 
 // The same order again, as the app hands it over once more: nothing written, nothing new to send.
 await settle()
@@ -793,7 +795,7 @@ assert.deepEqual([refusal(it), writes.length, sheetsIn(it)], [['failed', 'change
 // The Rope made a favorite in Foundry meanwhile, its sheet not yet sent: refused, the sheet first.
 await settle()
 thorin.items.set('rope', new Item(itemData('Rope', 'loot', {}, { id: 'rope' }), thorin))
-thorin.system.favorites.push({ type: 'item', id: '.Item.rope', sort: 700000 })
+thorin.system.favorites.push({ type: 'item', id: '.Item.rope', sort: 800000 })
 it = await made(ordering([...WANTED].reverse(), WANTED))
 assert.deepEqual([refusal(it), writes.length, sheetsIn(it)], [['failed', 'changed', null], 1, [['character.updated', 'thorin']]], 'one added in Foundry')
 assert.deepEqual(sentFavorites(it), listed([...WANTED, { type: 'item', id: 'rope' }]), 'the sheet as it stands')
