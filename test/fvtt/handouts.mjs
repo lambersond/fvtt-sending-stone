@@ -836,6 +836,15 @@ said = saidBy(made)
 assert.deepEqual(said.map(told), [['Vex received 1 gp from Thorin', ['bob'], 'thorin', 'alice'], ['Thorin handed out 1 gp each to Vex: 1 gp in all', GMS, 'thorin', 'alice']])
 assert.ok(said.every(message => JSON.stringify(message.flags['sending-stone']) === JSON.stringify({ request: made.command.id, by: 'gm' })))
 assert.deepEqual([made.result.messages, made.result.messageId, made.result.visible], [said.map(message => message.id), said.at(-1).id, true])
+// The Gamemasters' message stopped by a module's hook: the hand-out is made all the same, the whisper
+// to the one given posted, and the result has no message, `visible` true, as for any line that can't
+// be posted.
+const unposted = Hooks.on('preCreateChatMessage', message => (message.whisper.includes('gm') ? false : undefined))
+made = await handed('thorin', ['vex'], { gp: 1 })
+Hooks.off('preCreateChatMessage', unposted)
+said = saidBy(made)
+assert.deepEqual(said.map(told), [['Vex received 1 gp from Thorin', ['bob'], 'thorin', 'alice']], "no Gamemasters' message")
+assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, made.result.transfer.each], ['done', null, true, ['vex']])
 // Lia, whom no player owns, hands out: her messages are the bridge's Gamemaster's own, so the one
 // for the Gamemasters is theirs alone, and no player may see it.
 stock(lia, [], { sp: 5 })
@@ -849,7 +858,7 @@ assert.deepEqual(said.map(told), [
 assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, purse(lia)], ['done', said.at(-1).id, false, { sp: 1 }])
 assert.deepEqual(said.slice(0, 2).map(message => { const { audience } = chatOf(message.id).data.message; return [audience.gmOnly, audience.users, audience.characters] }), [[false, ['bob'], ['vex']], [false, ['carol'], ['bram']]])
 assert.equal(chatOf(said.at(-1).id), undefined, "the Gamemasters' own isn't sent to the app")
-okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver with no one player of its own, none owning it or two with neither having it as their character, has the bridge's Gamemaster as its author, so the Gamemasters' message, whispered to both of them still, is theirs alone, the result's `visible` false, a player's own hand-out too, and the app is sent the whispers but not that")
+okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver with no one player of its own, none owning it or two with neither having it as their character, has the bridge's Gamemaster as its author, so the Gamemasters' message, whispered to both of them still, is theirs alone, the result's `visible` false, a player's own hand-out too, and the app is sent the whispers but not that; a Gamemasters' message a module's hook stops leaves the hand-out made, `messageId` null and `visible` true")
 
 /* -------------------------------------------- */
 /*  A hand-out that fails                       */

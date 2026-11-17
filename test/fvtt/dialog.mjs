@@ -628,6 +628,13 @@ console.log("ok - 0.44.0: Hit points has its own fieldset on the Player actions 
   assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'no warning under dnd5e, with no app heard from')
   const box = name => find(win, `[name="campaign.${name}"]`)
   assert.deepEqual(['coins', 'coinChange'].map(name => [box(name).checked, box(name).disabled]), [[true, false], [true, false]], 'both ticked, read as on, whatever the rolls')
+  // Either switch changed alone is an unsaved change, and changed back is none.
+  for (const name of ['coins', 'coinChange']) {
+    tick(win, `campaign.${name}`, false)
+    assert.deepEqual(dirty(), ['true', 'SENDINGSTONE.Config.Unsaved'], `${name} unticked`)
+    tick(win, `campaign.${name}`)
+    assert.deepEqual(dirty(), ['false', 'SENDINGSTONE.Config.NoChanges'], `${name} ticked again`)
+  }
   tick(win, 'campaign.coins', false)
   await save(win)
   assert.deepEqual(settings.get('campaigns').map(c => [c.id, c.coins, c.coinChange]), [[a, false, true], [b, true, true]], "one saved off, the other switch and the other campaign's on as read")
@@ -675,7 +682,7 @@ console.log("ok - 0.44.0: Hit points has its own fieldset on the Player actions 
   await win.close()
   game.system.id = 'dnd5e'
 }
-console.log("ok - 0.48.0: Coins has its own fieldset on the Player actions tab, right after Items and coins, with Allow Players to add and take away coins from the app and Pay with other coins when a character is short of one: both ticked for a campaign saved without them and for a new one, never greyed by the rolls, each saved off and on with its campaign; a warning where the campaign's app has commands but takes no coins, none once it does or with the switch off; not available under another system")
+console.log("ok - 0.48.0: Coins has its own fieldset on the Player actions tab, right after Items and coins, with Allow Players to add and take away coins from the app and Pay with other coins when a character is short of one: both ticked for a campaign saved without them and for a new one, never greyed by the rolls, each an unsaved change when changed alone and saved off and on with its campaign; a warning where the campaign's app has commands but takes no coins, none once it does or with the switch off; not available under another system")
 
 // Module 0.36.0 (round 0.36.0 §6.12): Companions' initiative, its own fieldset on the Player actions
 // tab after Items and coins, a choice never disabled, saved with its campaign; a new campaign's its
