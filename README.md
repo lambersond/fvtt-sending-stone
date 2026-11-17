@@ -978,6 +978,11 @@ Gamemaster-only information switched on.
   druid, as does one that had already run out before Wild Shape.
   - **An effect you make on the form's own sheet is kept on the druid** when Wild Shape ends: delete
     it there first if it was only for the form.
+  - **A status effect that is no condition,** such as Sleeping, Dodging, Hiding or Marked, is
+    neither kept nor taken off: one put on the form ends with it, and one the druid already had
+    stays on the druid though it was taken off the form. Sleeping put on the form ends Wild Shape,
+    as it makes the form Incapacitated, and the druid comes back without it: you put it on the
+    druid.
 - **Worn gear isn't modelled:** dnd5e gives a form none of the druid's gear, so a ring that should
   work on the form doesn't; you decide.
 - **Bonus Actions are counted only under Midi-QOL's Enforce bonus actions, in a fight:** elsewhere

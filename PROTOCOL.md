@@ -5066,10 +5066,12 @@ the character, and so is one that has expired on the form and hadn't as the form
 `baseline.expired` names, expired already then, is left as it was, and where a record has no such
 list, as one from before 0.48.0, none is deleted for having expired. Before 0.48.0 only a condition
 or a concentration was taken off, and those two are still taken off only where gone from the form.
-Never a status effect's own that is no condition, such as Bloodied or Encumbered, which dnd5e keeps
-from the character's own numbers. A form recorded before 0.48.0, with no `formEffects`, has no
-gained effect carried, nor has one dnd5e made from such a form, or from a form with no record. One
-that can't be written is logged, and the rest of the return goes on.
+Never a status effect's own that is no condition: Bloodied or Encumbered, which dnd5e keeps from the
+character's own numbers, and as much one put on by hand, as Sleeping, Dodging, Hiding or Marked, or
+another module's, so that one of those put on the form ends with it, and one the character already
+had stays on the character though it was taken off the form. A form recorded before 0.48.0, with no
+`formEffects`, has no gained effect carried, nor has one dnd5e made from such a form, or from a form
+with no record. One that can't be written is logged, and the rest of the return goes on.
 
 **Made in Foundry.** A return made in Foundry, by the character's player or the Gamemaster, is
 carried back by the client that made it and noted `"foundry"`. A form deleted by hand from the

@@ -887,8 +887,9 @@ const clamp = (value, min, max=Infinity) => Math.min(Math.max(value, min), Numbe
  * concentration never finds itself keeping nothing up. And each of her effects the form carried
  * that is gone from it, or has run out on it, is deleted from her, where before only a condition or
  * a concentration was, which are still taken off only where gone: but a status effect's own that
- * is no condition, as Exhaustion's, which is counted, or Bloodied's and Encumbered's, which dnd5e
- * keeps from her own numbers. Run out on it means in form: one that had already run out as the form
+ * is no condition, as Exhaustion's, which is counted, Bloodied's and Encumbered's, which dnd5e
+ * keeps from her own numbers, or one put on by hand, as Sleeping's or Marked's, which stays on her
+ * as it was. Run out on it means in form: one that had already run out as the form
  * was made, which the baseline's `expired` names, is left as it was, nothing having happened to it;
  * and where a baseline has no such list, as one recorded before 0.48.0, none is deleted for having
  * run out, as which ran out in form can't be told. Each is read again as its turn comes, as ending

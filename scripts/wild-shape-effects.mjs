@@ -60,7 +60,9 @@ export function chainedBaseline(base, host, data) {
  * `CONFIG.statusEffects` (a list under dnd5e 5, an object under 6), as a condition's, Exhaustion's,
  * Encumbered's or Dead's is, or Midi-QOL's markers of a Bonus Action or a reaction used; or one of
  * the fixed ids dnd5e keeps for its own (its effect class's `ID`), as Bloodied's, which is in no
- * list. dnd5e sets these from an actor's own numbers, or the module carries them another way.
+ * list. dnd5e sets these from an actor's own numbers, or the module carries them another way; and
+ * one that is neither, put on by hand, as dnd5e's Sleeping, Dodging, Hiding or Marked, is left as
+ * it is: never kept from a form, and never taken off her for having been taken off one.
  * @param {ActiveEffect|object|null|undefined} effect   An effect, or its data.
  * @returns {boolean}
  */
