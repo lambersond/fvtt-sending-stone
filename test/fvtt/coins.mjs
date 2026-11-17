@@ -640,11 +640,13 @@ okay(`the rule, by ${TABLE.length} worked cases: the coins asked for paid from t
 
 // A world's own coin worth the same as another: a crown, 1 to the gp, listed after gp or before it.
 // Neither larger nor smaller, it pays for gold as a smaller coin does, one for one, and gold for it,
-// once no larger coin is left; the last of the change is in the coin paid, never in its like. And
-// wherever each coin is worth a whole number of every coin worth less, two of the same worth among
-// them, a payment is refused exactly where the coins together are worth too little: with the crown,
-// whichever of the two the world lists first, and at rates wholly a world's own, coins of 0.01,
-// 0.05, 1, 3, 12, 12 and 60 to the gp. The same cases each run.
+// once no larger coin is left; the last of the change is in the coin paid, never in its like.
+// Wherever else the two could both go, the one the world lists first does: paid first, broken first,
+// given as change first and paying first, so what's left never turns on the order the coins are
+// named in. And wherever each coin is worth a whole number of every coin worth less, two of the same
+// worth among them, a payment is refused exactly where the coins together are worth too little: with
+// the crown, whichever of the two the world lists first, and at rates wholly a world's own, coins of
+// 0.01, 0.05, 1, 3, 12, 12 and 60 to the gp. The same cases each run.
 {
   const dnd5es = CONFIG.DND5E.currencies
   const CROWNS = { pp: 0.1, gp: 1, crown: 1, ep: 2, sp: 10, cp: 100 }
@@ -657,6 +659,7 @@ okay(`the rule, by ${TABLE.length} worked cases: the coins asked for paid from t
   let paid = 0
   let refused = 0
   let alike = 0
+  let both = 0
   for (const [KEYS, RATE, why] of WORLDS) {
     CONFIG.DND5E.currencies = Object.fromEntries(KEYS.map(key => [key, { label: key, abbreviation: key, conversion: RATE[key] }]))
     const own = coinRates()
@@ -676,7 +679,14 @@ okay(`the rule, by ${TABLE.length} worked cases: the coins asked for paid from t
       assert.deepEqual(pays({ pp: 1, crown: 3 }, { gp: 5 }), [{ gp: 5, crown: 3 }, { pp: 1 }], `a larger coin is broken first: ${why}`)
       assert.deepEqual(pays({ crown: 3, sp: 50 }, { gp: 2 }), [{ crown: 1, sp: 50 }, { crown: 2 }], `crowns before smaller coins: ${why}`)
       assert.deepEqual(pays({ crown: 3, sp: 25 }, { gp: 5 }), [{ sp: 5 }, { crown: 3, sp: 20 }], `then the smaller ones: ${why}`)
-      assert.deepEqual(pays({ pp: 1 }, { gp: 1, crown: 1 }), [{ gp: 8 }, { pp: 1 }], `both paid from one platinum: ${why}`)
+      // Wherever else the two could both go, the one the world lists first does.
+      const [first, second] = KEYS.filter(key => RATE[key] === RATE.gp)
+      assert.deepEqual([first, second].sort(), ['crown', 'gp'])
+      assert.deepEqual(pays({ pp: 1 }, { gp: 1, crown: 1 }), [{ [first]: 8 }, { pp: 1 }], `both paid from one platinum, the first listed first, its change then paying for the other: ${why}`)
+      assert.deepEqual(pays({ pp: 1 }, { crown: 1, gp: 1 }), [{ [first]: 8 }, { pp: 1 }], `and so however the two are named: ${why}`)
+      assert.deepEqual(pays({ gp: 1, crown: 1 }, { sp: 1 }), [{ [second]: 1, sp: 9 }, { [first]: 1 }], `the first listed is broken first: ${why}`)
+      assert.deepEqual(pays({ pp: 1 }, { sp: 1 }), [{ [first]: 9, sp: 9 }, { pp: 1 }], `change above the coin paid comes in the first listed: ${why}`)
+      assert.deepEqual(pays({ gp: 6, crown: 6 }, { pp: 1 }), [{ [second]: 2 }, { [first]: 6, [second]: 4 }], `and the first listed pays first for a larger coin: ${why}`)
       assert.deepEqual(pays({ crown: 1, sp: 9 }, { gp: 2 }), 'short', `worth 1.9 gp: ${why}`)
       assert.deepEqual(pays({ crown: 5 }, { gp: 1 }, { change: false }), 'short', `other coins not paying: ${why}`)
     }
@@ -692,6 +702,8 @@ okay(`the rule, by ${TABLE.length} worked cases: the coins asked for paid from t
       const out = payCoins(held, pay, own)
       const said = () => `${why}: ${JSON.stringify([before, pay, out])}`
       assert.deepEqual(held, before, `what's held is changed, ${said()}`)
+      assert.deepEqual(payCoins(held, backwards(pay), own), out, `paid another way where the coins are named the other way round, ${said()}`)
+      if ((new Set(Object.keys(pay).map(key => RATE[key])).size < Object.keys(pay).length) && !out.refusal) both++
       assert.equal(!out.refusal, worth(held) >= worth(pay), `refused, or not, against what the coins are worth, ${said()}`)
       if (out.refusal) { refused++; continue }
       paid++
@@ -707,8 +719,8 @@ okay(`the rule, by ${TABLE.length} worked cases: the coins asked for paid from t
   }
   CONFIG.DND5E.currencies = dnd5es
   assert.deepEqual(coinRates(), rates, "dnd5e's own again")
-  assert.ok((paid > 30_000) && (refused > 30_000) && (alike > 2_000), `enough of each: ${paid} paid, ${refused} refused, ${alike} of one of two alike alone`)
-  okay(`a world's own coin worth the same as another, a crown of 1 to the gp, listed after gp or before it: crowns pay for gold one for one and gold for crowns, once no larger coin is left and ahead of smaller ones; the last of the change is in the coin paid, never in its like; and by ${cases.toLocaleString('en')} random cases, the same each run (${paid.toLocaleString('en')} paid, ${refused.toLocaleString('en')} refused), with the crown and at rates wholly a world's own that divide one another, two of them the same, a payment is refused exactly where the coins are worth too little, with no worth made or lost and no coin below none`)
+  assert.ok((paid > 30_000) && (refused > 30_000) && (alike > 2_000) && (both > 2_000), `enough of each: ${paid} paid, ${refused} refused, ${alike} of one of two alike alone, ${both} of two alike together`)
+  okay(`a world's own coin worth the same as another, a crown of 1 to the gp, listed after gp or before it: crowns pay for gold one for one and gold for crowns, once no larger coin is left and ahead of smaller ones; the last of the change is in the coin paid, never in its like; wherever else the two could both go, the one the world lists first is paid first, broken first, given as change first and pays first; and by ${cases.toLocaleString('en')} random cases, the same each run (${paid.toLocaleString('en')} paid, ${refused.toLocaleString('en')} refused), with the crown and at rates wholly a world's own that divide one another, two of them the same, a payment is refused exactly where the coins are worth too little, with no worth made or lost and no coin below none, and paid the same however the coins are named`)
 }
 
 /* -------------------------------------------- */

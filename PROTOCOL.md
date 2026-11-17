@@ -3741,7 +3741,11 @@ A world's own coin may be worth the same as another, neither larger nor smaller.
 the other in step 5, with the smaller coins and ahead of them, one for one: 3 gp from 1 gp and 5 of
 a coin of 1 to the gp leaves 3 of that coin, `used` 2 of it. And the last of the change (step 4) is
 in the coin paid, never in its like: 4 gp from 1 pp leaves 6 gp, whichever of the two the world
-lists first.
+lists first. Wherever else the two could both go, the one the world lists first does, in the order
+of `CONFIG.DND5E.currencies`: it's paid first (step 1), broken first (step 3), given as change first
+(step 4) and pays first (step 5). With such a coin listed before gp, 1 sp from 1 pp leaves 9 of it
+and 9 sp, and 1 gp and 1 of it from 1 pp leaves 8 of it; listed after gp, 9 gp and 9 sp, and 8 gp.
+So what's left never turns on the order `currency` names its coins in, there either.
 
 Every sum is made in whole coins. A larger coin is broken (step 3), and change given in a coin (step
 4), only where it's worth a whole number of the coin paid; and smaller coins pay (step 5) only where
@@ -3750,10 +3754,10 @@ dnd5e's own rates each coin is worth a whole number of every smaller one, so all
 holds, as it does in any world whose coins are each worth a whole number of every coin worth less,
 two of the same worth among them: a payment is then `"short"` exactly where the coins together are
 worth too little. In a world whose own rates don't divide one another it may not, and a payment the
-coins are worth can then be `"short"` too: with coins of 1, 4 and 6 to the gp, 3 gp from 1 gp and 26 of the
-coin of 4, worth 7.5 gp together, is refused. Worth is never made or lost, whatever the rates. A
-listener that works out beforehand whether a payment can be made should leave such rates to the
-game.
+coins are worth can then be `"short"` too: with coins of 1, 4 and 6 to the gp, 3 gp from 1 gp and 26
+of the coin of 4, worth 7.5 gp together, is refused. Worth is never made or lost, whatever the
+rates. A listener that works out beforehand whether a payment can be made should leave such rates to
+the game.
 
 | Holds | Takes away | Left | `used` |
 | --- | --- | --- | --- |

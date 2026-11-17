@@ -29,7 +29,10 @@
  *
  * A world's own coin may be worth the same as another, neither larger nor smaller. It pays for the
  * other as a smaller coin does, in step 6, one for one, so that coins worth enough are never refused
- * for it; and the last of the change, in step 5, is in the coin paid, never in its like.
+ * for it; and the last of the change, in step 5, is in the coin paid, never in its like. Wherever
+ * else two coins worth the same could both go, the one the world lists first does, as `coinRates`
+ * has them: paid first, broken first, given as change first and paying first. So what's left never
+ * turns on the order a command names its coins in.
  */
 
 /**
@@ -60,9 +63,10 @@ const MOST_DIGITS = 20;
  */
 
 /**
- * dnd5e's coins that have a rate, the largest coin first: those of `CONFIG.DND5E.currencies` whose
- * `conversion` is a number above 0. A coin with none, as a world's own may have, isn't among them,
- * so it's never broken, never pays for another and never comes back as change.
+ * dnd5e's coins that have a rate, the largest coin first, two worth the same in the order the world
+ * lists them: those of `CONFIG.DND5E.currencies` whose `conversion` is a number above 0. A coin with
+ * none, as a world's own may have, isn't among them, so it's never broken, never pays for another
+ * and never comes back as change.
  * @returns {CoinRate[]}
  */
 export function coinRates() {
@@ -117,9 +121,11 @@ function whole(ratio) {
 export function payCoins(held, pay, rates, { change=true }={}) {
   const left = { ...held };
   const rateOf = key => rates.find(rate => rate.key === key)?.conversion ?? null;
-  // Step 1: from the largest coin paid to the smallest; a coin with no rate first, which only its
-  // own coins pay.
-  const order = Object.keys(pay).sort((a, b) => (rateOf(a) ?? -1) - (rateOf(b) ?? -1));
+  // Step 1: from the largest coin paid to the smallest, two worth the same as the world lists them,
+  // which is each coin's place in `rates`, so whatever order `pay` names them in; a coin with no
+  // rate first, which only its own coins pay.
+  const placeOf = key => rates.findIndex(rate => rate.key === key);
+  const order = Object.keys(pay).sort((a, b) => placeOf(a) - placeOf(b));
   for ( const coin of order ) {
     let owed = payOwn(left, coin, pay[coin]);
     if ( !owed ) continue;
