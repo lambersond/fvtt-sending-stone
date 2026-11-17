@@ -3,8 +3,11 @@
 // updated and deleted as Foundry does, its pre-hook first (`false` stops the write, which resolves
 // with nothing, and what a pre-hook adds to the changes is written with them), then the hook every
 // client hears; dnd5e's `isTemporary`, from the duration and still so while turned off; the effects
-// a character's concentrations keep up; who an effect came from, by Foundry's fromUuidSync over the
-// world's actors, their items and effects; and the fixtures of the contract's §1.2. Written from
+// a character's concentrations keep up, those listed for it and, as dnd5e's registry of dependents
+// tracks them, every world actor's own effect whose `flags.dnd5e.dependentOn` names it; an effect's
+// `origin` prepared as dnd5e 6 prepares it, from `system.origin` where the source has one; who an
+// effect came from, by Foundry's fromUuidSync over the world's actors, their items and effects; and
+// the fixtures of the contract's §1.2. Written from
 // Foundry's behaviour and dnd5e's, not ported; built on dish-core.mjs's withDishes, which creates
 // and deletes a character's own effects through createEmbeddedDocuments and deleteEmbeddedDocuments.
 // Import after stub.mjs, dice-core.mjs and dish-core.mjs's installDishCore.
@@ -79,7 +82,7 @@ export class PlainEffect {
     const source = this._source
     Object.assign(this, {
       name: source.name, type: source.type ?? 'base', img: source.img ?? null, description: source.description ?? '',
-      origin: source.origin ?? null, transfer: source.transfer === true, disabled: source.disabled === true,
+      origin: originOf(source), transfer: source.transfer === true, disabled: source.disabled === true,
       statuses: new Set(source.statuses ?? []), start: structuredClone(source.start ?? null),
       duration: { expired: false, ...structuredClone(source.duration ?? {}) },
       system: structuredClone(source.system ?? {}), flags: structuredClone(source.flags ?? {}),
@@ -88,7 +91,24 @@ export class PlainEffect {
   }
 
   getFlag(scope, key) { return getProperty(this.flags?.[scope] ?? {}, key) }
-  getDependents() { return [...this.dependents] }
+
+  /**
+   * What depends on this effect: those listed for it (see concentrateOn), and, as dnd5e's registry
+   * of dependents has them (D5 registry.mjs:29-72, documents/mixins/dependent.mjs:11-15), every world
+   * actor's own effect whose `flags.dnd5e.dependentOn` is this one's uuid, or its bare id on the same
+   * actor; each once. One of an actor deleted from the world is tracked no longer.
+   */
+  getDependents() {
+    const found = new Set(this.dependents)
+    for (const actor of game.actors?.values?.() ?? []) {
+      for (const effect of Array.from(actor?.effects ?? [])) {
+        const on = effect?._source?.flags?.dnd5e?.dependentOn
+        if ((typeof on !== 'string') || (effect === this)) continue
+        if ((on === this.uuid) || ((on.length <= 16) && (effect.parent === this.parent) && (on === this.id))) found.add(effect)
+      }
+    }
+    return [...found]
+  }
   toObject() { return structuredClone(this._source) }
 
   /**
@@ -127,6 +147,19 @@ export class PlainEffect {
     await removeFrom(this, options)
     return this
   }
+}
+
+/**
+ * An effect's origin as dnd5e 6 prepares it (D6 documents/active-effect.mjs:331-335): the first of
+ * `system.origin`'s `effect`, `behavior`, `activity`, `item` and `actor`, else its own `origin`. Under
+ * dnd5e 5 no effect has a `system.origin`, so its `origin` is read as it is.
+ * @param {object} source
+ * @returns {string|null}
+ */
+function originOf(source) {
+  const from = source.system?.origin
+  const kept = (from && (typeof from === 'object')) ? ['effect', 'behavior', 'activity', 'item', 'actor'].map(key => from[key]).find(each => each != null) : null
+  return kept ?? source.origin ?? null
 }
 
 /** Take an effect from its parent as Foundry deletes one, firing deleteActiveEffect. */
