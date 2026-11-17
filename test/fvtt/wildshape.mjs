@@ -473,7 +473,7 @@ async function gainedOn(form, tag, fields = {}) {
  * @param {string} formId   The known form she takes, the Wolf.
  */
 async function effectsCarriedBack(formId) {
-  const { PlainEffect, concentrateOn, writes: fxWrites } = await import('./effects-core.mjs')
+  const { PlainEffect, concentrateOn, writes: fxWrites, faults: fxFaults } = await import('./effects-core.mjs')
   const { snapshot, carryBack } = await import(`${MODULE}/scripts/wild-shape.mjs`)
   const staticID = id => dnd5e.utils.staticID(`dnd5e${id}`)
   const [BLINDED, POISONED, EXHAUSTION, ENCUMBERED, BLOODIED] = ['blinded', 'poisoned', 'exhaustion', 'encumbered', 'bloodied'].map(staticID)
@@ -566,6 +566,7 @@ async function effectsCarriedBack(formId) {
       bareTieOnWolf000: { name: 'Faerie Fire', origin: ROWAN_BLESS, flags: { dnd5e: { dependentOn: 'wolfConcInForm00' } } },
       wolfConcInForm00: { name: 'Concentrating: Moonbeam', statuses: ['concentrating'], origin: `${wolf.uuid}.Item.elowenMoonbeam00` },
       moonlitOnWolf000: { name: 'Moonbeam (Glow)', origin: inForm, flags: { dnd5e: { dependentOn: inForm } } },
+      tiedInFormOnWolf: { name: 'Faerie Fire (Outline)', origin: ROWAN_BLESS, flags: { dnd5e: { dependentOn: inForm } } },
       wolfConcOther000: { name: 'Concentrating: Guidance', statuses: ['concentrating'], origin: 'Actor.elowen.Item.elowenMoonbeam00' },
       [BLOODIED]: { name: 'Bloodied', statuses: ['bloodied'] },
     }
@@ -574,7 +575,7 @@ async function effectsCarriedBack(formId) {
     mark = port.effectWrites.length
     await back()
     assert.deepEqual([...Object.keys(NEVER), 'wolfKeenSenses00'].filter(id => hers(id)), [],
-      "never on her: one run out, the form's own item's, its copy of her Lucky's, a relative origin, a bare id to depend on, a concentration begun in form and what depends on it, a concentration of any origin, Bloodied, the creature's own")
+      "never on her: one run out, the form's own item's, its copy of her Lucky's, a relative origin, a bare id to depend on, a concentration begun in form and what depends on it, by its origin or by its dependentOn alone, a concentration of any origin, Bloodied, the creature's own")
     assert.deepEqual(elowenWrites(mark).filter(write => write.options.sendingStone), [], "nothing made on her by the module's own write")
     assert.equal(count(BLINDED), 1, 'Blinded, gained in form, one effect on her, by the condition path')
     await elowen.toggleStatusEffect('blinded', { active: false })
@@ -596,6 +597,35 @@ async function effectsCarriedBack(formId) {
     assert.deepEqual(fxWrites.slice(fxMark).filter(write => [GUIDANCE, RESISTANCE, AID].includes(write.id) && (write.op === 'delete')).map(write => [write.id, write.options]),
       [[GUIDANCE, OWN], [RESISTANCE, OWN]], "each the module's own write; Aid not written")
     await clear(AID)
+
+    // 4b. One of hers deleted from her own actor meanwhile, as on her own sheet, and still on the form:
+    // the form was made with it, so it is never read as gained and put back on her.
+    put(elowen, { _id: AID, name: 'Aid', origin: ROWAN_BLESS, duration: { value: 8, units: 'hours', expiry: null, seconds: 28800, remaining: 20000 } })
+    wolf = await shapeAs()
+    await hers(AID).delete()
+    assert.deepEqual([Boolean(wolf.effects.get(AID)), count(AID)], [true, 0], 'Aid on the form still, hers gone')
+    mark = port.effectWrites.length
+    await back()
+    assert.deepEqual([count(AID), elowenWrites(mark)], [0, []], 'deleted from her own actor meanwhile: not put back on her, nothing written')
+
+    // 4c. One taken off that can't be deleted from her never stops the next: each on its own.
+    put(elowen, { _id: GUIDANCE, name: 'Guidance', origin: ROWAN_BLESS, duration: rounds(10, 9) })
+    put(elowen, { _id: RESISTANCE, name: 'Resistance', origin: ROWAN_BLESS, duration: rounds(10, 9) })
+    wolf = await shapeAs()
+    assert.deepEqual(recordOf(wolf).baseline.effects.filter(id => [GUIDANCE, RESISTANCE].includes(id)), [GUIDANCE, RESISTANCE], 'both hers going in, Guidance first')
+    await wolf.effects.get(GUIDANCE).delete()
+    await wolf.effects.get(RESISTANCE).delete()
+    await wolf.update({ 'system.attributes.hp.value': 30 })
+    fxFaults.throwOn.set(GUIDANCE, 'before')
+    errors.length = 0
+    it = await made(revert())
+    fxFaults.throwOn.delete(GUIDANCE)
+    assert.deepEqual([it.result.status, count(GUIDANCE), count(RESISTANCE)], ['done', 1, 0], "Guidance, which can't be deleted, still hers; Resistance, after it, gone all the same")
+    assert.deepEqual(errors.map(args => String(args[0])), ['sending-stone | Could not take Guidance off Elowen'], 'one failure logged, by name')
+    assert.deepEqual([elowenHall.actorId, elowenForest.actorId, elowen.system.attributes.hp.value, endedOf()?.why, formOf()], ['elowen', 'elowen', 30, 'app', undefined],
+      'and the rest of the return went on: her tokens hers, her hit points the form\'s, the ending noted')
+    await clear(GUIDANCE)
+    errors.length = 0
 
     // 5. dnd5e's own: Encumbered and Exhaustion are never deleted from her; exhaustion is counted.
     put(elowen, { _id: ENCUMBERED, name: 'Encumbered', statuses: ['encumbered'] })
@@ -648,18 +678,20 @@ async function effectsCarriedBack(formId) {
       { _id: HEX, name: 'Hex of Weariness', disabled: true })
     await wolf.effects.get(GUIDANCE).delete()
     await wolf.update({ 'system.attributes.hp.value': 30 })
-    port.faults.refuseEffect = 'Hex of Weariness'
+    port.faults.refuseEffect = 'Blessing of the Grove'
     mark = port.effectWrites.length
     errors.length = 0
     await back()
     port.faults.refuseEffect = null
-    assert.deepEqual([sof8.id, POTION, BOON, HEX, GUIDANCE].map(id => count(id)), [1, 1, 1, 0, 0], 'three kept, the bad one not; the one taken off gone')
+    assert.deepEqual([sof8.id, POTION, BOON, HEX, GUIDANCE].map(id => count(id)), [1, 1, 0, 1, 0], 'three kept, the bad one not; the one taken off gone')
     assert.deepEqual(elowenWrites(mark).filter(write => write.op === 'create').map(write => write.data.length), [4, 1, 1, 1, 1], 'the batch, then each alone')
-    assert.deepEqual([errors.length, String(errors[0]?.[0])], [1, 'sending-stone | Could not keep Hex of Weariness on Elowen'], 'one failure logged, by name')
+    assert.deepEqual(elowenWrites(mark).filter(write => write.op === 'update').map(write => write.data.map(each => each._id)), [[sof8.id, POTION]],
+      'one update, turning on the two made that were on: never the one that could not be made, which was on too')
+    assert.deepEqual([errors.length, String(errors[0]?.[0])], [1, 'sending-stone | Could not keep Blessing of the Grove on Elowen'], 'one failure logged, by name')
     assert.deepEqual([elowenHall.actorId, elowenForest.actorId, elowen.system.attributes.hp.value, endedOf()?.why, formOf()], ['elowen', 'elowen', 30, 'app', undefined],
       'and the rest of the return went on: her tokens hers, her hit points the form\'s, the ending noted')
     await sof8.gone()
-    await clear(POTION, BOON)
+    await clear(POTION, HEX)
     errors.length = 0
 
     // 9. A return refused: what was put on her for it is taken off again.
@@ -675,6 +707,46 @@ async function effectsCarriedBack(formId) {
     await back()
     assert.equal(count(sof9.id), 1, 'the next return carries it, once')
     await sof9.gone()
+
+    // 9b. A return that throws: the same, and the failure logged.
+    wolf = await shapeAs()
+    const sof9b = await gainedOn(wolf, 'cd')
+    port.faults.throwOnRevert = true
+    mark = port.effectWrites.length
+    errors.length = 0
+    it = await made(revert())
+    assert.deepEqual([refusal(it), formOf()?.id, count(sof9b.id), Boolean(wolf.effects.get(sof9b.id))], [['failed', 'cancelled', null], wolf.id, 0, true],
+      'the return threw: still the Wolf, nothing of it on her, the form\'s still there')
+    assert.deepEqual(elowenWrites(mark).map(write => [write.op, write.data.map(each => each._id ?? each), write.options]),
+      [['create', [sof9b.id], { keepId: true, ...OWN }], ['update', [sof9b.id], OWN], ['delete', [sof9b.id], OWN]], 'put on her, then taken off again')
+    assert.deepEqual(errors.map(args => String(args[0])), ['sending-stone | Could not end the Wild Shape of Elowen'], 'the failure logged, once')
+    errors.length = 0
+    await back()
+    assert.equal(count(sof9b.id), 1, 'the next return carries it, once')
+    await sof9b.gone()
+
+    // 9c. A return refused, and one of the two put on her for it can't be taken off again: the other
+    // is, and the one left is logged by name; the next return makes only the one she lacks.
+    wolf = await shapeAs()
+    const sof9c = await gainedOn(wolf, 'ce')
+    await onForm(wolf, { _id: POTION, name: 'Potion of Heroism', origin: potionEffect, flags: { dnd5e: { dependentOn: potionEffect } } })
+    elowen.deleteEmbeddedDocuments = function (type, list = [], options = {}) {
+      if (list.includes(POTION)) return Promise.reject(new Error('Potion of Heroism could not be deleted'))
+      return Object.getPrototypeOf(this).deleteEmbeddedDocuments.call(this, type, list, options)
+    }
+    port.faults.refuseRevert = true
+    it = await made(revert())
+    delete elowen.deleteEmbeddedDocuments
+    assert.deepEqual([refusal(it), formOf()?.id, count(sof9c.id), count(POTION)], [['failed', 'cancelled', null], wolf.id, 0, 1],
+      "refused: Shield of Faith taken off her again; the potion's, which can't be, left")
+    assert.deepEqual(errors.map(args => String(args[0])), ['sending-stone | Could not take Potion of Heroism off Elowen'], 'one failure logged, by name')
+    errors.length = 0
+    mark = port.effectWrites.length
+    await back()
+    assert.deepEqual([count(sof9c.id), count(POTION), elowenWrites(mark).filter(write => write.op === 'create').map(write => write.data.map(each => each._id))], [1, 1, [[sof9c.id]]],
+      'the next return: both on her once, only the one she lacked made')
+    await sof9c.gone()
+    await clear(POTION)
 
     // 10. Riders: a condition an effect brought with it, cured in form, never comes back with the copy.
     const VENOM = 'venomOnWolf00000'
@@ -711,7 +783,7 @@ async function effectsCarriedBack(formId) {
     await rowan.endConcentration(sof12.conc)
     assert.equal(count(sof12.id), 0, 'and gone when he ends it')
     assert.deepEqual(errors, [], 'nothing else logged')
-    ok('0.48.0, effects carried back: four put on the Wolf by others (one tied to Rowan\'s concentration, a potion\'s with its item used up, one made on the form\'s own sheet, one with no origin and turned off) are on her after the return with their ids, each as the form had it, the sheet-made one with her as its origin, in two writes before dnd5e deletes the form (created turned off with their ids kept, then the three that were on turned on), Shield of Faith hers to turn off or delete on her sheet before the result and the sheet-made one the Gamemaster\'s; a second return and a second pass of the carry-back write nothing; it leaves her when Rowan ends his concentration; never carried: one run out, the form\'s own item\'s, its copy of her Lucky\'s, a relative origin, a bare id to depend on, a concentration begun in form and what depends on it, a concentration of any origin, Bloodied, and the creature\'s own, which the record\'s formEffects names, while Blinded gained in form is one effect; taken off: one deleted on the form and one run out on it are deleted from her, one still on it not written; her Encumbered and her Exhaustion effect are never deleted, her exhaustion 0 by the sum; her concentration and what it kept up on herself, both taken off in form, end once with no second delete; one effect that can\'t be made is logged by name and the other three kept, the rest of the return going on; a return refused leaves nothing of it on her, and the next carries it once; a rider condition cured in form does not come back with its effect; where creating or enabling starts an effect\'s time afresh, a third write puts its start and duration right; with a deleted actor\'s effects each told of, carried and tied all the same')
+    ok('0.48.0, effects carried back: four put on the Wolf by others (one tied to Rowan\'s concentration, a potion\'s with its item used up, one made on the form\'s own sheet, one with no origin and turned off) are on her after the return with their ids, each as the form had it, the sheet-made one with her as its origin, in two writes before dnd5e deletes the form (created turned off with their ids kept, then the three that were on turned on), Shield of Faith hers to turn off or delete on her sheet before the result and the sheet-made one the Gamemaster\'s; a second return and a second pass of the carry-back write nothing; it leaves her when Rowan ends his concentration; never carried: one run out, the form\'s own item\'s, its copy of her Lucky\'s, a relative origin, a bare id to depend on, a concentration begun in form and what depends on it (by its origin, or by its dependentOn alone), a concentration of any origin, Bloodied, and the creature\'s own, which the record\'s formEffects names, while Blinded gained in form is one effect; taken off: one deleted on the form and one run out on it are deleted from her, one still on it not written; one of hers deleted from her own actor meanwhile and still on the form is not put back; one taken off that can\'t be deleted from her is logged by name and the next deleted all the same, the return going on; her Encumbered and her Exhaustion effect are never deleted, her exhaustion 0 by the sum; her concentration and what it kept up on herself, both taken off in form, end once with no second delete; one effect that can\'t be made, which was on, is logged by name and the other three kept, no update naming it, the rest of the return going on; a return refused, and one that throws (logged), each leave nothing of it on her, and the next carries it once; where one put on her for a refused return can\'t be taken off again it is logged by name and the other taken off; a rider condition cured in form does not come back with its effect; where creating or enabling starts an effect\'s time afresh, a third write puts its start and duration right; with a deleted actor\'s effects each told of, carried and tied all the same')
 
     // 13. dnd5e 6.0.5: the origin in `system.origin`.
     if (DND5E6) {
@@ -1440,7 +1512,7 @@ assert.deepEqual([...messages.values()].at(-1).flags['sending-stone'].wildShape,
 assert.equal(endedOf(), null, 'no ending noted')
 assert.equal(it.result.wildShape.form.name, 'Black Bear')
 assert.deepEqual([Boolean(blackBear.effects.get(onWolf3.id)), recordOf(blackBear).baseline.effects.includes(onWolf3.id), elowen.effects.filter(effect => effect.id === onWolf3.id).length], [true, true, 1],
-  "0.48.0: what another put on the Wolf is on the Black Bear, hers going in by its record, and on her") 
+  "0.48.0: what another put on the Wolf is on the Black Bear, hers going in by its record, and on her")
 assert.deepEqual(refusal(await made(transform(blackBearId))), ['failed', 'form', null], 'the current form')
 assert.deepEqual(refusal(await made(transform(wolfId))), ['failed', 'consume', null], 'no use left')
 assert.equal((await made(revert())).result.status, 'done')
@@ -1761,16 +1833,29 @@ await made(transform(wolfId))
 let chainWolf = formOf()
 await spentInWolf(chainWolf)
 const onChainWolf = await gainedOn(chainWolf, 'gd')
+// And two more on the Wolf, which dnd5e's change copies to the Bear with their origins as they are:
+// one made on the Wolf's own sheet, and one a feature of the Wolf's own gave it. The Wolf is an
+// earlier form of the Bear's chain, so the first comes back as hers and the second never does.
+const [ON_WOLF_SHEET, WOLFS_OWN_DOING] = ['madeOnWolfSheet0', 'wolfsLuckyEffect']
+await chainWolf.createEmbeddedDocuments('ActiveEffect', [
+  { _id: ON_WOLF_SHEET, name: 'Blessing of the Grove', disabled: false, origin: chainWolf.uuid },
+  { _id: WOLFS_OWN_DOING, name: 'Lucky', disabled: false, origin: `${chainWolf.uuid}.Item.${LUCKY}` },
+], { keepId: true })
 await chainWolf.transformInto(await fromUuid(uuidOf('Black Bear')), wildshape())
 let chainBear = game.actors.find(actor => actor.flags?.dnd5e?.previousActorIds?.includes(chainWolf.id))
 for (const name of ['Wolf', 'Black Bear']) packSource(name).effects.length = 0
 const onChainBear = await gainedOn(chainBear, 'ge')
 assert.deepEqual([recordOf(chainWolf).baseline.formEffects, recordOf(chainBear).baseline.formEffects, CREATURES_OWN.map(id => Boolean(chainBear.effects.get(id)))],
   [[CREATURES_OWN[0]], CREATURES_OWN, [true, true]], "0.48.0: the Bear's formEffects name both creatures' own effects, which it holds")
+assert.deepEqual([chainBear.effects.get(ON_WOLF_SHEET)?.origin, chainBear.effects.get(WOLFS_OWN_DOING)?.origin], [chainWolf.uuid, `${chainWolf.uuid}.Item.${LUCKY}`],
+  'both on the Bear, each with the Wolf in its origin still')
 await chainBear.revertOriginalForm()
 await settle(120)
 assert.deepEqual([elowen.effects.filter(effect => effect.id === onChainWolf.id).length, elowen.effects.filter(effect => effect.id === onChainBear.id).length, CREATURES_OWN.filter(id => elowen.effects.get(id))], [1, 1, []],
   "0.48.0: what another put on the Wolf and on the Bear each carried once, from the newest; neither creature's own")
+assert.deepEqual([elowen.effects.filter(effect => effect.id === ON_WOLF_SHEET).map(effect => effect.toObject().origin), elowen.effects.filter(effect => effect.id === WOLFS_OWN_DOING).length], [['Actor.elowen'], 0],
+  "0.48.0: one made on the Wolf's own sheet, an earlier form of the chain, carried with her as its origin; one the Wolf's own feature gave it never carried")
+await elowen.effects.get(ON_WOLF_SHEET).delete()
 await onChainWolf.gone()
 await onChainBear.gone()
 assert.deepEqual([game.actors.get(chainWolf.id), game.actors.get(chainBear.id), bridgeTokens()], [undefined, undefined, ['elowen', 'elowen']], 'both deleted, her tokens hers')
@@ -1836,6 +1921,30 @@ await form.effects.get('oldGuidance00000').delete()
 assert.equal((await made(revert())).result.status, 'done')
 assert.deepEqual([elowen.effects.filter(effect => effect.id === onOldForm.id).length, elowen.effects.filter(effect => effect.id === 'oldGuidance00000').length], [0, 0], "0.48.0: nothing gained carried from a form recorded before it; her Guidance, taken off the form, taken off her")
 await onOldForm.gone()
+// 0.48.0: a Wolf recorded before it, and one with no record at all, each made into a Black Bear by
+// dnd5e's own Wild Shape, each creature with an effect of its own: the Bear's record gets no
+// formEffects either, the Wolf's own being no longer told from what was gained, so nothing gained
+// is carried from the Bear and neither creature's own effect is ever put on her.
+const UNRECORDED = { 'recorded before 0.48.0': 'flags.sending-stone.form.baseline.-=formEffects', 'with no record at all': 'flags.sending-stone.-=form' }
+for (const [how, stripped] of Object.entries(UNRECORDED)) {
+  packSource('Wolf').effects.push({ _id: CREATURES_OWN[0], name: 'Keen Hearing and Smell', disabled: false })
+  packSource('Black Bear').effects.push({ _id: CREATURES_OWN[1], name: 'Keen Smell', disabled: false })
+  await reset()
+  await made(transform(wolfId))
+  chainWolf = formOf()
+  await chainWolf.update({ [stripped]: null })
+  assert.equal(recordOf(chainWolf)?.baseline?.formEffects, undefined, `the Wolf ${how}`)
+  await chainWolf.transformInto(await fromUuid(uuidOf('Black Bear')), wildshape())
+  chainBear = game.actors.find(actor => actor.flags?.dnd5e?.previousActorIds?.includes(chainWolf.id))
+  for (const name of ['Wolf', 'Black Bear']) packSource(name).effects.length = 0
+  const onUnrecorded = await gainedOn(chainBear, how.startsWith('with') ? 'gj' : 'gi')
+  assert.deepEqual([recordOf(chainBear).kind, 'formEffects' in recordOf(chainBear).baseline, CREATURES_OWN.map(id => Boolean(chainBear.effects.get(id)))], ['wildShape', false, [true, true]],
+    `a Bear made from a Wolf ${how}: no formEffects in its record, both creatures' own effects on it`)
+  assert.equal((await made(revert())).result.status, 'done')
+  assert.deepEqual([formOf(), CREATURES_OWN.filter(id => elowen.effects.get(id)), elowen.effects.filter(effect => effect.id === onUnrecorded.id).length], [undefined, [], 0],
+    `0.48.0: returned from a chain begun by a Wolf ${how}: neither creature's own effect on her, and nothing gained carried`)
+  await onUnrecorded.gone()
+}
 // A token dnd5e itself switched on the scene then viewed, which the Gamemaster hides once viewing
 // another: put back by the module, hidden still, over the visibility dnd5e kept of it at the change.
 await reset()
@@ -1868,7 +1977,7 @@ await settle(120)
 assert.deepEqual(bridgeTokens(), ['elowen', 'elowen'], 'both tokens hers')
 await until(() => wildShapeReader('camp-a'), 'the reader again after the hello')
 await settle(120)
-ok('made in Foundry: dnd5e\'s own Wild Shape by the Gamemaster recorded "wildShape" with its hours, followed, timed and returned from the app; a Polymorph "other", minutesLeft null, revert "transformed"; a Moon druid\'s Wild Shape into a Beast of the Gamemaster\'s own pack, flooredAc at the floor, the Beast never loaded on the bridge; the sidebar\'s return of an app-made form carried back once, both tokens hers, "foundry" by that client\'s hook, one Prone; Thorin\'s Polymorph restored, his temporary hit points untouched; a player\'s return leaves a form the bridge deletes, her hit points as dnd5e copied them, no "foundry" over it; a form deleted by hand puts back her tokens, hit points and temporary ones, "foundry"; dnd5e\'s chain: activeForm the newest with the first\'s baseline, even with the clock set back between, nothing ending past the first\'s end, her hit points kept; a chain returned in Foundry (a Black Bear, or a Polymorph, on the Wolf) carried back once, the ending the newest\'s, the damage counted once; its Wolf deleted by hand while she\'s the Bear carries nothing back until the Bear returns; her slots carried back as sums on a Foundry return and by hand; a token dnd5e switched, hidden on a scene no longer viewed, put back hidden; a player\'s return with no Gamemaster connected leaves a leftover the bridge deletes once one connects, both tokens hers; since 0.48.0 an effect another put on the form is carried once by the Gamemaster\'s sidebar return, by her player\'s own return (as that player), and after the settle for a form deleted by hand; along dnd5e\'s chain one put on each form is carried once from the newest, neither creature\'s own, the newest\'s formEffects naming both; under a Polymorph on the Wolf what the Wolf held is carried and what was put on the ape is not; a chain whose second change leaves her Bless behind leaves it on her; a form recorded with no formEffects has nothing gained carried, an effect taken off it still taken off her')
+ok('made in Foundry: dnd5e\'s own Wild Shape by the Gamemaster recorded "wildShape" with its hours, followed, timed and returned from the app; a Polymorph "other", minutesLeft null, revert "transformed"; a Moon druid\'s Wild Shape into a Beast of the Gamemaster\'s own pack, flooredAc at the floor, the Beast never loaded on the bridge; the sidebar\'s return of an app-made form carried back once, both tokens hers, "foundry" by that client\'s hook, one Prone; Thorin\'s Polymorph restored, his temporary hit points untouched; a player\'s return leaves a form the bridge deletes, her hit points as dnd5e copied them, no "foundry" over it; a form deleted by hand puts back her tokens, hit points and temporary ones, "foundry"; dnd5e\'s chain: activeForm the newest with the first\'s baseline, even with the clock set back between, nothing ending past the first\'s end, her hit points kept; a chain returned in Foundry (a Black Bear, or a Polymorph, on the Wolf) carried back once, the ending the newest\'s, the damage counted once; its Wolf deleted by hand while she\'s the Bear carries nothing back until the Bear returns; her slots carried back as sums on a Foundry return and by hand; a token dnd5e switched, hidden on a scene no longer viewed, put back hidden; a player\'s return with no Gamemaster connected leaves a leftover the bridge deletes once one connects, both tokens hers; since 0.48.0 an effect another put on the form is carried once by the Gamemaster\'s sidebar return, by her player\'s own return (as that player), and after the settle for a form deleted by hand; along dnd5e\'s chain one put on each form is carried once from the newest, neither creature\'s own, the newest\'s formEffects naming both; under a Polymorph on the Wolf what the Wolf held is carried and what was put on the ape is not; one made on the Wolf\'s own sheet and copied to the Bear is carried with her as its origin, and one the Wolf\'s own feature gave it never is; a chain whose second change leaves her Bless behind leaves it on her; a form recorded with no formEffects has nothing gained carried, an effect taken off it still taken off her; a Bear made by dnd5e from a Wolf recorded so, or with no record at all, gets no formEffects, so nothing gained and neither creature\'s own is put on her')
 
 /* -------------------------------------------- */
 /*  14b. Forms dnd5e didn't make                */

@@ -37,7 +37,8 @@ const sixth = () => String(game.system?.version ?? '').startsWith('6')
  * each TransformationSetting made; each fromUuid asked; each pack index read; each token batch
  * written; and faults: `throwOnTransform` makes the next transformInto throw before it creates
  * anything, `throwOnTokens` the next scenes' token batch, `refuseRevert` the next revert do nothing
- * (as a module's hook might stop it), `moonSpellList` registers Circle of the Moon's spell list;
+ * (as a module's hook might stop it), `throwOnRevert` the next revert throw before it changes
+ * anything, `moonSpellList` registers Circle of the Moon's spell list;
  * since module 0.41.0 `storedActorId` makes an actor's `inCombat` core's other reading, by the actor
  * id a combatant stored when it was made rather than its token's actor now. Since module 0.48.0 each
  * batch of an actor's own effects written (`effectWrites`: its op, actor, data or ids, and options),
@@ -52,7 +53,7 @@ const sixth = () => String(game.system?.version ?? '').startsWith('6')
 export const port = {
   transforms: [], reverts: [], settings: [], fromUuid: [], indexes: [], tokenWrites: [], created: [], deleted: [], effectWrites: [],
   faults: {
-    throwOnTransform: false, throwOnTokens: false, refuseRevert: false, moonSpellList: true, storedActorId: false,
+    throwOnTransform: false, throwOnTokens: false, refuseRevert: false, throwOnRevert: false, moonSpellList: true, storedActorId: false,
     cascadeEffects: false, refuseEffect: null, resetEffectStart: false, slowEffects: 0,
   },
 }
@@ -1017,7 +1018,8 @@ export class TActor extends Character {
    * hit points and temporary ones copied back where the transformation kept them, and her spell
    * slots; the viewed scene's tokens put back; a Gamemaster deletes every form of the chain with no
    * options, a player unflags them; then her update, with no concentration check. Faults:
-   * `refuseRevert` makes the next one do nothing, as a module's hook might stop it.
+   * `refuseRevert` makes the next one do nothing, as a module's hook might stop it; `throwOnRevert`
+   * makes the next one throw, before anything is changed.
    */
   async revertOriginalForm(options = {}) {
     if (!this.isPolymorphed) return undefined
@@ -1026,6 +1028,10 @@ export class TActor extends Character {
     if (port.faults.refuseRevert) {
       port.faults.refuseRevert = false
       return null
+    }
+    if (port.faults.throwOnRevert) {
+      port.faults.throwOnRevert = false
+      throw new Error('The form could not be returned')
     }
     options.renderSheet ??= true
     void Hooks.callAll('dnd5e.revertOriginalForm', this, options)
