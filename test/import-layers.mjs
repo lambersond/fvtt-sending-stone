@@ -8,36 +8,53 @@
 //   - scripts that import one another in a loop, which it prints with one way round it;
 //   - an import of a script in a higher layer;
 //   - a script that is in no layer, or in two, and a script LAYERS lists that isn't there;
-//   - an import it can't follow to one of the module's .mjs scripts: of a file that isn't there,
-//     isn't an .mjs or is outside scripts/, by a path that isn't relative or is written with a
+//   - an import it can't follow to one of the module's .mjs scripts: of a file that isn't there
+//     or isn't an .mjs, by a path that leaves scripts/, isn't relative or is written with a
 //     backslash, or an `import(` holding anything but one plain string in quotes.
 //
 // Each failure says what to do about it. Where there is none, this prints nothing.
 //
 // It reads the text, not a syntax tree, so that it needs nothing but Node, and where it can't tell
-// it fails. It reads on from every `import` and `export` in a script, wherever the word stands and
-// whatever stands above it, and takes white space and comments between an import's words as
-// JavaScript does: so nothing that Node 22 reads as an import is passed over. And so text counts
-// that makes no import. These fail by design, though nothing is imported:
+// it fails. It reads on from every `import` and `export` in a script but those let be below,
+// wherever the word stands and whatever stands above it, and takes white space and comments
+// between an import's words as JavaScript does. No import that Node 22 reads as one is known to be
+// passed over. Four newer spellings, which Node 22 itself refuses, are not read:
+// `import defer * as …`, `import source … from`, `import.defer(…)` and `import.source(…)`.
+//
+// And so text counts that makes no import. These fail though nothing is imported. They are the
+// kinds found, by reading this beside a real parser over many thousands of files; others may
+// exist. A failure on text that is no import is answered by rewording the text, as the last line
+// of every failure says.
 //
 //   - an import written out in a comment (a line commented out, a JSDoc type's
 //     `import("./x.mjs")`, an `@import` tag), in a string, a template or a regular expression, or
 //     in prose (`import them from "./x.mjs"`), where the script it names is higher, closes a loop
-//     or can't be followed. Not every one is read as an import: not one in a string that has its
-//     own quotes escaped, nor one commented out over several lines of `//`;
+//     or can't be followed. Not every one is read as an import: not an `import … from` or an
+//     `import "…"` in a string that has its own quotes escaped, nor one commented out over
+//     several lines of `//` with its path below its word; an `import(` written in either way
+//     fails as the next kind;
 //   - the word `import` before a bracket that holds anything but one plain string, which is an
 //     `import(` that can't be followed: in prose or a message (`can't import (…)`), in a regular
 //     expression (`/import(ed)?/`), and as the name a method is declared by;
 //   - the word where JavaScript has a property of that name, unless its dot stands directly
 //     before it: after a dot on the line above (`tool.`, then `import(…)`), or after a `#`
 //     (`this.#import(…)`). It is read as the two above are;
-//   - the word as the last of a string, where another string follows: `["import", "export"]` is
-//     read as an import of the `, ` between its two strings, a path that isn't relative; and the
-//     word as the last of a line comment, read with the line below where that begins with a
+//   - the word before a quote that comes again on its line, read as an import of what stands
+//     between the two: the word as the last of a longer string where another string in the same
+//     quotes follows (`["no import", "no export"]`, an import of `, `), and the word before an
+//     apostrophe where another follows (`the import's path isn't …`, an import of `s path isn`);
+//   - the word as the last of a line comment, read with the line below where that begins with a
 //     string or a bracket.
 //
-// Let be: `import()` with nothing in it, which is no code, and a property with its dot directly
-// before it (`tool.import(…)`).
+// Let be: the word with a quote directly before it (`["import", "export"]`,
+// `'import "./x.mjs"'`), where JavaScript has no import; `import()` with nothing in it, which
+// imports nothing; and a property with its dot directly before it (`tool.import(…)`).
+//
+// Where a failure names a script's line, it is the line, counted by line feeds, of the word its
+// reading began at. That can be in a comment above the import: an import with braces, commented
+// out over several lines of `//`, is read with the next import or `export … from` below it that
+// has braces, where no other `}` stands between, and that one may then be named at the line of
+// the word commented out.
 //
 //   node test/import-layers.mjs              the checkout this file is in
 //   node test/import-layers.mjs <dir>        another checkout of the module, the folder holding its
@@ -187,23 +204,28 @@ const describe = layer => `layer ${layer + 1} (${LAYERS[layer].name})`
 //
 // Only what stands directly before a word says whether it is the word at all: WORD keeps the end of
 // a longer name (`reimport`) and a property (`tool.import`) from being read as one, and after three
-// dots it is no property (`...import("./a.mjs")`). A name's letters are JavaScript's (ID), and any
-// may be written as an escape (`\u0061`). Between an import's words white space and comments may
-// stand (GAP), or nothing, as `import{a}from"./a.mjs"` has none. A comment is read as JavaScript
-// reads one, to its line's end or to its `*/`. What braces hold is taken a piece at a time: a
-// comment, a string or an escape whole, so that a brace in one doesn't close them, and anything
-// else by the letter. And a backslash in a string takes the next letter with it, a line's end among
-// them.
+// dots it is no property (`...import("./a.mjs")`). Nor is it the word directly after a quote
+// (`"import"`): JavaScript has no import there, where a string begins or has just ended. A name's
+// letters are JavaScript's (ID), and any may be written as an escape (`\u0061`). Between an
+// import's words white space and comments may stand (GAP), or nothing, as `import{a}from"./a.mjs"`
+// has none. A comment is read as JavaScript reads one, to its line's end or to its `*/`. What
+// braces hold is taken a piece at a time: a comment, a string or an escape whole, so that a brace
+// in one doesn't close them, and anything else by the letter. And a backslash in a string takes the
+// next letter with it, a line's end among them. A path may be empty (`import ""`): JavaScript reads
+// that as an import, and it is refused as a path that isn't relative.
 //
-// No pattern can read one stretch of text two ways. A line comment can't stop short of its line's
-// end, nor a block comment run past its first `*/` (one that has none runs to the script's end,
-// once); and a piece in braces, once taken, is not taken another way (a look ahead finds it and a
-// reference back takes it, as JavaScript has no other way to say so). So the work of a reading that
-// comes to nothing is in proportion to what it read, and none tries one reading after another of a
-// long list. What is left is the number of words: each reads on as far as its own comment or list
-// runs, so thousands of them in one script that each run on to its end take as many passes over it.
+// A line comment can't stop short of its line's end, nor a block comment run past its first `*/`
+// (one that has none runs to the script's end, once); and a piece in braces, once taken, is not
+// taken another way (a look ahead finds it and a reference back takes it, as JavaScript has no
+// other way to say so). So a list is cut into its pieces one way only. Time can still grow as the
+// square of the text. Three ways are known, none near what a contributor writes. Every word reads
+// on as far as its own comment or list runs, so thousands of them in one script that each run on
+// to its end take as many passes over it. A quote in braces that nothing closes on its line is
+// read to the line's end and then taken by the letter, and so is every escaped quote after it
+// (`\"`): a line of them 100 KB long takes seconds. And a reading's line is counted from the
+// script's top each time: some ten thousand readings in one script take seconds too.
 const ID = String.raw`[\p{ID_Continue}$\u200c\u200d]`
-const WORD = String.raw`(?<!${ID})(?<!(?<!\.\.)\.)`
+const WORD = String.raw`(?<!${ID})(?<!(?<!\.\.)\.)(?<!["'])`
 const ESCAPE = String.raw`\\u[0-9a-fA-F]{4}|\\u\{[0-9a-fA-F]+\}`
 const NAME = String.raw`(?:${ID}|${ESCAPE})+`
 const ESCAPED = String.raw`\\(?:\r\n|[\s\S])`
@@ -212,7 +234,7 @@ const IN_LINE = String.raw`[^\n\r\u2028\u2029]`
 const COMMENT = String.raw`/\*(?:[^*]|\*(?!/))*(?:\*/|$)|//${IN_LINE}*(?!${IN_LINE})`
 const GAP = String.raw`(?:\s|${COMMENT})`
 const BRACES = String.raw`\{(?:(?=(?<piece>${COMMENT}|${STRING}|${ESCAPE}|[^}]))\k<piece>)*\}`
-const QUOTED = String.raw`(?<quote>["'])(?<specifier>(?:${ESCAPED}|(?!\k<quote>)[^\\\n\r])+)\k<quote>`
+const QUOTED = String.raw`(?<quote>["'])(?<specifier>(?:${ESCAPED}|(?!\k<quote>)[^\\\n\r])*)\k<quote>`
 const CLAUSE = String.raw`(?:${NAME}${GAP}*,${GAP}*)?(?:${BRACES}|\*${GAP}*as${GAP}+${NAME}|${NAME})`
 const EXPORTED = String.raw`\*(?:${GAP}*as(?:${GAP}+${NAME}|${GAP}*(?:${STRING})))?|${BRACES}`
 const FROM = String.raw`${GAP}*from${GAP}*${QUOTED}`
@@ -250,7 +272,8 @@ function importsIn(text) {
   for (const match of text.matchAll(BARE)) note('import', match)
   for (const match of text.matchAll(REEXPORT)) note('export … from', match)
   for (const match of text.matchAll(DYNAMIC)) {
-    // `import()` with nothing in it is no code: a comment may say it.
+    // `import()` with nothing in it imports nothing: a comment may say it, and a method that takes
+    // nothing is declared so.
     if (match.groups.nothing !== undefined) continue
     if (match.groups.specifier !== undefined) note('import()', match)
     else unfollowed.push(match.index)
@@ -289,7 +312,7 @@ for (const file of files) {
     } else if (known.has(target)) {
       if (!imports.get(file).has(target)) imports.get(file).set(target, { line, how })
     } else if (target.startsWith('../')) {
-      refuse(`, which is outside scripts/: ${ownOnly}`)
+      refuse(`, by a path that leaves scripts/: ${ownOnly}, each by a path that stays in scripts/`)
     } else if (existsSync(join(SCRIPTS, target))) {
       refuse(`, which is not an .mjs script: ${ownOnly}, and this reads only .mjs files, so it could see`
         + ' no loop through another')
@@ -360,12 +383,17 @@ function whereToList(file) {
   }
   const where = `add it to LAYERS in ${GUARD}, in the lowest layer that holds everything it imports, ${describe(lowest)}`
   if (lowest === highest) return { open: true, advice: `${where}: no higher one is open to it` }
+  // One that imports this and has no one layer may yet lower its highest layer: until that one has
+  // its layer, no higher one is offered.
+  const waits = importers.filter(other => !placed(other))
+  if (waits.length) {
+    const names = waits.map(other => `${other}, ${state(other)}`).join(' and ')
+    const which = `${names}, which import${waits.length > 1 ? '' : 's'} it`
+    return { open: true, advice: `${where}. Whether a higher one is open waits on ${which}: list this one, then run this again` }
+  }
   const upTo = importers.some(placed) ? `, up to ${describe(highest)}, where a script imports it` : ''
   const higher = `or in a higher one if that says better what it is for${upTo}`
-  // One that imports this may yet lower its highest layer: so much is said of it.
-  const later = importers.filter(other => !placed(other))
-    .map(other => `. ${other}, which imports it, is ${state(other)}, and can go no lower than this one does`)
-  return { open: true, advice: `${where}, ${higher}. CLAUDE.md says what each layer is for${later.join('')}` }
+  return { open: true, advice: `${where}, ${higher}. CLAUDE.md says what each layer is for` }
 }
 
 // The scripts that import one another in a loop, group by group: found here, as where to list a
