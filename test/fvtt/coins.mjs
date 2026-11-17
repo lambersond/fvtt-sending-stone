@@ -1081,6 +1081,14 @@ for (const [actorId, reason, why] of [
     assert.deepEqual([refusal(made), sheetsIn(made)], [['failed', reason, null], []], `${why}, ${op}`)
   }
 }
+// The Company listed among the characters as well, as no Manage Campaigns lists it but a stored setting
+// might: still no character's coins, as one of the campaign's groups.
+campaignAs({ characters: [...CAMPAIGN.characters, 'party'] })
+for (const op of ['add', 'remove']) {
+  made = await changed('party', op, { gp: 1 })
+  assert.deepEqual([refusal(made), sheetsIn(made)], [['failed', 'unknown', null], []], `the Company among the characters too, ${op}`)
+}
+campaignAs()
 assert.deepEqual([writes.length, messages.size, coinsOf(ash).gp, coinsOf(form).gp, coinsOf(party).gp], [unchanged, lines, 9, 3, COMPANY_GP], 'nothing written or posted')
 actors.delete('ashform')
 campaignAs({ coins: false })
@@ -1102,7 +1110,7 @@ const elsewhere = await fetched(change('thorin', 'add', { gp: 1 }), change('thor
 assert.deepEqual([...elsewhere.map(refusal), writes.length, messages.size], [['failed', 'off', null], ['failed', 'off', null], unchanged, lines], "another system, the Gamemaster's too")
 game.system.id = 'dnd5e'
 await hello()
-okay("refused, with nothing written, posted or sent: a party's coins, an actor outside the campaign, one that's none and an NPC, `unknown`; a character transformed, `shaped`, and her form `unknown`; and with the switch off, or under another system, `off`, before `invalid`, the Gamemaster's own changes too")
+okay("refused, with nothing written, posted or sent: a party's coins, even one listed among the campaign's characters too, an actor outside the campaign, one that's none and an NPC, `unknown`; a character transformed, `shaped`, and her form `unknown`; and with the switch off, or under another system, `off`, before `invalid`, the Gamemaster's own changes too")
 
 /* -------------------------------------------- */
 /*  A write that fails                          */
@@ -1211,10 +1219,11 @@ campaignAs()
 okay("a change waits for a roll of its own character's on its way, and his next roll for it: a spend, 5 gp taken away and a spend, handed over together, are made in that order")
 
 // The campaign is read again as a change's turn comes, not as it was when fetched: one waiting in the
-// line of moves while the Gamemaster turns the switch off isn't made, and one waiting while Pay with
-// other coins is turned off is paid by the setting as it then is.
+// line of moves while the Gamemaster turns the switch off, or deletes the campaign, isn't made, and one
+// waiting while Pay with other coins is turned off is paid by the setting as it then is.
 for (const [setting, pay, reason, left, why] of [
   [{ coins: false }, { gp: 1 }, 'off', { pp: 2, gp: 3 }, 'the switch turned off'],
+  [null, { gp: 1 }, 'off', { pp: 2, gp: 3 }, 'the campaign gone'],
   [{ coinChange: false }, { gp: 5 }, 'short', { pp: 2, gp: 2 }, 'Pay with other coins turned off'],
 ]) {
   restock()
@@ -1230,7 +1239,8 @@ for (const [setting, pay, reason, left, why] of [
   await until(() => waiting.held, "the move ahead's write")
   await wait(100)
   assert.deepEqual([resultsOf(queued.id).length, resultsOf(exact.id).length], [0, 0], 'both changes wait')
-  campaignAs(setting)
+  if (setting) campaignAs(setting)
+  else settings.set('campaigns', [])
   waiting.release()
   await until(() => resultsOf(exact.id).length, 'their results')
   assert.deepEqual([resultsOf(moving.id)[0].status, refusal({ result: resultsOf(queued.id)[0] })], ['done', ['failed', reason, null]], why)
@@ -1239,8 +1249,9 @@ for (const [setting, pay, reason, left, why] of [
   assert.equal(writes.slice(at).filter(([, id]) => id === 'thorin').length, (reason === 'off') ? 0 : 1, 'nothing of the one refused written')
   assert.equal(messages.size, lines + ((reason === 'off') ? 1 : 2), 'nor posted')
   campaignAs()
+  if (!setting) await hello()
 }
-okay("the campaign is read again as a change's turn comes: one waiting behind a move while the switch is turned off is `off`, and one that needs another coin, waiting while Pay with other coins is turned off, is `short`, an exact one behind it still made; nothing of the one refused is written or posted")
+okay("the campaign is read again as a change's turn comes: one waiting behind a move while the switch is turned off, or the campaign is deleted, is `off`, and one that needs another coin, waiting while Pay with other coins is turned off, is `short`, an exact one behind it still made; nothing of the one refused is written or posted")
 
 /* -------------------------------------------- */
 /*  A name with markup                          */
