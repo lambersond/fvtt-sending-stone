@@ -2,8 +2,8 @@
 // `features.transfers.handOut` and `.change`; the `transfer` command's `each`, its check and who may
 // make it; the total paid as coins taken away are, exactly and with other coins, and what the
 // campaign's setting off does; the writes and their order, and what a failure leaves; the whispers,
-// one to each character given coins that has a player and one to the Gamemasters, none for everyone,
-// and who the app is told may read each; the sheets ahead of the result; a fraction of a coin the
+// one to each character given coins that has a player and one to the Gamemasters, both of the two at
+// this table, none for everyone, and who the app is told may read each; the sheets ahead of the result; a fraction of a coin the
 // giver or one given stores, and a coin a sheet shows more of than is stored; hand-outs and rolls
 // waiting for one another, and the campaign read again as a hand-out's turn comes. On a copy of
 // sends.mjs's stand-ins, with dnd5e's rates: the real module and
@@ -286,6 +286,9 @@ const { Actor5e } = await import('./actor5e.mjs')
 const { equip } = await import('./activity5e.mjs')
 users.activeGM = user('gm', 'Gamemaster', true)
 users.get('gm').targets = new Set()
+// A second Gamemaster at the table, an Assistant, whose browser isn't the bridge: every Gamemaster is
+// whispered what a character handed out, not the bridge's alone.
+Object.assign(user('gm2', 'Assistant', true, 3), { isActiveGM: false, isSelf: false })
 for (const [id, name] of [['alice', 'Alice'], ['bob', 'Bob'], ['carol', 'Carol'], ['eve', 'Eve']]) user(id, name)
 
 /** A character, as dnd5e's, with its items and coins. */
@@ -337,6 +340,9 @@ const potion = (quantity, options = {}) => itemData('Potion of Healing', 'consum
 // characters as the Company has, but not the same ones, can be told from one naming its own.
 const thorin = character('thorin', 'Thorin', ['alice'], { coins: { gp: 40 } })
 const vex = character('vex', 'Vex', ['bob'], { coins: { gp: 12 } })
+// The Assistant has Owner on Vex by name too, as a Gamemaster may be given: no player of hers for
+// that, so what Vex receives is whispered to Bob alone.
+vex.ownership = { default: 0, bob: 3, gm2: 3 }
 const bram = character('bram', 'Bram', ['carol'])
 const lia = character('lia', 'Lia', [])
 const grumble = character('grumble', 'Grumble', [], { npc: { max: 2, spent: 0, denomination: 'd8' } })
@@ -493,6 +499,8 @@ const saidBy = made => [...messages.values()].filter(message => message.flags?.[
 const told = message => [message.content.replace(/^<p>|<\/p>$/g, ''), [...message.whisper], message.speaker.actor, message.author.id]
 /** The chat event the app was sent for a message, if it was sent one. */
 const chatOf = id => app.events.find(e => (e.type === 'chat.message.created') && (e.data.message.id === id))
+/** Both Gamemasters, whom the one message of a hand-out is whispered to. */
+const GMS = ['gm', 'gm2']
 const THREE = ['vex', 'bram', 'lia']
 const RICH = { pp: 700, gp: 20 }
 const EACH = { pp: 200, gp: 50 }
@@ -622,17 +630,22 @@ let said = saidBy(made)
 assert.deepEqual(said.map(told), [
   ['Vex received 10 gp from Thorin', ['bob'], 'thorin', 'alice'],
   ['Bram received 10 gp from Thorin', ['carol'], 'thorin', 'alice'],
-  ['Thorin handed out 10 gp each to Vex and Bram: 20 gp in all', ['gm'], 'thorin', 'alice'],
+  ['Thorin handed out 10 gp each to Vex and Bram: 20 gp in all', GMS, 'thorin', 'alice'],
 ])
 assert.equal(messages.size, lines + 3, 'and no other')
 assert.ok(said.every(message => (message.whisper.length > 0) && (message.blind === false)), 'none for everyone')
+// Every Gamemaster is whispered the one message, the Assistant as the bridge's own; and neither is
+// whispered what a character received, though the Assistant has Owner on Vex by name.
+assert.deepEqual([users.filter(u => u.isGM).map(u => u.id), game.user.id, users.activeGM.id], [GMS, 'gm', 'gm'], "two Gamemasters, the bridge's the first")
+assert.deepEqual(said.at(-1).whisper, GMS, 'both Gamemasters, not the bridge\'s alone')
+assert.ok(said.slice(0, -1).every(message => message.whisper.every(id => users.get(id).isGM === false)), "no Gamemaster among a receiver's players")
 assert.ok(said.every(message => JSON.stringify(message.flags['sending-stone']) === JSON.stringify({ request: made.command.id })))
 assert.deepEqual(made.result, {
   id: made.command.id, status: 'done', reason: null, error: null, messageId: said.at(-1).id, visible: true, rolls: [],
   transfer: { from: 'thorin', to: null, items: [], currency: { gp: 10 }, each: ['vex', 'bram'], used: null },
 })
 assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ['character.updated', 'vex'], ['character.updated', 'bram']], "the giver's, then each one's given, in order")
-okay('Thorin hands out 10 gp each to Vex and Bram: 20 gp taken from him in one write, then 10 added to each in the order named; "Vex received 10 gp from Thorin" whispered to Bob, "Bram received 10 gp from Thorin" to Carol, and "Thorin handed out 10 gp each to Vex and Bram: 20 gp in all" to the Gamemaster, each as Thorin, by Alice, none for everyone; his sheet, then theirs, ahead of the result, whose `transfer` says what each was given, `each` and `used` null, its message the Gamemaster\'s')
+okay('Thorin hands out 10 gp each to Vex and Bram: 20 gp taken from him in one write, then 10 added to each in the order named; "Vex received 10 gp from Thorin" whispered to Bob alone, though the Assistant Gamemaster has Owner on her too, "Bram received 10 gp from Thorin" to Carol, and "Thorin handed out 10 gp each to Vex and Bram: 20 gp in all" to both Gamemasters, the bridge\'s and the Assistant, each as Thorin, by Alice, none for everyone; his sheet, then theirs, ahead of the result, whose `transfer` says what each was given, `each` and `used` null, its message the Gamemasters\'')
 
 /* -------------------------------------------- */
 /*  With other coins                            */
@@ -656,7 +669,7 @@ said = saidBy(made)
 assert.deepEqual(said.map(told), [
   ['Vex received 200 pp and 50 gp from Thorin', ['bob'], 'thorin', 'alice'],
   ['Bram received 200 pp and 50 gp from Thorin', ['carol'], 'thorin', 'alice'],
-  ['Thorin handed out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all', ['gm'], 'thorin', 'alice'],
+  ['Thorin handed out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all', GMS, 'thorin', 'alice'],
 ], 'none for Lia, whom no player owns, though the Gamemaster is told of her')
 assert.equal(messages.size, lines + 3)
 assert.ok([...messages.values()].slice(-3).every(message => message.whisper.length > 0), 'none for everyone')
@@ -801,7 +814,7 @@ ash.ownership = { default: 0, eve: 3, bob: 3 }
 await settle()
 made = await handed('thorin', ['ash'], { gp: 1 })
 assert.deepEqual(saidBy(made).map(told), [
-  ['Ash received 1 gp from Thorin', ['bob', 'eve'], 'thorin', 'alice'], ['Thorin handed out 1 gp each to Ash: 1 gp in all', ['gm'], 'thorin', 'alice'],
+  ['Ash received 1 gp from Thorin', ['bob', 'eve'], 'thorin', 'alice'], ['Thorin handed out 1 gp each to Ash: 1 gp in all', GMS, 'thorin', 'alice'],
 ])
 // Ash herself, still owned by both and neither's own character, hands out, as a player's own: with
 // no one player to write for her, her messages are the bridge's Gamemaster's, so neither of her
@@ -809,7 +822,7 @@ assert.deepEqual(saidBy(made).map(told), [
 stock(ash, [], { gp: 9 })
 made = await handed('ash', ['bram'], { gp: 2 })
 said = saidBy(made)
-assert.deepEqual(said.map(told), [['Bram received 2 gp from Ash', ['carol'], 'ash', 'gm'], ['Ash handed out 2 gp each to Bram: 2 gp in all', ['gm'], 'ash', 'gm']])
+assert.deepEqual(said.map(told), [['Bram received 2 gp from Ash', ['carol'], 'ash', 'gm'], ['Ash handed out 2 gp each to Bram: 2 gp in all', GMS, 'ash', 'gm']])
 assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, coinsOf(ash).gp, coinsOf(bram).gp], ['done', said.at(-1).id, false, 7, 2])
 assert.deepEqual([chatOf(said[0].id).data.message.audience.users, chatOf(said[0].id).data.message.audience.characters, chatOf(said[1].id)], [['carol'], ['bram'], undefined], "Bram's player alone is told of the whisper, and no one of the Gamemasters' message")
 // Shared with every player through her default, she's still her own players' alone.
@@ -820,7 +833,7 @@ ash.ownership = { default: 0, eve: 3 }
 // The Gamemaster's, at Thorin's page: each message flagged theirs, and listed in their result.
 made = await handed('thorin', ['vex'], { gp: 1 }, { by: 'gm' })
 said = saidBy(made)
-assert.deepEqual(said.map(told), [['Vex received 1 gp from Thorin', ['bob'], 'thorin', 'alice'], ['Thorin handed out 1 gp each to Vex: 1 gp in all', ['gm'], 'thorin', 'alice']])
+assert.deepEqual(said.map(told), [['Vex received 1 gp from Thorin', ['bob'], 'thorin', 'alice'], ['Thorin handed out 1 gp each to Vex: 1 gp in all', GMS, 'thorin', 'alice']])
 assert.ok(said.every(message => JSON.stringify(message.flags['sending-stone']) === JSON.stringify({ request: made.command.id, by: 'gm' })))
 assert.deepEqual([made.result.messages, made.result.messageId, made.result.visible], [said.map(message => message.id), said.at(-1).id, true])
 // Lia, whom no player owns, hands out: her messages are the bridge's Gamemaster's own, so the one
@@ -831,12 +844,12 @@ made = await handed('lia', ['vex', 'bram'], { sp: 2 }, { by: 'gm' })
 said = saidBy(made)
 assert.deepEqual(said.map(told), [
   ['Vex received 2 sp from Lia', ['bob'], 'lia', 'gm'], ['Bram received 2 sp from Lia', ['carol'], 'lia', 'gm'],
-  ['Lia handed out 2 sp each to Vex and Bram: 4 sp in all', ['gm'], 'lia', 'gm'],
+  ['Lia handed out 2 sp each to Vex and Bram: 4 sp in all', GMS, 'lia', 'gm'],
 ])
 assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, purse(lia)], ['done', said.at(-1).id, false, { sp: 1 }])
 assert.deepEqual(said.slice(0, 2).map(message => { const { audience } = chatOf(message.id).data.message; return [audience.gmOnly, audience.users, audience.characters] }), [[false, ['bob'], ['vex']], [false, ['carol'], ['bram']]])
 assert.equal(chatOf(said.at(-1).id), undefined, "the Gamemasters' own isn't sent to the app")
-okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver with no one player of its own, none owning it or two with neither having it as their character, has the bridge's Gamemaster as its author, so the Gamemasters' message is theirs alone, the result's `visible` false, a player's own hand-out too, and the app is sent the whispers but not that")
+okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver with no one player of its own, none owning it or two with neither having it as their character, has the bridge's Gamemaster as its author, so the Gamemasters' message, whispered to both of them still, is theirs alone, the result's `visible` false, a player's own hand-out too, and the app is sent the whispers but not that")
 
 /* -------------------------------------------- */
 /*  A hand-out that fails                       */
@@ -861,7 +874,7 @@ assert.deepEqual(writes.slice(at).map(([, id, changes]) => [id, changes]), [
 ], 'no write of Lia')
 assert.deepEqual(saidBy(made).map(told), [
   ['Vex received 200 pp and 50 gp from Thorin', ['bob'], 'thorin', 'alice'],
-  ['Thorin handed out 200 pp and 50 gp each to Vex: 200 pp and 50 gp in all', ['gm'], 'thorin', 'alice'],
+  ['Thorin handed out 200 pp and 50 gp each to Vex: 200 pp and 50 gp in all', GMS, 'thorin', 'alice'],
 ], 'only of those given')
 assert.equal(messages.size, lines + 2)
 assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ['character.updated', 'vex']])

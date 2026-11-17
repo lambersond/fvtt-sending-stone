@@ -3536,15 +3536,17 @@ received {things} from {giver}`, "Vex received 200 pp and 50 gp from Thorin"; on
 whispered nothing, as a whisper to no one would be for everyone. Then every Gamemaster is whispered
 one message, `{name} handed out {each} each to {names}: {total} in all`: "Thorin handed out 200 pp
 and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all", naming only those given, in order,
-and totalling only theirs. Each is spoken by the giver and written by the giver's player, as every
-line is, marked on its card, the Gamemaster's `by` `"gm"` and listed in their result's `messages`.
-So the giver's player reads every one of them, as Foundry shows a whisper to who wrote it: a
-[chat message](#chat-message) for each is sent with the giver's character among its readers, beside
-the one given. A giver with no one player of its own, one no player owns, or one several own with
-none of them having it as their character, has the bridge's Gamemaster as its author, as its
-[rolls](#making-a-roll) have: the Gamemasters' message is then theirs alone, the whispers reach
-only those given, and none of the giver's own players reads any of them, their own hand-out's
-either. Where no one was given coins, nothing is posted.
+and totalling only theirs. Every Gamemaster of the world, an Assistant too, not the one whose
+browser is the bridge alone; and none of them is whispered what a character received, whatever
+ownership of it they have by name. Each is spoken by the giver and written by the giver's player, as
+every line is, marked on its card, the Gamemaster's `by` `"gm"` and listed in their result's
+`messages`. So the giver's player reads every one of them, as Foundry shows a whisper to who wrote
+it: a [chat message](#chat-message) for each is sent with the giver's character among its readers,
+beside the one given. A giver with no one player of its own, one no player owns, or one several own
+with none of them having it as their character, has the bridge's Gamemaster as its author, as its
+[rolls](#making-a-roll) have: the Gamemasters' message is then theirs alone, the whispers reach only
+those given, and none of the giver's own players reads any of them, their own hand-out's either.
+Where no one was given coins, nothing is posted.
 
 **The result.** Both ends' sheets as they then stand go first, `from`'s then `to`'s, each in
 [`character.updated`](#characterupdated), or [`group.updated`](#groupupdated) to a listener that
