@@ -694,6 +694,30 @@ async function effectsCarriedBack(formId) {
     await clear(POTION, HEX)
     errors.length = 0
 
+    // 8b. One gone again as it is made: Rowan's concentration ends in that moment, and Shield of Faith
+    // with it. The writes that turn the kept effects on and put their time right name it no more,
+    // and nothing is logged of it: it simply ended.
+    wolf = await shapeAs()
+    const sof8b = await gainedOn(wolf, 'cf')
+    await onForm(wolf, { _id: POTION, name: 'Potion of Heroism', origin: potionEffect, flags: { dnd5e: { dependentOn: potionEffect } },
+      start: { time: game.time.worldTime - 600, combat: null, combatant: null, initiative: null, round: null, turn: null },
+      duration: { value: 1, units: 'hours', expiry: null, seconds: 3600, remaining: 3000 } })
+    const endsAsMade = Hooks.on('createActiveEffect', async effect => {
+      if ((effect.parent?.id === 'elowen') && (effect.id === sof8b.id)) await rowan.endConcentration(sof8b.conc)
+    })
+    port.faults.resetEffectStart = true
+    mark = port.effectWrites.length
+    await back()
+    port.faults.resetEffectStart = false
+    Hooks.off('createActiveEffect', endsAsMade)
+    assert.deepEqual([rowan.effects.includes(sof8b.conc), count(sof8b.id), count(POTION), hers(POTION)?.disabled], [false, 0, 1, false], 'Shield of Faith ended as it was made; the potion\'s effect kept, and on')
+    assert.deepEqual(elowenWrites(mark).map(write => [write.op, write.data.map(each => each._id ?? each)]),
+      [['create', [sof8b.id, POTION]], ['delete', [sof8b.id]], ['update', [POTION]], ['update', [POTION]]],
+      'made, the one that ended deleted with its concentration, then the turning-on and the time written for the other alone')
+    assert.deepEqual(errors, [], 'nothing logged')
+    await sof8b.gone()
+    await clear(POTION)
+
     // 9. A return refused: what was put on her for it is taken off again.
     wolf = await shapeAs()
     const sof9 = await gainedOn(wolf, 'c9')
@@ -783,7 +807,7 @@ async function effectsCarriedBack(formId) {
     await rowan.endConcentration(sof12.conc)
     assert.equal(count(sof12.id), 0, 'and gone when he ends it')
     assert.deepEqual(errors, [], 'nothing else logged')
-    ok('0.48.0, effects carried back: four put on the Wolf by others (one tied to Rowan\'s concentration, a potion\'s with its item used up, one made on the form\'s own sheet, one with no origin and turned off) are on her after the return with their ids, each as the form had it, the sheet-made one with her as its origin, in two writes before dnd5e deletes the form (created turned off with their ids kept, then the three that were on turned on), Shield of Faith hers to turn off or delete on her sheet before the result and the sheet-made one the Gamemaster\'s; a second return and a second pass of the carry-back write nothing; it leaves her when Rowan ends his concentration; never carried: one run out, the form\'s own item\'s, its copy of her Lucky\'s, a relative origin, a bare id to depend on, a concentration begun in form and what depends on it (by its origin, or by its dependentOn alone), a concentration of any origin, Bloodied, and the creature\'s own, which the record\'s formEffects names, while Blinded gained in form is one effect; taken off: one deleted on the form and one run out on it are deleted from her, one still on it not written; one of hers deleted from her own actor meanwhile and still on the form is not put back; one taken off that can\'t be deleted from her is logged by name and the next deleted all the same, the return going on; her Encumbered and her Exhaustion effect are never deleted, her exhaustion 0 by the sum; her concentration and what it kept up on herself, both taken off in form, end once with no second delete; one effect that can\'t be made, which was on, is logged by name and the other three kept, no update naming it, the rest of the return going on; a return refused, and one that throws (logged), each leave nothing of it on her, and the next carries it once; where one put on her for a refused return can\'t be taken off again it is logged by name and the other taken off; a rider condition cured in form does not come back with its effect; where creating or enabling starts an effect\'s time afresh, a third write puts its start and duration right; with a deleted actor\'s effects each told of, carried and tied all the same')
+    ok('0.48.0, effects carried back: four put on the Wolf by others (one tied to Rowan\'s concentration, a potion\'s with its item used up, one made on the form\'s own sheet, one with no origin and turned off) are on her after the return with their ids, each as the form had it, the sheet-made one with her as its origin, in two writes before dnd5e deletes the form (created turned off with their ids kept, then the three that were on turned on), Shield of Faith hers to turn off or delete on her sheet before the result and the sheet-made one the Gamemaster\'s; a second return and a second pass of the carry-back write nothing; it leaves her when Rowan ends his concentration; never carried: one run out, the form\'s own item\'s, its copy of her Lucky\'s, a relative origin, a bare id to depend on, a concentration begun in form and what depends on it (by its origin, or by its dependentOn alone), a concentration of any origin, Bloodied, and the creature\'s own, which the record\'s formEffects names, while Blinded gained in form is one effect; taken off: one deleted on the form and one run out on it are deleted from her, one still on it not written; one of hers deleted from her own actor meanwhile and still on the form is not put back; one taken off that can\'t be deleted from her is logged by name and the next deleted all the same, the return going on; her Encumbered and her Exhaustion effect are never deleted, her exhaustion 0 by the sum; her concentration and what it kept up on herself, both taken off in form, end once with no second delete; one effect that can\'t be made, which was on, is logged by name and the other three kept, no update naming it, the rest of the return going on; one ended again as it was made, with its caster\'s concentration, is named by neither the turning-on nor the time put right, and nothing is logged of it; a return refused, and one that throws (logged), each leave nothing of it on her, and the next carries it once; where one put on her for a refused return can\'t be taken off again it is logged by name and the other taken off; a rider condition cured in form does not come back with its effect; where creating or enabling starts an effect\'s time afresh, a third write puts its start and duration right; with a deleted actor\'s effects each told of, carried and tied all the same')
 
     // 13. dnd5e 6.0.5: the origin in `system.origin`.
     if (DND5E6) {

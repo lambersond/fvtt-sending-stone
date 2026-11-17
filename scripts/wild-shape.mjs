@@ -1024,7 +1024,10 @@ async function eachOrAll(original, list, write, failed) {
  * 3. Its time put right: each copy read back, and its `start` and `duration` written again where
  *    creating it or turning it on changed them, so the time left goes on as it was.
  *
- * The first write is sent before anything is awaited, as `carryBack` needs of it.
+ * The second and third name only those of them she holds as each is sent. One that couldn't be made
+ * is not among them; and one may be gone again by then, ended with its caster's concentration,
+ * which is nothing to write and no failure. The first write is sent before anything is awaited, as
+ * `carryBack` needs of it.
  * @param {object} kept       snapshot's.
  * @param {Actor} original
  * @returns {Promise<string[]>}   The ids of the effects it made.
@@ -1034,14 +1037,16 @@ async function putGained(kept, original) {
   if ( !wanted.length ) return [];
   const made = await eachOrAll(original, wanted.map(data => ({ ...data, disabled: true })),
     batch => original.createEmbeddedDocuments("ActiveEffect", batch, { keepId: true, sendingStone: OWN }), "keep");
-  const ids = new Set(made.map(effect => effect?.id).filter(Boolean));
-  const kin = wanted.filter(data => ids.has(data._id));
-  const update = batch => original.updateEmbeddedDocuments("ActiveEffect", batch.map(({ name, ...changes }) => changes), { sendingStone: OWN });
-  await eachOrAll(original, kin.filter(data => data.disabled !== true).map(data => ({ _id: data._id, name: data.name, disabled: false })), update, "keep");
-  const timing = kin.map(data => ({ _id: data._id, name: data.name, ...timingChanges(ownEffect(original, data._id)?.toObject(), data) }))
+  const update = async batch => {
+    const held = batch.filter(each => ownEffect(original, each._id));
+    if ( !held.length ) return [];
+    return original.updateEmbeddedDocuments("ActiveEffect", held.map(({ name, ...changes }) => changes), { sendingStone: OWN });
+  };
+  await eachOrAll(original, wanted.filter(data => data.disabled !== true).map(data => ({ _id: data._id, name: data.name, disabled: false })), update, "keep");
+  const timing = wanted.map(data => ({ _id: data._id, name: data.name, ...timingChanges(ownEffect(original, data._id)?.toObject(), data) }))
     .filter(each => each.start || each.duration);
   await eachOrAll(original, timing, update, "keep");
-  return Array.from(ids);
+  return made.map(effect => effect?.id).filter(Boolean);
 }
 
 /**
