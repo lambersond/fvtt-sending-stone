@@ -49,12 +49,17 @@ const sixth = () => String(game.system?.version ?? '').startsWith('6')
  * dnd5e 6 gives one created with a duration and no expiry `turnStart`, as its `_preCreate` does in a
  * started fight (D6 documents/active-effect.mjs:754-762) [core, unverified: whether core starts an
  * effect's time afresh]; `slowEffects` is how many turns more a creation waits, as a slow round trip.
+ * And `noCanvas` makes the canvas not ready, as dnd5e's return reads it: that return then writes no
+ * token, and goes from its hook to its deletion of the forms with nothing awaited between
+ * (D5 documents/actor/actor.mjs:3155, :3213-3237; D6 :3233, :3291-3316), the least it ever leaves
+ * a hook's own write to get ahead in. Here a write waits one turn from where it is sent, so the one
+ * sent first is made first [core, unverified: what each waits on before its request goes].
  */
 export const port = {
   transforms: [], reverts: [], settings: [], fromUuid: [], indexes: [], tokenWrites: [], created: [], deleted: [], effectWrites: [],
   faults: {
     throwOnTransform: false, throwOnTokens: false, refuseRevert: false, throwOnRevert: false, moonSpellList: true, storedActorId: false,
-    cascadeEffects: false, refuseEffect: null, resetEffectStart: false, slowEffects: 0,
+    cascadeEffects: false, refuseEffect: null, resetEffectStart: false, slowEffects: 0, noCanvas: false,
   },
 }
 
@@ -250,9 +255,10 @@ export function installTransformCore() {
   foundry.utils.isEmpty ??= value => !value || !Object.keys(value).length
   globalThis.Actor = { implementation: { create: TActor.create, deleteDocuments: TActor.deleteDocuments, updateDocuments: TActor.updateDocuments } }
 
-  // The Gamemaster's canvas, ready, showing token-core's viewed scene (its faults.canvasScene, else the active one).
+  // The Gamemaster's canvas, ready unless `port.faults.noCanvas`, showing token-core's viewed scene (its
+  // faults.canvasScene, else the active one).
   const canvas = globalThis.canvas ?? {}
-  Object.defineProperty(canvas, 'ready', { configurable: true, get: () => true })
+  Object.defineProperty(canvas, 'ready', { configurable: true, get: () => !port.faults.noCanvas })
   Object.defineProperty(canvas, 'scene', { configurable: true, get: () => viewedScene() })
   globalThis.canvas = canvas
 
@@ -1019,7 +1025,8 @@ export class TActor extends Character {
    * slots; the viewed scene's tokens put back; a Gamemaster deletes every form of the chain with no
    * options, a player unflags them; then her update, with no concentration check. Faults:
    * `refuseRevert` makes the next one do nothing, as a module's hook might stop it; `throwOnRevert`
-   * makes the next one throw, before anything is changed.
+   * makes the next one throw, before anything is changed; with `noCanvas` no token is written, and
+   * nothing is awaited between the hook and the forms' deletion.
    */
   async revertOriginalForm(options = {}) {
     if (!this.isPolymorphed) return undefined
