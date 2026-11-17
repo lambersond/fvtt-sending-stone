@@ -8,9 +8,9 @@
 //   - scripts that import one another in a loop, which it prints with one way round it;
 //   - an import of a script in a higher layer;
 //   - a script that is in no layer, or in two, and a script LAYERS lists that isn't there;
-//   - an import it can't follow to one of the module's .mjs scripts: of a file that isn't there or
-//     isn't an .mjs, by a path that isn't relative or is written with a backslash, or an `import(`
-//     holding anything but one plain string in quotes.
+//   - an import it can't follow to one of the module's .mjs scripts: of a file that isn't there,
+//     isn't an .mjs or is outside scripts/, by a path that isn't relative or is written with a
+//     backslash, or an `import(` holding anything but one plain string in quotes.
 //
 // Each failure says what to do about it. Where there is none, this prints nothing.
 //
@@ -30,7 +30,11 @@
 //     expression (`/import(ed)?/`), and as the name a method is declared by;
 //   - the word where JavaScript has a property of that name, unless its dot stands directly
 //     before it: after a dot on the line above (`tool.`, then `import(…)`), or after a `#`
-//     (`this.#import(…)`). It is read as the two above are.
+//     (`this.#import(…)`). It is read as the two above are;
+//   - the word as the last of a string, where another string follows: `["import", "export"]` is
+//     read as an import of the `, ` between its two strings, a path that isn't relative; and the
+//     word as the last of a line comment, read with the line below where that begins with a
+//     string or a bracket.
 //
 // Let be: `import()` with nothing in it, which is no code, and a property with its dot directly
 // before it (`tool.import(…)`).
