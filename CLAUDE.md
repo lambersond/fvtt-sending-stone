@@ -125,7 +125,7 @@ those too. The module's only two, `findLink`'s in `command-links.mjs`, point dow
   `test/fvtt/<area>.mjs`, under both releases where they differ. A change that only moves code
   changes no assertion: only the import lines that name what moved. The app's e2e imports
   `test/fvtt/`'s stand-ins too: a change to one can break it.
-- **test/README.md's counts stay true:** "51 harnesses, 121 runs" changes with `harness-all.sh`.
+- **test/README.md's counts stay true:** "52 harnesses, 122 runs" changes with `harness-all.sh`.
 - **The dnd5e checkouts are read-only:** `test:setup` fetches them at pinned SHAs into
   `.cache/dnd5e/` (or set `DND5E5_DIR` and `DND5E6_DIR`). Never edit or commit them; a pin moves in
   `test/pins.env` alone.

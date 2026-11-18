@@ -355,6 +355,7 @@
       "Refused": "Last refused at {time}: {problem}",
       "Withheld": "{name}'s sheet is withheld: it came to {size}, more than the {limit} the app takes.",
       "RollsFetched": "Players' rolls fetched at {time}.",
+      "RollsQuiet": "Players' rolls fetched at {time}. No one has a character or party open in the app, so Sending Stone asks it every {seconds} seconds.",
       "RollsStopped": "Players' rolls stopped at {time}: {problem}",
       "RollsFailing": "Players' rolls failing since {time}: {problem}",
       "OtherBrowser": "Events go from {name}'s browser, the active Gamemaster's, which is told of any problem."

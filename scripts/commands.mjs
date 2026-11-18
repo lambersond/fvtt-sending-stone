@@ -63,6 +63,11 @@ import { noteWildShapeReader, wildShapeOn, wildShapeReader } from "./wild-shape.
  * read, isn't made again until the settings change or the campaign's hello is sent; one that may
  * work later, as with the app unreachable, is, after a while. Since 0.23.0 the Gamemaster is told
  * of either, as delivery-status.mjs tells them of a post's failure.
+ *
+ * Since 0.50.0, while nobody is in a campaign's app, as its answers say (`quiet`), it is looked at
+ * about every 20 seconds, a look asking whether there is anything to fetch, and fetched in full at
+ * least every five minutes: never in the two minutes after its hello is answered, nor while a
+ * command is being made here, nor after a failed fetch or an answer that says nothing of quiet.
  */
 
 /**
@@ -99,6 +104,20 @@ const WATCHDOG = 60_000;
 const HELD_CHECK = 1_000;
 
 /**
+ * Since 0.50.0, how long after a campaign's fetching starts, or its hello is answered, it keeps its
+ * usual pace whatever the app says of quiet, in milliseconds.
+ * @type {number}
+ */
+const QUIET_AFTER = 120_000;
+
+/**
+ * Since 0.50.0, while quiet, the longest between two full fetches, in milliseconds, so that a note
+ * handed over and never answered is handed over again.
+ * @type {number}
+ */
+const FULL_EVERY = 300_000;
+
+/**
  * How many of the latest commands are remembered, so that one fetched twice is made once.
  * @type {number}
  */
@@ -109,6 +128,13 @@ const REMEMBERED = 200;
  * @type {Set<string>}
  */
 const offered = new Set();
+
+/**
+ * Since 0.50.0, the campaigns whose app said, in its last answer to their hello or heartbeat, that it
+ * answers fetches quietly while nobody is in it: `quiet` of 1 or more.
+ * @type {Set<string>}
+ */
+const quietReaders = new Set();
 
 /**
  * Campaigns whose fetch the app refused, as for a wrong secret, until the settings change.
@@ -309,8 +335,10 @@ export function registerCommandHooks() {
  * whether it takes coins added and taken away, for which it's fetched from where the campaign's
  * Gamemaster lets its players, under dnd5e, with everything else off; and since 0.50.0, whether it
  * reads how hurt other creatures are, `health`, to which its combats are sent again where it first
- * says so (health-sync.mjs). A hello's answer wakes
- * the campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
+ * says so (health-sync.mjs), and whether it answers fetches quietly while nobody is in it, `quiet`.
+ * A hello's answer wakes the campaign's fetching, which may be waiting as an answer given before
+ * the hello was taken asked; since 0.50.0 it fetches in full at its usual pace again, for two
+ * minutes at least.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -339,8 +367,9 @@ export function noteListenerFeatures(campaignId, features, type) {
   const healthWas = healthReader(campaignId);
   noteHealthReader(campaignId, features);
   if ( !healthWas && healthReader(campaignId) ) healthWanted(campaignId);
+  noteQuietReader(campaignId, features);
   syncPollers();
-  if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.wake?.();
+  if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.rouse();
 }
 
 /**
@@ -416,6 +445,29 @@ export function commandsOffered(campaignId) {
 }
 
 /**
+ * Note whether a campaign's app answers fetches quietly while nobody is in it, since 0.50.0:
+ * `features.quiet`, 1 or later. One that says nothing of it, as an older or rolled back app, is
+ * fetched from as before.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @returns {void}
+ */
+function noteQuietReader(campaignId, features) {
+  const format = features?.quiet;
+  if ( Number.isInteger(format) && (format >= 1) ) quietReaders.add(campaignId);
+  else quietReaders.delete(campaignId);
+}
+
+/**
+ * Does a campaign's app answer fetches quietly while nobody is in it?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+function quietReader(campaignId) {
+  return quietReaders.has(campaignId);
+}
+
+/**
  * Stop fetching, as when this client is no longer the bridge.
  * @returns {void}
  */
@@ -458,6 +510,25 @@ class Poller {
      * @type {(() => void)|null}
      */
     this.wake = null;
+
+    /**
+     * Since 0.50.0, the `quiet` of the last answer, in milliseconds: 0 where it said none, handed
+     * anything over, or the fetch failed.
+     * @type {number}
+     */
+    this.quiet = 0;
+
+    /**
+     * Since 0.50.0, when fetching started, or the campaign's hello was last answered.
+     * @type {number}
+     */
+    this.since = Date.now();
+
+    /**
+     * Since 0.50.0, when the last full fetch was answered; 0 before the first.
+     * @type {number}
+     */
+    this.fullAt = 0;
   }
 
   /** @returns {void} */
@@ -475,7 +546,30 @@ class Poller {
   }
 
   /**
-   * Fetch until stopped, waiting as the app asks, and longer after each failure in a row.
+   * Since 0.50.0, fetch in full at the usual pace again, at once and for two minutes at least: the
+   * campaign's hello has been answered.
+   * @returns {void}
+   */
+  rouse() {
+    this.quiet = 0;
+    this.since = Date.now();
+    this.wake?.();
+  }
+
+  /**
+   * Since 0.50.0, is the campaign fetched quietly now? Where its app said, in its last answer, that
+   * nobody is in it, says it answers quietly, two minutes after its hello was answered, while no
+   * command is being made here.
+   * @returns {boolean}
+   */
+  #quietNow() {
+    return (this.quiet > 0) && quietReader(this.campaignId) && ((Date.now() - this.since) >= QUIET_AFTER)
+      && !isMakingCommands();
+  }
+
+  /**
+   * Fetch until stopped, waiting as the app asks, and longer after each failure in a row; since
+   * 0.50.0, while quiet, as its answer's `quiet` asks.
    * @returns {Promise<void>}
    */
   async #run() {
@@ -487,10 +581,15 @@ class Poller {
       try {
         answer = await this.#fetch(campaign);
         failures = 0;
-        noteFetched(campaign.id);
+        if ( !answer.looked ) this.fullAt = Date.now();
+        // Never quiet after a hand-over: whoever sent it may send more.
+        this.quiet = answer.commands.length ? 0 : answer.quiet;
+        noteFetched(campaign.id, { quiet: this.#quietNow() ? this.quiet : 0 });
       } catch (err) {
         if ( this.stopped ) break;
         failures++;
+        // The first fetch after any failure is a full one.
+        this.quiet = 0;
         // The app won't take this campaign's fetch as it's set up: not until the settings change.
         const stop = stopsFetching(err?.reason);
         noteFetchFailed(campaign, err, { stopped: stop, failures });
@@ -510,19 +609,26 @@ class Poller {
       // made as it now is.
       const current = getCampaigns().find(({ id }) => id === this.campaignId) ?? campaign;
       for ( const command of answer.commands ) take(command, current);
-      if ( answer.wait > 0 ) await this.#pause(Math.min(answer.wait, MAX_WAIT));
+      const pause = this.#quietNow() ? this.quiet : answer.wait;
+      if ( pause > 0 ) await this.#pause(Math.min(pause, MAX_WAIT));
     }
     this.stop();
   }
 
   /**
    * Fetch the campaign's commands once, and since 0.27.0 which of its characters the app has open,
-   * `open`, as it lists them; none where it lists none, as an older app.
+   * `open`, as it lists them; none where it lists none, as an older app. Since 0.50.0, to an app that
+   * answers quietly, the fetch says whether it is a quiet look, `quiet`, which it is while the
+   * campaign is fetched quietly but for a full fetch at least every five minutes; and what's
+   * returned says how long its answer asked to wait while nobody is in the app, `quiet`, 0 where it
+   * asked nothing or the app doesn't answer quietly, and whether it was a look, `looked`.
    * @param {Campaign} campaign
-   * @returns {Promise<{commands: object[], wait: number, open: unknown}>}
+   * @returns {Promise<{commands: object[], wait: number, quiet: number, open: unknown, looked: boolean}>}
    * @throws {DeliveryError}   Saying why, as a post's does.
    */
   async #fetch(campaign) {
+    const reads = quietReader(this.campaignId);
+    const looked = reads && this.#quietNow() && ((Date.now() - this.fullAt) < FULL_EVERY);
     const destination = parseDestination(getDestination());
     const network = (key, reason, cause) => new DeliveryError(game.i18n.localize(`SENDINGSTONE.Error.${key}`), {
       retryable: true, reason, cause
@@ -544,7 +650,8 @@ class Poller {
           body: JSON.stringify({
             protocol: PROTOCOL_VERSION,
             session: currentSession(),
-            campaign: describeCampaign(campaign)
+            campaign: describeCampaign(campaign),
+            ...(reads ? { quiet: looked } : {})
           }),
           mode: "cors",
           credentials: "omit",
@@ -568,7 +675,9 @@ class Poller {
       return {
         commands: commands.filter(command => command && (typeof command === "object")),
         wait: Number.isFinite(answer?.wait) ? answer.wait : 0,
-        open: answer?.open
+        quiet: (reads && Number.isFinite(answer?.quiet) && (answer.quiet > 0)) ? answer.quiet : 0,
+        open: answer?.open,
+        looked
       };
     } finally {
       clearTimeout(timer);
@@ -710,6 +819,15 @@ function onQueueSettled(key) {
  */
 export function queueBusy(key) {
   return queues.has(key);
+}
+
+/**
+ * Is any command being made here, or waiting its turn, for any campaign? Since 0.50.0, while one is,
+ * fetching keeps its usual pace, whatever the app says of quiet.
+ * @returns {boolean}
+ */
+function isMakingCommands() {
+  return queues.size > 0;
 }
 
 /**
