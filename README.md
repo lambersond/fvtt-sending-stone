@@ -498,10 +498,10 @@ either is missing.
 - **What moves.** Part of a stack, or all of it; a container whole, with everything in it, as dnd5e's
   drop moves it. Each item arrives unequipped and unattuned, what a container held too, with its
   uses, effects and identification. A potion joins a stack of the same potion, but never an
-  unidentified one, one with uses spent or one enchanted. Coins given to a party, or by an app
-  before v0.50.0 to a character, are moved exactly: never more than there are, and dnd5e 6's
-  fractions stay. An item in a container that hides what it holds, or deeper than five containers,
-  isn't offered.
+  unidentified one, one with uses spent or one enchanted. Coins are moved exactly: never more than
+  there are, and dnd5e 6's fractions stay; coins given to characters, as above, are taken from the
+  giver as coins taken away are. An item in a container that hides what it holds, or deeper than
+  five containers, isn't offered.
 - **A line in chat** for each move, as the character who moved it, for everyone, such as "Takes 50
   gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM". Coins given to
   characters, as above, are whispered instead.
