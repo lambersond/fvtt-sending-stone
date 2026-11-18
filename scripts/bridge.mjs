@@ -13,6 +13,7 @@ import { wildShapeFeatures } from "./command-wildshape.mjs";
 import { removalFeatures, transferFeatures } from "./command-transfers.mjs";
 import { companionFeatures, rollFeatures, stopPollers, syncPollers } from "./commands.mjs";
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
+import { healthFeatures } from "./creature-health.mjs";
 import { followAll } from "./creature-initiative.mjs";
 import { companionList } from "./creatures.mjs";
 import { noteListed } from "./creature-sync.mjs";
@@ -88,7 +89,9 @@ const resent = new Map();
  * `features.hitPoints`, by its own switch, on until turned off, under D&D Fifth Edition. Since
  * 0.49.0, whether its players may add coins to their characters and take them away from the app,
  * and whether their other coins pay where they're short of one, `features.coins`, by its own switch,
- * on until turned off, under D&D Fifth Edition. Since
+ * on until turned off, under D&D Fifth Edition. Since 0.50.0, whether its players see in the app
+ * how hurt other creatures in a fight are, and their hit points too, `features.health`, by its own
+ * two switches, off until turned on, under D&D Fifth Edition. Since
  * 0.44.0 too, under D&D Fifth Edition, what of Tidy 5e Sheets' journal its characters hold, and
  * whether Tidy is active, `features.notes.tidy` (tidy-journal.mjs); and it lists the dice asks
  * waiting on its players, `diceAsks`, so that a hello sent again, as when the settings change,
@@ -133,7 +136,7 @@ export function announce({ campaignId }={}) {
         notes: { ...noteFeatures(campaign), ...tidyHello(campaign) }, companions: companionFeatures(campaign),
         favorites: favoriteFeatures(),
         dishes: dishFeatures(campaign), effects: effectFeatures(campaign), wildShape: wildShapeFeatures(campaign),
-        hitPoints: hitPointFeatures(campaign), coins: coinFeatures(campaign)
+        hitPoints: hitPointFeatures(campaign), coins: coinFeatures(campaign), health: healthFeatures(campaign)
       },
       sheetsApart: true,
       characters: roster(campaign),

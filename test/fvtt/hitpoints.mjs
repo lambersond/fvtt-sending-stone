@@ -261,7 +261,8 @@ const SYSTEM = { enabled: false, kinds: [], reason: 'system' }
 assert.equal(Object.hasOwn(settings.get('campaigns')[0], 'hitPoints'), false, 'saved without the key')
 assert.deepEqual(helloOf().features.hitPoints, ON, 'on for a campaign saved without the switch')
 // Changed on purpose (module 0.49.0): no longer last, `coins` after it.
-assert.deepEqual(Object.keys(helloOf().features).slice(-3), ['wildShape', 'hitPoints', 'coins'], 'after wildShape')
+// Changed on purpose (module 0.50.0, item 58): `features.health`, whether its players see how hurt other creatures are, after coins.
+assert.deepEqual(Object.keys(helloOf().features).slice(-4), ['wildShape', 'hitPoints', 'coins', 'health'], 'after wildShape')
 assert.equal(helloOf().features.rolls.enabled, false, 'whatever the rolls')
 await campaignAs({ hitPoints: false })
 assert.deepEqual(helloOf().features.hitPoints, OFF, 'a saved switch sends the hello again, off')
@@ -597,7 +598,8 @@ if (DND5E6) {
   // The campaign's row in the hello's settings, after Wild Shape's.
   const rowsOf = () => helloOf().settings.sections.find(section => section.id === 'campaign').rows
   await hello()
-  assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'hitPoints', 'coins', 'coinChange', 'companionInitiative', 'groups'])
+  // Changed on purpose (module 0.50.0, item 58): the rows of other creatures' health and their hit points, after companions' initiative.
+  assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'hitPoints', 'coins', 'coinChange', 'companionInitiative', 'health', 'healthHitPoints', 'groups'])
   assert.deepEqual(rowsOf().find(each => each.id === 'hitPoints'), { id: 'hitPoints', label, value: true, text: 'On' })
   game.system.id = 'pf2e'
   await hello()

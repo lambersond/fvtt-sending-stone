@@ -30,6 +30,7 @@ import { attacksUnavailable, failedResult, HIT_DICE_KINDS, runRollCommand } from
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
 import { noteAloneReader } from "./character-sync.mjs";
 import { gmRollOf } from "./chat-data.mjs";
+import { noteHealthReader } from "./creature-health.mjs";
 import { noteCompanionReader } from "./creature-sync.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { dishReader, noteDishReader } from "./dish-card.mjs";
@@ -305,7 +306,8 @@ export function registerCommandHooks() {
  * where it starts to in a heartbeat's answer (tidy-journal.mjs), and whether it reads dice asks,
  * `diceAsks`, the dice the game rolls later asked of a player typing theirs; and since 0.49.0,
  * whether it takes coins added and taken away, for which it's fetched from where the campaign's
- * Gamemaster lets its players, under dnd5e, with everything else off. A hello's answer wakes
+ * Gamemaster lets its players, under dnd5e, with everything else off; and since 0.50.0, whether it
+ * reads how hurt other creatures are, `health`. A hello's answer wakes
  * the campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
@@ -331,6 +333,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteTidyReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);
   noteDiceAskReader(campaignId, features);
+  noteHealthReader(campaignId, features);
   syncPollers();
   if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.wake?.();
 }

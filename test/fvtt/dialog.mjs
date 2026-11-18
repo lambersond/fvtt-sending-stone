@@ -33,9 +33,11 @@ await save(win)
 // Actors its druids learn Beasts from.
 // Changed on purpose (module 0.44.0, the v0.44 plan's item 4): and whether its players set their hit
 // points from the app, on, as every new campaign is.
+// Changed on purpose (module 0.50.0, item 58): and whether its players see other creatures' health,
+// and their hit points, both off, as every new campaign's are.
 assert.deepEqual(settings.get('campaigns'), [
-  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, companionInitiative: 'own' },
-  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, companionInitiative: 'own' },
+  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, health: false, healthHitPoints: false, companionInitiative: 'own' },
+  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, health: false, healthHitPoints: false, companionInitiative: 'own' },
 ])
 assert.equal(win.element.isConnected, false, 'saved, it closes')
 console.log('ok - saves campaigns in order, trims titles, drops unticked and missing characters')
@@ -684,6 +686,105 @@ console.log("ok - 0.44.0: Hit points has its own fieldset on the Player actions 
   game.system.id = 'dnd5e'
 }
 console.log("ok - 0.49.0: Coins has its own fieldset on the Player actions tab, right after Items and coins, with Allow Players to add and take away coins from the app and Pay with other coins when a character is short of one: both ticked for a campaign saved without them and for a new one, never greyed by the rolls, each an unsaved change when changed alone and saved off and on with its campaign; a warning where the campaign's app has commands but takes no coins, none once it does or with the switch off; not available under another system")
+
+// Module 0.50.0 (item 58): Other creatures' health, the last fieldset on the Player actions tab, after
+// Companions, with two switches: the permission, and nested under it Show their hit points too,
+// greyed while the first is off; both unticked for a campaign saved before them, which has neither
+// key, and for a new one; saved off and on with their campaign; a warning where the campaign's app has
+// commands but doesn't read health, and under another system.
+{
+  const { noteListenerFeatures } = await import(`${MODULE}/scripts/commands.mjs`)
+  const { noteHealthReader } = await import(`${MODULE}/scripts/creature-health.mjs`)
+  const kept = settings.get('campaigns')
+  settings.set('campaigns', kept.map(({ health, healthHitPoints, ...rest }) => rest))
+  assert.ok(settings.get('campaigns').every(c => !Object.hasOwn(c, 'health') && !Object.hasOwn(c, 'healthHitPoints')), 'saved before 0.50.0, without the keys')
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  const fieldset = () => find(win, 'fieldset.sending-stone-health')
+  const order = [...win.element.querySelectorAll('fieldset')].map(each => each.className)
+  assert.equal(order.at(-1), 'sending-stone-health', 'the last fieldset on the tab')
+  assert.equal(order.at(-2), 'sending-stone-companions', 'right after Companions')
+  assert.equal(fieldset().querySelector('legend').textContent.trim(), 'SENDINGSTONE.Config.Actions.Health')
+  assert.deepEqual([...fieldset().querySelectorAll('label')].map(label => [label.getAttribute('for'), label.textContent.trim()]), [
+    ['sending-stone-health', 'SENDINGSTONE.Config.Actions.HealthPlayers'], ['sending-stone-health-hit-points', 'SENDINGSTONE.Config.Actions.HealthHitPoints'],
+  ])
+  assert.deepEqual([...fieldset().querySelectorAll('.hint')].map(hint => hint.textContent.trim()), ['SENDINGSTONE.Config.Actions.HealthHint', 'SENDINGSTONE.Config.Actions.HealthHitPointsHint'])
+  assert.deepEqual([lang.Actions.Health, lang.Actions.HealthPlayers, lang.Actions.HealthHitPoints], ["Other creatures' health", "Allow Players to see other creatures' health in the app", 'Show their hit points too'])
+  assert.equal(lang.Actions.HealthHint, "Off by default. On the app's Combat tab, each creature in a fight that isn't the party's shows how hurt it is: Unhurt, Hurt, Bloodied at dnd5e's Bloodied threshold, usually half its hit points, or Down at 0. The party is this campaign's characters, their companions and any creature a player owns. Never a hidden combatant, nor one whose token is hidden or Secret. Where dnd5e's Bloodied Status is Never Display, Bloodied isn't used. Changes reach the app within a few seconds.")
+  assert.equal(lang.Actions.HealthHitPointsHint, "Off by default, as it gives away how much each creature can still take. On: those creatures show their hit points instead, of their maximum, with any temporary hit points, as the party's do.")
+  assert.equal(lang.Actions.HealthApp, "The app this campaign sends to doesn't show other creatures' health yet.")
+  assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'no warning under dnd5e, with no app heard from')
+  const box = name => find(win, `[name="campaign.${name}"]`)
+  const nested = () => box('healthHitPoints').closest('.form-group')
+  assert.ok(nested().classList.contains('sending-stone-nested'), 'Show their hit points too is nested under it')
+  assert.deepEqual([box('health').checked, box('health').disabled, box('healthHitPoints').checked, box('healthHitPoints').disabled, nested().classList.contains('disabled')],
+    [false, false, false, true, true], 'both unticked, read as off; the second greyed while the first is off')
+  tick(win, 'campaign.health')
+  assert.deepEqual([box('healthHitPoints').disabled, nested().classList.contains('disabled')], [false, false], 'ticking the first lets the second be ticked')
+  assert.deepEqual(dirty(), ['true', 'SENDINGSTONE.Config.Unsaved'], 'an unsaved change')
+  tick(win, 'campaign.health', false)
+  assert.deepEqual([box('healthHitPoints').disabled, nested().classList.contains('disabled')], [true, true], 'and unticking it greys the second again')
+  assert.deepEqual(dirty(), ['false', 'SENDINGSTONE.Config.NoChanges'], 'changed back, no change')
+  tick(win, 'campaign.health')
+  await save(win)
+  assert.deepEqual(settings.get('campaigns').map(c => [c.id, c.health, c.healthHitPoints]), [[a, true, false], [b, false, false]], "the first saved on, the second off; the other campaign's both off as read")
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.deepEqual([box('health').checked, box('healthHitPoints').checked, box('healthHitPoints').disabled], [true, false, false], 'shown as saved')
+  tick(win, 'campaign.healthHitPoints')
+  await save(win)
+  assert.deepEqual(settings.get('campaigns').map(c => [c.id, c.health, c.healthHitPoints]), [[a, true, true], [b, false, false]], 'both saved on')
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.deepEqual([box('health').checked, box('healthHitPoints').checked], [true, true], 'shown as saved')
+  tick(win, 'campaign.healthHitPoints', false)
+  tick(win, 'campaign.health', false)
+  await save(win)
+  assert.deepEqual(settings.get('campaigns').map(c => [c.health, c.healthHitPoints]), [[false, false], [false, false]], 'both saved off again')
+  // The campaign's app answers with commands, but says nothing of health: an older one.
+  settings.set('campaigns', settings.get('campaigns').map(c => ({ ...c, health: true })))
+  noteListenerFeatures(a, { commands: true })
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.deepEqual([...fieldset().querySelectorAll('.sending-stone-warning')].map(each => each.textContent.trim()), ['SENDINGSTONE.Config.Actions.HealthApp'], "an app that doesn't read health")
+  assert.equal(fieldset().querySelector('.sending-stone-warning').closest('.form-group').querySelector('input').name, 'campaign.health', 'under the switch it is about')
+  await view(win, 'campaign', { campaignId: b, tab: 'actions' })
+  assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, "none for a campaign whose app wasn't heard from")
+  await win.close()
+  noteHealthReader(a, { health: 1 })
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'none once its app says it reads it')
+  await win.close()
+  noteListenerFeatures(a, { commands: true })
+  settings.set('campaigns', settings.get('campaigns').map(c => ({ ...c, health: false })))
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'none with the switch off')
+  await win.close()
+  noteListenerFeatures(a, null)
+  game.system.id = 'pf2e'
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.equal(fieldset().querySelector('.sending-stone-warning')?.textContent.trim().startsWith('SENDINGSTONE.Config.Actions.Unavailable'), true, 'under another system')
+  await win.close()
+  game.system.id = 'dnd5e'
+  // A new campaign has both off.
+  win = await openSettings()
+  await click(win, '[data-action="addCampaign"]')
+  type(win, 'campaign.title', 'Gondor')
+  await view(win, 'campaign', { campaignId: campaignIds(win).at(-1), tab: 'actions' })
+  assert.deepEqual([box('health').checked, box('healthHitPoints').checked, box('healthHitPoints').disabled], [false, false, true], "a new campaign's both unticked")
+  await save(win)
+  assert.deepEqual(['health', 'healthHitPoints'].map(name => settings.get('campaigns').find(c => c.title === 'Gondor')[name]), [false, false], "a new campaign's saved off")
+  const { registered } = await import('./stub.mjs')
+  const { fields } = registered.get('campaigns').type.element
+  for (const name of ['health', 'healthHitPoints']) {
+    assert.ok((fields[name] instanceof foundry.data.fields.BooleanField) && (fields[name].initial === false), `${name} is in the schema, off`)
+  }
+  settings.set('campaigns', kept)
+}
+console.log("ok - 0.50.0: Other creatures' health is the last fieldset on the Player actions tab, after Companions, with Allow Players to see other creatures' health in the app and, nested under it and greyed while it's off, Show their hit points too: both unticked for a campaign saved without them and for a new one, saved off and on with their campaign; a warning where the campaign's app has commands but doesn't read health, none once it does or with the switch off; not available under another system")
 
 // Module 0.36.0 (round 0.36.0 §6.12): Companions' initiative, its own fieldset on the Player actions
 // tab after Items and coins, a choice never disabled, saved with its campaign; a new campaign's its

@@ -101,6 +101,7 @@ const LAYERS = [
       'typed-dice.mjs',             // who may type in a character's dice: it asks characters.mjs whose it is
       'groups.mjs',
       'results.mjs',
+      'creature-health.mjs',        // how hurt a creature is, by dnd5e's rule; combat-data.mjs describes it
       'combat-data.mjs',
       'campaign-combats.mjs',
       'dish-effects.mjs',           // what a dish does to the characters it is served to
