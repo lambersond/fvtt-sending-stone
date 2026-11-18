@@ -22,7 +22,7 @@ const DEEPEST = 5;
 
 /**
  * The character's inventory; since 0.30.0 a Group's too, whose items are only looked at. Since
- * 0.48.0 each coin says its rate, `conversion`.
+ * 0.49.0 each coin says its rate, `conversion`.
  * @param {Actor} actor
  * @param {SheetTexts} texts    Collects the items' descriptions.
  * @param {object} [options]
@@ -64,7 +64,7 @@ export function inventoryOf(actor, texts, { usable=true }={}) {
 }
 
 /**
- * A coin's rate, since 0.48.0: how many of it make one gp, as dnd5e's configuration has it
+ * A coin's rate, since 0.49.0: how many of it make one gp, as dnd5e's configuration has it
  * (`conversion`: 0.1 for pp, 10 for sp), for the app to tell whether a character's other coins are
  * worth what one is short of. None for a coin with no rate, or one that isn't a number above 0, as a
  * world's own coin may have.

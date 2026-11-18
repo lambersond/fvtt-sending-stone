@@ -303,7 +303,7 @@ export function registerCommandHooks() {
  * fetched from where the campaign's Gamemaster lets its players, under dnd5e, with everything else
  * off; and whether it reads Tidy 5e Sheets' journal, `notes` 3, which is sent at once
  * where it starts to in a heartbeat's answer (tidy-journal.mjs), and whether it reads dice asks,
- * `diceAsks`, the dice the game rolls later asked of a player typing theirs; and since 0.48.0,
+ * `diceAsks`, the dice the game rolls later asked of a player typing theirs; and since 0.49.0,
  * whether it takes coins added and taken away, for which it's fetched from where the campaign's
  * Gamemaster lets its players, under dnd5e, with everything else off. A hello's answer wakes
  * the campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
@@ -344,7 +344,7 @@ export function noteListenerFeatures(campaignId, features, type) {
  * under dnd5e 5, wherever its app takes them, or since 0.39.0 change their own effects, where its
  * Gamemaster lets them, under dnd5e, wherever its app takes them, or since 0.40.0 use Wild Shape, where
  * its Gamemaster lets them, under dnd5e, wherever its app takes it, or since 0.44.0 set their hit
- * points, where its Gamemaster lets them, under dnd5e, wherever its app takes them, or since 0.48.0
+ * points, where its Gamemaster lets them, under dnd5e, wherever its app takes them, or since 0.49.0
  * add and take away their coins, where its Gamemaster lets them, under dnd5e, wherever its app takes
  * them, and that the app has commands for, while this client is the bridge; and for no other.
  * @param {object} [options]
@@ -381,7 +381,7 @@ export function syncPollers({ retry=false }={}) {
  * with everything else off too; or since 0.40.0 Wild Shape, by the campaign's own switch, under dnd5e,
  * wherever its app takes it, with everything else off too; or since 0.44.0 hit points set, by the
  * campaign's own switch, on until turned off, under dnd5e, wherever its app takes them, with
- * everything else off too; or since 0.48.0 coins added and taken away, by the campaign's own switch,
+ * everything else off too; or since 0.49.0 coins added and taken away, by the campaign's own switch,
  * on until turned off, under dnd5e, wherever its app takes them, with everything else off too. A
  * roll fetched while only moves, removals, notes, favorites, dishes, effects, Wild Shape, hit points
  * or coins are is refused as one fetched while rolls are off.
@@ -618,7 +618,7 @@ class Poller {
  * commands, as a roll does, a companion's hit points its character's too, and their next ones for
  * them: so a form set to 0 hit points ends once the setting is done. Since 0.44.0 an answer to a
  * dice ask is made at once, as a Midi prompt's answer is: the roll it answers is waiting on it.
- * Since 0.48.0 coins added or taken away wait for their character's earlier commands, as a removal
+ * Since 0.49.0 coins added or taken away wait for their character's earlier commands, as a removal
  * does, and their next ones for them; and a character's coins handed out wait for every character
  * given them, as a distribution does, and theirs for it.
  * @param {object} command

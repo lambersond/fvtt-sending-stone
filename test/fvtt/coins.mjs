@@ -1,4 +1,4 @@
-// Coins added to a character and taken away (module 0.48.0): the rule of paying in coins
+// Coins added to a character and taken away (module 0.49.0): the rule of paying in coins
 // (coin-change.mjs) on its own, by worked cases and many random ones, in whole numbers, at dnd5e's
 // rates, at a world's own that don't divide one another or that floating point doesn't divide
 // exactly, and with a coin worth the same as another; the hello's `features.coins` and each coin's
@@ -741,7 +741,7 @@ okay(`the rule, by ${TABLE.length} worked cases: the coins asked for paid from t
 
 const ON = { enabled: true, kinds: ['coins'], reason: null, change: true }
 const OFF = { enabled: false, kinds: [], reason: 'off', change: false }
-assert.ok(!Object.hasOwn(settings.get('campaigns')[0], 'coins') && !Object.hasOwn(settings.get('campaigns')[0], 'coinChange'), 'a campaign saved before 0.48.0, with neither key')
+assert.ok(!Object.hasOwn(settings.get('campaigns')[0], 'coins') && !Object.hasOwn(settings.get('campaigns')[0], 'coinChange'), 'a campaign saved before 0.49.0, with neither key')
 assert.deepEqual(helloOf().data.features.coins, ON, 'on for a campaign saved without it')
 assert.deepEqual(Object.keys(helloOf().data.features).slice(-2), ['hitPoints', 'coins'], 'last, after hitPoints')
 const [campaign] = getCampaigns()

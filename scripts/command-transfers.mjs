@@ -64,7 +64,7 @@ import { inventoryTypes, localize } from "./sheet-values.mjs";
  * stack is never taken for all of it: a removal names how many the app's sheet showed, and is
  * refused where the stack holds any other number now.
  *
- * Since 0.48.0 a character's coins may be handed out: so many of each coin to each of the campaign's
+ * Since 0.49.0 a character's coins may be handed out: so many of each coin to each of the campaign's
  * characters picked, the total taken from the giver as coins taken away are (coin-change.mjs), other
  * coins paying where it's short of one, unless the campaign's Gamemaster has turned that off. No line
  * for everyone: each one given is whispered what they received, "Vex received 200 pp and 50 gp from
@@ -92,7 +92,7 @@ const removers = new Set();
 
 /**
  * The latest move, which the next waits for; since 0.33.0 a removal too, in the same line, and
- * since 0.48.0 coins added or taken away (`afterMoves`).
+ * since 0.49.0 coins added or taken away (`afterMoves`).
  * @type {Promise<void>}
  */
 let chain = Promise.resolve();
@@ -116,7 +116,7 @@ export function transfersOn(campaign) {
  * moves are made here, and if not, why not, the Gamemaster not letting its players, or another
  * system. Since 0.32.0, wherever they're made, that a party's things may be sent elsewhere by its
  * Owner, party to party too (`partySends`), and a party's coin distributed among its characters
- * (`distribute`). Since 0.48.0, wherever they're made, that a character's coins may be handed out to
+ * (`distribute`). Since 0.49.0, wherever they're made, that a character's coins may be handed out to
  * the characters picked (`handOut`), and whether its other coins pay where it's short of one
  * (`change`), as the campaign's Gamemaster has set it.
  * @param {Campaign} campaign
@@ -165,7 +165,7 @@ export function transferReader(campaignId) {
 /**
  * Make a move fetched from the app, once every move before it has been made, whoever made it.
  * @param {object} command      `{transfer: {from, to, items?, currency?}}`, or since 0.32.0 a
- *                              distribution's `{transfer: {from, among, currency}}`, or since 0.48.0
+ *                              distribution's `{transfer: {from, among, currency}}`, or since 0.49.0
  *                              a hand-out's `{transfer: {from, each, currency}}`, as fetched.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @returns {Promise<CommandResult>}
@@ -176,7 +176,7 @@ export function runTransferCommand(command, campaign) {
 
 /**
  * Make something once every move and removal before it has been made, whoever made them, and have
- * the next wait for it: the one line they stand in. Since 0.48.0 coins added to a character or taken
+ * the next wait for it: the one line they stand in. Since 0.49.0 coins added to a character or taken
  * away stand in it too (command-coins.mjs), so that coins on their way elsewhere are never also
  * taken away. The line is kept here, where it's changed.
  * @template T
@@ -270,7 +270,7 @@ async function transferNow(command, passed) {
  * they only observe is `not-owner`, and one they can't see `unknown`, as one not there. The
  * Gamemaster moves anything between them, party to party too. A distribution is shared among
  * exactly the party's characters, as Foundry now has them (`members`). Since 0.40.0 nothing moves
- * to, from or by a character transformed, as by Wild Shape (`shaped`). Since 0.48.0 a hand-out's
+ * to, from or by a character transformed, as by Wild Shape (`shaped`). Since 0.49.0 a hand-out's
  * characters are read as a distribution's are, any of the campaign's (`unknown`), none of them
  * transformed (`shaped`); it's a character's own coins, made as that character, the Gamemaster's too,
  * and never a party's, which a player is told only of a party they own (`not-yours`).
@@ -429,7 +429,7 @@ async function distributeNow(command, campaign, { from, among, mover }) {
 /* -------------------------------------------- */
 
 /**
- * Hand out a character's coins, since 0.48.0: so many of each coin to each of the characters picked.
+ * Hand out a character's coins, since 0.49.0: so many of each coin to each of the characters picked.
  * The total, each count times how many are picked, is taken from the giver as coins taken away are
  * (coin-change.mjs's `takenCoins`), its other coins paying where it's short of one unless the
  * campaign's setting is off, refused where they can't (`short`). The giver's one update first:
@@ -1043,7 +1043,7 @@ function coinsText(key, n) {
 }
 
 /**
- * Coins of several kinds, as a line says them, since 0.48.0: "2 pp, 5 gp, and 3 sp", each by
+ * Coins of several kinds, as a line says them, since 0.49.0: "2 pp, 5 gp, and 3 sp", each by
  * `coinsText`, in dnd5e's order whatever order they're given in, listed as the language lists them.
  * A coin dnd5e hasn't, or none of one, is left out.
  * @param {Record<string, number>} coins   How many of each, by key.

@@ -25,7 +25,7 @@ import { chainedBaseline, expiredOf, formEffectsOf, gainedOf, isStatusEffect, ti
  * in (`flags.sending-stone.form`); her tokens switched and put back on every scene, not only the one
  * the Gamemaster is viewing; its endings; and on every return, what she spent or gained in form, which
  * dnd5e's return would lose, carried back onto her own actor, added to anything done to her meanwhile.
- * Since module 0.48.0 effects too: those others put on the form are kept on her, and those of hers
+ * Since module 0.49.0 effects too: those others put on the form are kept on her, and those of hers
  * taken off it are taken off her; wild-shape-effects.mjs says which, and the writes are here.
  *
  * A transformation made in Foundry, Wild Shape or not, is recorded the same way on the client that
@@ -547,7 +547,7 @@ function profileOf(original, uuid) {
  * Write the record into a form's creation data, before dnd5e creates it, whoever transforms and from
  * wherever: what it is, when it began, how long the rules give it where they time it, the profile
  * and command it was made for, and what she had going in, which a form made from a form inherits;
- * since module 0.48.0 with `formEffects`, the effects the form is made with that aren't hers, each
+ * since module 0.49.0 with `formEffects`, the effects the form is made with that aren't hers, each
  * later creature's own added along a chain (`chainedBaseline`), and `expired`, those of her effects
  * it carries that had already run out. A form made from a form that has no record gets her baseline
  * as it stands, with neither.
@@ -590,7 +590,7 @@ export function record(host, source, data, settings, options) {
  * What she had going in, for the carry-back's sums: her hit points and temporary ones; each of her
  * items the form keeps, its uses spent and each activity's; each class's hit dice spent; her Heroic
  * Inspiration, exhaustion and death saves; which of her own effects the form carries; and each of
- * her spell slot pools' value. `record` adds `formEffects` and `expired` to it, since module 0.48.0.
+ * her spell slot pools' value. `record` adds `formEffects` and `expired` to it, since module 0.49.0.
  * @param {Actor} original
  * @param {object} data   The form's creation data.
  * @returns {object}
@@ -789,7 +789,7 @@ export async function restoreTokens(ids, original) {
  * counts, conditions, effects and spell slots, her own hit points and spell slots now, the record's
  * baseline, whether dnd5e's return copies the form's slots over hers, and the forms whose tokens go
  * back: this one, and each earlier form of its chain, live or noted as hers when it was deleted.
- * Since module 0.48.0 the effects gained in form too (`gained`, each as the data to put on her),
+ * Since module 0.49.0 the effects gained in form too (`gained`, each as the data to put on her),
  * those of them that couldn't be read (`unread`, each by its name, with what it threw) and those run
  * out on it (`expired`), as plain data: the form is gone when a deletion by hand reads it.
  * @param {Actor} form
@@ -884,7 +884,7 @@ const clamp = (value, min, max=Infinity) => Math.min(Math.max(value, min), Numbe
  * form put on her, one effect each; and conditions and concentration that ended in form taken off
  * her. Each written only where it differs from what she has.
  *
- * Since module 0.48.0 effects too. Those gained in form are put on her first (`putGained`), with
+ * Since module 0.49.0 effects too. Those gained in form are put on her first (`putGained`), with
  * nothing awaited before that write is sent: on a return made in Foundry this runs in dnd5e's own
  * hook, and the write must go ahead of dnd5e's deletion of the form, so that a caster's
  * concentration never finds itself keeping nothing up. And each of her effects the form carried
@@ -894,7 +894,7 @@ const clamp = (value, min, max=Infinity) => Math.min(Math.max(value, min), Numbe
  * keeps from her own numbers, or one put on by hand, as Sleeping's or Marked's, which stays on her
  * as it was. Run out on it means in form: one that had already run out as the form
  * was made, which the baseline's `expired` names, is left as it was, nothing having happened to it;
- * and where a baseline has no such list, as one recorded before 0.48.0, none is deleted for having
+ * and where a baseline has no such list, as one recorded before 0.49.0, none is deleted for having
  * run out, as which ran out in form can't be told. Each is read again as its turn comes, as ending
  * a concentration deletes what it kept up on her, and deleted on its own, so one that can't be
  * never stops the next.
@@ -1160,7 +1160,7 @@ export async function correctSlots(kept, original, { copied=true }={}) {
  * dnd5e's return doesn't do: what she spent or gained in form carried back, her tokens put back on
  * every scene, and her hit points and spell slots where her own changed meanwhile. One at a time
  * for each character; a second call while one is on its way does nothing, as does one for a form
- * dnd5e didn't make of her (`madeForm`). Since module 0.48.0 the effects gained in form are put on
+ * dnd5e didn't make of her (`madeForm`). Since module 0.49.0 the effects gained in form are put on
  * her before dnd5e's return, so that a caster's concentration always has her copy to keep up when
  * the form's goes with the form (Midi-QOL ends one left keeping nothing up); and taken off her
  * again where the return throws, is refused, or is stopped. Whatever is thrown here, the reading of
@@ -1236,7 +1236,7 @@ export function switchedOnCharacters() {
 /**
  * On the client that returns her, from wherever: what comes back, unless the module is returning her
  * itself, which carries it back once dnd5e is done (the effects gained in form first, since module
- * 0.48.0, sent from this hook ahead of dnd5e's deletion of the form: see `carryBack`); and the
+ * 0.49.0, sent from this hook ahead of dnd5e's deletion of the form: see `carryBack`); and the
  * ending noted on her Wild Shape, before
  * dnd5e deletes the form, for the app's banner and the deletion safety net. Only where this user owns
  * her, and the form is a Wild Shape's.
@@ -1326,7 +1326,7 @@ export function formDeleted(form) {
  * it: a later Wild Shape holds what it spent and is carried back itself, by its return or deleted
  * so, so nothing more; under a later form of another kind, which keeps none of her features, what
  * it spent is carried back here, and no hit points, which dnd5e's return of that one copies, nor
- * spell slots where that return copies them too. Since module 0.48.0 effects with the rest, but one
+ * spell slots where that return copies them too. Since module 0.49.0 effects with the rest, but one
  * whose concentration went with the form (`putGained`'s rule); and where a return made the
  * deletion, an effect that return put on her whose concentration has gone since is taken off her
  * (`dropUntied`).

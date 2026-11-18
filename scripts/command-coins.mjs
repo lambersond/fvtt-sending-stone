@@ -9,7 +9,7 @@ import { afterMoves, coinsWords, escape, messageOf, updated } from "./command-tr
 import { campaignGroups } from "./groups.mjs";
 
 /**
- * A character's coins added to and taken away from the Sending Stone app, since module 0.48.0, as
+ * A character's coins added to and taken away from the Sending Stone app, since module 0.49.0, as
  * when the Gamemaster says "you're paid 5 gp" or "that costs 5 gp": so many of each coin, by its
  * player, on their own character, or by the campaign's Gamemaster at that character's page. Never a
  * party's, which has its own moves, nor a companion's.

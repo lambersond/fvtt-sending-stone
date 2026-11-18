@@ -86,7 +86,7 @@ const resent = new Map();
  * whether its players may use Wild Shape from the app, `features.wildShape`, by its own switch under
  * D&D Fifth Edition. Since 0.44.0, whether its players may set their hit points from the app,
  * `features.hitPoints`, by its own switch, on until turned off, under D&D Fifth Edition. Since
- * 0.48.0, whether its players may add coins to their characters and take them away from the app,
+ * 0.49.0, whether its players may add coins to their characters and take them away from the app,
  * and whether their other coins pay where they're short of one, `features.coins`, by its own switch,
  * on until turned off, under D&D Fifth Edition. Since
  * 0.44.0 too, under D&D Fifth Edition, what of Tidy 5e Sheets' journal its characters hold, and

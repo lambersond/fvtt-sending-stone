@@ -336,7 +336,7 @@ assert.ok((campaignFields.wildShapePacks instanceof foundry.data.fields.ArrayFie
 assert.deepEqual(campaignFields.wildShapePacks.initial(), ['dnd5e.actors24'])
 // Module 0.44.0 (the v0.44 plan's item 4): so is hitPoints, the only switch on until it's turned off.
 assert.ok((campaignFields.hitPoints instanceof foundry.data.fields.BooleanField) && (campaignFields.hitPoints.initial === true), 'hitPoints is in the schema, on')
-// Module 0.48.0: so are coins and coinChange, each on until it's turned off.
+// Module 0.49.0: so are coins and coinChange, each on until it's turned off.
 for (const name of ['coins', 'coinChange']) {
   assert.ok((campaignFields[name] instanceof foundry.data.fields.BooleanField) && (campaignFields[name].initial === true), `${name} is in the schema, on`)
 }
@@ -561,7 +561,7 @@ const order = [...win.element.querySelectorAll('fieldset')].map(each => each.cla
 // Changed on purpose (round 0.39.0 §1.9): Active effects between it and Companions.
 // Changed on purpose (round 0.40.0 §10.2): and Wild Shape after Active effects.
 // Changed on purpose (module 0.44.0, the v0.44 plan's item 4): and Hit points after Wild Shape.
-// Changed on purpose (module 0.48.0): and Coins right after Items and coins.
+// Changed on purpose (module 0.49.0): and Coins right after Items and coins.
 assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 7),
   ['sending-stone-transfers', 'sending-stone-coins', 'sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-hit-points', 'sending-stone-companions'], 'between Coins and Active effects')
 assert.equal(find(win, '[name="campaign.dishes"]').checked, false)
@@ -607,7 +607,7 @@ console.log("ok - 0.38.0: Dishes from the Magical Recipe Book has its own fields
 }
 console.log("ok - 0.44.0: Hit points has its own fieldset on the Player actions tab, between Wild Shape and Companions, ticked for a campaign saved without it and for a new one, never greyed by the rolls, saved off and on with its campaign; not available under another system")
 
-// Module 0.48.0: Coins, its own fieldset on the Player actions tab right after Items and coins, with
+// Module 0.49.0: Coins, its own fieldset on the Player actions tab right after Items and coins, with
 // two switches, neither greyed by the rolls, both ticked for a campaign saved before it, which has
 // neither key, each saved off and on again with its campaign; a warning where the campaign's app has
 // commands but takes no coins, and under another system.
@@ -616,7 +616,7 @@ console.log("ok - 0.44.0: Hit points has its own fieldset on the Player actions 
   const { noteCoinReader } = await import(`${MODULE}/scripts/command-coins.mjs`)
   const without = settings.get('campaigns')
   settings.set('campaigns', without.map(({ coins, coinChange, ...rest }) => rest))
-  assert.ok(settings.get('campaigns').every(c => !Object.hasOwn(c, 'coins') && !Object.hasOwn(c, 'coinChange')), 'saved before 0.48.0, without the keys')
+  assert.ok(settings.get('campaigns').every(c => !Object.hasOwn(c, 'coins') && !Object.hasOwn(c, 'coinChange')), 'saved before 0.49.0, without the keys')
   win = await openSettings()
   await view(win, 'campaign', { campaignId: a, tab: 'actions' })
   const fieldset = () => find(win, 'fieldset.sending-stone-coins')
@@ -683,7 +683,7 @@ console.log("ok - 0.44.0: Hit points has its own fieldset on the Player actions 
   await win.close()
   game.system.id = 'dnd5e'
 }
-console.log("ok - 0.48.0: Coins has its own fieldset on the Player actions tab, right after Items and coins, with Allow Players to add and take away coins from the app and Pay with other coins when a character is short of one: both ticked for a campaign saved without them and for a new one, never greyed by the rolls, each an unsaved change when changed alone and saved off and on with its campaign; a warning where the campaign's app has commands but takes no coins, none once it does or with the switch off; not available under another system")
+console.log("ok - 0.49.0: Coins has its own fieldset on the Player actions tab, right after Items and coins, with Allow Players to add and take away coins from the app and Pay with other coins when a character is short of one: both ticked for a campaign saved without them and for a new one, never greyed by the rolls, each an unsaved change when changed alone and saved off and on with its campaign; a warning where the campaign's app has commands but takes no coins, none once it does or with the switch off; not available under another system")
 
 // Module 0.36.0 (round 0.36.0 §6.12): Companions' initiative, its own fieldset on the Player actions
 // tab after Items and coins, a choice never disabled, saved with its campaign; a new campaign's its

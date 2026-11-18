@@ -755,7 +755,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * and since 0.40.0, whether they may use Wild Shape, which needs D&D Fifth Edition and an app that
    * takes it, and which of the world's Actor compendiums its druids learn Beasts from; and since 0.44.0,
    * whether they may set their hit points, which needs D&D Fifth Edition and an app that takes them,
-   * an older one answering with commands but not with `hitPoints`; and since 0.48.0, whether they may
+   * an older one answering with commands but not with `hitPoints`; and since 0.49.0, whether they may
    * add coins to their characters and take them away, which needs D&D Fifth Edition and an app that
    * takes them, an older one answering with commands but not with `coins`, and whether a character's
    * other coins pay where it's short of one.

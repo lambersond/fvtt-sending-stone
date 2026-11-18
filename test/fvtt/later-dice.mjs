@@ -10,7 +10,7 @@
 // callMacros and rollBonusDamage, one after another, and a homebrew macro rolling more as Midi
 // finishes the roll (midi.postActiveEffects); a companion of Thorin's and a Wild Shape form of his;
 // Mira, another player's character, whose use spends what Thorin's charm does, and whose dagger
-// rolls Midi's bonus damage beside his; since module 0.48.0 a goblin's hide and wand, whose
+// rolls Midi's bonus damage beside his; since module 0.49.0 a goblin's hide and wand, whose
 // reactions spend dice of their charges, for Midi-QOL's look for reactions, with Midi's Cast
 // activity, and dnd5e's own Utility activity beside Midi's; a stand-in
 // app that answers asks, says which characters are open, and whether it reads asks (OLD_APP=1: an
@@ -154,12 +154,12 @@ users.get('gm').targets = new Set()
 const alice = user('alice', 'Alice', false, 2)
 if (MIDI) {
   installMidi()
-  // Since module 0.48.0: Midi's Cast activity, which reads its activation from its spell.
+  // Since module 0.49.0: Midi's Cast activity, which reads its activation from its spell.
   activityTypes.cast = MidiCastActivity
   midi.settings.defaultOtherActivity = 'auto'
   midi.ammunitionActivities = true
 }
-// Since module 0.48.0: dnd5e's own Utility activity under a type of its own, which stays dnd5e's
+// Since module 0.49.0: dnd5e's own Utility activity under a type of its own, which stays dnd5e's
 // where Midi-QOL puts its activities in place of dnd5e's. So an activity with none of Midi's
 // readings of it, no `effectiveActivationType` among them, as every one of dnd5e's is where Midi's
 // "Replace default activities" is off: Midi then registers its own beside dnd5e's (as its
@@ -268,7 +268,7 @@ const place = actor => {
 const goblin = add(new Actor5e({ id: 'goblin', name: 'Goblin', mods: {}, hp: { value: 40, max: 40, temp: 0 } }))
 goblin.type = 'npc'
 equip(goblin, { ac: 12, items: [
-  // Since module 0.48.0, for Midi-QOL's look for reactions: a hide whose reactions spend dice of
+  // Since module 0.49.0, for Midi-QOL's look for reactions: a hide whose reactions spend dice of
   // its charges, each a die of its own, so that a cost asked says whose it is: its Spikes 1d4; its
   // Barbs 1d6, activated as one of the reactions Midi names itself ("reactiondamage", which its
   // look reads as a reaction's by the word within it, utils.ts:5954-5955); and its Quills 1d8, an
@@ -418,7 +418,7 @@ assert.deepEqual(prompts.splice(0), [], "the self-tests never ask the Gamemaster
 /*  Midi-QOL's checks of the reactions it looks for */
 /* -------------------------------------------- */
 
-// Since module 0.48.0, with the Gamemaster's Manual Dice on: a dice cost asked of them is its
+// Since module 0.49.0, with the Gamemaster's Manual Dice on: a dice cost asked of them is its
 // formula after '0 + ' among `prompts`, '0 + 1d4' for the hide's Spikes and for each of the wand's
 // spells, '0 + 1d6' for the hide's Barbs and '0 + 1d8' for its Quills; and the stand-in's manual
 // die gives its highest face, 4 of a d4.

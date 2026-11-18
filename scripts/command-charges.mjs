@@ -221,7 +221,7 @@ function chargeRefusal(command, campaign) {
  * whose names are escaped already, being what players may write. One the Gamemaster made in the
  * app is flagged theirs, and so listed in their result. One that can't be posted is no failure of
  * what it tells of, which is done: it's left unsaid. Since 0.31.0 a move of items and coins posts
- * its line so too. Since 0.48.0 a line may be whispered instead, to the users named, as what a
+ * its line so too. Since 0.49.0 a line may be whispered instead, to the users named, as what a
  * character handed out is said to each one given it: its author, the character's player, reads it
  * too, as Foundry shows a whisper to who wrote it. One whispered to no one isn't posted: Foundry
  * reads a whisper to none as a message for everyone.
