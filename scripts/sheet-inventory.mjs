@@ -21,7 +21,8 @@ const DEEPEST = 5;
 /* -------------------------------------------- */
 
 /**
- * The character's inventory; since 0.30.0 a Group's too, whose items are only looked at.
+ * The character's inventory; since 0.30.0 a Group's too, whose items are only looked at. Since
+ * 0.48.0 each coin says its rate, `conversion`.
  * @param {Actor} actor
  * @param {SheetTexts} texts    Collects the items' descriptions.
  * @param {object} [options]
@@ -52,13 +53,27 @@ export function inventoryOf(actor, texts, { usable=true }={}) {
       id,
       label: localize(config.label) || id,
       abbreviation: localize(config.abbreviation) || id.toUpperCase(),
-      value: finite(actor.system?.currency?.[id]) ?? 0
+      value: finite(actor.system?.currency?.[id]) ?? 0,
+      conversion: rateOf(config)
     })),
     encumbrance: encumbranceOf(actor),
     attunement: attributes.attunement
       ? { value: finite(attributes.attunement.value) ?? 0, max: finite(attributes.attunement.max) }
       : null
   };
+}
+
+/**
+ * A coin's rate, since 0.48.0: how many of it make one gp, as dnd5e's configuration has it
+ * (`conversion`: 0.1 for pp, 10 for sp), for the app to tell whether a character's other coins are
+ * worth what one is short of. None for a coin with no rate, or one that isn't a number above 0, as a
+ * world's own coin may have.
+ * @param {{conversion?: unknown}} config   The coin, as `CONFIG.DND5E.currencies` has it.
+ * @returns {number|null}
+ */
+function rateOf(config) {
+  const rate = finite(config?.conversion);
+  return ((rate !== null) && (rate > 0)) ? rate : null;
 }
 
 /* -------------------------------------------- */

@@ -18,13 +18,15 @@
 // deferred until the saves are (1119-1137), when its cost is checked and thrown away, then spent
 // (Workflow.ts:2494-2575, 2592-2610); and a bonus damage macro's formulas rolled by rollBonusDamage
 // after its callMacros has returned (4078-4105, 4110-4125); and a use's check of what it would spend,
-// thrown away before dnd5e's use spends it (MidiActivityMixin.ts:776-779, 949-966). It can't stand
-// for Midi itself.
+// thrown away before dnd5e's use spends it (MidiActivityMixin.ts:776-779, 949-966). Since module
+// 0.48.0, its look for reactions as an attack's targets are attacked, then hit or missed
+// (utils.ts:5925-6105, Workflow.ts:7299-7301, 7337, 7371), and its Cast activity's activation
+// (CastActivity.ts:44-61). It can't stand for Midi itself.
 // Install it before the module is imported.
 
 import {
-  AttackActivity, CheckActivity, DamageActivity, ForwardActivity, HealActivity, SaveActivity, SummonActivity, UtilityActivity,
-  activityTypes, screen,
+  AttackActivity, CastActivity, CheckActivity, DamageActivity, ForwardActivity, HealActivity, SaveActivity, SummonActivity,
+  UtilityActivity, activityTypes, screen,
 } from './activity5e.mjs'
 
 export const midi = {
@@ -56,6 +58,12 @@ export const midi = {
     // Since module 0.44.0: whether a Gamemaster's use spends what it uses without its dialog, where
     // the workflow's options don't say (utils.ts:4421-4424), at Midi's own default (settings.ts:191).
     gmConsumeResource: 'none',
+    // Since module 0.48.0: whether reactions are looked for among a workflow's targets, where the
+    // target's player is a Gamemaster (utils.ts:4498-4501). Midi's own default is "all"
+    // (settings.ts:192); the stand-in's is "none", so that the harnesses before it roll as they did,
+    // tick for tick; later-dice.mjs sets "all". The players' own setting (`doReactions`,
+    // settings.ts:175) isn't modelled: this one is read for every target.
+    gmDoReactions: 'none',
   },
   /**
    * Midi's client setting AutoRemoveTargets (settings.ts:1860-1869, 988-991), at its default: which
@@ -115,6 +123,16 @@ export const midi = {
    * checkAutoConsume does, working out what it would spend and throwing that away, by its id, in order.
    */
   consumeChecks: [],
+  /**
+   * Since module 0.48.0, each reaction Midi looked for, working out what its use would spend and
+   * keeping only whether that could be paid, as its doReactions does: { activity, trigger }, in order.
+   */
+  reactionChecks: [],
+  /**
+   * Since module 0.48.0, the reaction each target takes, once, by its token's id: its activity's id.
+   * Midi's reaction dialog isn't modelled: the one named is used as the dialog uses the one chosen.
+   */
+  reactions: new Map(),
   /**
    * Since module 0.44.0: called with each bonus damage entry's index, and the workflow, just before
    * rollBonusDamage builds its roll, where nothing of Midi's own runs: a roll a test makes then stands
@@ -226,6 +244,52 @@ function autoConsumes(activity, workflow) {
   const setting = workflow.workflowOptions?.autoConsumeResource ?? midi.settings.gmConsumeResource
   const spell = activity.item?.type === 'spell'
   return (setting === 'both') || ((setting === 'spell') && spell) || ((setting === 'item') && !spell)
+}
+
+/** Since module 0.48.0, utils.ts:4498-4501, 5935: are reactions looked for, for this target? */
+const looksForReactions = target => !!target?.actor && (midi.settings.gmDoReactions !== 'none')
+
+/**
+ * Since module 0.48.0, Midi-QOL v14 (GitLab 2ac2f66) utils.ts:5925-6105 (doReactions), as far as
+ * what it rolls: for each activity of the target's items a reaction activates, as Midi reads that
+ * (5954-5955), but a spell kept for a Cast activity (5951) and, once the creature has used its
+ * reaction, one that costs a reaction (5960), what its use would spend is worked out with a
+ * configuration that creates nothing, a spell's without its slot, and only whether that could be
+ * paid is kept (5993-5996). Then the reaction `midi.reactions` names for the target, where it's
+ * among those, is used as the reaction dialog uses the one chosen (6308-6326), without its usage
+ * dialog. Left out: the players' own setting (4498-4501), an incapacitated target (5932), an item
+ * that needs attunement (5961), an unprepared spell and one above the caster's slots (5976-5986),
+ * each reaction's condition (5997-6004), the filter hook (6022), the optional bonuses counted with
+ * them (6027-6035), and the prompt, its chat line and its timeout (6039-6088): a harness that needs
+ * one of those adds it first.
+ * @param {object} target        The token attacked.
+ * @param {Workflow} workflow    The attack's.
+ * @param {string} triggerType   "reactionattacked", "reaction" or "reactionmissed".
+ * @returns {Promise<{name?: string, uuid?: string}>}
+ */
+async function doReactions(target, workflow, triggerType) {
+  const usedReaction = midi.usedReaction.has(target.actor.id)
+  const reactions = []
+  for (const item of [...(target.actor.items.values?.() ?? target.actor.items)]) {
+    if (!item.system?.activities) continue
+    if (item.getFlag?.('dnd5e', 'cachedFor')) continue
+    for (const activity of item.system.activities.values()) {
+      const activationType = activity.effectiveActivationType ?? activity.activation?.type
+      if (!activationType?.includes('reaction')) continue
+      if (((activity.activation?.value ?? 1) > 0) && usedReaction) continue
+      const config = activity._prepareUsageConfig({ create: false })
+      if (item.type === 'spell') foundry.utils.setProperty(config, 'consume.spellSlot', false)
+      midi.reactionChecks.push({ activity: activity.id, trigger: triggerType })
+      const canUse = await activity._prepareUsageUpdates(config, { returnErrors: true })
+      if (Array.isArray(canUse)) continue
+      reactions.push(activity)
+    }
+  }
+  const chosen = reactions.find(activity => activity.id === midi.reactions.get(target.id))
+  if (!chosen) return {}
+  midi.reactions.delete(target.id)
+  await chosen.use({ midiOptions: { isReaction: true, workflowOptions: { targetConfirmation: 'none' } } }, { configure: false }, {})
+  return { name: chosen.name, uuid: chosen.uuid }
 }
 
 class Workflow {
@@ -499,13 +563,20 @@ class Workflow {
     return this.WorkflowState_Suspend
   }
 
-  /** Workflow.ts:2186-2245: hits are checked, then the workflow waits for damage, unless all missed. */
-  WorkflowState_AttackRollComplete() {
+  /**
+   * Workflow.ts:2186-2245: hits are checked, then the workflow waits for damage, unless all missed.
+   * Since module 0.48.0, as its checkHits does (7299-7301, 7337, 7371), reactions are looked for as
+   * each target is attacked, then as it's hit or missed, where they are looked for at all: where
+   * they aren't, nothing is awaited, and the state takes the tick it took before.
+   */
+  async WorkflowState_AttackRollComplete() {
     if (midi.settings.autoCheckHit !== 'none') {
       for (const token of this.targets) {
+        if (looksForReactions(token)) await doReactions(token, this, 'reactionattacked')
         const ac = token.actor.system.attributes.ac.value
         const hit = (ac !== null) && (this.isCritical || (!this.isFumble && (this.attackRoll.total >= ac)))
         if (hit) this.hitTargets.add(token)
+        if (looksForReactions(token)) await doReactions(token, this, hit ? 'reaction' : 'reactionmissed')
       }
       this.whisperAttackCard = (midi.settings.autoCheckHit === 'whisper')
         || ['blind', 'gm'].includes(game.settings.get('core', 'messageMode'))
@@ -997,6 +1068,22 @@ export class MidiDamageActivity extends MidiActivity(DamageActivity) {}
 export class MidiHealActivity extends MidiActivity(HealActivity) {}
 export class MidiUtilityActivity extends MidiActivity(UtilityActivity) {}
 export class MidiSummonActivity extends MidiActivity(SummonActivity) {}
+/**
+ * Since module 0.48.0, Midi's Cast activity as far as how it's activated (CastActivity.ts:44-61):
+ * by its own activation where that overrides its spell's, else as the first usable activity of the
+ * spell dnd5e keeps for it is, else as its item or itself is. Its use isn't Midi's, as the module
+ * never uses one. Not among `installMidi`'s: a harness that needs it puts it in `activityTypes`
+ * itself, as enchant.mjs does its Enchant activity.
+ */
+export class MidiCastActivity extends CastActivity {
+  get effectiveActivationType() {
+    if (this.activation?.override) return this.activation.type
+    const activities = [...(this.cachedSpell?.system?.activities?.values?.() ?? [])]
+    const spellActivity = activities.find(activity => activity.canUse) ?? activities[0]
+    if (spellActivity?.activation?.type) return spellActivity.activation.type
+    return this.item?.system?.activation?.type ?? this.activation?.type
+  }
+}
 /**
  * Midi's activity over dnd5e's check activity: its workflow has its targets roll the check as
  * `midiCheckRoll` has it, above. Its own class isn't in Midi's source to hand; the mixin's is.

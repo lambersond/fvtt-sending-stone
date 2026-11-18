@@ -34,8 +34,8 @@ await save(win)
 // Changed on purpose (module 0.44.0, the v0.44 plan's item 4): and whether its players set their hit
 // points from the app, on, as every new campaign is.
 assert.deepEqual(settings.get('campaigns'), [
-  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, companionInitiative: 'own' },
-  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, companionInitiative: 'own' },
+  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, companionInitiative: 'own' },
+  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, companionInitiative: 'own' },
 ])
 assert.equal(win.element.isConnected, false, 'saved, it closes')
 console.log('ok - saves campaigns in order, trims titles, drops unticked and missing characters')
@@ -336,6 +336,10 @@ assert.ok((campaignFields.wildShapePacks instanceof foundry.data.fields.ArrayFie
 assert.deepEqual(campaignFields.wildShapePacks.initial(), ['dnd5e.actors24'])
 // Module 0.44.0 (the v0.44 plan's item 4): so is hitPoints, the only switch on until it's turned off.
 assert.ok((campaignFields.hitPoints instanceof foundry.data.fields.BooleanField) && (campaignFields.hitPoints.initial === true), 'hitPoints is in the schema, on')
+// Module 0.48.0: so are coins and coinChange, each on until it's turned off.
+for (const name of ['coins', 'coinChange']) {
+  assert.ok((campaignFields[name] instanceof foundry.data.fields.BooleanField) && (campaignFields[name].initial === true), `${name} is in the schema, on`)
+}
 assert.equal(campaignFields.manualDice.initial, false)
 assert.deepEqual(Object.keys(campaignFields).sort(), Object.keys(settings.get('campaigns')[0]).sort())
 const hellosNow = () => Object.fromEntries(posts.splice(0).filter(post => post.envelope.type === 'bridge.hello')
@@ -557,8 +561,9 @@ const order = [...win.element.querySelectorAll('fieldset')].map(each => each.cla
 // Changed on purpose (round 0.39.0 §1.9): Active effects between it and Companions.
 // Changed on purpose (round 0.40.0 §10.2): and Wild Shape after Active effects.
 // Changed on purpose (module 0.44.0, the v0.44 plan's item 4): and Hit points after Wild Shape.
-assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 6),
-  ['sending-stone-transfers', 'sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-hit-points', 'sending-stone-companions'], 'between Items and coins and Active effects')
+// Changed on purpose (module 0.48.0): and Coins right after Items and coins.
+assert.deepEqual(order.slice(order.indexOf('sending-stone-transfers'), order.indexOf('sending-stone-transfers') + 7),
+  ['sending-stone-transfers', 'sending-stone-coins', 'sending-stone-dishes', 'sending-stone-effects', 'sending-stone-wild-shape', 'sending-stone-hit-points', 'sending-stone-companions'], 'between Coins and Active effects')
 assert.equal(find(win, '[name="campaign.dishes"]').checked, false)
 assert.equal(find(win, '[name="campaign.dishes"]').disabled, false, 'whatever the rolls')
 tick(win, 'campaign.dishes')
@@ -602,6 +607,84 @@ console.log("ok - 0.38.0: Dishes from the Magical Recipe Book has its own fields
 }
 console.log("ok - 0.44.0: Hit points has its own fieldset on the Player actions tab, between Wild Shape and Companions, ticked for a campaign saved without it and for a new one, never greyed by the rolls, saved off and on with its campaign; not available under another system")
 
+// Module 0.48.0: Coins, its own fieldset on the Player actions tab right after Items and coins, with
+// two switches, neither greyed by the rolls, both ticked for a campaign saved before it, which has
+// neither key, each saved off and on again with its campaign; a warning where the campaign's app has
+// commands but takes no coins, and under another system.
+{
+  const { noteListenerFeatures } = await import(`${MODULE}/scripts/commands.mjs`)
+  const { noteCoinReader } = await import(`${MODULE}/scripts/command-coins.mjs`)
+  const without = settings.get('campaigns')
+  settings.set('campaigns', without.map(({ coins, coinChange, ...rest }) => rest))
+  assert.ok(settings.get('campaigns').every(c => !Object.hasOwn(c, 'coins') && !Object.hasOwn(c, 'coinChange')), 'saved before 0.48.0, without the keys')
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  const fieldset = () => find(win, 'fieldset.sending-stone-coins')
+  assert.equal(fieldset().querySelector('legend').textContent.trim(), 'SENDINGSTONE.Config.Actions.Coins')
+  assert.deepEqual([...fieldset().querySelectorAll('label')].map(label => [label.getAttribute('for'), label.textContent.trim()]), [
+    ['sending-stone-coins', 'SENDINGSTONE.Config.Actions.CoinsPlayers'], ['sending-stone-coin-change', 'SENDINGSTONE.Config.Actions.CoinChange'],
+  ])
+  assert.deepEqual([...fieldset().querySelectorAll('.hint')].map(hint => hint.textContent.trim()), ['SENDINGSTONE.Config.Actions.CoinsHint', 'SENDINGSTONE.Config.Actions.CoinChangeHint'])
+  assert.equal(lang.Actions.CoinsHint, "On by default. From the app, a player adds coins to their own character or takes them away, as when they are paid or buy something. You can do the same for any of its characters, at the character's page in the app. Each change posts a line in chat, such as “Thorin paid 5 gp”.")
+  assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'no warning under dnd5e, with no app heard from')
+  const box = name => find(win, `[name="campaign.${name}"]`)
+  assert.deepEqual(['coins', 'coinChange'].map(name => [box(name).checked, box(name).disabled]), [[true, false], [true, false]], 'both ticked, read as on, whatever the rolls')
+  // Either switch changed alone is an unsaved change, and changed back is none.
+  for (const name of ['coins', 'coinChange']) {
+    tick(win, `campaign.${name}`, false)
+    assert.deepEqual(dirty(), ['true', 'SENDINGSTONE.Config.Unsaved'], `${name} unticked`)
+    tick(win, `campaign.${name}`)
+    assert.deepEqual(dirty(), ['false', 'SENDINGSTONE.Config.NoChanges'], `${name} ticked again`)
+  }
+  tick(win, 'campaign.coins', false)
+  await save(win)
+  assert.deepEqual(settings.get('campaigns').map(c => [c.id, c.coins, c.coinChange]), [[a, false, true], [b, true, true]], "one saved off, the other switch and the other campaign's on as read")
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.deepEqual([box('coins').checked, box('coinChange').checked], [false, true], 'shown as saved')
+  tick(win, 'campaign.coins')
+  tick(win, 'campaign.coinChange', false)
+  await save(win)
+  assert.deepEqual(settings.get('campaigns').map(c => [c.id, c.coins, c.coinChange]), [[a, true, false], [b, true, true]], 'saved the other way round')
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.deepEqual([box('coins').checked, box('coinChange').checked], [true, false], 'shown as saved')
+  tick(win, 'campaign.coinChange')
+  await save(win)
+  assert.deepEqual(settings.get('campaigns').map(c => [c.coins, c.coinChange]), [[true, true], [true, true]], 'both on again')
+  // The campaign's app answers with commands, but says nothing of coins: an older one.
+  noteListenerFeatures(a, { commands: true })
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.deepEqual([...fieldset().querySelectorAll('.sending-stone-warning')].map(each => each.textContent.trim()), ['SENDINGSTONE.Config.Actions.CoinsApp'], "an app that doesn't take coins")
+  assert.equal(fieldset().querySelector('.sending-stone-warning').closest('.form-group').querySelector('input').name, 'campaign.coins', 'under the switch it is about')
+  await view(win, 'campaign', { campaignId: b, tab: 'actions' })
+  assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, "none for a campaign whose app wasn't heard from")
+  await win.close()
+  noteCoinReader(a, { coins: 1 })
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'none once its app says it takes them')
+  await win.close()
+  noteListenerFeatures(a, null)
+  // With the switch off there is nothing to warn of.
+  noteListenerFeatures(a, { commands: true })
+  settings.set('campaigns', settings.get('campaigns').map(c => ({ ...c, coins: c.id !== a })))
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.equal(fieldset().querySelectorAll('.sending-stone-warning').length, 0, 'none with the switch off')
+  await win.close()
+  noteListenerFeatures(a, null)
+  settings.set('campaigns', settings.get('campaigns').map(c => ({ ...c, coins: true })))
+  game.system.id = 'pf2e'
+  win = await openSettings()
+  await view(win, 'campaign', { campaignId: a, tab: 'actions' })
+  assert.equal(fieldset().querySelector('.sending-stone-warning')?.textContent.trim().startsWith('SENDINGSTONE.Config.Actions.Unavailable'), true, 'under another system')
+  await win.close()
+  game.system.id = 'dnd5e'
+}
+console.log("ok - 0.48.0: Coins has its own fieldset on the Player actions tab, right after Items and coins, with Allow Players to add and take away coins from the app and Pay with other coins when a character is short of one: both ticked for a campaign saved without them and for a new one, never greyed by the rolls, each an unsaved change when changed alone and saved off and on with its campaign; a warning where the campaign's app has commands but takes no coins, none once it does or with the switch off; not available under another system")
+
 // Module 0.36.0 (round 0.36.0 §6.12): Companions' initiative, its own fieldset on the Player actions
 // tab after Items and coins, a choice never disabled, saved with its campaign; a new campaign's its
 // own roll; the field in the campaigns setting's schema.
@@ -636,6 +719,7 @@ type(win, 'campaign.title', 'Rohan')
 await save(win)
 assert.equal(settings.get('campaigns').find(c => c.title === 'Rohan').companionInitiative, 'own', "a new campaign's its own roll")
 assert.equal(settings.get('campaigns').find(c => c.title === 'Rohan').hitPoints, true, "a new campaign's hit points from the app, on")
+assert.deepEqual([settings.get('campaigns').find(c => c.title === 'Rohan').coins, settings.get('campaigns').find(c => c.title === 'Rohan').coinChange], [true, true], "a new campaign's coins from the app, and other coins paying, on")
 settings.set('campaigns', kept.map(c => ({ ...c, companionInitiative: 'own' })))
 {
   const { registered } = await import('./stub.mjs')

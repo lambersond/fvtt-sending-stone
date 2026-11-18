@@ -292,7 +292,7 @@ assert.deepEqual(helloOf().features.dishes, OFF, 'off by default')
 // Changed on purpose (round 0.39.0 §1.9): a player's own effects after dishes.
 // Changed on purpose (round 0.40.0 §10.2): and whether its players use Wild Shape, after effects.
 // Changed on purpose (module 0.44.0, the v0.44 plan's item 4): `features.hitPoints`, whether its players set their hit points from the app, after Wild Shape.
-assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape', 'hitPoints'])
+assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape', 'hitPoints', 'coins'])
 await campaignAs({ dishes: true })
 assert.deepEqual(helloOf().features.dishes, DND5E6 ? SYSTEM : ON)
 assert.deepEqual(helloOf('camp-b').features.dishes, OFF, "another campaign's switch is its own")

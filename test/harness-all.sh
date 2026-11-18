@@ -94,6 +94,8 @@ for v in X=1 "X=1 DND5E6=1"; do run effects $v SLIM_CHECK=1; done
 # Module 0.40.0: Wild Shape from the app, a 2024 druid's known forms, the shaped seat followed, its
 # endings (dnd5e 5.3.3 and 6.0.5 stand-ins), and Midi-QOL's saves asked of and answered for a form.
 # Module 0.41.0: under MIDI=1, a change and a return refused and marked by Midi-QOL's Bonus Actions.
+# Module 0.48.0: the effects gained in form kept on the druid and those taken off it taken off, in
+# all three; under MIDI=1 with Midi-QOL's own hook on a caster's concentration.
 for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run wildshape $v; done
 # Module 0.44.0: hit points and temporary hit points set from the app, the character's and a
 # companion's, by the campaign's own switch, on by default, fetched with every other switch off, and
@@ -108,4 +110,11 @@ for v in X=1 "X=1 DND5E6=1" MIDI=1 LIBWRAPPER=1; do run plain $v; done
 # before them asked nothing, and a core whose die doesn't await its fulfillment failing the self-test,
 # with dnd5e alone and Midi-QOL's stand-ins, whose own check of a use's cost stays on computer dice.
 for v in X=1 "X=1 DND5E6=1" MIDI=1 "MIDI=1 DND5E6=1" "MIDI=1 LIBWRAPPER=1" OLD_APP=1 BREAK_ASK=1 "MIDI=1 BREAK_ASK=1"; do run later-dice $v; done
+# Module 0.48.0: coins added to a character and taken away, the rule of paying in coins by worked and
+# random cases, fetched with every other switch off (dnd5e 5.3.3 and 6.0.5 stand-ins).
+for v in X=1 "X=1 DND5E6=1"; do run coins $v SLIM_CHECK=1; done
+# Module 0.48.0: a character's coins handed out to the characters picked, each whispered what they
+# received and the Gamemasters all of it, and what a failure part way leaves (dnd5e 5.3.3 and 6.0.5
+# stand-ins).
+for v in X=1 "X=1 DND5E6=1"; do run handouts $v SLIM_CHECK=1; done
 exit $fail

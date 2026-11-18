@@ -83,7 +83,7 @@ export { FIELDS as HIT_POINT_FIELDS };
  */
 const OTHERS = [
   "transfer", "remove", "typed", "rerolls", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter",
-  "count", "inspiration", "concentration", "enchantment", "prepare", "turn", "undo"
+  "count", "inspiration", "concentration", "enchantment", "prepare", "turn", "undo", "coins"
 ];
 
 /**

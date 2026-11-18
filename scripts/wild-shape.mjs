@@ -6,6 +6,7 @@ import { endedForms, madeForm, originalOf, playerOwners, transformed } from "./c
 import { traitsOf } from "./sheet-details.mjs";
 import { damageOf, toHitOf } from "./sheet-rolls.mjs";
 import { finite, localize } from "./sheet-values.mjs";
+import { chainedBaseline, expiredOf, formEffectsOf, gainedOf, isStatusEffect, tieOf, timingChanges } from "./wild-shape-effects.mjs";
 
 /**
  * Wild Shape from the Sending Stone app, since module 0.40.0, by the 2024 rules: a druid of level 2
@@ -24,6 +25,8 @@ import { finite, localize } from "./sheet-values.mjs";
  * in (`flags.sending-stone.form`); her tokens switched and put back on every scene, not only the one
  * the Gamemaster is viewing; its endings; and on every return, what she spent or gained in form, which
  * dnd5e's return would lose, carried back onto her own actor, added to anything done to her meanwhile.
+ * Since module 0.48.0 effects too: those others put on the form are kept on her, and those of hers
+ * taken off it are taken off her; wild-shape-effects.mjs says which, and the writes are here.
  *
  * A transformation made in Foundry, Wild Shape or not, is recorded the same way on the client that
  * makes it, so the app follows it; a 2024 Wild Shape made there is timed and ended as one from the
@@ -543,7 +546,11 @@ function profileOf(original, uuid) {
 /**
  * Write the record into a form's creation data, before dnd5e creates it, whoever transforms and from
  * wherever: what it is, when it began, how long the rules give it where they time it, the profile
- * and command it was made for, and what she had going in, which a form made from a form inherits.
+ * and command it was made for, and what she had going in, which a form made from a form inherits;
+ * since module 0.48.0 with `formEffects`, the effects the form is made with that aren't hers, each
+ * later creature's own added along a chain (`chainedBaseline`), and `expired`, those of her effects
+ * it carries that had already run out. A form made from a form that has no record gets her baseline
+ * as it stands, with neither.
  * @param {Actor} host       The actor transformed: she, or a form of hers.
  * @param {Actor} source     What it's transformed into.
  * @param {object} data      The creation data, mutated.
@@ -555,8 +562,16 @@ export function record(host, source, data, settings, options) {
   const original = originalOf(host) ?? host;
   const wild = (settings?.preset === "wildshape") && Boolean(original.classes?.druid);
   const rules = wild ? wildShapeRules(original) : null;
-  const earlier = transformed(host) ? host.getFlag(MODULE_ID, "form") : null;
+  const chained = transformed(host);
+  const earlier = chained ? host.getFlag(MODULE_ID, "form") : null;
   const now = game.time?.worldTime ?? 0;
+  let baseline = null;
+  if ( chained ) baseline = earlier?.baseline ? chainedBaseline(earlier.baseline, host, data) : baselineOf(original, data);
+  else {
+    const hers = baselineOf(original, data);
+    const ranOut = new Set(expiredOf(original));
+    baseline = { ...hers, formEffects: formEffectsOf(host, data), expired: hers.effects.filter(id => ranOut.has(id)) };
+  }
   data.flags ??= {};
   data.flags[MODULE_ID] = { ...(data.flags[MODULE_ID] ?? {}), form: {
     kind: wild ? "wildShape" : "other",
@@ -566,7 +581,7 @@ export function record(host, source, data, settings, options) {
     hours: rules ? rules.hours : null, endsAt: rules ? now + (rules.hours * 3600) : null,
     profile: options?.sendingStone?.profile ?? profileOf(original, source.uuid),
     request: options?.sendingStone?.request ?? null,
-    baseline: earlier?.baseline ?? baselineOf(original, data)
+    baseline
   } };
   if ( options?.sendingStone?.request ) tokenData.set(options.sendingStone.request, foundry.utils.deepClone(data.prototypeToken));
 }
@@ -575,7 +590,7 @@ export function record(host, source, data, settings, options) {
  * What she had going in, for the carry-back's sums: her hit points and temporary ones; each of her
  * items the form keeps, its uses spent and each activity's; each class's hit dice spent; her Heroic
  * Inspiration, exhaustion and death saves; which of her own effects the form carries; and each of
- * her spell slot pools' value.
+ * her spell slot pools' value. `record` adds `formEffects` and `expired` to it, since module 0.48.0.
  * @param {Actor} original
  * @param {object} data   The form's creation data.
  * @returns {object}
@@ -641,6 +656,16 @@ function hitDiceOf(actor) {
  */
 function ownEffects(actor) {
   return Array.from(actor?.effects ?? []);
+}
+
+/**
+ * One of an actor's own effects, by its id, as it stands now.
+ * @param {Actor} actor
+ * @param {string} id
+ * @returns {ActiveEffect|null}
+ */
+function ownEffect(actor, id) {
+  return actor?.effects?.get?.(id) ?? null;
 }
 
 /* -------------------------------------------- */
@@ -764,6 +789,9 @@ export async function restoreTokens(ids, original) {
  * counts, conditions, effects and spell slots, her own hit points and spell slots now, the record's
  * baseline, whether dnd5e's return copies the form's slots over hers, and the forms whose tokens go
  * back: this one, and each earlier form of its chain, live or noted as hers when it was deleted.
+ * Since module 0.48.0 the effects gained in form too (`gained`, each as the data to put on her),
+ * those of them that couldn't be read (`unread`, each by its name, with what it threw) and those run
+ * out on it (`expired`), as plain data: the form is gone when a deletion by hand reads it.
  * @param {Actor} form
  * @param {Actor} original
  * @returns {object}
@@ -775,11 +803,13 @@ export function snapshot(form, original) {
   for ( const item of form.items ?? [] ) items[item.id] = countsOf(item);
   const effects = ownEffects(form);
   const chain = id => (id !== original.id) && (game.actors.get(id) ? madeForm(game.actors.get(id), original) : (endedForms.get(id) === original.id));
+  const ids = [form.id, ...(form.getFlag("dnd5e", "previousActorIds") ?? []).filter(id => id && chain(id))];
+  const { gained, unread } = gainedOf(form, record.baseline ?? null, ids, original);
   return {
     formId: form.id,
     name: record.name ?? form.name,
     hours: Number.isFinite(record.hours) ? record.hours : null,
-    ids: [form.id, ...(form.getFlag("dnd5e", "previousActorIds") ?? []).filter(id => id && chain(id))],
+    ids,
     baseline: record.baseline ?? null,
     slotsCopied: copiesSlots(form),
     form: {
@@ -792,6 +822,9 @@ export function snapshot(form, original) {
       death: { success: finite(attributes.death?.success) ?? 0, failure: finite(attributes.death?.failure) ?? 0 },
       effects: effects.map(effect => effect.id),
       conditions: effects.map(effect => ({ id: effect.id, status: conditionOf(effect) })).filter(each => each.status),
+      gained,
+      unread,
+      expired: expiredOf(form),
       spells: slotsOf(form)
     },
     own: ownOf(original)
@@ -850,13 +883,32 @@ const clamp = (value, min, max=Infinity) => Math.min(Math.max(value, min), Numbe
  * each field's range; Heroic Inspiration the form's where it changed in form; conditions gained in
  * form put on her, one effect each; and conditions and concentration that ended in form taken off
  * her. Each written only where it differs from what she has.
+ *
+ * Since module 0.48.0 effects too. Those gained in form are put on her first (`putGained`), with
+ * nothing awaited before that write is sent: on a return made in Foundry this runs in dnd5e's own
+ * hook, and the write must go ahead of dnd5e's deletion of the form, so that a caster's
+ * concentration never finds itself keeping nothing up. And each of her effects the form carried
+ * that is gone from it, or has run out on it, is deleted from her, where before only a condition or
+ * a concentration was, which are still taken off only where gone: but a status effect's own that
+ * is no condition, as Exhaustion's, which is counted, Bloodied's and Encumbered's, which dnd5e
+ * keeps from her own numbers, or one put on by hand, as Sleeping's or Marked's, which stays on her
+ * as it was. Run out on it means in form: one that had already run out as the form
+ * was made, which the baseline's `expired` names, is left as it was, nothing having happened to it;
+ * and where a baseline has no such list, as one recorded before 0.48.0, none is deleted for having
+ * run out, as which ran out in form can't be told. Each is read again as its turn comes, as ending
+ * a concentration deletes what it kept up on her, and deleted on its own, so one that can't be
+ * never stops the next.
  * @param {object} kept       snapshot's.
  * @param {Actor} original
+ * @param {object} [options]
+ * @param {boolean} [options.gained]   Are the effects gained in form still to be put on her? Not
+ *                                     where `endWildShape` put them on before dnd5e's return.
  * @returns {Promise<void>}
  */
-export async function carryBack(kept, original) {
+export async function carryBack(kept, original, { gained=true }={}) {
   const b = kept?.baseline;
   if ( !b || !original ) return;
+  if ( gained ) await putGained(kept, original);
   const f = kept.form;
   const options = { sendingStone: OWN };
   const sum = (h, fv, bv, max) => clamp((finite(h) ?? 0) + ((finite(fv) ?? 0) - (finite(bv) ?? 0)), 0, max);
@@ -905,15 +957,140 @@ export async function carryBack(kept, original) {
   for ( const { id, status } of f.conditions ?? [] ) {
     if ( !hers().has(id) ) await original.toggleStatusEffect(status, { active: true });
   }
-  // Conditions and concentration that ended in form: those the form had from her, and has no longer.
-  const carried = new Set(b.effects ?? []);
+  // Her effects taken off in form: those the form had from her and has no longer, or that ran out
+  // on it, which one that had already run out as the form was made did not.
   const still = new Set(f.effects ?? []);
-  for ( const effect of ownEffects(original) ) {
-    if ( !carried.has(effect.id) || still.has(effect.id) ) continue;
+  const before = Array.isArray(b.expired) ? new Set(b.expired) : null;
+  const ranOut = new Set(before ? Array.from(f.expired ?? []).filter(id => !before.has(id)) : []);
+  for ( const id of b.effects ?? [] ) {
+    const effect = ownEffect(original, id);
+    if ( !effect ) continue;
+    const gone = !still.has(id);
     const status = conditionOf(effect);
-    if ( status ) await original.toggleStatusEffect(status, { active: false });
-    else if ( effect.statuses?.has?.("concentrating") ) await original.endConcentration(effect);
+    if ( status ) {
+      if ( gone ) await original.toggleStatusEffect(status, { active: false });
+    } else if ( effect.statuses?.has?.("concentrating") ) {
+      if ( gone ) await original.endConcentration(effect);
+    } else if ( !isStatusEffect(effect) && (gone || ranOut.has(id)) ) {
+      try {
+        await effect.delete(options);
+      } catch (err) {
+        console.error(`${MODULE_ID} | Could not take ${effect.name} off ${original.name}`, err);
+      }
+    }
   }
+}
+
+/**
+ * Has the concentration an effect's data is tied to gone: it names one (`tieOf`), and nothing is
+ * found there. Such an effect ended with its concentration, and is never put on her. One whose tie
+ * can't be read is taken as still tied.
+ * @param {object} data   An effect's source data.
+ * @returns {boolean}
+ */
+function untied(data) {
+  const tie = tieOf(data);
+  if ( !tie ) return false;
+  try {
+    return !fromUuidSync(tie, { strict: false });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Write a batch of her own effects, and where the batch throws, each alone: one that can't be
+ * written is logged by its name, and never costs the rest.
+ * @param {Actor} original
+ * @param {object[]} list                                   Each with its `_id` and `name`.
+ * @param {(batch: object[]) => Promise<unknown[]>} write   Writes a batch of them.
+ * @param {string} failed                                   What couldn't be done: "keep", or "take".
+ * @returns {Promise<unknown[]>}   What the writes returned.
+ */
+async function eachOrAll(original, list, write, failed) {
+  if ( !list.length ) return [];
+  try {
+    return Array.from(await write(list) ?? []);
+  } catch {
+    const done = [];
+    for ( const each of list ) {
+      try {
+        done.push(...Array.from(await write([each]) ?? []));
+      } catch (err) {
+        const words = (failed === "keep") ? `Could not keep ${each.name} on ${original.name}` : `Could not take ${each.name} off ${original.name}`;
+        console.error(`${MODULE_ID} | ${words}`, err);
+      }
+    }
+    return done;
+  }
+}
+
+/**
+ * Put on her the effects gained in form, each as it was on the form, with its id: its origin and
+ * duration, its changes, statuses and flags, dnd5e's `dependentOn` among them, so one a caster's
+ * concentration keeps up still ends with it. Never one she holds by that id already, so a second
+ * pass writes nothing; nor one whose concentration is gone (`untied`). Three writes at most:
+ *
+ * 1. Created turned off, in one batch, with its id kept. Both dnd5e releases add an effect's rider
+ *    conditions, and dnd5e 6 its prompt to end a concentration, only as an active effect is created:
+ *    the form's conditions come back by their own path, as they stood at the end, so a rider cured
+ *    in form must not return; and the prompt was answered in form.
+ * 2. Turned on, in one batch, those that were on on the form.
+ * 3. Its time put right: each copy read back, and its `start` and `duration` written again where
+ *    creating it or turning it on changed them, so the time left goes on as it was.
+ *
+ * The second and third name only those of them she holds as each is sent. One that couldn't be made
+ * is not among them; and one may be gone again by then, ended with its caster's concentration,
+ * which is nothing to write and no failure. The first write is sent before anything is awaited, as
+ * `carryBack` needs of it. One that couldn't be read on the form (snapshot's `unread`) is logged
+ * here by its name, as one that can't be made is: once for an ending, by whoever keeps the rest.
+ * @param {object} kept       snapshot's.
+ * @param {Actor} original
+ * @returns {Promise<string[]>}   The ids of the effects it made.
+ */
+async function putGained(kept, original) {
+  for ( const { name, err } of kept?.form?.unread ?? [] ) console.error(`${MODULE_ID} | Could not keep ${name} on ${original.name}`, err);
+  const wanted = Array.from(kept?.form?.gained ?? []).filter(data => data?._id && !ownEffect(original, data._id) && !untied(data));
+  if ( !wanted.length ) return [];
+  const made = await eachOrAll(original, wanted.map(data => ({ ...data, disabled: true })),
+    batch => original.createEmbeddedDocuments("ActiveEffect", batch, { keepId: true, sendingStone: OWN }), "keep");
+  const update = async batch => {
+    const held = batch.filter(each => ownEffect(original, each._id));
+    if ( !held.length ) return [];
+    return original.updateEmbeddedDocuments("ActiveEffect", held.map(({ name, ...changes }) => changes), { sendingStone: OWN });
+  };
+  await eachOrAll(original, wanted.filter(data => data.disabled !== true).map(data => ({ _id: data._id, name: data.name, disabled: false })), update, "keep");
+  const timing = wanted.map(data => ({ _id: data._id, name: data.name, ...timingChanges(ownEffect(original, data._id)?.toObject(), data) }))
+    .filter(each => each.start || each.duration);
+  await eachOrAll(original, timing, update, "keep");
+  return made.map(effect => effect?.id).filter(Boolean);
+}
+
+/**
+ * Delete from her those of these effects she still holds, each one alone where the batch can't be:
+ * what `putGained` made for a return that didn't happen, and what `dropUntied` finds.
+ * @param {Actor} original
+ * @param {string[]} ids
+ * @returns {Promise<void>}
+ */
+async function takeBack(original, ids) {
+  const held = ids.map(id => ownEffect(original, id)).filter(Boolean).map(effect => ({ _id: effect.id, name: effect.name }));
+  await eachOrAll(original, held,
+    batch => original.deleteEmbeddedDocuments("ActiveEffect", batch.map(each => each._id), { sendingStone: OWN }), "take");
+}
+
+/**
+ * Delete from her each effect gained in form that she holds and whose concentration has gone since:
+ * on the bridge, once a return's deletion of the form has settled. On a return made in Foundry her
+ * copy is created by the client that returns her, as dnd5e deletes the form; where that write lost
+ * the race, the caster's concentration may have ended with the form's copy, under Midi-QOL, leaving
+ * hers tied to nothing.
+ * @param {Actor} original
+ * @param {object} kept       snapshot's.
+ * @returns {Promise<void>}
+ */
+async function dropUntied(original, kept) {
+  await takeBack(original, Array.from(kept?.form?.gained ?? []).filter(data => data?._id && untied(data)).map(data => data._id));
 }
 
 /**
@@ -983,7 +1160,11 @@ export async function correctSlots(kept, original, { copied=true }={}) {
  * dnd5e's return doesn't do: what she spent or gained in form carried back, her tokens put back on
  * every scene, and her hit points and spell slots where her own changed meanwhile. One at a time
  * for each character; a second call while one is on its way does nothing, as does one for a form
- * dnd5e didn't make of her (`madeForm`).
+ * dnd5e didn't make of her (`madeForm`). Since module 0.48.0 the effects gained in form are put on
+ * her before dnd5e's return, so that a caster's concentration always has her copy to keep up when
+ * the form's goes with the form (Midi-QOL ends one left keeping nothing up); and taken off her
+ * again where the return throws, is refused, or is stopped. Whatever is thrown here, the reading of
+ * the form before anything is written too, she is never left marked as ending.
  * @param {Actor} form
  * @param {"app"|"change"|"time"|"hp"|"incapacitated"} why
  * @returns {Promise<boolean>}   Is the form gone?
@@ -994,22 +1175,26 @@ export async function endWildShape(form, why) {
   // deleted or carried back as a Gamemaster on what a player wrote.
   if ( !original || !madeForm(form, original) || ending.has(original.id) ) return false;
   ending.add(original.id);
-  const kept = snapshot(form, original);
-  for ( const id of kept.ids ) returning.add(id);
   try {
+    const kept = snapshot(form, original);
+    for ( const id of kept.ids ) returning.add(id);
+    const put = await putGained(kept, original);
     try {
       await form.revertOriginalForm({ renderSheet: false, sendingStone: why });
     } catch (err) {
       console.error(`${MODULE_ID} | Could not end the Wild Shape of ${original.name}`, err);
       for ( const id of kept.ids ) returning.delete(id);
+      await takeBack(original, put);
       return false;
     }
-    // A return dnd5e refused, or a module's hook stopped: nothing more is written.
+    // A return dnd5e refused, or a module's hook stopped: nothing more is written, and what was
+    // put on her for it is taken off again.
     if ( game.actors.get(form.id) ) {
       for ( const id of kept.ids ) returning.delete(id);
+      await takeBack(original, put);
       return false;
     }
-    await carryBack(kept, original);
+    await carryBack(kept, original, { gained: false });
     await restoreTokens(kept.ids, original);
     await correctHp(kept, original);
     await correctSlots(kept, original);
@@ -1050,7 +1235,9 @@ export function switchedOnCharacters() {
 
 /**
  * On the client that returns her, from wherever: what comes back, unless the module is returning her
- * itself, which carries it back once dnd5e is done; and the ending noted on her Wild Shape, before
+ * itself, which carries it back once dnd5e is done (the effects gained in form first, since module
+ * 0.48.0, sent from this hook ahead of dnd5e's deletion of the form: see `carryBack`); and the
+ * ending noted on her Wild Shape, before
  * dnd5e deletes the form, for the app's banner and the deletion safety net. Only where this user owns
  * her, and the form is a Wild Shape's.
  * @param {Actor} form
@@ -1139,7 +1326,10 @@ export function formDeleted(form) {
  * it: a later Wild Shape holds what it spent and is carried back itself, by its return or deleted
  * so, so nothing more; under a later form of another kind, which keeps none of her features, what
  * it spent is carried back here, and no hit points, which dnd5e's return of that one copies, nor
- * spell slots where that return copies them too.
+ * spell slots where that return copies them too. Since module 0.48.0 effects with the rest, but one
+ * whose concentration went with the form (`putGained`'s rule); and where a return made the
+ * deletion, an effect that return put on her whose concentration has gone since is taken off her
+ * (`dropUntied`).
  * @param {Actor} form
  * @param {Actor} original
  * @param {object} kept
@@ -1148,8 +1338,11 @@ export function formDeleted(form) {
  */
 async function byHand(form, original, kept, ours) {
   const found = wildShapeRules(original);
-  if ( ours || returning.has(form.id) || (found?.item.getFlag(MODULE_ID, "wildShape")?.ended?.formId === form.id) ) return;
   if ( !game.actors.get(original.id) ) return;
+  if ( ours || returning.has(form.id) || (found?.item.getFlag(MODULE_ID, "wildShape")?.ended?.formId === form.id) ) {
+    await dropUntied(original, kept);
+    return;
+  }
   const later = laterForm(form.id, original);
   if ( later?.kind === "wildShape" ) return;
   // Her own hit points and spell slots now, as dnd5e would have copied the form's over them.

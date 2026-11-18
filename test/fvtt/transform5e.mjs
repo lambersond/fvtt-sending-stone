@@ -10,8 +10,10 @@
 // dnd5e merges them, armor class, proficiency by level or Challenge Rating, a druid's scale values by
 // her level, P/classes24/druid/druid.yml:337-387), updated, created and deleted as Foundry does, each
 // firing its hooks, its pre-hooks first where Foundry has them; their items (activity5e.mjs's,
-// updated through the actor, `preUpdateItem` first); their effects (effects-core.mjs's), a condition
-// toggled by its status's static id as core's toggleStatusEffect does, its implied statuses with it;
+// updated through the actor, `preUpdateItem` first); their effects (effects-core.mjs's), created in
+// a batch with a new id each unless `keepId`, dnd5e's rider conditions after one created active, and
+// updated in a batch; a condition toggled by its status's static id as core's toggleStatusEffect
+// does, its implied statuses with it;
 // scenes' tokens updated in a batch (token-core.mjs's scenes); a canvas showing one scene; and
 // compendiums with their indexes, folders and documents, holding dnd5e 5.3.3's own 2024 Beasts, each
 // fixture's numbers read from its P file (packs/_source), its art from dnd5e's own mapping
@@ -35,13 +37,30 @@ const sixth = () => String(game.system?.version ?? '').startsWith('6')
  * each TransformationSetting made; each fromUuid asked; each pack index read; each token batch
  * written; and faults: `throwOnTransform` makes the next transformInto throw before it creates
  * anything, `throwOnTokens` the next scenes' token batch, `refuseRevert` the next revert do nothing
- * (as a module's hook might stop it), `moonSpellList` registers Circle of the Moon's spell list;
+ * (as a module's hook might stop it), `throwOnRevert` the next revert throw before it changes
+ * anything, `moonSpellList` registers Circle of the Moon's spell list;
  * since module 0.41.0 `storedActorId` makes an actor's `inCombat` core's other reading, by the actor
- * id a combatant stored when it was made rather than its token's actor now.
+ * id a combatant stored when it was made rather than its token's actor now. Since module 0.48.0 each
+ * batch of an actor's own effects written (`effectWrites`: its op, actor, data or ids, and options),
+ * and four faults more: `cascadeEffects` makes an actor's deletion fire `deleteActiveEffect` for each
+ * of its own effects first, core's other reading of a deleted actor's effects [core, unverified];
+ * `refuseEffect` names an effect whose creation throws, alone or in a batch, creating nothing;
+ * `resetEffectStart` makes creating an effect, and turning one on, write its `start` anew, and under
+ * dnd5e 6 gives one created with a duration and no expiry `turnStart`, as its `_preCreate` does in a
+ * started fight (D6 documents/active-effect.mjs:754-762) [core, unverified: whether core starts an
+ * effect's time afresh]; `slowEffects` is how many turns more a creation waits, as a slow round trip.
+ * And `noCanvas` makes the canvas not ready, as dnd5e's return reads it: that return then writes no
+ * token, and goes from its hook to its deletion of the forms with nothing awaited between
+ * (D5 documents/actor/actor.mjs:3155, :3213-3237; D6 :3233, :3291-3316), the least it ever leaves
+ * a hook's own write to get ahead in. Here a write waits one turn from where it is sent, so the one
+ * sent first is made first [core, unverified: what each waits on before its request goes].
  */
 export const port = {
-  transforms: [], reverts: [], settings: [], fromUuid: [], indexes: [], tokenWrites: [], created: [], deleted: [],
-  faults: { throwOnTransform: false, throwOnTokens: false, refuseRevert: false, moonSpellList: true, storedActorId: false },
+  transforms: [], reverts: [], settings: [], fromUuid: [], indexes: [], tokenWrites: [], created: [], deleted: [], effectWrites: [],
+  faults: {
+    throwOnTransform: false, throwOnTokens: false, refuseRevert: false, throwOnRevert: false, moonSpellList: true, storedActorId: false,
+    cascadeEffects: false, refuseEffect: null, resetEffectStart: false, slowEffects: 0, noCanvas: false,
+  },
 }
 
 /** A turn of the event loop, as a server's round trip takes at least. */
@@ -236,9 +255,10 @@ export function installTransformCore() {
   foundry.utils.isEmpty ??= value => !value || !Object.keys(value).length
   globalThis.Actor = { implementation: { create: TActor.create, deleteDocuments: TActor.deleteDocuments, updateDocuments: TActor.updateDocuments } }
 
-  // The Gamemaster's canvas, ready, showing token-core's viewed scene (its faults.canvasScene, else the active one).
+  // The Gamemaster's canvas, ready unless `port.faults.noCanvas`, showing token-core's viewed scene (its
+  // faults.canvasScene, else the active one).
   const canvas = globalThis.canvas ?? {}
-  Object.defineProperty(canvas, 'ready', { configurable: true, get: () => true })
+  Object.defineProperty(canvas, 'ready', { configurable: true, get: () => !port.faults.noCanvas })
   Object.defineProperty(canvas, 'scene', { configurable: true, get: () => viewedScene() })
   globalThis.canvas = canvas
 
@@ -620,8 +640,24 @@ export class TActor extends Character {
     return this
   }
 
-  /** As Foundry's: its items each through `preUpdateItem`, whose `false` stops that one, then written, then `updateItem`. */
+  /**
+   * As Foundry's: its items each through `preUpdateItem`, whose `false` stops that one, then written,
+   * then `updateItem`; its own effects each through the effect's own update, one not held left out.
+   * Faults: `resetEffectStart` writes the `start` of an effect turned on anew.
+   */
   async updateEmbeddedDocuments(type, updates = [], options = {}) {
+    if (type === 'ActiveEffect') {
+      port.effectWrites.push({ op: 'update', actor: this.id, data: deepClone(updates), options: deepClone(options) })
+      await turn()
+      const done = []
+      for (const { _id, ...changes } of updates) {
+        const effect = this.effects.get(_id)
+        if (!effect) continue
+        const on = port.faults.resetEffectStart && effect.disabled && (changes.disabled === false)
+        if (await effect.update(on ? { ...changes, start: freshStart() } : changes, options)) done.push(effect)
+      }
+      return done
+    }
     if (type !== 'Item') throw new Error(`No ${type} here`)
     await turn()
     const done = []
@@ -638,19 +674,47 @@ export class TActor extends Character {
     return done.map(([item]) => item)
   }
 
-  /** As Foundry's: each effect with the id it's given, kept, then createActiveEffect. */
+  /**
+   * As Foundry's: each effect with a new id, or with `keepId` the id it's given, then
+   * createActiveEffect; and as dnd5e's, for each created active, its rider conditions a turn later,
+   * unawaited, each unless it is there (D5 documents/active-effect.mjs:608-613, :461-483; D6 :768-783,
+   * data/abstract/active-effect-data-model.mjs:149-170): `flags.dnd5e.riders.statuses` under dnd5e 5,
+   * `system.rider.statuses` under 6. A status's own riders, as Unconscious's Prone, aren't modelled.
+   * Faults: `refuseEffect`, `slowEffects` and `resetEffectStart`, as `port` says.
+   */
   async createEmbeddedDocuments(type, list = [], options = {}) {
     if (type !== 'ActiveEffect') throw new Error(`No ${type} here`)
+    port.effectWrites.push({ op: 'create', actor: this.id, data: deepClone(list), options: deepClone(options) })
+    const refused = port.faults.refuseEffect
+    if (refused && list.some(data => data?.name === refused)) throw new Error(`${refused} could not be created`)
     await turn()
-    const made = list.map(data => new PlainEffect(this, data))
+    for (let waited = 0; waited < port.faults.slowEffects; waited++) await turn()
+    const made = list.map(data => {
+      const source = deepClone(data)
+      if (!options.keepId) delete source._id
+      if (port.faults.resetEffectStart) {
+        source.start = freshStart()
+        const { expiry, units, value } = source.duration ?? {}
+        if (sixth() && !expiry && Number.isFinite(value) && (units !== 'turns')) source.duration.expiry = 'turnStart'
+      }
+      return new PlainEffect(this, source)
+    })
     this.effects.push(...made)
     for (const effect of made) await Hooks.callAll('createActiveEffect', effect, options, userId())
+    for (const effect of made) {
+      if (!effect.active) continue
+      const riders = (sixth() ? effect._source.system?.rider?.statuses : effect._source.flags?.dnd5e?.riders?.statuses) ?? []
+      for (const status of riders) {
+        void turn().then(() => (this.effects.get(dnd5e.utils.staticID(`dnd5e${status}`)) ? null : this.toggleStatusEffect(status, { active: true })))
+      }
+    }
     return made
   }
 
   /** As Foundry's: one not held throws before anything's deleted; then each gone, then deleteActiveEffect. */
   async deleteEmbeddedDocuments(type, ids = [], options = {}) {
     if (type !== 'ActiveEffect') throw new Error(`No ${type} here`)
+    port.effectWrites.push({ op: 'delete', actor: this.id, data: [...ids], options: deepClone(options) })
     for (const id of ids) if (!this.effects.some(effect => effect.id === id)) throw new Error(`ActiveEffect ${id} does not exist`)
     await turn()
     const gone = []
@@ -719,12 +783,20 @@ export class TActor extends Character {
     return actor
   }
 
-  /** As Foundry's: each gone from the world, then deleteActor for each, with the options given. */
+  /**
+   * As Foundry's: each gone from the world, then deleteActor for each, with the options given. Faults:
+   * with `cascadeEffects`, deleteActiveEffect first for each of a deleted actor's own effects, the
+   * actor already gone from the world, as Midi-QOL's own hook expects of a form's return
+   * (its src/module/Hooks.ts:254-262) [core, unverified].
+   */
   static async deleteDocuments(ids = [], options = {}) {
     await turn()
     const gone = ids.map(id => game.actors.get(id)).filter(Boolean)
     for (const actor of gone) actors.delete(actor.id)
     port.deleted.push(...gone.map(actor => actor.id))
+    if (port.faults.cascadeEffects) {
+      for (const actor of gone) for (const effect of [...actor.effects]) await Hooks.callAll('deleteActiveEffect', effect, options, userId())
+    }
     for (const actor of gone) await Hooks.callAll('deleteActor', actor, options, userId())
     return gone
   }
@@ -952,7 +1024,9 @@ export class TActor extends Character {
    * hit points and temporary ones copied back where the transformation kept them, and her spell
    * slots; the viewed scene's tokens put back; a Gamemaster deletes every form of the chain with no
    * options, a player unflags them; then her update, with no concentration check. Faults:
-   * `refuseRevert` makes the next one do nothing, as a module's hook might stop it.
+   * `refuseRevert` makes the next one do nothing, as a module's hook might stop it; `throwOnRevert`
+   * makes the next one throw, before anything is changed; with `noCanvas` no token is written, and
+   * nothing is awaited between the hook and the forms' deletion.
    */
   async revertOriginalForm(options = {}) {
     if (!this.isPolymorphed) return undefined
@@ -961,6 +1035,10 @@ export class TActor extends Character {
     if (port.faults.refuseRevert) {
       port.faults.refuseRevert = false
       return null
+    }
+    if (port.faults.throwOnRevert) {
+      port.faults.throwOnRevert = false
+      throw new Error('The form could not be returned')
     }
     options.renderSheet ??= true
     void Hooks.callAll('dnd5e.revertOriginalForm', this, options)
@@ -1002,6 +1080,16 @@ export class TActor extends Character {
     if (!foundry.utils.isEmpty(update)) await original.update(update, { dnd5e: { concentrationCheck: false } })
     return original
   }
+}
+
+/**
+ * An effect's `start` as core writes one now (ActiveEffect.getEffectStart, as dish-core.mjs has it):
+ * the world time, and the fight viewed with its round and turn, if there is one.
+ * @returns {object}
+ */
+function freshStart() {
+  const combat = game.combat ?? null
+  return { time: game.time?.worldTime ?? 0, combat: combat?.id ?? null, combatant: null, initiative: null, round: combat?.round ?? null, turn: combat?.turn ?? null }
 }
 
 /** actor.mjs:2829-2833: the token props a form takes from its source, its texture's, and those it keeps of hers. */

@@ -1,5 +1,5 @@
 import {
-  ATTACK_KINDS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, DISH_OUTCOMES, DISH_VERSIONS,
+  ATTACK_KINDS, COIN_OPS, COMPANION_INITIATIVE, COMPANION_UNTAKEN, CONCENTRATION_KINDS, DIE_FACES, DISH_OUTCOMES, DISH_VERSIONS,
   EFFECT_DICE_KINDS, EFFECT_ID, EFFECT_OPS, ENCHANT_KINDS, FAVORITE_OPS, FAVORITE_ORDER, FAVORITE_TYPES, FORM_UUID,
   MODULE_ID, MOST_AMONG, MOST_DISH_CHANGES, MOST_DISH_INGREDIENTS, MOST_EFFECT_DICE, MOST_FAVORITE_ORDER, MOST_HIT_DICE,
   MOST_MOVED, MOST_MOVED_ITEMS, MOST_PLAIN_BONUS, MOST_PLAIN_DICE, MOST_SPENT, PREPARE_OPS, PROFILE_ID, ROLL_KINDS,
@@ -283,7 +283,7 @@ export function commandRefusal(command, campaign) {
  * `effectDice`. And since 0.42.1 a spell slot spent or restored: which, how, and the count it was
  * made from. And since 0.42.1 a spell prepared or unprepared, which and how. And since 0.44.0 hit
  * points set, to what and from what; and a plain roll of the dice tray, its dice and what it adds,
- * which no other kind names.
+ * which no other kind names. And since 0.48.0 coins added or taken away, which and how many.
  * @param {object} command
  * @returns {string|null}
  */
@@ -310,6 +310,7 @@ export function checkCommand(command) {
   if ( command.kind === "wildShape" ) return checkWildShapeCommand(command);
   if ( command.kind === "prepare" ) return checkPrepareCommand(command);
   if ( command.kind === "hitPoints" ) return checkHitPointsCommand(command);
+  if ( command.kind === "coins" ) return checkCoinsCommand(command);
   if ( command.kind === "plainRoll" ) return checkPlainRollCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
   if ( command.kind === "ask" ) return checkAskCommand(command);
@@ -715,17 +716,20 @@ function namesTurn({ turn }) {
 
 /**
  * The fields a move names what it moves by; since 0.32.0, `among` for a distribution, in place of
- * `to`.
+ * `to`; and since 0.48.0, `each` for a character's coins handed out, in place of either.
  * @type {ReadonlySet<string>}
  */
-const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among"]));
+const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among", "each"]));
 
 /**
  * Why a fetched move isn't one to make, if it isn't: it names its two ends, which differ, and what
  * moves, items by id with how many of each, each once, and coins by their keys with how many; at
  * least one of them, and nothing a roll names, and throws no dice. Since 0.32.0 a distribution names
  * the characters it shares among in place of the end it goes to: from one to MOST_AMONG of them,
- * each once, never the party itself, and coins of one kind alone, no items.
+ * each once, never the party itself, and coins of one kind alone, no items. Since 0.48.0 a hand-out
+ * names the characters each given the coins, `each`, in place of either: from one to MOST_AMONG of
+ * them, each once, never the giver, and coins as a move names them, no items. Exactly one of `to`,
+ * `among` and `each` is named.
  * @param {object} command
  * @returns {string|null}
  */
@@ -735,14 +739,18 @@ export function checkTransferCommand(command) {
   if ( namesRollFields(command) || !isObject(transfer) ) return "transfer";
   if ( Object.keys(transfer).some(key => !FIELDS.has(key)) ) return "transfer";
   if ( !isId(transfer.from) ) return "transfer";
-  if ( given(transfer.to) === given(transfer.among) ) return "transfer";
+  if ( ["to", "among", "each"].filter(key => given(transfer[key])).length !== 1 ) return "transfer";
   if ( given(transfer.to) ) {
     if ( !isId(transfer.to) || (transfer.from === transfer.to) ) return "transfer";
     if ( !given(transfer.items) && !given(transfer.currency) ) return "transfer";
-  } else {
+  } else if ( given(transfer.among) ) {
     if ( !isAmong(transfer.among, transfer.from) ) return "among";
     if ( given(transfer.items) ) return "items";
     if ( !isCoins(transfer.currency) || (Object.keys(transfer.currency).length !== 1) ) return "currency";
+  } else {
+    if ( !isAmong(transfer.each, transfer.from) ) return "each";
+    if ( given(transfer.items) ) return "items";
+    if ( !isCoins(transfer.currency) ) return "currency";
   }
   if ( given(transfer.items) && !isItemList(transfer.items) ) return "items";
   if ( given(transfer.currency) && !isCoins(transfer.currency) ) return "currency";
@@ -750,8 +758,8 @@ export function checkTransferCommand(command) {
 }
 
 /**
- * Are these the characters a distribution shares among: from one to MOST_AMONG ids, each once, none
- * the party it's from?
+ * Are these the characters a distribution shares among, or since 0.48.0 those a hand-out gives to:
+ * from one to MOST_AMONG ids, each once, none the party, or the character, it's from?
  * @param {unknown} among
  * @param {string} from
  * @returns {boolean}
@@ -799,6 +807,34 @@ function isCoins(currency) {
  */
 function isMoved(value) {
   return Number.isInteger(value) && (value >= 1) && (value <= MOST_MOVED);
+}
+
+/**
+ * What else a command may name, none of which coins added or taken away name: another kind's own
+ * fields, as hit points' check has them (command-checks.mjs), and hit points themselves.
+ * @type {string[]}
+ */
+const COIN_OTHERS = [
+  "transfer", "remove", "typed", "rerolls", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter",
+  "count", "inspiration", "concentration", "enchantment", "prepare", "turn", "undo", "hitPoints"
+];
+
+/**
+ * Why fetched coins added or taken away aren't ones to make, if they aren't, since 0.48.0: the
+ * command names exactly `{ op, currency }`, `op` to add or to remove, and `currency` the coins as a
+ * move names them, by dnd5e's keys, each a whole number from 1 to MOST_MOVED; and nothing else,
+ * nothing a roll names nor any other kind's field, and throws no dice. The Gamemaster's is taken, as
+ * its line in chat is marked theirs.
+ * @param {object} command
+ * @returns {string|null}
+ */
+export function checkCoinsCommand(command) {
+  const coins = command.coins;
+  const given = value => (value !== undefined) && (value !== null);
+  if ( namesRollFields(command) || COIN_OTHERS.some(key => given(command[key])) ) return "coins";
+  if ( !isObject(coins) || (Object.keys(coins).sort().join() !== "currency,op") || !COIN_OPS.includes(coins.op) ) return "coins";
+  if ( !isCoins(coins.currency) ) return "currency";
+  return throwsNoDice(command) ? null : "dice";
 }
 
 /**
@@ -1012,12 +1048,13 @@ export function checkWildShapeCommand(command) {
 /**
  * The fields of other kinds a spell prepared or unprepared never names, beside those a roll names:
  * a move, a removal, anything typed in, a favorite, a note, a dish, an effect, Wild Shape, a spell
- * slot, charges, Heroic Inspiration, a concentration, a turn and the End Turn a turn taken back names.
+ * slot, charges, Heroic Inspiration, a concentration, a turn and the End Turn a turn taken back names,
+ * and since 0.48.0 coins added or taken away.
  * @type {string[]}
  */
 const OTHERS = [
   "transfer", "remove", "typed", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter", "count",
-  "inspiration", "concentration", "turn", "undo"
+  "inspiration", "concentration", "turn", "undo", "coins"
 ];
 
 /**

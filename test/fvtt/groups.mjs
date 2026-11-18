@@ -33,7 +33,10 @@ game.documentTypes = { Actor: ['character', 'npc', 'vehicle', 'group', 'encounte
 if (DND5E6) game.system.version = '6.0.5'
 CONFIG.DND5E = {
   abilities: Object.fromEntries(['str', 'dex', 'con', 'int', 'wis', 'cha'].map(a => [a, { label: a.toUpperCase(), abbreviation: a }])),
-  currencies: Object.fromEntries(['pp', 'gp', 'ep', 'sp', 'cp'].map(id => [id, { label: `DND5E.Currency${id.toUpperCase()}`, abbreviation: id }])),
+  // dnd5e's coins, each with its rate, how many make one gp (config.mjs, `conversion`, the same in
+  // 5.3.3 and 6.0.5), which a group's sheet carries too (module 0.48.0).
+  currencies: Object.fromEntries(Object.entries({ pp: 0.1, gp: 1, ep: 2, sp: 10, cp: 100 })
+    .map(([id, conversion]) => [id, { label: `DND5E.Currency${id.toUpperCase()}`, abbreviation: id, conversion }])),
   weightUnits: { lb: { abbreviation: 'lb' } },
 }
 // dnd5e's enrichers, as far as these use them: a save link becomes its request (enrichers.mjs), and
@@ -215,12 +218,13 @@ assert.ok(!JSON.stringify(sheet.members).includes('hp'), 'no hit points, level o
 assert.equal(sheet.inventory.encumbrance, null)
 assert.equal(sheet.inventory.attunement, null)
 assert.deepEqual(sheet.inventory.currency.find(c => c.id === 'gp').value, DND5E6 ? 12.5 : 12, DND5E6 ? 'fractional coins under dnd5e 6' : 'coins')
+assert.deepEqual(sheet.inventory.currency.map(c => [c.id, c.conversion]), [['pp', 0.1], ['gp', 1], ['ep', 2], ['sp', 10], ['cp', 100]], "each coin's rate, as a character's sheet has it")
 const rows = [...sheet.inventory.sections.flatMap(s => s.items), ...sheet.inventory.containers, ...sheet.inventory.containers.flatMap(c => c.contents)]
 assert.deepEqual(rows.map(r => r.id).sort(), ['bag', 'gem', 'rope', 'sword', 'torch'])
 const ROLL_KEYS = ['activation', 'activationType', 'range', 'target', 'toHit', 'attackId', 'activity', 'attackModes', 'ammunition', 'save', 'damage', 'activities', 'consumable', 'enchantments', 'enchantment', 'rollFormula', 'check']
 for (const row of rows) assert.ok(ROLL_KEYS.every(key => !(key in row)), `${row.id}: ${Object.keys(row).join(' ')}`)
 assert.ok(sheet.description.full && sheet.description.summary)
-ok(`a group's sheet: its members by exactly five keys, characters first, as dnd5e lists them; its inventory with containers, nothing to roll, use or enchant, no encumbrance or attunement${DND5E6 ? ', and coins as dnd5e 6 keeps them, fractional' : ''}; and its descriptions by hash`)
+ok(`a group's sheet: its members by exactly five keys, characters first, as dnd5e lists them; its inventory with containers, nothing to roll, use or enchant, no encumbrance or attunement${DND5E6 ? ', and coins as dnd5e 6 keeps them, fractional' : ''}, each coin with its rate; and its descriptions by hash`)
 
 // ---- Its descriptions: no secrets, no links to act on ----
 const textsSent = posts.filter(e => (e.type === 'character.texts') && (e.campaign.id === 'camp-a')).reduce((all, e) => ({ ...all, ...e.data.texts }), {})

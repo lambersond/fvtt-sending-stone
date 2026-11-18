@@ -478,11 +478,11 @@ const share = (currency, among = FOUR, from = 'party') => ({ from, among, curren
 /*  The hello                                   */
 /* -------------------------------------------- */
 
-assert.deepEqual(helloOf().data.features.transfers, { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true })
+assert.deepEqual(helloOf().data.features.transfers, { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true, handOut: true, change: true })
 const [campaign] = getCampaigns()
-assert.deepEqual(transferFeatures({ ...campaign, transfers: false }), { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false })
+assert.deepEqual(transferFeatures({ ...campaign, transfers: false }), { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false, handOut: false, change: false })
 game.system.id = 'pf2e'
-assert.deepEqual(transferFeatures(campaign), { enabled: false, kinds: [], reason: 'system', partySends: false, distribute: false })
+assert.deepEqual(transferFeatures(campaign), { enabled: false, kinds: [], reason: 'system', partySends: false, distribute: false, handOut: false, change: false })
 game.system.id = 'dnd5e'
 assert.deepEqual(campaignMembers(party, campaign).map(actor => actor.id), ['thorin', 'vex', 'bram', 'lia'], "the Company's characters, in its order, Grumble left out")
 okay("the hello's features.transfers says a party's things may be sent and distributed, `partySends` and `distribute`, wherever moves are made, both false while they're off or under another system")

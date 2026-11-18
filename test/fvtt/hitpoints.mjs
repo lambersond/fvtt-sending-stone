@@ -260,8 +260,8 @@ const OFF = { enabled: false, kinds: [], reason: 'off' }
 const SYSTEM = { enabled: false, kinds: [], reason: 'system' }
 assert.equal(Object.hasOwn(settings.get('campaigns')[0], 'hitPoints'), false, 'saved without the key')
 assert.deepEqual(helloOf().features.hitPoints, ON, 'on for a campaign saved without the switch')
-assert.deepEqual(Object.keys(helloOf().features).at(-1), 'hitPoints', 'last, after wildShape')
-assert.deepEqual(Object.keys(helloOf().features).slice(-2), ['wildShape', 'hitPoints'])
+// Changed on purpose (module 0.48.0): no longer last, `coins` after it.
+assert.deepEqual(Object.keys(helloOf().features).slice(-3), ['wildShape', 'hitPoints', 'coins'], 'after wildShape')
 assert.equal(helloOf().features.rolls.enabled, false, 'whatever the rolls')
 await campaignAs({ hitPoints: false })
 assert.deepEqual(helloOf().features.hitPoints, OFF, 'a saved switch sends the hello again, off')
@@ -276,7 +276,7 @@ assert.deepEqual(helloOf().features.hitPoints, ON)
 await campaignAs({ rolls: true, attacks: true })
 assert.ok(!helloOf().features.rolls.kinds.includes('hitPoints') && !helloOf().features.companions.kinds.includes('hitPoints'), "never among the rolls' kinds, nor a companion's")
 await campaignAs({ rolls: false, attacks: false })
-ok(`the hello's features.hitPoints, last, after wildShape: on for a campaign saved without the switch, whatever its rolls; off with it off, "off" before "system"; "system" with it on under another system; on under dnd5e ${DND5E6 ? '6.0.5' : '5.3.3'}; never among the rolls' or a companion's kinds`)
+ok(`the hello's features.hitPoints, after wildShape: on for a campaign saved without the switch, whatever its rolls; off with it off, "off" before "system"; "system" with it on under another system; on under dnd5e ${DND5E6 ? '6.0.5' : '5.3.3'}; never among the rolls' or a companion's kinds`)
 
 /* -------------------------------------------- */
 /*  2. Fetching                                 */
@@ -337,6 +337,8 @@ ok('fetched for with every other switch off where the answer says "hitPoints": 1
     ['a spell slot beside it', setting({ value: 21 }, { value: 22 }, { spellSlot: { op: 'spend', id: 'spell1', from: 1 } }), 'hitPoints'],
     ['typed', setting({ value: 21 }, { value: 22 }, { typed: true }), 'hitPoints'],
     ['rerolls', setting({ value: 21 }, { value: 22 }, { rerolls: 'kept' }), 'hitPoints'],
+    // Module 0.48.0: nor coins added or taken away beside it.
+    ['coins beside it', setting({ value: 21 }, { value: 22 }, { coins: { op: 'add', currency: { gp: 5 } } }), 'hitPoints'],
     ['a plain roll beside it', setting({ value: 21 }, { value: 22 }, { plainRoll: { terms: [{ faces: 6, count: 1 }] } }), 'plainRoll'],
     ['effect dice', setting({ value: 21 }, { value: 22 }, { effectDice: [{ faces: 4, sign: 1, results: [2] }] }), 'effectDice'],
     ['dice', setting({ value: 21 }, { value: 22 }, { dice: [{ faces: 20, results: [3] }] }), 'dice'],
@@ -595,7 +597,7 @@ if (DND5E6) {
   // The campaign's row in the hello's settings, after Wild Shape's.
   const rowsOf = () => helloOf().settings.sections.find(section => section.id === 'campaign').rows
   await hello()
-  assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'hitPoints', 'companionInitiative', 'groups'])
+  assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'hitPoints', 'coins', 'coinChange', 'companionInitiative', 'groups'])
   assert.deepEqual(rowsOf().find(each => each.id === 'hitPoints'), { id: 'hitPoints', label, value: true, text: 'On' })
   game.system.id = 'pf2e'
   await hello()

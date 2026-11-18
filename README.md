@@ -84,7 +84,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; since 0.44.0 whether Tidy 5e Sheets is active, turned off or not installed, none of which is a fault; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Allow Players to change their hit points from the app, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Hit points**, whether its players may set their characters', forms' and companions' hit points and temporary hit points from the app, on by default ([Hit points](#hit-points)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Allow Players to add and take away coins from the app, Pay with other coins when a character is short of one, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Allow Players to change their hit points from the app, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Coins**, whether its players may [add coins to their characters and take them away](#adding-and-taking-away-coins) from the app, on until you turn it off, and whether a character short of a coin pays with its other coins, on until you turn it off too. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Hit points**, whether its players may set their characters', forms' and companions' hit points and temporary hit points from the app, on by default ([Hit points](#hit-points)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -228,9 +228,15 @@ while the roll is being made.
   check of what a use from the app would spend, which it throws away, rolls a dice cost with
   Foundry's computer dice, never your Manual Dice; so do Midi-QOL's own check of it as Midi's use
   begins, its check of the cost of a player's typed run's other activity, under dnd5e 5, and the
-  module's dice self-test as it starts. The cost the use spends is rolled as ever: your own dice
-  settings, or a typing player's dice. Midi's checks of other uses, as the reactions it looks for
-  among the targets, are rolled as Midi rolls them.
+  module's dice self-test as it starts. Since 0.48.0 so do the checks Midi-QOL makes as it looks for
+  reactions: as a creature is attacked, hit, missed, damaged or healed, or makes a save, Midi works
+  out what each of its reactions would spend and keeps only whether it could be paid. A dice cost
+  rolled for that in your Foundry is Foundry's computer dice, never your Manual Dice, whether the
+  attack came from the app or you made it in Foundry. Under dnd5e 6 that holds where Midi-QOL's
+  line for it looks for reactions as its line for dnd5e 5 does; where it doesn't, those checks are
+  rolled as Midi rolls them. The cost the use spends is rolled as ever: your own dice settings, or
+  a typing player's dice. A reaction that's taken still rolls its cost with the dice settings of
+  whoever takes it. Midi's check of a use you make in Foundry yourself is rolled as Midi rolls it.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -473,8 +479,21 @@ either is missing.
   among its members that are the campaign's characters, each the same whole share; what can't be
   shared evenly stays with the party: "Distributes 100 gp among Bram, Lia, Thorin, and Vex (25 gp
   each); 3 gp stays with The Iron Company". Its members changing in the meantime stops it.
+- **Handing out coins.** Since 0.48.0, a player can hand out a set amount of their own character's
+  coins to each of several of the campaign's characters at once: **Hand out**, on the Inventory
+  tab's Currency row. The total is taken from the giver as coins
+  [taken away](#adding-and-taking-away-coins) are, other coins paying where they're short of one,
+  unless **Pay with other coins when a character is short of one** is off. No line is posted for
+  everyone: each character given coins is whispered what they received, "Vex received 200 pp and 50
+  gp from Thorin", you and any other Gamemaster of the world are whispered one message with all of
+  it, "Thorin handed out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all",
+  and the giver's player sees each of them. A character no player owns is whispered nothing, though
+  your message names it. A giver with no one player of its own, one no player owns, or one several
+  own with none of them having it as their character, is written for by you, as its rolls are: its
+  own players then see none of these messages, only you and each one given.
 - **You** can move anything between the campaign's characters and parties from the app's Gamemaster
-  pages, party to party too, and distribute any party's coin. The switch counts for your moves too.
+  pages, party to party too, distribute any party's coin, and hand out a character's coins at its
+  page. The switch counts for your moves too.
 - **What moves.** Part of a stack, or all of it; a container whole, with everything in it, as dnd5e's
   drop moves it. Each item arrives unequipped and unattuned, what a container held too, with its
   uses, effects and identification. A potion joins a stack of the same potion, but never an
@@ -500,6 +519,36 @@ players' rolls and moves are made here. Each removal posts a line in chat as the
 "Removes 2 Potion of Healing"; yours, from a character's page in the app's Gamemaster view, is
 marked "GM". Removals are made one at a time with moves, so an item on its way is never also
 removed. An item in a container that hides what it holds isn't offered.
+
+### Adding and taking away coins
+
+Since 0.48.0 a player can add coins to their own character in the app, or take them away, as when
+you say "you're paid 5 gp" or "that costs 5 gp": **Add or take away**, on the Inventory tab's
+Currency row, then how many of each coin. **Allow Players to add and take away coins from the app**,
+under **Coins** on the campaign's Player actions tab, is **on by default**, for campaigns saved
+before 0.48.0 too, apart from players' rolls and moves, under D&D Fifth Edition 5 and 6; untick it
+to keep coins yours. You can do the same from a character's page in the app's Gamemaster view. The
+switch counts for your changes from the app too; in Foundry the sheet is yours as ever. A party's
+coins and a companion's aren't changed this way.
+
+- **A line in chat** for each change, as the character, for everyone: "Thorin received 5 gp",
+  "Thorin paid 5 gp"; yours marked "GM".
+- **Short of a coin.** Taking away more of a coin than the character holds breaks a larger coin, the
+  nearest first, and gives the change back in the fewest coins, never in electrum unless electrum
+  is what's taken: 5 gp from 3 gp and 2 pp leaves 1 pp and 8 gp. With no larger coin left, smaller
+  coins pay, the largest first: 5 gp from 2 gp and 40 sp leaves 10 sp. Only an amount worth more
+  than all the character's coins is refused. The line says the coins asked for; the app says which
+  others went. The rates are dnd5e's own; a coin your world gave no rate is never broken, never pays
+  for another and never comes back as change, and one your world made worth the same as another pays
+  for it one for one. Every sum is made in whole coins, so where your world's own rates don't divide
+  one another, as coins of 4 and of 6 to the gp, an amount the coins are worth can be refused too;
+  dnd5e's own rates always divide.
+- **Pay with other coins when a character is short of one**, beside it, is on by default too: untick
+  it, and taking away more of a coin than the character holds is refused.
+- **What's written.** Only the coins that change, in one update, so dnd5e 6's fraction of a coin
+  stays, as it's written: 10.7 gp less 10 leaves 0.7. Changes are made one at a time with moves, so
+  coins on their way to another character are never also taken away. Nothing while the character is
+  transformed, as by Wild Shape.
 
 ### Favorites
 
@@ -606,8 +655,9 @@ the druid's linked tokens become the form on every scene, not only the one you'r
 line goes to chat. Wild Shape ends as the rules end it: when its hours of world time run out, or the
 form drops to 0 hit points or is Incapacitated, while your Foundry is connected; and on a return,
 from the app or in Foundry, what the druid spent or gained in form, uses, hit dice, spell slots,
-conditions and the like, is kept, on top of anything done to the druid meanwhile, such as a party's
-Long Rest. Only a form dnd5e made of the druid is followed, ended or returned: a player's own actor
+conditions, effects others put on the form and the like, is kept, and an effect taken off the form
+is taken off the druid, on top of anything done to the druid meanwhile, such as a party's Long
+Rest. Only a form dnd5e made of the druid is followed, ended or returned: a player's own actor
 flagged by hand to look like one never is. It's
 off by default, apart from players' rolls, under D&D Fifth Edition 5 and 6. A 2014 druid's Wild Shape
 stays in Foundry, and so does any other transformation, such as Polymorph: the app shows the form,
@@ -918,8 +968,10 @@ Gamemaster-only information switched on.
   not as it was when given; it follows the bard's within a turn in combat.
 - **Two bards' Inspired:** each is offered; the 2024 rule allows one die at a time. Two bards who
   aren't the party's are offered under the same name.
-- **In Wild Shape**, Inspired is offered from the form; removed there, the druid's own Inspired
-  stays and is offered again once the druid changes back: the Gamemaster removes it from both.
+- **In Wild Shape**, Inspired is offered from the form. A die used there leaves Inspired on the
+  form, as the app may not remove a shaped druid's effect: once the Gamemaster removes it from the
+  form, the druid's own is removed too when Wild Shape ends; left on the form, it stays on the
+  druid.
 - **A world on the legacy (2014) rules:** a Bardic Inspiration item that doesn't say its rules
   counts as 2014's and isn't offered; dnd5e's 2024 compendium feature is.
 - **Advantage the game adds as the roll is made**, such as Midi-QOL's from a target, takes Foundry's
@@ -961,10 +1013,19 @@ Gamemaster-only information switched on.
 - **Wild Shape from the app is the 2024 Wild Shape only:** a 2014 druid's Wild Shape is used in
   Foundry, and the app follows the form, shown as Wild Shape, but never times, ends or returns it:
   the 2014 rules end it differently (0 hit points or Unconscious), and you return it in Foundry.
-- **Effects gained or ended while shaped**, but conditions and concentration, aren't carried back:
-  dnd5e's return keeps the druid's own effects as they were at the change, so a Bless cast on the
-  wolf ends with the form. Conditions gained in form are put on the druid, and conditions and
-  concentration that ended in form are taken off.
+- **What a druid begins in Wild Shape isn't carried back:** a spell the druid casts as a beast and
+  concentrates on ends with the form, as does an effect one of the form's own features gave it, and
+  anything on the form's items. Effects others put on the form are kept on the druid, and those
+  taken off the form, or run out on it, are taken off the druid. One the druid already had that is
+  only changed on the form, turned off, edited, or applied again for longer, stays as it was on the
+  druid, as does one that had already run out before Wild Shape.
+  - **An effect you make on the form's own sheet is kept on the druid** when Wild Shape ends: delete
+    it there first if it was only for the form.
+  - **A status effect that is no condition,** such as Sleeping, Dodging, Hiding or Marked, is
+    neither kept nor taken off: one put on the form ends with it, and one the druid already had
+    stays on the druid though it was taken off the form. Sleeping put on the form ends Wild Shape,
+    as it makes the form Incapacitated, and the druid comes back without it: you put it on the
+    druid.
 - **Worn gear isn't modelled:** dnd5e gives a form none of the druid's gear, so a ring that should
   work on the form doesn't; you decide.
 - **Bonus Actions are counted only under Midi-QOL's Enforce bonus actions, in a fight:** elsewhere
@@ -1166,7 +1227,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-features.mjs` | A character's classes and features, grouped as dnd5e's Features tab groups them |
 | `scripts/sheet-effects.mjs` | A character's conditions and effects, as dnd5e shows them to its player, and what it concentrates on, as a prompt's label too, with the ability its own concentration check is rolled with; from 0.39.0, what its player may do to each effect from the app |
 | `scripts/sheet-effect-dice.mjs` | From 0.42.0, the dice a character's effects add to its d20 rolls, as dnd5e will add them, named by the spell or item they come from, for a player typing in their dice; from 0.42.1, the Bardic Inspiration an effect offers |
-| `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, encumbrance and attunement |
+| `scripts/sheet-inventory.mjs` | A character's inventory: items by type, containers, currency, from 0.48.0 each coin with its rate, encumbrance and attunement |
 | `scripts/sheet-spells.mjs` | A character's spellcasting and spellbook, sectioned as dnd5e sections it, and the pool a slot is spent or restored from; from 0.42.1, each class's count of prepared spells, and whether a spell is prepared, as the app may change it |
 | `scripts/sheet-details.mjs` | A character's biography, personality and details, traits, tools and death saves |
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
@@ -1204,16 +1265,19 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-enchant.mjs` | Enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items: the profile and item a use is made with, as the player chose them, the enchantment applied as the card's tray would, and enchantments ended; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
 | `scripts/command-turn.mjs` | Ending the current turn from the app, the character's or one of its companions', where it's still the turn the app was shown, by Foundry's own Next Turn; and taking back the turn one just ended, with Foundry's turn events off |
-| `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat; from 0.42.1, a spell slot spent or restored |
+| `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat; from 0.42.1, a spell slot spent or restored; from 0.48.0, a line whispered to the users named, never posted for no one |
 | `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent; and what a note command from the app must look like, which `command-rolls.mjs` asks before `command-notes.mjs` makes it |
 | `scripts/tidy-journal.mjs` | From 0.44.0, Tidy 5e Sheets' journal on a campaign's characters, read only: its current sheet's entries and its Classic sheet's boxes, read straight off the character's flags whether Tidy is active or not, in Tidy's order, without secrets where no player owns the character; what the hello says of it; sending each character's in `journal.tidy` after a hello's books and 500 ms after its Tidy flags or ownership change, never twice the same, withheld when too large |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
-| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch |
+| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch, and from 0.48.0 a character's coins handed out to the characters picked, each whispered what they received and the Gamemasters all of it; and the one line that moves, removals and coins added or taken away stand in |
+| `scripts/coin-change.mjs` | The rule of paying in coins, from 0.48.0, which the coins' commands read: dnd5e's coins that have a rate, and the whole coins an actor holds; a coin paid from its own, then a larger coin broken and its change given back, then smaller coins; which of the coins held went beyond those asked for; and the update that changes an actor's coins from what it stores. It imports nothing and writes nothing |
+| `scripts/command-coins.mjs` | A character's coins added and taken away from the app, from 0.48.0, by the campaign's switch, on by default, under dnd5e: fetching them from an app that takes them; its player's, or the Gamemaster's at its page; other coins paying where it's short of one, by the campaign's setting; one update of the coins that change, made in the line of moves, with its line in chat |
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch, and from 0.47.0 putting them in order, writing dnd5e's own sorts; nothing posted |
 | `scripts/command-prepare.mjs` | Preparing and unpreparing a character's spells from the app, as dnd5e's menu does; nothing posted |
 | `scripts/command-effects.mjs` | A player's own effects turned off, on and deleted from the app, from 0.39.0, by the campaign's switch under dnd5e: fetching them from an app that takes them; each checked against what `sheet-effects.mjs` says its player may do, written with the mark of the app's own Turn off, and read again; the hook that clears the mark on any other change; nothing posted |
 | `scripts/command-hit-points.mjs` | Hit points and temporary hit points set from the app, from 0.44.0, by the campaign's switch, on by default, under dnd5e: fetching them from an app that takes them; the character's, its form's or a companion's, each field only from the number the app showed, within the maximum the sheet shows, one plain update read again; nothing posted |
 | `scripts/command-plain.mjs` | A plain roll of the app's dice tray, from 0.44.0, wherever players' rolls are made: its formula from the dice and the number added, made by dnd5e's basic roll with the player's dice, its card dnd5e 5's generic roll or dnd5e 6's generic message |
+| `scripts/wild-shape-effects.mjs` | Which of a Wild Shape form's effects come back with the druid, from 0.48.0: those gained in form, told from the creature's own and the form's own doing, and those of the druid's taken off it |
 | `scripts/wild-shape.mjs` | Wild Shape, from 0.40.0, by the 2024 rules: the campaign's switch, under dnd5e, and which apps take it; a druid's Wild Shape and what the rules allow the druid now; the campaign's compendiums, the Beasts the druid may learn and the known forms' summaries; the record written on every form as dnd5e makes it; the character's tokens switched and put back on every scene; what comes back on every return, as sums, and the character's hit points; ending a form, and why one is due; a form deleted by hand, and a player's leftover form |
 | `scripts/wild-shape-hooks.mjs` | Wild Shape's hooks, from 0.40.0, and the watch that ends each form when it's due, on the bridge: as world time moves, as a form or its effects change, when a character's queue of commands settles, and when a browser becomes the one that sends |
 | `scripts/sheet-wild-shape.mjs` | A 2024 druid's `wildShape` block and a transformed character's `form` on the sheet, from 0.40.0 |
@@ -1221,7 +1285,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-dishes.mjs` | Dishes from the Magical Recipe Book, from 0.38.0: whether a campaign takes them, by its own switch under dnd5e 5, and what its hello says of them; each dish command posted once as its card, answered again from its card or its tombstone |
 | `scripts/dish-card.mjs` | A dish's card, whispered to the Gamemasters and the campaign's players: its words, its buttons for Gamemasters, what became of it for anyone, the dialog of who ate it, serving it and setting it aside; which apps take dishes, and telling them what was decided, again after a drop and after every hello; deleted cards' tombstones; one dish effect per character |
 | `scripts/dish-effects.mjs` | A dish's Active Effect: its changes on dnd5e 5.3.3's paths, its one-offs, its duration and flags; whether the system is one dishes are taken under, dnd5e 5; cookbook strings made inert for enrichers; dish effects ended once their time has passed; the long rest's top-up |
-| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.44.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one, and Midi-QOL's of a use from the app, Foundry's computer dice; and what lists a campaign's open dice asks for its hello, once `later-dice.mjs` registers it |
+| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.44.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one, and Midi-QOL's of a use from the app, Foundry's computer dice; from 0.48.0, so is Midi-QOL's check of a reaction it looks for; and what lists a campaign's open dice asks for its hello, once `later-dice.mjs` registers it |
 | `scripts/later-dice.mjs` | From 0.44.0, under dnd5e 5, the dice the game rolls later asked of a player typing theirs: a typed roll's run, bound to its Midi-QOL workflow; which rolls are its, by their subject, workflow, a use's own spending (its consumption hooks, and Midi's check of a workflow's other activity's consumption) and Midi's bonus damage; one ask per step, or per die thrown again, a minute's wait, the Gamemaster's window with Roll it now, the answers and their refusals, what the watchdog doesn't count, the hello's list, and its self-test |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster; and from 0.39.0 the links to the module's issue forms at the end of its side |
 | `scripts/apps/help-window.mjs` | From 0.39.0, Configure Settings' Report a bug or request a feature, which any user may open: the links to the module's issue forms |

@@ -6,6 +6,7 @@ import { candidateActors, playerOwners } from "../characters.mjs";
 import { transferReader } from "../command-transfers.mjs";
 import { effectReader } from "../command-effects.mjs";
 import { hitPointReader } from "../command-hit-points.mjs";
+import { coinReader } from "../command-coins.mjs";
 import { attacksUnavailable } from "../command-rolls.mjs";
 import { commandsOffered } from "../commands.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
@@ -160,7 +161,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * @type {{id: string, title: string, secret: string, characters: Set<string>, groups: Set<string>,
    *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean,
    *   dishes: boolean, effects: boolean, wildShape: boolean, wildShapePacks: string[], hitPoints: boolean,
-   *   companionInitiative: string}[]}
+   *   coins: boolean, coinChange: boolean, companionInitiative: string}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({
     ...campaign, wildShapePacks: [...campaign.wildShapePacks], secret: getSecret(campaign.id)
@@ -278,6 +279,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         wildShape: campaign.wildShape,
         wildShapePacks: campaign.wildShapePacks,
         hitPoints: campaign.hitPoints,
+        coins: campaign.coins,
+        coinChange: campaign.coinChange,
         companionInitiative: campaign.companionInitiative
       }))
     });
@@ -311,7 +314,10 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     if ( campaign ) {
       if ( has("campaign.title") ) campaign.title = String(data["campaign.title"] ?? "");
       if ( has("campaign.secret") ) campaign.secret = String(data["campaign.secret"] ?? "");
-      for ( const name of ["rolls", "attacks", "prompts", "manualDice", "transfers", "dishes", "effects", "wildShape", "hitPoints"] ) {
+      for ( const name of [
+        "rolls", "attacks", "prompts", "manualDice", "transfers", "dishes", "effects", "wildShape", "hitPoints", "coins",
+        "coinChange"
+      ] ) {
         if ( has(`campaign.${name}`) ) campaign[name] = data[`campaign.${name}`] === true;
       }
       // Since 0.40.0 the Beasts' compendiums, a box each, named for its collection, whose own id has a
@@ -749,7 +755,10 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * and since 0.40.0, whether they may use Wild Shape, which needs D&D Fifth Edition and an app that
    * takes it, and which of the world's Actor compendiums its druids learn Beasts from; and since 0.44.0,
    * whether they may set their hit points, which needs D&D Fifth Edition and an app that takes them,
-   * an older one answering with commands but not with `hitPoints`.
+   * an older one answering with commands but not with `hitPoints`; and since 0.48.0, whether they may
+   * add coins to their characters and take them away, which needs D&D Fifth Edition and an app that
+   * takes them, an older one answering with commands but not with `coins`, and whether a character's
+   * other coins pay where it's short of one.
    * @param {SettingsWindow["#campaigns"][number]} campaign
    * @returns {object}
    */
@@ -806,6 +815,13 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
           reason: game.i18n.localize("SENDINGSTONE.Config.Actions.RollsReason.system")
         }) : null,
       hitPointsApp: campaign.hitPoints && commandsOffered(campaign.id) && !hitPointReader(campaign.id),
+      coins: campaign.coins,
+      coinsUnavailable: (game.system?.id !== "dnd5e")
+        ? game.i18n.format("SENDINGSTONE.Config.Actions.Unavailable", {
+          reason: game.i18n.localize("SENDINGSTONE.Config.Actions.RollsReason.system")
+        }) : null,
+      coinsApp: campaign.coins && commandsOffered(campaign.id) && !coinReader(campaign.id),
+      coinChange: campaign.coinChange,
       // Since 0.36.0, how its companions enter initiative, which needs no app: it's kept here.
       initiativeChoices: [
         { value: COMPANION_INITIATIVE.OWN, key: "CompanionInitiativeOwn" },
@@ -1125,7 +1141,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     const campaign = {
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
       attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false,
-      wildShape: false, wildShapePacks: [...WILD_SHAPE_PACKS], hitPoints: true, companionInitiative: COMPANION_INITIATIVE.OWN
+      wildShape: false, wildShapePacks: [...WILD_SHAPE_PACKS], hitPoints: true, coins: true, coinChange: true,
+      companionInitiative: COMPANION_INITIATIVE.OWN
     };
     this.#campaigns.push(campaign);
     await this.#show({ section: "campaign", campaignId: campaign.id, tab: "connection" }, "[name='campaign.title']");
@@ -1431,6 +1448,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       wildShape: campaign.wildShape,
       wildShapePacks: [...campaign.wildShapePacks],
       hitPoints: campaign.hitPoints,
+      coins: campaign.coins,
+      coinChange: campaign.coinChange,
       companionInitiative: campaign.companionInitiative
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {
