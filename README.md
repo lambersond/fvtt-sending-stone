@@ -1189,6 +1189,14 @@ Gamemaster-only information switched on.
 - **Module 0.38.x's dish dialog served only the characters ticked as it opened,** whatever you
   ticked, and a card whose cook had left the campaign could never be served: if you used it, check
   who ate each dish served then.
+- **While nobody is in the app, your Foundry asks it less.** A minute or two after the last page of a
+  campaign in the app closes or goes to the background, yours or a player's, Sending Stone asks it
+  every 20 seconds whether there is anything to fetch, where it fetched every 10, with a full fetch
+  every five minutes. Someone opening the app is noticed within about 20 seconds, and their first
+  roll, note or move reaches the game then; after that, at once. A dish from the Magical Recipe Book
+  reaches you within about 20 seconds. For two minutes after Foundry connects it fetches as usual,
+  and notes written in the app while Foundry was closed reach it as it connects. With an older app,
+  nothing changes.
 
 ## Reporting a problem or an idea
 
@@ -1249,7 +1257,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/bridge-role.mjs` | Which browser sends: whether this one is the active Gamemaster's, and whether it has somewhere to post; apart from `bridge.mjs`, as the scripts the hello is built from ask it too |
 | `scripts/heartbeat.mjs` | Heartbeats to campaigns sent nothing lately, so the app knows the game is connected |
 | `scripts/transport.mjs` | Envelope, ordered delivery queue and retries, each post's outcome counted into `delivery-status.mjs`'s tally; what the app says it takes of sheets, and no post larger; why the app refused a post or fetch |
-| `scripts/delivery-status.mjs` | The tally of recent deliveries, which `transport.mjs` counts into; what the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window; a size in megabytes, as the Gamemaster and the app are told it |
+| `scripts/delivery-status.mjs` | The tally of recent deliveries, which `transport.mjs` counts into; what the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window, quiet fetching among it; a size in megabytes, as the Gamemaster and the app are told it |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
 | `scripts/characters.mjs` | A campaign's characters and who owns them; a character's players, those who own it by name, else those it's assigned to: from 0.45.0 for its companions, from 0.46.0 for what its campaign is sent of other players and a dish's card, and from 0.47.0 for who a roll from the app is made as |
 | `scripts/typed-dice.mjs` | Whether a character's player may type in what their own dice show in the app: its primary players, and core's Make Manual Rolls permission |
@@ -1283,7 +1291,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/health-sync.mjs` | From 0.50.0, to an app that reads health, each fight's combatants sent again outside the combat events, once the changes in that fight settle (250 ms), where their hit points, health or defeat differ from what the app was last told; and its combats afresh where it first says it does |
 | `scripts/creature-health.mjs` | From 0.50.0, how hurt a creature is, by dnd5e's own Bloodied rule, for the app's Combat tab; whether a campaign's app reads it, and what its hello says of the campaign's two switches |
 | `scripts/creature-initiative.mjs` | Companions' initiative "Right after its character": each of a character's companions in its combat set just below the character's initiative whenever it's set, rerolled or cleared, by the active Gamemaster's Foundry alone, its own writes marked so that they're never followed |
-| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells, descriptions' links, moves of items and coins, removals and journal notes from the app, one campaign at a time, with which characters it has open, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes, of its players' rolls and of their companions' |
+| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells, descriptions' links, moves of items and coins, removals and journal notes from the app, one campaign at a time, with which characters it has open, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes, of its players' rolls and of their companions'; and, while nobody is in the app, quiet looks in place of full fetches |
 | `scripts/prompts.mjs` | The saves the game asks of a campaign's characters on chat cards, and from 0.41.0 of their companions, to an app that reads them, told to the app as prompts, and closed as they're answered, or a concentration card's once its character no longer concentrates on what it asked about, or a companion's as it leaves the list |
 | `scripts/midi-prompts.mjs` | Midi-QOL's own saves, concentration checks and OverTime turn saves, asked in the app while the character is open there, and from 0.41.0 a companion's while one of its characters is, answered with the player's dice, or left to Midi |
 | `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card, as the Gamemaster's where they made it; a prompt's save on its card, or Midi-QOL's as Midi rolls it; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time; what a command fetched from the app must look like, with each kind's own check but three: a note's, hit points', and that of a dice ask's answer, which is `later-dice.mjs`'s; why attacks can't be made here, and why a use isn't to be made |
