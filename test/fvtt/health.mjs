@@ -1,11 +1,15 @@
 // Other creatures' health in the app (module 0.50.0, the app's ROADMAP item 58): the hello's
 // `features.health` by the campaign's two switches; how hurt a creature is, run beside dnd5e's own
 // `updateBloodied`, read from 5.3.3's or with DND5E6=1 6.0.5's actor.mjs by its lines; who is shown
-// it, and who never is; its hit points with the second switch; the watch that sends a combatant
-// again 250 ms after its hit points, health or defeat change between combat events, the party's
-// too; a combat sent afresh on an app's first answer that reads it, and described anew by the hello
-// as the switches are saved mid-fight; two campaigns; the campaign's
-// settings rows; and an older app sent exactly what it was before. The real module on stub.mjs's
+// it, and who never is, under dnd5e only; its hit points with the second switch; the watch that
+// sends a combatant again 250 ms after its hit points, health or defeat change between combat
+// events, the party's too, by every hook that can change them (an actor, its delta, its token's
+// delta, disposition, hiding, link and actor, an effect made, changed or deleted); a combat sent
+// afresh on an app's first answer that reads it, and described anew by the hello as the switches
+// are saved mid-fight; two campaigns; where the watch sends nothing (combat events off, a client
+// that isn't the bridge, a fight its campaign isn't told of or no longer in, a combatant hidden
+// mid-fight); the campaign's settings rows; and an older app sent exactly what it was before, as an
+// answer saying health in any other form than a format number is. The real module on stub.mjs's
 // Foundry, with a stand-in app that answers each post with the features it reads, and plain tokens
 // as scenario.mjs makes them. Run with --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
@@ -92,7 +96,7 @@ await Hooks.callAll('ready')
 await settle()
 
 const { getCampaigns } = await import(`${MODULE}/scripts/campaigns.mjs`)
-const { snapshotCombat, registerCombatantCompanion } = await import(`${MODULE}/scripts/combat-data.mjs`)
+const { healthChanges, snapshotCombat, registerCombatantCompanion } = await import(`${MODULE}/scripts/combat-data.mjs`)
 const { combatantCompanion } = await import(`${MODULE}/scripts/creature-sync.mjs`)
 const { healthOf, isHealthShown, noteHealthReader } = await import(`${MODULE}/scripts/creature-health.mjs`)
 const { foundrySettings } = await import(`${MODULE}/scripts/foundry-settings.mjs`)
@@ -245,6 +249,15 @@ assert.equal(created(0, 'camp-b').at(-1)?.data.combat.id, 'cmbt1', 'and Mirkwood
 
 // ---- H8: the first answer that says health ----
 {
+  // Health said in any other form than a format number, 1 or later, isn't read: no fight afresh,
+  // and no description with health, the switches on.
+  for (const said of [0, '1', true]) {
+    app.answers = { 'camp-a': { health: said } }
+    const from = app.events.length
+    await beat()
+    assert.equal(created(from).length, 0, `health: ${JSON.stringify(said)} sends no fight afresh`)
+    assert.ok(!JSON.stringify(snapshotCombat(fight, campaignA())).includes('"health"'), `health: ${JSON.stringify(said)} isn't read`)
+  }
   app.answers = { 'camp-a': { health: 1 }, 'camp-b': { health: 1 } }
   let from = app.events.length
   await beat()
@@ -269,7 +282,7 @@ assert.equal(created(0, 'camp-b').at(-1)?.data.combat.id, 'cmbt1', 'and Mirkwood
   assert.ok(!JSON.stringify(types[0].data.combats).includes('"health"'), 'the hello described without it')
   assert.equal(byId(types[1].data.combat.combatants)['c-gob'].health, 'unhurt', 'the fight after it with it')
   assert.ok(app.events.indexOf(types[0]) < app.events.indexOf(types[1]))
-  ok("H8: an app's first answer saying health, a heartbeat's or a hello's, sends each fight its campaign knows again whole, with health; a second sends nothing")
+  ok("H8: an app's first answer saying health, a heartbeat's or a hello's, sends each fight its campaign knows again whole, with health; a second sends nothing; health said as 0, '1' or true isn't read")
 }
 
 // ---- H4 and H5: who is shown ----
@@ -321,9 +334,16 @@ assert.equal(created(0, 'camp-b').at(-1)?.data.combat.id, 'cmbt1', 'and Mirkwood
   assert.deepEqual([plain['s-hostile'].hp, plain['s-hostile'].health], [{ value: 7, max: 12, temp: 3 }, 'hurt'], 'Show their hit points too: its maximum with its change, and its temporary hit points')
   assert.ok(['s-secret', 's-veiled', 's-odd', 's-pet', 's-vex'].every(id => !Object.hasOwn(plain[id], 'hp')), 'never for one not shown')
   assert.deepEqual([isHealthShown(sides.combatants.get('s-tokenless'), others.tokenless), isHealthShown(null, null)], [true, false])
+  // Under another system the switches show nothing: no health, and no other creature's hit points.
+  game.system.id = 'pf2e'
+  const elsewhere = byId(snapshotCombat(sides, campaignA()).combatants)
+  assert.ok(!JSON.stringify(elsewhere).includes('"health"'), 'no health under another system')
+  assert.ok(['s-hostile', 's-neutral', 's-friendly', 's-tokenless'].every(id => !Object.hasOwn(elsewhere[id], 'hp')), "nor another creature's hit points")
+  assert.deepEqual([elsewhere['s-thorin'].hp, elsewhere['s-fam'].hp], [{ value: 30, max: 30, temp: 0 }, { value: 9, max: 9, temp: 0 }], "the campaign's own keep theirs")
+  game.system.id = 'dnd5e'
   registerCombatantCompanion(combatantCompanion)
   combats.delete(sides.id)
-  ok("H4: Hostile, Neutral, Friendly and tokenless creatures get health; a Secret token, a hidden one, any other disposition, a hidden combatant, a player's creature and another campaign's character never do; the campaign's character and companion have hit points, never health")
+  ok("H4: Hostile, Neutral, Friendly and tokenless creatures get health; a Secret token, a hidden one, any other disposition, a hidden combatant, a player's creature and another campaign's character never do; the campaign's character and companion have hit points, never health; and under another system no creature has health, nor another's hit points")
   ok("H5: Show their hit points too gives a shown creature its hit points, the maximum with its change and its temporary hit points, and never one not shown; GM-only details still sends every combatant's hit points, with no health where it isn't shown")
 }
 
@@ -367,13 +387,60 @@ await switches({ health: true, healthHitPoints: false })
   await settled()
   posted = updates(from)
   assert.deepEqual(posted.map(each => [each.data.combatant.id, each.data.combatant.health]), [['c-kob', 'hurt']], 'and by updateToken with its delta')
-  // An effect raising the Ogre's maximum, as Aid does.
+  const told = from => updates(from).map(each => [each.data.combatant.id, each.data.changes, each.data.combatant.health])
+  // The Kobold's token linked to its base actor, whole, and unlinked again: heard by actorLink.
+  const baseKobold = game.actors.get('kobold')
+  from = app.events.length
+  Object.assign(tokens.kobold, { actorLink: true, actor: baseKobold })
+  fight.combatants.get('c-kob').actor = baseKobold
+  await Hooks.callAll('updateToken', tokens.kobold, { actorLink: true })
+  await settled()
+  assert.deepEqual(told(from), [['c-kob', ['health'], 'unhurt']], 'a token linked to its actor')
+  from = app.events.length
+  Object.assign(tokens.kobold, { actorLink: false, actor: kobold })
+  fight.combatants.get('c-kob').actor = kobold
+  await Hooks.callAll('updateToken', tokens.kobold, { actorLink: false })
+  await settled()
+  assert.deepEqual(told(from), [['c-kob', ['health'], 'hurt']], 'and unlinked')
+  // The Wolf's token made to stand for a hurt Dire wolf, and back: heard by actorId. The combatant
+  // keeps its own actorId, as core's does, and reads its actor through its token.
+  const direWolf = creature('dire-wolf', 'Dire wolf', 20)
+  direWolf.system.attributes.hp.value = 12
+  from = app.events.length
+  Object.assign(tokens.wolf, { actorId: 'dire-wolf', actor: direWolf })
+  fight.combatants.get('c-wolf').actor = direWolf
+  await Hooks.callAll('updateToken', tokens.wolf, { actorId: 'dire-wolf' })
+  await settled()
+  assert.deepEqual(told(from), [['c-wolf', ['health'], 'hurt']], 'a token made to stand for another actor')
+  from = app.events.length
+  Object.assign(tokens.wolf, { actorId: 'wolf', actor: wolf })
+  fight.combatants.get('c-wolf').actor = wolf
+  await Hooks.callAll('updateToken', tokens.wolf, { actorId: 'wolf' })
+  await settled()
+  assert.deepEqual(told(from), [['c-wolf', ['health'], 'unhurt']], 'and for its own again')
+  // An effect raising the Ogre's maximum, as Aid does; changed, as Aid suspended and resumed; and
+  // deleted, as Aid ends: each heard by its own hook, with no change to the actor.
+  const aid = { parent: ogre, documentName: 'ActiveEffect' }
   from = app.events.length
   ogre.system.attributes.hp.effectiveMax = 64
-  await Hooks.callAll('createActiveEffect', { parent: ogre, documentName: 'ActiveEffect' })
+  await Hooks.callAll('createActiveEffect', aid)
   await settled()
-  posted = updates(from)
-  assert.deepEqual(posted.map(each => [each.data.combatant.id, each.data.changes, each.data.combatant.health]), [['c-ogre', ['health'], 'hurt']], 'an effect raising its maximum makes it hurt')
+  assert.deepEqual(told(from), [['c-ogre', ['health'], 'hurt']], 'an effect raising its maximum makes it hurt')
+  from = app.events.length
+  ogre.system.attributes.hp.effectiveMax = 59
+  await Hooks.callAll('updateActiveEffect', aid, { disabled: true })
+  await settled()
+  assert.deepEqual(told(from), [['c-ogre', ['health'], 'unhurt']], 'an effect changed: Aid suspended')
+  from = app.events.length
+  ogre.system.attributes.hp.effectiveMax = 64
+  await Hooks.callAll('updateActiveEffect', aid, { disabled: false })
+  await settled()
+  assert.deepEqual(told(from), [['c-ogre', ['health'], 'hurt']], 'and resumed')
+  from = app.events.length
+  ogre.system.attributes.hp.effectiveMax = 59
+  await Hooks.callAll('deleteActiveEffect', aid)
+  await settled()
+  assert.deepEqual(told(from), [['c-ogre', ['health'], 'unhurt']], 'an effect deleted: Aid ended')
   // The Goblin's token made Secret: posted without health.
   from = app.events.length
   tokens.goblin.disposition = CONST.TOKEN_DISPOSITIONS.SECRET
@@ -385,6 +452,24 @@ await switches({ health: true, healthHitPoints: false })
   tokens.goblin.disposition = CONST.TOKEN_DISPOSITIONS.HOSTILE
   await Hooks.callAll('updateToken', tokens.goblin, { disposition: CONST.TOKEN_DISPOSITIONS.HOSTILE })
   await settled()
+  // The Goblin's token hidden from players mid-fight, with Show their hit points too on: posted with
+  // neither its health nor its hit points; shown again, with both.
+  await switches({ health: true, healthHitPoints: true })
+  from = app.events.length
+  tokens.goblin.hidden = true
+  await Hooks.callAll('updateToken', tokens.goblin, { hidden: true })
+  await settled()
+  posted = updates(from)
+  assert.deepEqual(posted.map(each => [each.data.combatant.id, each.data.changes]), [['c-gob', ['hp', 'health']]], 'a token hidden mid-fight')
+  assert.ok(!Object.hasOwn(posted[0].data.combatant, 'health') && !Object.hasOwn(posted[0].data.combatant, 'hp'), JSON.stringify(posted[0].data.combatant))
+  from = app.events.length
+  tokens.goblin.hidden = false
+  await Hooks.callAll('updateToken', tokens.goblin, { hidden: false })
+  await settled()
+  posted = updates(from)
+  assert.deepEqual(posted.map(each => [each.data.combatant.id, each.data.changes, each.data.combatant.health, each.data.combatant.hp]),
+    [['c-gob', ['hp', 'health'], 'bloodied', { value: 4, max: 10, temp: 0 }]], 'and shown again')
+  await switches({ health: true, healthHitPoints: false })
   // The Wolf down, then made Dead by an effect.
   from = app.events.length
   await hitPointsTo(wolf, 0)
@@ -395,17 +480,13 @@ await switches({ health: true, healthHitPoints: false })
   await Hooks.callAll('createActiveEffect', { parent: wolf, documentName: 'ActiveEffect', statuses: new Set(['dead']) })
   await settled()
   assert.deepEqual(updates(from).map(each => [each.data.combatant.id, each.data.changes, each.data.combatant.defeated]), [['c-wolf', ['defeated'], true]], 'Dead after down: defeated')
-  ok('H6: the watch posts once, 250 ms after a change settles, a creature whose health changed; nothing in the same band; one post for a burst; an unlinked creature by its delta and its token; an effect raising a maximum; a token made Secret, without health; and Dead after down, as defeated')
+  ok('H6: the watch posts once, 250 ms after a change settles, a creature whose health changed; nothing in the same band; one post for a burst; an unlinked creature by its delta and its token; a token linked, or made to stand for another actor; an effect made, changed and deleted; a token made Secret, without health; a token hidden, without health or hit points; and Dead after down, as defeated')
 }
 
 // ---- H7: a turn between the change and the watch ----
 {
   fight.started = true; fight.round = 1; fight.turn = 0
   await Hooks.callAll('combatTurnChange', fight, { round: 0, turn: null, combatantId: null }, { round: 1, turn: 0, combatantId: 'c-thorin' })
-  await settled()
-  await hitPointsTo(ogre, 59)
-  ogre.system.attributes.hp.effectiveMax = 59
-  await Hooks.callAll('deleteActiveEffect', { parent: ogre, documentName: 'ActiveEffect' })
   await settled()
   // The Ogre bloodied, a turn telling it so before the watch settles, then healed whole.
   let from = app.events.length
@@ -479,17 +560,98 @@ await switches({ health: true, healthHitPoints: false })
   ok("H12: the switches saved mid-fight: the hello after the save describes each fight anew, other creatures' health and hit points in or out, and nothing else is sent")
 }
 
+// ---- H13: where the watch sends nothing ----
+{
+  const fall = async (who, value) => { await hitPointsTo(who, value); await settled() }
+  // Combat events off: a fall posts nothing, and an app first saying health is sent no fight afresh.
+  settings.set('combatEvents', false)
+  let from = app.events.length
+  await fall(goblin, 3)
+  assert.deepEqual(updates(from), [], 'combat events off: nothing')
+  app.answers = { 'camp-b': { health: 1 } }
+  await beat()
+  app.answers = { 'camp-a': { health: 1 }, 'camp-b': { health: 1 } }
+  from = app.events.length
+  await beat()
+  assert.deepEqual(created(from), [], 'nor a fight afresh to an app first saying health')
+  await fall(goblin, 7)
+  settings.set('combatEvents', true)
+  // A client that isn't the bridge hears the same hooks, and posts nothing.
+  users.get('gm').isActiveGM = false
+  from = app.events.length
+  await fall(goblin, 3)
+  assert.deepEqual([updates(from), updates(from, 'camp-b')], [[], []], "a client that isn't the bridge: nothing")
+  await fall(goblin, 7)
+  users.get('gm').isActiveGM = true
+  // A fight its campaign isn't told of: Thorin left the ambush, then came back unheard while combat
+  // events were off, and they're on again before any hello.
+  const ambush = combat('cmbt-ambush')
+  const orc = creature('orc', 'Orc', 15)
+  combatant(ambush, 'a-orc', orc, { initiative: 9, token: token('t-orc', CONST.TOKEN_DISPOSITIONS.HOSTILE, { actor: orc }), tokenId: 't-orc' })
+  const thorinThere = combatant(ambush, 'a-thorin', thorin, { initiative: 8, token: token('t-thorin2', CONST.TOKEN_DISPOSITIONS.FRIENDLY, { actor: thorin }), tokenId: 't-thorin2' })
+  from = app.events.length
+  await Hooks.callAll('createCombatant', thorinThere)
+  await settle()
+  assert.equal(byId(created(from).at(-1)?.data.combat.combatants ?? [])['a-orc']?.health, 'unhurt', 'Erebor told of the ambush, the Orc unhurt')
+  ambush.combatants.delete('a-thorin')
+  await Hooks.callAll('deleteCombatant', thorinThere)
+  await settle()
+  assert.equal(ofType(app.events.slice(from), 'combat.ended').at(-1)?.data.combat.id, 'cmbt-ambush', 'and that it ended for it, as Thorin left')
+  settings.set('combatEvents', false)
+  ambush.combatants.set('a-thorin', thorinThere)
+  await Hooks.callAll('createCombatant', thorinThere)
+  settings.set('combatEvents', true)
+  from = app.events.length
+  await fall(orc, 5)
+  assert.deepEqual(updates(from).filter(each => each.data.combatId === 'cmbt-ambush'), [], "a fight its campaign isn't told of: nothing")
+  combats.delete(ambush.id)
+  await Hooks.callAll('deleteCombat', ambush)
+  await settle()
+  // A fight its campaign is told of but no longer in: Erebor's characters saved without Thorin,
+  // before the hello that follows. Mirkwood, still in it, is sent the fall.
+  const saved = settings.get('campaigns')
+  settings.set('campaigns', saved.map(c => (c.id === 'camp-a') ? { ...c, characters: [] } : c))
+  from = app.events.length
+  await fall(goblin, 3)
+  assert.deepEqual([updates(from).length, updates(from, 'camp-b').length], [0, 1], "a fight its campaign is no longer in: nothing, while Mirkwood's told")
+  await fall(goblin, 7)
+  settings.set('campaigns', saved)
+  // A combatant hidden mid-fight, Gamemaster-only information off: removed, then sent nothing as
+  // its hit points change; shown again, added back.
+  const ogreThere = fight.combatants.get('c-ogre')
+  from = app.events.length
+  ogreThere.hidden = true
+  await Hooks.callAll('updateCombatant', ogreThere, { hidden: true })
+  await settle()
+  assert.deepEqual(ofType(app.events.slice(from), 'combat.combatant.removed').map(each => each.data.combatantId), ['c-ogre'], 'hidden: removed')
+  from = app.events.length
+  await fall(ogre, 20)
+  assert.deepEqual([updates(from), updates(from, 'camp-b')], [[], []], 'a combatant hidden mid-fight: nothing')
+  await fall(ogre, 59)
+  ogreThere.hidden = false
+  await Hooks.callAll('updateCombatant', ogreThere, { hidden: false })
+  await settle()
+  assert.equal(ofType(app.events.slice(from), 'combat.combatant.added').at(-1)?.data.combatant.health, 'unhurt', 'shown again: added back, unhurt')
+  ok("H13: the watch sends nothing with combat events off, nor a fight afresh then; nothing from a client that isn't the bridge; nothing for a fight its campaign isn't told of, or no longer has a character in; and nothing for a combatant hidden mid-fight")
+}
+
 // A combat deleted is forgotten, and its watch with it.
 {
   noteHealthReader('camp-a', { health: 1 })
   await hitPointsTo(goblin, 10)
+  const goblinThere = fight.combatants.get('c-gob')
+  assert.deepEqual(healthChanges(goblinThere, campaignA()), ['health'], 'told hurt, unhurt now')
   combats.delete(fight.id)
   await Hooks.callAll('deleteCombat', fight)
+  // The fight's combat.ended described the Goblin unhurt; hurt since, it would differ, but nothing
+  // told of a deleted fight is kept.
+  goblin.system.attributes.hp.value = 2
+  assert.deepEqual(healthChanges(goblinThere, campaignA()), [], 'what it was told is forgotten')
   const from = app.events.length
   await settled()
   assert.deepEqual(updates(from), [], 'nothing after the fight is deleted')
-  ok('a deleted combat is forgotten, and its waiting check with it')
+  ok('a deleted combat is forgotten, what each campaign was told of it and its waiting check with it')
 }
 
-assert.equal(oks, 13)
+assert.equal(oks, 14)
 console.log(`\nall ${oks} health cases passed`)
