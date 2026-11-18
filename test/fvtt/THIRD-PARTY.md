@@ -43,7 +43,7 @@ midi-fake.mjs, midi-saves.mjs and midi-critical.mjs are stand-ins modelled on Mi
 (https://gitlab.com/tposney/midi-qol, Creative Commons Attribution 3.0 Unported). A few short lines
 follow its source: a method's signature and a chat card's markup. Since module 0.44.0 midi-fake.mjs
 models its other activity, the deferral of its damage and Midi's bonus damage macros, and since
-module 0.48.0 its look for reactions (utils.ts's doReactions) and its Cast activity's activation
+module 0.49.0 its look for reactions (utils.ts's doReactions) and its Cast activity's activation
 (CastActivity.ts), after the v14 branch (GitLab 2ac2f66), read only. No Midi-QOL file is copied,
 shipped in module.zip, or run.
 
