@@ -481,9 +481,8 @@ either is missing.
   shared evenly stays with the party: "Distributes 100 gp among Bram, Lia, Thorin, and Vex (25 gp
   each); 3 gp stays with The Iron Company". Its members changing in the meantime stops it.
 - **Handing out coins.** Since 0.49.0, a player can give a set amount of their own character's
-  coins to each of the campaign's characters ticked, one or several at once: **Give**, on the
-  Inventory tab's Currency row, with the characters ticked. The total is taken from the giver as
-  coins
+  coins to each of the campaign's characters they tick, one or several at once: **Give**, on the
+  Inventory tab's Currency row. The total is taken from the giver as coins
   [taken away](#adding-and-taking-away-coins) are, other coins paying where they're short of one,
   unless **Pay with other coins when a character is short of one** is off. No line is posted for
   everyone: each character given coins is whispered what they received, "Vex received 200 pp and 50
@@ -501,8 +500,8 @@ either is missing.
   uses, effects and identification. A potion joins a stack of the same potion, but never an
   unidentified one, one with uses spent or one enchanted. Coins given to a party, or by an app
   before v0.50.0 to a character, are moved exactly: never more than there are, and dnd5e 6's
-  fractions stay. An item in a container that hides what it holds, or
-  deeper than five containers, isn't offered.
+  fractions stay. An item in a container that hides what it holds, or deeper than five containers,
+  isn't offered.
 - **A line in chat** for each move, as the character who moved it, for everyone, such as "Takes 50
   gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM". Coins given to
   characters, as above, are whispered instead.
