@@ -694,8 +694,8 @@ hit points; under dnd5e 6 the creature's own, which an effect can change, and ne
 **Down** at 0. Temporary hit points don't count, as in dnd5e. Where dnd5e's *Bloodied Status* is
 *Never Display*, Bloodied isn't used: Hurt instead. *Only Display for Allies* doesn't hide it: the
 switch is your own permission for the app. Tick **Show their hit points too**, nested under it and
-off by default too, and those creatures show their hit points instead, of their maximum, with any
-temporary hit points, as the party's do; it gives away how much each can still take.
+off by default too, and those creatures show their hit points instead, out of their maximum and with
+any temporary hit points, as the party's do; it gives away how much each can still take.
 
 The party is the campaign's characters, their companions and any creature a player owns: their rows
 show their hit points as before, never a word. Never shown: a hidden combatant, a creature whose
