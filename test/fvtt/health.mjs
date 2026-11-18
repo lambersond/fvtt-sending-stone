@@ -3,7 +3,8 @@
 // `updateBloodied`, read from 5.3.3's or with DND5E6=1 6.0.5's actor.mjs by its lines; who is shown
 // it, and who never is; its hit points with the second switch; the watch that sends a combatant
 // again 250 ms after its hit points, health or defeat change between combat events, the party's
-// too; a combat sent afresh on an app's first answer that reads it; two campaigns; the campaign's
+// too; a combat sent afresh on an app's first answer that reads it, and described anew by the hello
+// as the switches are saved mid-fight; two campaigns; the campaign's
 // settings rows; and an older app sent exactly what it was before. The real module on stub.mjs's
 // Foundry, with a stand-in app that answers each post with the features it reads, and plain tokens
 // as scenario.mjs makes them. Run with --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
@@ -458,6 +459,26 @@ await switches({ health: true, healthHitPoints: false })
   ok("H10: only the campaign whose switch is on is sent another creature's health")
 }
 
+// ---- H12: the switches saved mid-fight ----
+{
+  let from = app.events.length
+  await switches({ health: true, healthHitPoints: true }, { health: true })
+  const fightOf = (campaign = 'camp-a') => byId(ofType(app.events.slice(from), 'bridge.hello', campaign).at(-1)?.data.combats.find(c => c.id === 'cmbt1')?.combatants ?? [])
+  assert.deepEqual([fightOf()['c-gob'].health, fightOf()['c-gob'].hp], ['hurt', { value: 6, max: 10, temp: 0 }], "the hello after the save describes the fight anew: the Goblin's hit points too")
+  assert.equal(Object.hasOwn(fightOf('camp-b')['c-gob'], 'hp'), false, "Mirkwood's still without them")
+  assert.deepEqual([updates(from).length, created(from).length], [0, 0], 'nothing else is sent')
+  from = app.events.length
+  await switches({ health: false, healthHitPoints: false }, { health: true })
+  const goblinOff = fightOf()['c-gob']
+  assert.ok(!Object.hasOwn(goblinOff, 'health') && !Object.hasOwn(goblinOff, 'hp'), JSON.stringify(goblinOff))
+  from = app.events.length
+  await hitPointsTo(goblin, 7)
+  await settled()
+  assert.deepEqual(updates(from), [], 'and with the switch off, a fall the hello told none of posts nothing')
+  await switches({ health: true }, { health: true })
+  ok("H12: the switches saved mid-fight: the hello after the save describes each fight anew, other creatures' health and hit points in or out, and nothing else is sent")
+}
+
 // A combat deleted is forgotten, and its watch with it.
 {
   noteHealthReader('camp-a', { health: 1 })
@@ -470,5 +491,5 @@ await switches({ health: true, healthHitPoints: false })
   ok('a deleted combat is forgotten, and its waiting check with it')
 }
 
-assert.equal(oks, 12)
+assert.equal(oks, 13)
 console.log(`\nall ${oks} health cases passed`)

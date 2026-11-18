@@ -1728,7 +1728,8 @@ sent when a combatant's `hp`, `health` or `defeated`, as the campaign would be t
 from what it was last told: 250 ms after a burst of changes to its actor, its token or its effects
 settles. `changes` then names those of `"hp"`, `"health"` and `"defeated"` that differ. On such a
 listener's first answer saying so, each combat its campaign knows goes again whole, as
-`combat.created`.
+`combat.created`. As the Gamemaster saves the campaign's switches mid-fight, the `bridge.hello` that
+follows describes its combats as they now are, with or without `health` and other creatures' `hp`.
 
 `combat.turn` is sent whenever whose turn it is, or the round, changes, in either direction:
 
