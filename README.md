@@ -705,11 +705,11 @@ loses its word; given to a player, it's the party's. **GM-only details** still s
 combatant's hit points, but the app shows another creature's only beside its word, where both
 switches allow it, and so never a Secret or hidden one's.
 
-The words follow the game: a quarter of a second after a creature's hit points, its token or its
-effects stop changing, what its campaign's app would be told of it now is compared with what it was
-told, and a combatant that differs is sent again, the party's own too, so their hit points on the
-Combat tab no longer wait for the next turn. An app before 0.50.0 is sent none of this, and a
-campaign whose app doesn't show other creatures' health yet says so under the switch.
+The words follow the game: a quarter of a second after the creatures in a fight, their tokens and
+their effects stop changing, what each campaign's app would be told of them now is compared with
+what it was told, and a combatant that differs is sent again, the party's own too, so their hit
+points on the Combat tab no longer wait for the next turn. An app before 0.50.0 is sent none of
+this, and a campaign whose app doesn't show other creatures' health yet says so under the switch.
 
 ### Hit, miss and save results
 

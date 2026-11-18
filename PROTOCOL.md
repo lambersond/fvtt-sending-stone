@@ -1725,11 +1725,12 @@ Sent only while **Combat tracker** is ticked. Every payload naming a combat carr
 
 Since module 0.50.0, to a listener that answers `"health": 1`, `combat.combatant.updated` is also
 sent when a combatant's `hp`, `health` or `defeated`, as the campaign would be told them now, differ
-from what it was last told: 250 ms after a burst of changes to its actor, its token or its effects
-settles. `changes` then names those of `"hp"`, `"health"` and `"defeated"` that differ. On such a
-listener's first answer saying so, each combat its campaign knows goes again whole, as
-`combat.created`. As the Gamemaster saves the campaign's switches mid-fight, the `bridge.hello` that
-follows describes its combats as they now are, with or without `health` and other creatures' `hp`.
+from what it was last told: 250 ms after a burst of changes to the creatures in its fight, their
+tokens or their effects settles, each fight on its own. `changes` then names those of `"hp"`,
+`"health"` and `"defeated"` that differ. On such a listener's first answer saying so, each combat
+its campaign knows goes again whole, as `combat.created`. As the Gamemaster saves the campaign's
+switches mid-fight, the `bridge.hello` that follows describes its combats as they now are, with or
+without `health` and other creatures' `hp`.
 
 `combat.turn` is sent whenever whose turn it is, or the round, changes, in either direction:
 
