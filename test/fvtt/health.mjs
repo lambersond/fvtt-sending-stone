@@ -4,14 +4,15 @@
 // it, and who never is, under dnd5e only; its hit points with the second switch; the watch that
 // sends a combatant again 250 ms after its hit points, health or defeat change between combat
 // events, the party's too, by every hook that can change them (an actor, its delta, its token's
-// delta, disposition, hiding, link and actor, an effect made, changed or deleted); a combat sent
-// afresh on an app's first answer that reads it, and described anew by the hello as the switches
-// are saved mid-fight; two campaigns; where the watch sends nothing (combat events off, a client
-// that isn't the bridge, a fight its campaign isn't told of or no longer in, a combatant hidden
-// mid-fight); the campaign's settings rows; and an older app sent exactly what it was before, as an
-// answer saying health in any other form than a format number is. The real module on stub.mjs's
-// Foundry, with a stand-in app that answers each post with the features it reads, and plain tokens
-// as scenario.mjs makes them. Run with --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
+// delta, disposition, hiding, link and actor, an effect made, changed or deleted), once for a burst
+// however long, as it settles, and each fight waiting on its own; a combat sent afresh on an app's
+// first answer that reads it, and described anew by the hello as the switches are saved mid-fight;
+// two campaigns; where the watch sends nothing (combat events off, a client that isn't the bridge,
+// a fight its campaign isn't told of or no longer in, a combatant hidden mid-fight); the campaign's
+// settings rows; and an older app sent exactly what it was before, as an answer saying health in
+// any other form than a format number is. The real module on stub.mjs's Foundry, with a stand-in
+// app that answers each post with the features it reads, and plain tokens as scenario.mjs makes
+// them. Run with --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { actor, combat, combatant, combats, settings, user, users } from './stub.mjs'
@@ -365,6 +366,21 @@ await switches({ health: true, healthHitPoints: false })
   await hitPointsTo(goblin, 8)
   await settled()
   assert.deepEqual(updates(from), [], 'the same band posts nothing')
+  // A burst longer than the wait, each change in it under 250 ms after the one before: healed whole,
+  // bloodied 150 ms later, healed whole 150 ms after that. Each change starts the wait again, so
+  // nothing goes until 250 ms after the last, and then once, as it settled: never Bloodied, which it
+  // was only mid-burst.
+  from = app.events.length
+  await hitPointsTo(goblin, 10)
+  await wait(150)
+  await hitPointsTo(goblin, 3)
+  await wait(150)
+  await hitPointsTo(goblin, 10)
+  await wait(150)
+  assert.deepEqual(updates(from), [], 'nothing while a burst longer than the wait goes on, nor until it settles')
+  await settled()
+  posted = updates(from)
+  assert.deepEqual(posted.map(each => [each.data.changes, each.data.combatant.health]), [[['health'], 'unhurt']], 'then one post, as it settled')
   // Three changes within 100 ms: one post, of the last.
   from = app.events.length
   await hitPointsTo(goblin, 7)
@@ -376,6 +392,32 @@ await switches({ health: true, healthHitPoints: false })
   posted = updates(from)
   assert.equal(posted.length, 1, 'a burst posts once')
   assert.equal(posted[0].data.combatant.health, 'bloodied')
+  // Two fights at once, each waiting for the last change to any creature in it, and only in it: the
+  // Goblin hurt here; 100 ms later a Warg in a camp Thorin is fighting too; 100 ms after that the
+  // Ogre here. The camp goes 250 ms after the Warg; this fight 250 ms after the Ogre, the Goblin
+  // with it, put off by the Ogre and not by the Warg.
+  const camp = combat('cmbt-camp')
+  const warg = creature('warg', 'Warg', 12)
+  combatant(camp, 'k-warg', warg, { initiative: 7, token: token('t-warg', CONST.TOKEN_DISPOSITIONS.HOSTILE, { actor: warg }), tokenId: 't-warg' })
+  const thorinInCamp = combatant(camp, 'k-thorin', thorin, { initiative: 6, token: token('t-thorin3', CONST.TOKEN_DISPOSITIONS.FRIENDLY, { actor: thorin }), tokenId: 't-thorin3' })
+  from = app.events.length
+  await Hooks.callAll('createCombatant', thorinInCamp)
+  await settle()
+  assert.equal(byId(created(from).at(-1)?.data.combat.combatants ?? [])['k-warg']?.health, 'unhurt', 'Erebor told of the camp, the Warg unhurt')
+  from = app.events.length
+  await hitPointsTo(goblin, 9)
+  await wait(100)
+  await hitPointsTo(warg, 5)
+  await wait(100)
+  await hitPointsTo(ogre, 58)
+  await settled()
+  assert.deepEqual(updates(from).map(each => [each.data.combatId, each.data.combatant.id, each.data.combatant.health]),
+    [['cmbt-camp', 'k-warg', 'bloodied'], ['cmbt1', 'c-gob', 'hurt'], ['cmbt1', 'c-ogre', 'hurt']], 'each fight posted as its own changes settled')
+  combats.delete(camp.id)
+  await Hooks.callAll('deleteCombat', camp)
+  await hitPointsTo(goblin, 4)
+  await hitPointsTo(ogre, 59)
+  await settled()
   // An unlinked token's creature, by its delta, and by its token's delta.
   from = app.events.length
   await hitPointsTo(kobold, 2, 'updateActorDelta', { parent: { actor: kobold } })
@@ -480,7 +522,7 @@ await switches({ health: true, healthHitPoints: false })
   await Hooks.callAll('createActiveEffect', { parent: wolf, documentName: 'ActiveEffect', statuses: new Set(['dead']) })
   await settled()
   assert.deepEqual(updates(from).map(each => [each.data.combatant.id, each.data.changes, each.data.combatant.defeated]), [['c-wolf', ['defeated'], true]], 'Dead after down: defeated')
-  ok('H6: the watch posts once, 250 ms after a change settles, a creature whose health changed; nothing in the same band; one post for a burst; an unlinked creature by its delta and its token; a token linked, or made to stand for another actor; an effect made, changed and deleted; a token made Secret, without health; a token hidden, without health or hit points; and Dead after down, as defeated')
+  ok('H6: the watch posts once, 250 ms after a change settles, a creature whose health changed; nothing in the same band; one post for a burst, nothing until 250 ms after its last change however long it goes on, and as it settled; two fights at once each posted; an unlinked creature by its delta and its token; a token linked, or made to stand for another actor; an effect made, changed and deleted; a token made Secret, without health; a token hidden, without health or hit points; and Dead after down, as defeated')
 }
 
 // ---- H7: a turn between the change and the watch ----
