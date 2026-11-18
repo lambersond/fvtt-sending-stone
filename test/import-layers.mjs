@@ -143,6 +143,7 @@ const LAYERS = [
       'dish-card.mjs',
       'character-sync.mjs',
       'combat.mjs',
+      'health-sync.mjs',            // its combatants sent again as their health changes
       'chat-data.mjs',
       'chat.mjs',
       'midi-prompts.mjs',

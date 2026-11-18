@@ -1,10 +1,11 @@
 /**
  * Which generation of dnd5e the world runs: 5 or 6, by the first number of the system's version.
  *
- * Three things ask it that have nothing else in common: damage on its own (command-alone.mjs), a
- * plain roll of the dice tray (command-plain.mjs), and whether dishes are taken here
- * (dish-effects.mjs). So it's in a file of its own, a leaf importing nothing, as midi-economy.mjs
- * is: kept in any one of the three, the other two would import that file for this alone.
+ * Four things ask it that have nothing else in common: damage on its own (command-alone.mjs), a
+ * plain roll of the dice tray (command-plain.mjs), whether dishes are taken here
+ * (dish-effects.mjs), and how hurt a creature is (creature-health.mjs). So it's in a file of its
+ * own, a leaf importing nothing, as midi-economy.mjs is: kept in any one of the four, the others
+ * would import that file for this alone.
  */
 
 /**

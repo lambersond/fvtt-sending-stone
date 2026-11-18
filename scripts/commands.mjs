@@ -30,12 +30,13 @@ import { attacksUnavailable, failedResult, HIT_DICE_KINDS, runRollCommand } from
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
 import { noteAloneReader } from "./character-sync.mjs";
 import { gmRollOf } from "./chat-data.mjs";
-import { noteHealthReader } from "./creature-health.mjs";
+import { healthReader, noteHealthReader } from "./creature-health.mjs";
 import { noteCompanionReader } from "./creature-sync.mjs";
 import { diceStatus } from "./dice-plan.mjs";
 import { dishReader, noteDishReader } from "./dish-card.mjs";
 import { noteSettingsReader } from "./foundry-settings.mjs";
 import { noteGroupReader } from "./groups.mjs";
+import { healthWanted } from "./health-sync.mjs";
 import {
   answersDiceAsk, beginRun, checkAsks, diceAskFeatures, endRun, heldFor, noteDiceAskReader, runDiceAnswer
 } from "./later-dice.mjs";
@@ -307,7 +308,8 @@ export function registerCommandHooks() {
  * `diceAsks`, the dice the game rolls later asked of a player typing theirs; and since 0.49.0,
  * whether it takes coins added and taken away, for which it's fetched from where the campaign's
  * Gamemaster lets its players, under dnd5e, with everything else off; and since 0.50.0, whether it
- * reads how hurt other creatures are, `health`. A hello's answer wakes
+ * reads how hurt other creatures are, `health`, to which its combats are sent again where it first
+ * says so (health-sync.mjs). A hello's answer wakes
  * the campaign's fetching, which may be waiting as an answer given before the hello was taken asked.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
@@ -333,7 +335,10 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteTidyReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);
   noteDiceAskReader(campaignId, features);
+  // The hello this answers, or the combats told before, were described without health.
+  const healthWas = healthReader(campaignId);
   noteHealthReader(campaignId, features);
+  if ( !healthWas && healthReader(campaignId) ) healthWanted(campaignId);
   syncPollers();
   if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.wake?.();
 }

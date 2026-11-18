@@ -901,7 +901,7 @@ function campaignCharacters() {
  * @param {Document} document
  * @returns {Actor|null}
  */
-function owningActor(document) {
+export function owningActor(document) {
   let parent = document?.parent;
   while ( parent && (parent.documentName !== "Actor") ) {
     if ( parent.documentName === "ActorDelta" ) return parent.parent?.actor ?? null;

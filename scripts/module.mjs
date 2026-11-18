@@ -12,6 +12,7 @@ import { migrateConnectedCharacters } from "./campaigns.mjs";
 import { registerChatHooks } from "./chat.mjs";
 import { registerCombatHooks } from "./combat.mjs";
 import { registerCombatantCompanion } from "./combat-data.mjs";
+import { registerHealthHooks } from "./health-sync.mjs";
 import { registerFollowHooks } from "./creature-initiative.mjs";
 import { combatantCompanion, registerCreatureHooks, registerSheetSync } from "./creature-sync.mjs";
 import { registerDishHooks, renderDishCard } from "./dish-card.mjs";
@@ -43,6 +44,7 @@ Hooks.once("init", () => {
   registerSettings();
   registerChatHooks();
   registerCombatHooks();
+  registerHealthHooks();
   registerFollowHooks();
   registerCharacterHooks();
   registerCreatureHooks();

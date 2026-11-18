@@ -117,4 +117,7 @@ for v in X=1 "X=1 DND5E6=1"; do run coins $v SLIM_CHECK=1; done
 # received and the Gamemasters all of it, and what a failure part way leaves (dnd5e 5.3.3 and 6.0.5
 # stand-ins).
 for v in X=1 "X=1 DND5E6=1"; do run handouts $v SLIM_CHECK=1; done
+# Module 0.50.0: other creatures' health in the app: who is shown, dnd5e's bands under 5.3.3 and
+# 6.0.5, the watch that follows hit points between combat events, and older apps sent nothing new.
+for v in X=1 "X=1 DND5E6=1"; do run health $v; done
 exit $fail
