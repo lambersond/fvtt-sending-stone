@@ -88,6 +88,8 @@ let status = null
 let campaignOf = null
 // The settings window's line for Erebor's players' rolls, as it stands.
 const rollsLine = () => status?.campaignStatus(campaignOf('camp-a')).find(({ text }) => text.startsWith('SENDINGSTONE.Status.Rolls')) ?? null
+// A time of day as the settings window writes it, to the minute.
+const timeOf = ms => new Date(ms).toLocaleTimeString(game.i18n.lang, { hour: 'numeric', minute: '2-digit' })
 globalThis.fetch = async (url, init) => {
   const post = { url: String(url), body: JSON.parse(init.body) }
   post.commands = post.url.endsWith('/api/bridge/commands')
@@ -296,12 +298,23 @@ for (const quiet of [true, '1', 0, 1.5]) {
   assert.ok(list.every(poll => !hasQuiet(poll)), `quiet ${JSON.stringify(quiet)} not read: no fetch says quiet`)
   assert.deepEqual(await Promise.all(list.map(pauseAfter)), [20, 20, 20], `quiet ${JSON.stringify(quiet)} not read: wait 20`)
 }
+// A later format, 2, is read as this one: a whole number of 1 or more.
+app.quiet = 2
+from = polls()
+await beat()
+list = await fromFirst(from, hasQuiet, 3, 'fetches after a heartbeat answered quiet 2')
+assert.deepEqual(looks(list), [false, true, true], 'quiet 2 read: a full fetch, then looks')
+app.quiet = 0
+from = polls()
+await beat()
+list = await fromFirst(from, poll => !hasQuiet(poll), 2, 'fetches after a heartbeat without quiet again')
+assert.ok(list.every(poll => !hasQuiet(poll)), 'no fetch says quiet again')
 app.quiet = 1
 from = polls()
 await beat()
 list = await fromFirst(from, hasQuiet, 3, 'fetches after the next heartbeat')
 assert.deepEqual(looks(list), [false, true, true], 'a full fetch, then looks: no hello, so no two minutes')
-ok('Q8: a heartbeat\'s answer without quiet, or with one that is no whole number of 1 or more (true, "1", 0, 1.5): no fetch says it, and wait 20 is waited; one with it again: looks again after one full fetch')
+ok('Q8: a heartbeat\'s answer without quiet, or with one that is no whole number of 1 or more (true, "1", 0, 1.5): no fetch says it, and wait 20 is waited; one with quiet 2, a later format, or 1: looks again after one full fetch')
 
 // ---- Q9: a failed fetch ----
 when(post => post.commands, json(500, { reason: 'unavailable', message: 'Down' }), 1)
@@ -336,7 +349,10 @@ assert.match(list[1].line.text, /^SENDINGSTONE\.Status\.RollsFetched /, 'after a
 app.answerQuiet = 60_000
 list = await fetches(polls(), 1, 'a fetch answered with a minute\'s quiet')
 assert.equal(await pauseAfter(list[0]), 60_000)
-assert.match(rollsLine().text, /^SENDINGSTONE\.Status\.RollsQuiet \{"time":"[^"]+","seconds":60\}$/)
+// The time it says is that fetch's, not the time it is drawn: ten minutes on, as the wait runs.
+advance(600_000)
+assert.notEqual(timeOf(list[0].at), timeOf(now))
+assert.equal(rollsLine().text, `SENDINGSTONE.Status.RollsQuiet ${JSON.stringify({ time: timeOf(list[0].at), seconds: 60 })}`, "the quiet line says the last fetch's time")
 app.answerQuiet = 2_000
 from = polls()
 await hello()
@@ -352,6 +368,11 @@ await until(() => rollsLine().text.startsWith('SENDINGSTONE.Status.RollsFetched 
 from = polls()
 await wait(50)
 assert.equal(polls(), from, 'fetching stopped')
+// Ten minutes on, it still says the time of the last fetch.
+const lastAt = app.polls.at(-1).at
+advance(600_000)
+assert.notEqual(timeOf(lastAt), timeOf(now))
+assert.equal(rollsLine().text, `SENDINGSTONE.Status.RollsFetched ${JSON.stringify({ time: timeOf(lastAt) })}`, "the plain line says the last fetch's time")
 Object.assign(diceStatus, { ready: true })
 syncPollers()
 await after(120_000, 2, 'two minutes after fetching started again')
@@ -364,7 +385,7 @@ assert.equal(polls(), from, 'fetching stopped')
 // The words, as the Gamemaster reads them.
 const lang = JSON.parse(readFileSync(`${MODULE}/lang/en.json`, 'utf8'))
 assert.equal(lang.SENDINGSTONE.Status.RollsQuiet, "Players' rolls fetched at {time}. No one has a character or party open in the app, so Sending Stone asks it every {seconds} seconds.")
-ok('Q10: the settings window says RollsQuiet with its seconds while quiet, RollsFetched after an answer without quiet and after a failed fetch, at once as a hello is answered, and once fetching stops, as the campaign fetches nothing or this client stops, in the words Players\' rolls fetched at {time}. No one has a character or party open in the app, so Sending Stone asks it every {seconds} seconds.')
+ok('Q10: the settings window says RollsQuiet with its seconds and the last fetch\'s time while quiet, RollsFetched after an answer without quiet and after a failed fetch, at once as a hello is answered, and once fetching stops, as the campaign fetches nothing or this client stops, with the last fetch\'s time ten minutes on, in the words Players\' rolls fetched at {time}. No one has a character or party open in the app, so Sending Stone asks it every {seconds} seconds.')
 
 assert.deepEqual(logged, [], 'nothing logged')
 console.log('\nall quiet checks passed')
