@@ -21,13 +21,14 @@ The scripts stand in seven layers, bottom to top:
    common.
 2. **The post.** The queue that posts events, and what became of each post.
 3. **The game.** Which characters and parties are a campaign's, who may type a character's dice, its
-   combats as it is told them, the rules of what players are shown of results, a dish's effects, and
-   the rule of paying in coins.
+   combats as it is told them and how hurt a creature in them is, the rules of what players are
+   shown of results, a dish's effects, and the rule of paying in coins.
 4. **Sheets.** A character's or a party's sheet as plain data, with its descriptions and their
    links; a druid's Wild Shape and its forms; and which creatures are a character's companions.
 5. **What each app was told.** Keeping every campaign's copy current: characters and parties,
-   companions, journals, dishes' cards, chat, combat, the saves the game asks, and heartbeats; and,
-   posting nothing itself, companions set right after their characters in Foundry's initiative.
+   companions, journals, dishes' cards, chat, combat and its creatures' health, the saves the game
+   asks, and heartbeats; and, posting nothing itself, companions set right after their characters in
+   Foundry's initiative.
 6. **Commands.** What the app asks to be made here: each command's check and each kind's run, the
    dice the game rolls later, whose answer is a command, and the fetcher with its queues; and a
    campaign's Foundry settings for its Gamemaster, which say why attacks can't be made.
