@@ -3544,7 +3544,8 @@ the coins are lost, never made twice. Under dnd5e 6, of a party's 103.5 gp, 100 
 leaves it 3.5.
 
 **A character's coins handed out.** Since module 0.49.0, where the hello says `handOut`, a
-`transfer` with `each` in place of `to` hands out a character's coins, as the app's Hand out does:
+`transfer` with `each` in place of `to` hands out a character's coins, as the app's Give does for the
+characters ticked:
 `currency` to each of the characters `each` names, any of the campaign's characters but the giver,
 none of them transformed, no party among them. It's a character's own coins, made as that character
 (`actorId` is `from`), by its player or, `by` `"gm"`, the Gamemaster; never a party's. The total,

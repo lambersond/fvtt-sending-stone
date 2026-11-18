@@ -480,9 +480,10 @@ either is missing.
   among its members that are the campaign's characters, each the same whole share; what can't be
   shared evenly stays with the party: "Distributes 100 gp among Bram, Lia, Thorin, and Vex (25 gp
   each); 3 gp stays with The Iron Company". Its members changing in the meantime stops it.
-- **Handing out coins.** Since 0.49.0, a player can hand out a set amount of their own character's
-  coins to each of several of the campaign's characters at once: **Hand out**, on the Inventory
-  tab's Currency row. The total is taken from the giver as coins
+- **Handing out coins.** Since 0.49.0, a player can give a set amount of their own character's
+  coins to each of the campaign's characters ticked, one or several at once: **Give**, on the
+  Inventory tab's Currency row, with the characters ticked. The total is taken from the giver as
+  coins
   [taken away](#adding-and-taking-away-coins) are, other coins paying where they're short of one,
   unless **Pay with other coins when a character is short of one** is off. No line is posted for
   everyone: each character given coins is whispered what they received, "Vex received 200 pp and 50
@@ -498,11 +499,13 @@ either is missing.
 - **What moves.** Part of a stack, or all of it; a container whole, with everything in it, as dnd5e's
   drop moves it. Each item arrives unequipped and unattuned, what a container held too, with its
   uses, effects and identification. A potion joins a stack of the same potion, but never an
-  unidentified one, one with uses spent or one enchanted. Coins are moved exactly: never more than
-  there are, and dnd5e 6's fractions stay. An item in a container that hides what it holds, or
+  unidentified one, one with uses spent or one enchanted. Coins given to a party, or by an app
+  before v0.50.0 to a character, are moved exactly: never more than there are, and dnd5e 6's
+  fractions stay. An item in a container that hides what it holds, or
   deeper than five containers, isn't offered.
 - **A line in chat** for each move, as the character who moved it, for everyone, such as "Takes 50
-  gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM".
+  gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM". Coins given to
+  characters, as above, are whispered instead.
 - **One at a time.** Moves are made one after another, so two players taking the last potion at once
   never both get it. A move is written in steps, the copy before the original is deleted; one that
   fails, or that another module stops, puts back what it can and moves nothing more. A browser
@@ -524,7 +527,7 @@ removed. An item in a container that hides what it holds isn't offered.
 ### Adding and taking away coins
 
 Since 0.49.0 a player can add coins to their own character in the app, or take them away, as when
-you say "you're paid 5 gp" or "that costs 5 gp": **Add or take away**, on the Inventory tab's
+you say "you're paid 5 gp" or "that costs 5 gp": **Add or remove**, on the Inventory tab's
 Currency row, then how many of each coin. **Allow Players to add and take away coins from the app**,
 under **Coins** on the campaign's Player actions tab, is **on by default**, for campaigns saved
 before 0.49.0 too, apart from players' rolls and moves, under D&D Fifth Edition 5 and 6; untick it
