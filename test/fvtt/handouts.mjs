@@ -1,4 +1,4 @@
-// A character's coins handed out to the characters picked (module 0.48.0): the hello's
+// A character's coins handed out to the characters picked (module 0.49.0): the hello's
 // `features.transfers.handOut` and `.change`; the `transfer` command's `each`, its check and who may
 // make it; the total paid as coins taken away are, exactly and with other coins, and what the
 // campaign's setting off does; the writes and their order, and what a failure leaves; the whispers,

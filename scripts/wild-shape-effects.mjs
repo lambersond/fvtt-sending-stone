@@ -1,5 +1,5 @@
 /**
- * Which of a Wild Shape form's effects come back with the druid, since module 0.48.0, as plain data:
+ * Which of a Wild Shape form's effects come back with the druid, since module 0.49.0, as plain data:
  * those gained in form, told from the effects the form was made with (hers, the creature's own and
  * dnd5e's own for the change) and from the form's own doing; and which of hers have run out on it.
  * dnd5e's return keeps no effect and offers no setting for it, in 5.3.3 or 6.0.5.
@@ -40,7 +40,7 @@ export function formEffectsOf(host, data) {
 /**
  * The baseline a form made from a form carries on: the earlier form's, its `expired` among it, with
  * the later creature's own effects added to `formEffects`, where the earlier one has that list (one
- * recorded before 0.48.0 has none, and gets none); and without those of `effects` that the earlier
+ * recorded before 0.49.0 has none, and gets none); and without those of `effects` that the earlier
  * form still holds and the later change left behind, by its settings, which were never taken off.
  * @param {object} base   The earlier form's baseline.
  * @param {Actor} host    The earlier form.
@@ -147,7 +147,7 @@ function asHers(data, chain, uuid) {
  * form's own actor, never its items', that the form wasn't made with (her own it carried, and
  * `formEffects`), that are no status effect's own, no concentration and haven't run out, and that
  * aren't the form's own doing. None where the baseline has no `formEffects`, as one recorded before
- * 0.48.0: without it the creature's own can't be told from what was gained. Each is read on its
+ * 0.49.0: without it the creature's own can't be told from what was gained. Each is read on its
  * own: one that can't be read, its duration or its data throwing as it is asked, as another module's
  * might, is left out, and named in `unread` with what it threw, so that it never costs the rest.
  * @param {Actor} form

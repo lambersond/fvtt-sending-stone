@@ -98,7 +98,7 @@ export const SETTINGS = Object.freeze({
    *  manualDice, transfers, dishes, effects, wildShape, wildShapePacks, hitPoints, coins,
    *  coinChange, companionInitiative}, characters and groups being actor ids, since 0.40.0 the
    *  Beasts' packs by collection, since 0.44.0 `hitPoints`, a missing one read as on, and since
-   *  0.48.0 `coins` and `coinChange`, each read as on where missing. */
+   *  0.49.0 `coins` and `coinChange`, each read as on where missing. */
   CAMPAIGNS: "campaigns",
 
   /** World-scope list of the dish cards deleted undecided, since 0.38.0, so that their app hears of
@@ -382,7 +382,7 @@ export const HIT_POINT_OPS = Object.freeze(["set"]);
 
 /**
  * What a player, or their Gamemaster, can have done here from the app to a character's coins, since
- * module 0.48.0: so many of each added, or taken away, as when the character is paid or buys
+ * module 0.49.0: so many of each added, or taken away, as when the character is paid or buys
  * something. Each posts a line in chat saying so. Offered under D&D Fifth Edition where the campaign's
  * Gamemaster lets its players, by its own switch, on until turned off, apart from the rolls and the
  * moves: it throws no dice.
@@ -390,7 +390,7 @@ export const HIT_POINT_OPS = Object.freeze(["set"]);
  */
 export const COIN_KINDS = Object.freeze(["coins"]);
 
-/** What may be done to a character's coins, since 0.48.0: some added, or some taken away. */
+/** What may be done to a character's coins, since 0.49.0: some added, or some taken away. */
 export const COIN_OPS = Object.freeze(["add", "remove"]);
 
 /** What may be done to an effect, as the state wanted, never a toggle, since 0.39.0. */
@@ -512,7 +512,7 @@ export const MOST_COMPANIONS_EACH = 20;
  * prepared, which an NPC's sheet has prepared already, and what's its character's to do, as ending a
  * turn or taking one back, which the character's command does for the companion's turn too (round
  * 0.36.0 §2.8), or since 0.44.0 a plain roll of the dice tray, which is the character's player's and
- * names no one's sheet, or since 0.48.0 coins added or taken away, which are a character's own. But
+ * names no one's sheet, or since 0.49.0 coins added or taken away, which are a character's own. But
  * not hit points, which since 0.44.0 a player sets for their companion as they could on its sheet.
  */
 export const COMPANION_UNTAKEN = Object.freeze([
@@ -692,7 +692,7 @@ export const COST_CHECK = "sendingStoneCheck";
 export const COST_SPENDING = "sendingStoneSpending";
 
 /**
- * The key of a use's configuration saying, since 0.48.0, that dnd5e has begun spending it, from
+ * The key of a use's configuration saying, since 0.49.0, that dnd5e has begun spending it, from
  * `dnd5e.preActivityConsumption` until `dnd5e.activityConsumption`: a dice cost dnd5e rolls with it
  * is the use's own, never Midi-QOL's check of a reaction it looks for (dice-plan.mjs's
  * `isReactionLookup`). dnd5e passes it on to a linked activity's spending.

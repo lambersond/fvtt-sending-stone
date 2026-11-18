@@ -40,7 +40,7 @@ const sixth = () => String(game.system?.version ?? '').startsWith('6')
  * (as a module's hook might stop it), `throwOnRevert` the next revert throw before it changes
  * anything, `moonSpellList` registers Circle of the Moon's spell list;
  * since module 0.41.0 `storedActorId` makes an actor's `inCombat` core's other reading, by the actor
- * id a combatant stored when it was made rather than its token's actor now. Since module 0.48.0 each
+ * id a combatant stored when it was made rather than its token's actor now. Since module 0.49.0 each
  * batch of an actor's own effects written (`effectWrites`: its op, actor, data or ids, and options),
  * and four faults more: `cascadeEffects` makes an actor's deletion fire `deleteActiveEffect` for each
  * of its own effects first, core's other reading of a deleted actor's effects [core, unverified];

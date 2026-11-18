@@ -9,7 +9,7 @@
 // the world's `chatResults` after `chatScope`, which sends one bridge.settings when it changes, no
 // hello.
 //
-// Module 0.48.0: the campaign's `coins` and `coinChange` rows, after `hitPoints`, each whole.
+// Module 0.49.0: the campaign's `coins` and `coinChange` rows, after `hitPoints`, each whole.
 import assert from 'node:assert/strict'
 import {
   MIDI, midiLanguage, midiSettings, ok, settings, start, users, withMidi, withSettings, words
@@ -130,13 +130,13 @@ await withSettings({ campaigns: [{ ...settings.get('campaigns')[0], companionIni
   assert.equal(row(foundrySettings(campaign()), 'campaign', 'companionInitiative').value, 'own', 'anything else stored is its own roll')
 })
 ok("since 0.36.0 the campaign's companions' initiative, after its moves: Its own roll until \"Right after its character\" is saved")
-// Module 0.48.0: the campaign's two switches for coins, after its hit points', each whole: On for a
-// campaign saved before 0.48.0, as this one, each Off alone while the other stays On; the first with
+// Module 0.49.0: the campaign's two switches for coins, after its hit points', each whole: On for a
+// campaign saved before 0.49.0, as this one, each Off alone while the other stays On; the first with
 // its note under another system while it's on, the second never with one.
 const COINS_ROW = { id: 'coins', label: 'Allow Players to add and take away coins from the app', value: true, text: 'On' }
 const CHANGE_ROW = { id: 'coinChange', label: 'Pay with other coins when a character is short of one', value: true, text: 'On' }
 const coinRows = () => { const value = foundrySettings(campaign()); return [row(value, 'campaign', 'coins'), row(value, 'campaign', 'coinChange')] }
-assert.ok(!Object.hasOwn(settings.get('campaigns')[0], 'coins') && !Object.hasOwn(settings.get('campaigns')[0], 'coinChange'), 'a campaign saved before 0.48.0')
+assert.ok(!Object.hasOwn(settings.get('campaigns')[0], 'coins') && !Object.hasOwn(settings.get('campaigns')[0], 'coinChange'), 'a campaign saved before 0.49.0')
 assert.deepEqual([row(sent, 'campaign', 'coins'), row(sent, 'campaign', 'coinChange')], [COINS_ROW, CHANGE_ROW], "in the hello's")
 assert.deepEqual(coinRows(), [COINS_ROW, CHANGE_ROW])
 await withSettings({ campaigns: [{ ...settings.get('campaigns')[0], coins: false }] }, () => {
@@ -154,7 +154,7 @@ await withSettings({ campaigns: [{ ...settings.get('campaigns')[0], coinChange: 
 game.system.id = 'pf2e'
 assert.deepEqual(coinRows(), [{ ...COINS_ROW, note: 'it needs the D&D Fifth Edition system.' }, CHANGE_ROW], 'under another system: a note for the first, on, and none for the second')
 game.system.id = 'dnd5e'
-ok("since 0.48.0 the campaign's two switches for coins, each row whole: \"Allow Players to add and take away coins from the app\" and \"Pay with other coins when a character is short of one\", On for a campaign saved before 0.48.0, each Off alone; the first with its note under another system while on, the second never with one")
+ok("since 0.49.0 the campaign's two switches for coins, each row whole: \"Allow Players to add and take away coins from the app\" and \"Pay with other coins when a character is short of one\", On for a campaign saved before 0.49.0, each Off alone; the first with its note under another system while on, the second never with one")
 // A note on why a switch that's on does nothing here.
 await withSettings({ campaigns: [{ ...settings.get('campaigns')[0], rolls: true, manualDice: true }] }, async () => {
   const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)

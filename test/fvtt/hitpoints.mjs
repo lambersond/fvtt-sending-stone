@@ -260,7 +260,7 @@ const OFF = { enabled: false, kinds: [], reason: 'off' }
 const SYSTEM = { enabled: false, kinds: [], reason: 'system' }
 assert.equal(Object.hasOwn(settings.get('campaigns')[0], 'hitPoints'), false, 'saved without the key')
 assert.deepEqual(helloOf().features.hitPoints, ON, 'on for a campaign saved without the switch')
-// Changed on purpose (module 0.48.0): no longer last, `coins` after it.
+// Changed on purpose (module 0.49.0): no longer last, `coins` after it.
 assert.deepEqual(Object.keys(helloOf().features).slice(-3), ['wildShape', 'hitPoints', 'coins'], 'after wildShape')
 assert.equal(helloOf().features.rolls.enabled, false, 'whatever the rolls')
 await campaignAs({ hitPoints: false })
@@ -337,7 +337,7 @@ ok('fetched for with every other switch off where the answer says "hitPoints": 1
     ['a spell slot beside it', setting({ value: 21 }, { value: 22 }, { spellSlot: { op: 'spend', id: 'spell1', from: 1 } }), 'hitPoints'],
     ['typed', setting({ value: 21 }, { value: 22 }, { typed: true }), 'hitPoints'],
     ['rerolls', setting({ value: 21 }, { value: 22 }, { rerolls: 'kept' }), 'hitPoints'],
-    // Module 0.48.0: nor coins added or taken away beside it.
+    // Module 0.49.0: nor coins added or taken away beside it.
     ['coins beside it', setting({ value: 21 }, { value: 22 }, { coins: { op: 'add', currency: { gp: 5 } } }), 'hitPoints'],
     ['a plain roll beside it', setting({ value: 21 }, { value: 22 }, { plainRoll: { terms: [{ faces: 6, count: 1 }] } }), 'plainRoll'],
     ['effect dice', setting({ value: 21 }, { value: 22 }, { effectDice: [{ faces: 4, sign: 1, results: [2] }] }), 'effectDice'],

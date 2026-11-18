@@ -283,7 +283,7 @@ export function commandRefusal(command, campaign) {
  * `effectDice`. And since 0.42.1 a spell slot spent or restored: which, how, and the count it was
  * made from. And since 0.42.1 a spell prepared or unprepared, which and how. And since 0.44.0 hit
  * points set, to what and from what; and a plain roll of the dice tray, its dice and what it adds,
- * which no other kind names. And since 0.48.0 coins added or taken away, which and how many.
+ * which no other kind names. And since 0.49.0 coins added or taken away, which and how many.
  * @param {object} command
  * @returns {string|null}
  */
@@ -716,7 +716,7 @@ function namesTurn({ turn }) {
 
 /**
  * The fields a move names what it moves by; since 0.32.0, `among` for a distribution, in place of
- * `to`; and since 0.48.0, `each` for a character's coins handed out, in place of either.
+ * `to`; and since 0.49.0, `each` for a character's coins handed out, in place of either.
  * @type {ReadonlySet<string>}
  */
 const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among", "each"]));
@@ -726,7 +726,7 @@ const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among"
  * moves, items by id with how many of each, each once, and coins by their keys with how many; at
  * least one of them, and nothing a roll names, and throws no dice. Since 0.32.0 a distribution names
  * the characters it shares among in place of the end it goes to: from one to MOST_AMONG of them,
- * each once, never the party itself, and coins of one kind alone, no items. Since 0.48.0 a hand-out
+ * each once, never the party itself, and coins of one kind alone, no items. Since 0.49.0 a hand-out
  * names the characters each given the coins, `each`, in place of either: from one to MOST_AMONG of
  * them, each once, never the giver, and coins as a move names them, no items. Exactly one of `to`,
  * `among` and `each` is named.
@@ -758,7 +758,7 @@ export function checkTransferCommand(command) {
 }
 
 /**
- * Are these the characters a distribution shares among, or since 0.48.0 those a hand-out gives to:
+ * Are these the characters a distribution shares among, or since 0.49.0 those a hand-out gives to:
  * from one to MOST_AMONG ids, each once, none the party, or the character, it's from?
  * @param {unknown} among
  * @param {string} from
@@ -820,7 +820,7 @@ const COIN_OTHERS = [
 ];
 
 /**
- * Why fetched coins added or taken away aren't ones to make, if they aren't, since 0.48.0: the
+ * Why fetched coins added or taken away aren't ones to make, if they aren't, since 0.49.0: the
  * command names exactly `{ op, currency }`, `op` to add or to remove, and `currency` the coins as a
  * move names them, by dnd5e's keys, each a whole number from 1 to MOST_MOVED; and nothing else,
  * nothing a roll names nor any other kind's field, and throws no dice. The Gamemaster's is taken, as
@@ -1049,7 +1049,7 @@ export function checkWildShapeCommand(command) {
  * The fields of other kinds a spell prepared or unprepared never names, beside those a roll names:
  * a move, a removal, anything typed in, a favorite, a note, a dish, an effect, Wild Shape, a spell
  * slot, charges, Heroic Inspiration, a concentration, a turn and the End Turn a turn taken back names,
- * and since 0.48.0 coins added or taken away.
+ * and since 0.49.0 coins added or taken away.
  * @type {string[]}
  */
 const OTHERS = [

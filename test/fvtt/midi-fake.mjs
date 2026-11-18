@@ -19,7 +19,7 @@
 // (Workflow.ts:2494-2575, 2592-2610); and a bonus damage macro's formulas rolled by rollBonusDamage
 // after its callMacros has returned (4078-4105, 4110-4125); and a use's check of what it would spend,
 // thrown away before dnd5e's use spends it (MidiActivityMixin.ts:776-779, 949-966). Since module
-// 0.48.0, its look for reactions as an attack's targets are attacked, then hit or missed
+// 0.49.0, its look for reactions as an attack's targets are attacked, then hit or missed
 // (utils.ts:5925-6105, Workflow.ts:7299-7301, 7337, 7371), and its Cast activity's activation
 // (CastActivity.ts:44-61). It can't stand for Midi itself.
 // Install it before the module is imported.
@@ -58,7 +58,7 @@ export const midi = {
     // Since module 0.44.0: whether a Gamemaster's use spends what it uses without its dialog, where
     // the workflow's options don't say (utils.ts:4421-4424), at Midi's own default (settings.ts:191).
     gmConsumeResource: 'none',
-    // Since module 0.48.0: whether reactions are looked for among a workflow's targets, where the
+    // Since module 0.49.0: whether reactions are looked for among a workflow's targets, where the
     // target's player is a Gamemaster (utils.ts:4498-4501). Midi's own default is "all"
     // (settings.ts:192); the stand-in's is "none", so that the harnesses before it roll as they did,
     // tick for tick; later-dice.mjs sets "all". The players' own setting (`doReactions`,
@@ -124,12 +124,12 @@ export const midi = {
    */
   consumeChecks: [],
   /**
-   * Since module 0.48.0, each reaction Midi looked for, working out what its use would spend and
+   * Since module 0.49.0, each reaction Midi looked for, working out what its use would spend and
    * keeping only whether that could be paid, as its doReactions does: { activity, trigger }, in order.
    */
   reactionChecks: [],
   /**
-   * Since module 0.48.0, the reaction each target takes, once, by its token's id: its activity's id.
+   * Since module 0.49.0, the reaction each target takes, once, by its token's id: its activity's id.
    * Midi's reaction dialog isn't modelled: the one named is used as the dialog uses the one chosen.
    */
   reactions: new Map(),
@@ -246,11 +246,11 @@ function autoConsumes(activity, workflow) {
   return (setting === 'both') || ((setting === 'spell') && spell) || ((setting === 'item') && !spell)
 }
 
-/** Since module 0.48.0, utils.ts:4498-4501, 5935: are reactions looked for, for this target? */
+/** Since module 0.49.0, utils.ts:4498-4501, 5935: are reactions looked for, for this target? */
 const looksForReactions = target => !!target?.actor && (midi.settings.gmDoReactions !== 'none')
 
 /**
- * Since module 0.48.0, Midi-QOL v14 (GitLab 2ac2f66) utils.ts:5925-6105 (doReactions), as far as
+ * Since module 0.49.0, Midi-QOL v14 (GitLab 2ac2f66) utils.ts:5925-6105 (doReactions), as far as
  * what it rolls: for each activity of the target's items a reaction activates, as Midi reads that
  * (5954-5955), but a spell kept for a Cast activity (5951) and, once the creature has used its
  * reaction, one that costs a reaction (5960), what its use would spend is worked out with a
@@ -565,7 +565,7 @@ class Workflow {
 
   /**
    * Workflow.ts:2186-2245: hits are checked, then the workflow waits for damage, unless all missed.
-   * Since module 0.48.0, as its checkHits does (7299-7301, 7337, 7371), reactions are looked for as
+   * Since module 0.49.0, as its checkHits does (7299-7301, 7337, 7371), reactions are looked for as
    * each target is attacked, then as it's hit or missed, where they are looked for at all: where
    * they aren't, nothing is awaited, and the state takes the tick it took before.
    */
@@ -1069,7 +1069,7 @@ export class MidiHealActivity extends MidiActivity(HealActivity) {}
 export class MidiUtilityActivity extends MidiActivity(UtilityActivity) {}
 export class MidiSummonActivity extends MidiActivity(SummonActivity) {}
 /**
- * Since module 0.48.0, Midi's Cast activity as far as how it's activated (CastActivity.ts:44-61):
+ * Since module 0.49.0, Midi's Cast activity as far as how it's activated (CastActivity.ts:44-61):
  * by its own activation where that overrides its spell's, else as the first usable activity of the
  * spell dnd5e keeps for it is, else as its item or itself is. Its use isn't Midi's, as the module
  * never uses one. Not among `installMidi`'s: a harness that needs it puts it in `activityTypes`

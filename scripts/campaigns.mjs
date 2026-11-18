@@ -51,11 +51,11 @@ import { diceStatus } from "./dice-plan.mjs";
  *                                    companions' too? On until the Gamemaster turns it off, apart from
  *                                    `rolls`, under dnd5e.
  * @property {boolean} coins          May its players add coins to their own characters and take them
- *                                    away from the app, since 0.48.0, each change a line in chat? On
+ *                                    away from the app, since 0.49.0, each change a line in chat? On
  *                                    until the Gamemaster turns it off, apart from `rolls` and
  *                                    `transfers`, under dnd5e.
  * @property {boolean} coinChange     Do a character's other coins pay where it's short of one, since
- *                                    0.48.0: a larger coin broken, then smaller ones? On until the
+ *                                    0.49.0: a larger coin broken, then smaller ones? On until the
  *                                    Gamemaster turns it off, and then more of a coin than is held is
  *                                    refused.
  * @property {string[]} wildShapePacks  The Actor compendiums, by collection, its druids learn Beasts
@@ -95,7 +95,7 @@ export function getCampaigns() {
     // On unless the Gamemaster turned it off: a campaign saved before 0.44.0 has none, and its players
     // set their hit points from the app, as every new campaign's do.
     hitPoints: hitPoints !== false,
-    // Each on unless the Gamemaster turned it off: a campaign saved before 0.48.0 has neither, and its
+    // Each on unless the Gamemaster turned it off: a campaign saved before 0.49.0 has neither, and its
     // players add and take away coins from the app, other coins paying where one is short, as every
     // new campaign's do.
     coins: coins !== false,

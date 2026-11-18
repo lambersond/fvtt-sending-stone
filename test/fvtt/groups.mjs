@@ -34,7 +34,7 @@ if (DND5E6) game.system.version = '6.0.5'
 CONFIG.DND5E = {
   abilities: Object.fromEntries(['str', 'dex', 'con', 'int', 'wis', 'cha'].map(a => [a, { label: a.toUpperCase(), abbreviation: a }])),
   // dnd5e's coins, each with its rate, how many make one gp (config.mjs, `conversion`, the same in
-  // 5.3.3 and 6.0.5), which a group's sheet carries too (module 0.48.0).
+  // 5.3.3 and 6.0.5), which a group's sheet carries too (module 0.49.0).
   currencies: Object.fromEntries(Object.entries({ pp: 0.1, gp: 1, ep: 2, sp: 10, cp: 100 })
     .map(([id, conversion]) => [id, { label: `DND5E.Currency${id.toUpperCase()}`, abbreviation: id, conversion }])),
   weightUnits: { lb: { abbreviation: 'lb' } },

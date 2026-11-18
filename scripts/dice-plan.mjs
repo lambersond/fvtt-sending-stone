@@ -34,7 +34,7 @@ import { COST_BEGUN, COST_CHECK, CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MOD
  * itself here (`registerLaterDice`), so that this one never imports it. And since 0.44.0 the dice
  * costs dnd5e rolls for the module's own check of what a use would spend, which it throws away, are
  * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6, as are those of
- * Midi-QOL's own check of a use the module hands it (`checkedUntilSpent`), and, since 0.48.0, of
+ * Midi-QOL's own check of a use the module hands it (`checkedUntilSpent`), and, since 0.49.0, of
  * its check of a reaction it looks for, where it looks as its line for dnd5e 5 does
  * (`isReactionLookup`), and, under dnd5e 5, of Midi's check of a typed roll's run's other activity:
  * told by dnd5e's consumption targets' `resolveCost`, which is passed the use's configuration, and
@@ -199,7 +199,7 @@ let laterDice = null;
 
 /**
  * Since 0.44.0, the dice costs rolled for the module's own check of what a use would spend, which it
- * throws away, and, since 0.48.0, for Midi-QOL's check of a reaction it looks for
+ * throws away, and, since 0.49.0, for Midi-QOL's check of a reaction it looks for
  * (`isReactionLookup`): Foundry's computer dice, never asked of anyone.
  * @type {WeakSet<Roll>}
  */
@@ -418,7 +418,7 @@ export function checkedUntilSpent(usage) {
 /**
  * dnd5e begins spending what a use spends, since 0.44.0: its configuration is no longer a check
  * (`checkedUntilSpent`), so that a dice cost dnd5e rolls for it is rolled as ever; and, since
- * 0.48.0, it says its spending has begun (`COST_BEGUN`), so that no cost of it is taken for
+ * 0.49.0, it says its spending has begun (`COST_BEGUN`), so that no cost of it is taken for
  * Midi-QOL's check of a reaction it looks for (`isReactionLookup`).
  * @param {Activity} activity
  * @param {object} usageConfig
@@ -431,7 +431,7 @@ function spendingBegins(activity, usageConfig) {
 }
 
 /**
- * dnd5e has worked out what a use spends, since 0.48.0, every dice cost of it rolled: its
+ * dnd5e has worked out what a use spends, since 0.49.0, every dice cost of it rolled: its
  * configuration no longer says its spending has begun.
  * @param {Activity} activity
  * @param {object} usageConfig
@@ -442,7 +442,7 @@ function spendingWorkedOut(activity, usageConfig) {
 }
 
 /**
- * Is a dice cost Midi-QOL's check of a reaction it looks for, since 0.48.0? As Midi looks for the
+ * Is a dice cost Midi-QOL's check of a reaction it looks for, since 0.49.0? As Midi looks for the
  * reactions a creature could take, attacked, hit, missed, damaged, healed or making a save, it works
  * out what each would spend, keeps only whether that could be paid, and throws the rest away (its
  * `doReactions`): for each activity a reaction activates, as Midi reads that (its
@@ -551,7 +551,7 @@ function followsPlayerThrow(term, options) {
  * player typed in, saying they rerolled at the table, keeps none of the rerolls of the dice they
  * typed (`keepTypedRerolls`): by now dnd5e has expanded its advantage and configured it. Since 0.44.0
  * a later roll of a typed roll's run is evaluated as `laterEvaluate` has it, and a dice cost of the
- * module's own check, and, since 0.48.0, of Midi-QOL's check of a reaction it looks for
+ * module's own check, and, since 0.49.0, of Midi-QOL's check of a reaction it looks for
  * (`isReactionLookup`), with Foundry's computer dice alone.
  * @this {Roll}
  * @param {Function} wrapped   Foundry's own evaluation.
@@ -560,7 +560,7 @@ function followsPlayerThrow(term, options) {
  * @returns {Promise<Roll>}
  */
 function taggedEvaluate(wrapped, options={}, ...rest) {
-  // Since 0.44.0, a dice cost of the module's own check, and, since 0.48.0, of Midi-QOL's check of
+  // Since 0.44.0, a dice cost of the module's own check, and, since 0.49.0, of Midi-QOL's check of
   // a reaction it looks for (`isReactionLookup`), is Foundry's computer dice, asked of no one.
   if ( checkRolls.has(this) ) return wrapped({ ...options, allowInteractive: false }, ...rest);
   const later = laterDice?.stepOf(this) ?? null;
@@ -587,7 +587,7 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
  * Around dnd5e's roll of a dice cost, since 0.44.0, `ConsumptionTargetData#resolveCost`, which is
  * passed the use's configuration: for the module's own check of what a use would spend
  * (`costCheck`), Midi-QOL's of a use the module hands it (`checkedUntilSpent`), Midi's of a typed
- * roll's run's other activity, or, since 0.48.0, its check of a reaction it looks for
+ * roll's run's other activity, or, since 0.49.0, its check of a reaction it looks for
  * (`isReactionLookup`), each thrown away, or a run's own spending (later-dice.mjs), the roll is
  * built unevaluated, noted, then evaluated, as dnd5e would have evaluated it; any other, as dnd5e
  * has it.
@@ -1802,10 +1802,10 @@ let installed = false;
  * libWrapper runs outside every other kind, so outside Midi-QOL's: a critical hit's damage for the
  * app is then made as dnd5e makes it. Since 0.44.0 dnd5e's roll of a dice cost too, where its
  * consumption targets have one, as a WRAPPER: the module's own check's, and Midi-QOL's of a use the
- * module hands it, and, since 0.48.0, Midi-QOL's check of a reaction it looks for
+ * module hands it, and, since 0.49.0, Midi-QOL's check of a reaction it looks for
  * (`isReactionLookup`), are Foundry's computer dice, and a run's are noted for later-dice.mjs. With
  * it, dnd5e's hooks around its working out of what a use spends: as it begins (`spendingBegins`)
- * and, since 0.48.0, once it has (`dnd5e.activityConsumption`, `spendingWorkedOut`).
+ * and, since 0.49.0, once it has (`dnd5e.activityConsumption`, `spendingWorkedOut`).
  * @returns {void}
  */
 export function installDicePlans() {

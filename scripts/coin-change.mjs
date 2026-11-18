@@ -1,5 +1,5 @@
 /**
- * Paying in coins, since module 0.48.0: what a character is left with when more of a coin is taken
+ * Paying in coins, since module 0.49.0: what a character is left with when more of a coin is taken
  * away than it holds, a larger coin broken for it, the change given back, and smaller coins paying
  * where no larger one is left. One rule, read by two commands: coins taken away from a character
  * (command-coins.mjs) and a character's coins handed out (command-transfers.mjs). So it stands apart

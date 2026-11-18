@@ -169,7 +169,7 @@ function toggle(id, label, value, note=null) {
  * The campaign's own switches, since 0.31.0 whether its players move items and coins among them,
  * since 0.38.0 whether it takes their dishes from the Magical Recipe Book, since 0.39.0 whether they
  * may turn off and delete their own effects, since 0.40.0 whether they may use Wild Shape, since 0.44.0
- * whether they may set their hit points, since 0.48.0 whether they may add and take away their coins
+ * whether they may set their hit points, since 0.49.0 whether they may add and take away their coins
  * and whether other coins pay where a character is short of one, since 0.36.0 how its characters'
  * companions enter initiative, and its groups.
  * @param {Campaign} campaign
