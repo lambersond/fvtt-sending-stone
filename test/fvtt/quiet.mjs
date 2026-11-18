@@ -2,9 +2,9 @@
 // answer to a campaign's hello or heartbeat says `features.quiet`, each fetch says whether it is a
 // quiet look, `quiet`; an answer's `quiet` is waited in place of its `wait` two minutes after the
 // hello is answered, while no command is being made here, with a full fetch at least every five
-// minutes; a failed fetch, an answer without it, a hand-over, a hello answered, and an app that stops
-// saying it bring full fetches at the usual pace back at once; and the settings window's status line
-// says when it's quiet. An app that says nothing of it is fetched from as before. The real module; a
+// minutes; an answer without it, a hand-over, a hello answered, and an app that stops saying it bring
+// full fetches at the usual pace back at once, and the fetch after a failed one is in full; and the
+// settings window's status line says when it's quiet. An app that says nothing of it is fetched from as before. The real module; a
 // stand-in Foundry and app, which answers `wait` 20 and `quiet` 60; the clock moved by the harness
 // alone, so a case reads the pause the fetcher asked, never the time it took. Run with X=1 and
 // --import ./unref-timers.mjs --import ./dnd5e-register.mjs.

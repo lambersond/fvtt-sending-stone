@@ -2565,15 +2565,15 @@ An ask:
   information, and no update of a combatant between combat events, as before; it ignores the new
   hello field and settings rows. A module before 0.50.0 says no `features.health`, sends no `health`,
   and sends a combatant's hit points only with the combat events, as before.
-- Module 0.50.0 fetches quietly while nobody is in the app ([Fetching rolls](#fetching-rolls)): to a
-  listener whose answer to a hello or heartbeat says `"quiet": 1`, each fetch says `quiet`, `false`
-  for a full fetch or `true` for a quiet look, and an answer may say `quiet`, how long to wait in
-  place of `wait`, which the module takes two minutes after the campaign's hello while it is making
-  none of its commands, with a full fetch at least every five minutes, and full fetches at its usual
-  pace after a failed fetch or any answer without it. A quiet look is answered at once with nothing
-  only while nothing waits. Heartbeats and events go as before. A listener before 0.50.0 never says
-  `"quiet": 1`, is sent no `quiet`, and is fetched from as before. A module before 0.50.0 sends no
-  `quiet`: a listener answers it as before, without `quiet`.
+- Module 0.50.0 fetches quietly while nobody is in the app ([Fetching rolls](#fetching-rolls)): to
+  a listener whose answer to a hello or heartbeat says `"quiet": 1`, each fetch says `quiet`,
+  `false` for a full fetch or `true` for a quiet look, and an answer may say `quiet`, how long to
+  wait in place of `wait`, which the module takes two minutes after the campaign's hello while it
+  is making none of its commands, with a full fetch at least every five minutes and after a failed
+  fetch, and full fetches at its usual pace after any answer without it. A quiet look is answered
+  at once with nothing only while nothing waits. Heartbeats and events go as before. A listener
+  before 0.50.0 never says `"quiet": 1`, is sent no `quiet`, and is fetched from as before. A
+  module before 0.50.0 sends no `quiet`: a listener answers it as before, without `quiet`.
 
 ## Changes from protocol 1
 
@@ -2700,11 +2700,12 @@ fetch that doesn't say `quiet`, as a module's before 0.50.0. The module takes `q
 minutes or more after the campaign's hello is answered, and only while it is making none of its
 commands: it then waits `quiet`, capped as `wait` is, in place of `wait`, and its next fetch is a
 quiet look, but a full fetch at least every five minutes, so that a note handed over and never
-answered is handed over again. A failed fetch, any answer without `quiet`, an answer to the
-campaign's hello, and a listener that stops saying `"quiet": 1` bring it back to full fetches at its
-usual pace at once. The first fetch after a hello is always a full one, so notes written in the app
-while Foundry was closed are handed over as it connects. Heartbeats and events are sent as before.
-Keep counting the game as fetching for at least 20 seconds more than the quiet wait you give.
+answered is handed over again. Any answer without `quiet`, an answer to the campaign's hello, and a
+listener that stops saying `"quiet": 1` bring it back to full fetches at its usual pace at once. A
+failed fetch is followed, after its back-off, by a full fetch, and an answer to that which says
+`quiet` is taken again. The first fetch after a hello is always a full one, so notes written in the
+app while Foundry was closed are handed over as it connects. Heartbeats and events are sent as
+before. Keep counting the game as fetching for at least 20 seconds more than the quiet wait you give.
 
 **Hand each roll over once.** One whose answer is lost is lost: never a roll made twice. The
 module also makes a roll only once, however often it's handed over, and a character's rolls in

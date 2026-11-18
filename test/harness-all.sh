@@ -38,8 +38,8 @@ run activities X=1 SLIM_CHECK=1; run activities MIDI=1 SLIM_CHECK=1; run activit
 for v in X=1 MIDI=1; do run enchant $v SLIM_CHECK=1; done
 run errors X=1
 # Module 0.50.0: quiet looks while nobody is in the app, its usual pace for two minutes after a hello,
-# while a command is made, after a failed fetch or an answer without quiet, and the settings window's
-# line. dnd5e 5.3.3 alone: the fetcher reads nothing of dnd5e.
+# while a command is made or after an answer without quiet, a full fetch after a failed one, and the
+# settings window's line. dnd5e 5.3.3 alone: the fetcher reads nothing of dnd5e.
 run quiet X=1
 # Ending a concentration, spending charges and Heroic Inspiration, and hits, misses and saves in chat
 # (module 0.29.0), and since 0.42.1 spell slots spent and restored: dnd5e's alone, and with Midi-QOL's

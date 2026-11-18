@@ -67,7 +67,8 @@ import { noteWildShapeReader, wildShapeOn, wildShapeReader } from "./wild-shape.
  * Since 0.50.0, while nobody is in a campaign's app, as its answers say (`quiet`), it is looked at
  * about every 20 seconds, a look asking whether there is anything to fetch, and fetched in full at
  * least every five minutes: never in the two minutes after its hello is answered, nor while a
- * command is being made here, nor after a failed fetch or an answer that says nothing of quiet.
+ * command is being made here, nor after an answer that says nothing of quiet; and the fetch after a
+ * failed one, its back-off waited, is in full, quiet again once an answer says so.
  */
 
 /**

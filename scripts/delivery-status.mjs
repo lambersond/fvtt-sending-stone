@@ -211,7 +211,7 @@ export function noteFetched(campaignId, { quiet=0 }={}) {
  * @returns {void}
  */
 export function noteFetchFailed(campaign, err, { stopped=false, failures=1 }={}) {
-  // The next fetch is made at the usual pace.
+  // The next fetch, after the back-off, is in full: nothing is said of quiet until an answer says it.
   quietFetches.delete(campaign.id);
   const reason = reasonOf(err);
   const key = (REASONS[reason] === "app") ? `app:${reason}` : `${campaign.id}:${reason}`;
