@@ -21,7 +21,7 @@ Authorization: Bearer <the campaign's secret>     (only when one is configured)
 
 | Your answer | What the module does |
 | --- | --- |
-| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). In answer to a `bridge.hello` or `bridge.heartbeat`, `{"features": {"commands": true}}` says the listener has players' rolls for the module to fetch; see [Rolls from the app](#rolls-from-the-app). Since module 0.22.0, in answer to those and to a `character.updated`, `features`' `slimSheets` and `maxBytes` say what the listener takes of sheets and posts; see [below](#post-size-and-slim-sheets). Since module 0.27.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `midiPrompts` says the listener reads [Midi-QOL's prompts](#midi-qols-own-saves). Since module 0.30.0, in answer to those, `features`' `groups` says it reads [groups](#group), and `settings` that it reads [`bridge.settings`](#bridgesettings); and a `group.updated`'s answer says what it takes of sheets, as a `character.updated`'s does. Since module 0.38.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `dishes` says the listener takes [dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). Since module 0.41.0, in answer to those, `features`' `companions` at 2 or more says it reads the [saves the game asks](#saves-the-game-asks-for) of companions, as well as companions. Since module 0.44.0, in answer to those, `features`' `hitPoints` says it takes [hit points set](#hit-points) from the app, and `diceAsks` that it reads [dice asks](#dice-the-game-rolls-later), the dice the game rolls later asked of a player typing theirs. Since module 0.50.0, in answer to those, `features`' `health` says it reads how hurt [other creatures](#combatant) in a fight are. All may be in one body. Anything else is ignored. |
+| Any `2xx` | Delivered. `204 No Content` is fine. A JSON body of `{"resend": "hello"}` asks for the campaign's full state again; see [Keeping in step](#keeping-in-step). In answer to a `bridge.hello` or `bridge.heartbeat`, `{"features": {"commands": true}}` says the listener has players' rolls for the module to fetch; see [Rolls from the app](#rolls-from-the-app). Since module 0.22.0, in answer to those and to a `character.updated`, `features`' `slimSheets` and `maxBytes` say what the listener takes of sheets and posts; see [below](#post-size-and-slim-sheets). Since module 0.27.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `midiPrompts` says the listener reads [Midi-QOL's prompts](#midi-qols-own-saves). Since module 0.30.0, in answer to those, `features`' `groups` says it reads [groups](#group), and `settings` that it reads [`bridge.settings`](#bridgesettings); and a `group.updated`'s answer says what it takes of sheets, as a `character.updated`'s does. Since module 0.38.0, in answer to a `bridge.hello` or `bridge.heartbeat`, `features`' `dishes` says the listener takes [dishes from the Magical Recipe Book](#dishes-from-the-magical-recipe-book). Since module 0.41.0, in answer to those, `features`' `companions` at 2 or more says it reads the [saves the game asks](#saves-the-game-asks-for) of companions, as well as companions. Since module 0.44.0, in answer to those, `features`' `hitPoints` says it takes [hit points set](#hit-points) from the app, and `diceAsks` that it reads [dice asks](#dice-the-game-rolls-later), the dice the game rolls later asked of a player typing theirs. Since module 0.50.0, in answer to those, `features`' `health` says it reads how hurt [other creatures](#combatant) in a fight are, and `quiet` that it answers [fetches](#fetching-rolls) quietly while nobody is in it. All may be in one body. Anything else is ignored. |
 | `408`, `425`, `429`, any `5xx`, no answer, or no answer within 10 s | Retried after 1 s, then again after 3 s, with the same envelope. Dropped after the third failure. |
 | Any other status, such as `400` or `401` | Dropped immediately. |
 
@@ -2565,6 +2565,15 @@ An ask:
   information, and no update of a combatant between combat events, as before; it ignores the new
   hello field and settings rows. A module before 0.50.0 says no `features.health`, sends no `health`,
   and sends a combatant's hit points only with the combat events, as before.
+- Module 0.50.0 fetches quietly while nobody is in the app ([Fetching rolls](#fetching-rolls)): to a
+  listener whose answer to a hello or heartbeat says `"quiet": 1`, each fetch says `quiet`, `false`
+  for a full fetch or `true` for a quiet look, and an answer may say `quiet`, how long to wait in
+  place of `wait`, which the module takes two minutes after the campaign's hello while it is making
+  none of its commands, with a full fetch at least every five minutes, and full fetches at its usual
+  pace after a failed fetch or any answer without it. A quiet look is answered at once with nothing
+  only while nothing waits. Heartbeats and events go as before. A listener before 0.50.0 never says
+  `"quiet": 1`, is sent no `quiet`, and is fetched from as before. A module before 0.50.0 sends no
+  `quiet`: a listener answers it as before, without `quiet`.
 
 ## Changes from protocol 1
 
@@ -2664,6 +2673,7 @@ Answer it as an event, CORS included, with the campaign's waiting rolls:
 | --- | --- |
 | `commands` | The rolls to make, oldest first; may be empty. |
 | `wait` | How long to wait before fetching again, in milliseconds. Absent or `0`: fetch again at once. |
+| `quiet` | Since module 0.50.0, to a fetch that says `quiet`: nobody is in the app, and this answer hands over nothing; how long the module may wait, in milliseconds, before a quiet look, in place of `wait`. See *While nobody is in the app*. |
 | `open` | Since module 0.27.0: the campaign's characters open in the app, by actor id, whose player's page asked for the table lately (the Sending Stone app: within 15 seconds), at most 200, each matching `^[A-Za-z0-9]{1,64}$`; may be `[]`. Send it in every answer. The module asks [Midi's saves](#midi-qols-own-saves) only of a character an answer within the last 45 seconds listed; one absent or not an array lists none, as from an older listener, and entries that aren't ids are dropped. A listener holding a fetch open may answer early, with no commands, when the list changes, so that the module learns of a character closed within seconds. |
 
 Hold a fetch open, for up to 30 seconds, while a roll may come, so that it reaches the game at
@@ -2675,6 +2685,26 @@ minute, when it failed for a reason that may pass: `unreachable`, `timeout`, `un
 `400`, `401`, `403`, `404` or `413`, stops fetching for the campaign until the settings change or
 its hello is sent, and the Gamemaster is told. Before module 0.23.0, only a `401`, `403` or `404`
 stopped it, and nothing was told.
+
+**While nobody is in the app.** Since module 0.50.0, to a listener whose latest answer to the
+campaign's `bridge.hello` or `bridge.heartbeat` said `"quiet": 1`, every fetch says `quiet`:
+`false` for a full fetch, `true` for a quiet look, which asks whether there is anything to fetch.
+Answer either with `quiet`, a number of milliseconds, where nobody is in the app (the Sending Stone
+app: no page of the campaign's, a player's or the Gamemaster's, has asked for a character's table, a
+party sheet, a companion or a player's notes for a minute or two) and the answer hands over nothing;
+the Sending Stone app says 20000. You may answer a quiet look at once, handing over nothing, with
+`open` `[]`, your `wait` and `quiet`, only where nobody is in the app and nothing waits that nobody
+in it sent (the Sending Stone app reads whether a dish from the Magical Recipe Book waits);
+otherwise answer it as a full fetch, held as one is. Leave `quiet` out otherwise, and in answer to a
+fetch that doesn't say `quiet`, as a module's before 0.50.0. The module takes `quiet` only two
+minutes or more after the campaign's hello is answered, and only while it is making none of its
+commands: it then waits `quiet`, capped as `wait` is, in place of `wait`, and its next fetch is a
+quiet look, but a full fetch at least every five minutes, so that a note handed over and never
+answered is handed over again. A failed fetch, any answer without `quiet`, an answer to the
+campaign's hello, and a listener that stops saying `"quiet": 1` bring it back to full fetches at its
+usual pace at once. The first fetch after a hello is always a full one, so notes written in the app
+while Foundry was closed are handed over as it connects. Heartbeats and events are sent as before.
+Keep counting the game as fetching for at least 20 seconds more than the quiet wait you give.
 
 **Hand each roll over once.** One whose answer is lost is lost: never a roll made twice. The
 module also makes a roll only once, however often it's handed over, and a character's rolls in
