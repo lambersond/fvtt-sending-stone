@@ -1,13 +1,14 @@
 // Quiet fetching while nobody is in the app (module 0.50.0, its plan's Q1–Q10): to an app whose
-// answer to a campaign's hello or heartbeat says `features.quiet`, each fetch says whether it is a
-// quiet look, `quiet`; an answer's `quiet` is waited in place of its `wait` two minutes after the
-// hello is answered, while no command is being made here, with a full fetch at least every five
-// minutes; an answer without it, a hand-over, a hello answered, and an app that stops saying it bring
-// full fetches at the usual pace back at once, and the fetch after a failed one is in full; and the
-// settings window's status line says when it's quiet. An app that says nothing of it is fetched from as before. The real module; a
-// stand-in Foundry and app, which answers `wait` 20 and `quiet` 60; the clock moved by the harness
-// alone, so a case reads the pause the fetcher asked, never the time it took. Run with X=1 and
-// --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
+// answer to a campaign's hello or heartbeat says `features.quiet`, a whole number of 1 or more,
+// each fetch says whether it is a quiet look, `quiet`; an answer's `quiet`, a number over 0, is
+// waited in place of its `wait`, capped as that is, two minutes after the hello is answered, while
+// no command is being made here, with a full fetch at least every five minutes; an answer without
+// it, a hand-over, a hello answered, and an app that stops saying it bring full fetches at the
+// usual pace back at once, and the fetch after a failed one is in full; and the settings window's
+// status line says when it's quiet. An app that says nothing of it is fetched from as before. The
+// real module; a stand-in Foundry and app, which answers `wait` 20 and `quiet` 60; the clock moved
+// by the harness alone, so a case reads the pause the fetcher asked, never the time it took. Run
+// with X=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { actor, settings, user, users } from './stub.mjs'
@@ -211,6 +212,14 @@ assert.deepEqual(looks(list.slice(0, 2)), [true, false], 'the look someone was f
 assert.equal(await pauseAfter(list[0]), 20, 'waited 20 after an answer without quiet')
 assert.equal(await pauseAfter(list[1]), 60, 'quiet again after an answer with it')
 assert.deepEqual(looks(list.slice(2)), [true, true])
+// An answer whose quiet is no number of milliseconds over 0 is as one without it.
+for (const quiet of ['60', true, -60, 0]) {
+  when(post => post.commands, json(200, { commands: [], wait: 20, quiet, open: [] }), 1)
+  from = polls()
+  list = await fetches(from, 2, `fetches after an answer saying quiet ${JSON.stringify(quiet)}`)
+  assert.equal(await pauseAfter(list[0]), 20, `quiet ${JSON.stringify(quiet)} not waited: the answer's wait`)
+  assert.equal(list[1].body.quiet, false, `after quiet ${JSON.stringify(quiet)}, a full fetch`)
+}
 // A command handed over with quiet: the next fetch is full; the command, Gamemaster's hit points for
 // a character not in the campaign, refused at once.
 app.waiting.push({ id: 'hp-gone', actorId: 'nobody', kind: 'hitPoints', mode: 0, explicit: false, extras: [], dice: [], hitPoints: { op: 'set', value: 1, from: { value: 30 } } })
@@ -220,7 +229,7 @@ assert.equal(app.waiting.length, 0, 'handed over')
 assert.ok(sentOf('command.result').some(post => post.body.data.id === 'hp-gone' && post.body.data.reason === 'unknown'), 'refused at once')
 assert.deepEqual(looks(list), [true, false, true, true], 'the look that took it, a full fetch, then looks')
 assert.equal(await pauseAfter(list[0]), 20, 'the usual pace after a hand-over')
-ok('Q4: an answer without quiet, as with someone in the app, and an answer handing over a command though it says quiet: the next fetch is full, after the answer\'s wait 20; quiet again after the next answer that says so')
+ok('Q4: an answer without quiet, as with someone in the app, one whose quiet is no number over 0 ("60", true, -60, 0), and an answer handing over a command though it says quiet: the next fetch is full, after the answer\'s wait 20; quiet again after the next answer that says so')
 
 // ---- Q5: a full fetch at least every five minutes ----
 list = await after(300_000, 3, 'five minutes of looks on')
@@ -233,9 +242,9 @@ assert.deepEqual(looks(list), [false, true])
 ok('Q5: while quiet, a full fetch five minutes after the last, at the quiet pace, and looks again after it')
 
 // ---- Q6: the hello answered: at once, full, and two minutes at the usual pace ----
-app.answerQuiet = 60_000
-list = await fetches(polls(), 1, 'a fetch answered with a minute\'s quiet')
-assert.equal(await pauseAfter(list[0]), 60_000, 'waiting a minute')
+app.answerQuiet = 600_000
+list = await fetches(polls(), 1, 'a fetch answered with ten minutes\' quiet')
+assert.equal(await pauseAfter(list[0]), 300_000, 'waiting five minutes: capped as wait is')
 from = polls()
 await wait(50)
 assert.equal(polls(), from, 'and waits')
@@ -249,7 +258,7 @@ list = await after(119_000, 3, 'a second short of two minutes after the hello')
 assert.deepEqual(looks(list), [false, false, false])
 list = await after(1_000, 2, 'two minutes after the hello')
 assert.deepEqual(looks(list), [true, true])
-ok('Q6: the hello sent and answered while a quiet wait of a minute runs: a full fetch at once, then two minutes of full fetches at the usual pace, then looks')
+ok('Q6: an answer\'s quiet of ten minutes waited five, capped as wait is; the hello sent and answered while that wait runs: a full fetch at once, then two minutes of full fetches at the usual pace, then looks')
 
 // ---- Q7: a command being made keeps the usual pace ----
 const release = hold()
@@ -279,12 +288,20 @@ await beat()
 list = await fromFirst(from, poll => !hasQuiet(poll), 3, 'fetches after the heartbeat')
 assert.ok(list.every(poll => !hasQuiet(poll)), 'no fetch says quiet')
 assert.deepEqual(await Promise.all(list.map(pauseAfter)), [20, 20, 20])
+// An app's quiet is read only as a whole number of 1 or more.
+for (const quiet of [true, '1', 0, 1.5]) {
+  when(post => post.body.type === 'bridge.heartbeat', json(200, { features: { commands: true, quiet } }), 1)
+  await beat()
+  list = await fetches(polls(), 3, `fetches after a heartbeat answered quiet ${JSON.stringify(quiet)}`)
+  assert.ok(list.every(poll => !hasQuiet(poll)), `quiet ${JSON.stringify(quiet)} not read: no fetch says quiet`)
+  assert.deepEqual(await Promise.all(list.map(pauseAfter)), [20, 20, 20], `quiet ${JSON.stringify(quiet)} not read: wait 20`)
+}
 app.quiet = 1
 from = polls()
 await beat()
 list = await fromFirst(from, hasQuiet, 3, 'fetches after the next heartbeat')
 assert.deepEqual(looks(list), [false, true, true], 'a full fetch, then looks: no hello, so no two minutes')
-ok('Q8: a heartbeat\'s answer without quiet: no fetch says it, and wait 20 is waited; one with it again: looks again after one full fetch')
+ok('Q8: a heartbeat\'s answer without quiet, or with one that is no whole number of 1 or more (true, "1", 0, 1.5): no fetch says it, and wait 20 is waited; one with it again: looks again after one full fetch')
 
 // ---- Q9: a failed fetch ----
 when(post => post.commands, json(500, { reason: 'unavailable', message: 'Down' }), 1)
