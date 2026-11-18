@@ -2700,12 +2700,13 @@ fetch that doesn't say `quiet`, as a module's before 0.50.0. The module takes `q
 minutes or more after the campaign's hello is answered, and only while it is making none of its
 commands: it then waits `quiet`, capped as `wait` is, in place of `wait`, and its next fetch is a
 quiet look, but a full fetch at least every five minutes, so that a note handed over and never
-answered is handed over again. Any answer without `quiet`, an answer to the campaign's hello, and a
-listener that stops saying `"quiet": 1` bring it back to full fetches at its usual pace at once. A
-failed fetch is followed, after its back-off, by a full fetch, and an answer to that which says
-`quiet` is taken again. The first fetch after a hello is always a full one, so notes written in the
-app while Foundry was closed are handed over as it connects. Heartbeats and events are sent as
-before. Keep counting the game as fetching for at least 20 seconds more than the quiet wait you give.
+answered is handed over again. Any answer without `quiet` and an answer to the campaign's hello
+bring it back to full fetches at its usual pace at once; a listener that stops saying `"quiet": 1`,
+from its next fetch, once a quiet wait already running ends. A failed fetch is followed, after its
+back-off, by a full fetch, and an answer to that which says `quiet` is taken again. The first fetch
+after a hello is always a full one, so notes written in the app while Foundry was closed are handed
+over as it connects. Heartbeats and events are sent as before. Keep counting the game as fetching
+for at least 20 seconds more than the quiet wait you give.
 
 **Hand each roll over once.** One whose answer is lost is lost: never a roll made twice. The
 module also makes a roll only once, however often it's handed over, and a character's rolls in
