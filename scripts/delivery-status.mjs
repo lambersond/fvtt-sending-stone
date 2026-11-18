@@ -201,6 +201,16 @@ export function noteFetched(campaignId, { quiet=0 }={}) {
 }
 
 /**
+ * Since 0.50.0, note a campaign's fetches no longer quiet, as the settings window says: its fetching
+ * stopped, or its hello was answered and it fetches in full at its usual pace again.
+ * @param {string} campaignId
+ * @returns {void}
+ */
+export function noteQuietEnded(campaignId) {
+  if ( quietFetches.delete(campaignId) ) changed();
+}
+
+/**
  * Note a failed fetch of a campaign's players' rolls: told at once when fetching stops, and for a
  * failure that's retried, once it's failed three times in a row.
  * @param {Campaign} campaign

@@ -5,7 +5,7 @@ import {
 import { canSend } from "./bridge-role.mjs";
 import { describeCampaign, getCampaigns, manualDiceOn, prompting } from "./campaigns.mjs";
 import { commandsUrl, getDestination, getSecret, parseDestination } from "./config.mjs";
-import { noteFetched, noteFetchFailed } from "./delivery-status.mjs";
+import { noteFetched, noteFetchFailed, noteQuietEnded } from "./delivery-status.mjs";
 import { runItemDamageCommand, runRechargeCommand } from "./command-alone.mjs";
 import { runEndEnchantmentCommand } from "./command-enchant.mjs";
 import { runEndConcentrationCommand } from "./command-concentration.mjs";
@@ -538,12 +538,17 @@ class Poller {
     void this.#run();
   }
 
-  /** @returns {void} */
+  /**
+   * Stop fetching; since 0.50.0 the settings window says nothing of quiet fetches no longer made.
+   * @returns {void}
+   */
   stop() {
     this.stopped = true;
     this.controller?.abort();
     this.wake?.();
-    if ( pollers.get(this.campaignId) === this ) pollers.delete(this.campaignId);
+    if ( pollers.get(this.campaignId) !== this ) return;
+    pollers.delete(this.campaignId);
+    noteQuietEnded(this.campaignId);
   }
 
   /**
@@ -554,6 +559,7 @@ class Poller {
   rouse() {
     this.quiet = 0;
     this.since = Date.now();
+    noteQuietEnded(this.campaignId);
     this.wake?.();
   }
 

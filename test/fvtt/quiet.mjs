@@ -314,12 +314,41 @@ when(post => post.commands, json(500, { reason: 'unavailable', message: 'Down' }
 from = polls()
 list = await fetches(from, 2, 'fetches after a failure')
 assert.match(list[1].line.text, /^SENDINGSTONE\.Status\.RollsFetched /, 'after a failed fetch')
+// The hello answered while a quiet wait of a minute runs: the line says nothing of quiet at once, as
+// the full fetch it brings is made, before that fetch is answered.
+app.answerQuiet = 60_000
+list = await fetches(polls(), 1, 'a fetch answered with a minute\'s quiet')
+assert.equal(await pauseAfter(list[0]), 60_000)
+assert.match(rollsLine().text, /^SENDINGSTONE\.Status\.RollsQuiet \{"time":"[^"]+","seconds":60\}$/)
+app.answerQuiet = 2_000
+from = polls()
+await hello()
+list = await fetches(from, 1, 'the fetch at once after the hello')
+assert.equal(list[0].body.quiet, false)
+assert.match(list[0].line.text, /^SENDINGSTONE\.Status\.RollsFetched /, 'as the hello is answered')
+// Fetching stopped, as when the campaign no longer fetches anything, or this client stops sending:
+// the line says when its rolls were last fetched, and nothing of quiet fetches no longer made.
+await after(120_000, 2, 'two minutes after the hello')
+await until(() => rollsLine().text.startsWith('SENDINGSTONE.Status.RollsQuiet '), 'quiet again')
+Object.assign(diceStatus, { ready: false })
+await until(() => rollsLine().text.startsWith('SENDINGSTONE.Status.RollsFetched '), 'the line once fetching stops')
+from = polls()
+await wait(50)
+assert.equal(polls(), from, 'fetching stopped')
+Object.assign(diceStatus, { ready: true })
+syncPollers()
+await after(120_000, 2, 'two minutes after fetching started again')
+await until(() => rollsLine().text.startsWith('SENDINGSTONE.Status.RollsQuiet '), 'quiet again')
+stopPollers()
+assert.match(rollsLine().text, /^SENDINGSTONE\.Status\.RollsFetched /, 'as this client stops fetching')
+from = polls()
+await wait(50)
+assert.equal(polls(), from, 'fetching stopped')
 // The words, as the Gamemaster reads them.
 const lang = JSON.parse(readFileSync(`${MODULE}/lang/en.json`, 'utf8'))
 assert.equal(lang.SENDINGSTONE.Status.RollsQuiet, "Players' rolls fetched at {time}. No one has a character or party open in the app, so Sending Stone asks it every {seconds} seconds.")
-ok('Q10: the settings window says RollsQuiet with its seconds while quiet, RollsFetched after an answer without quiet and after a failed fetch, in the words Players\' rolls fetched at {time}. No one has a character or party open in the app, so Sending Stone asks it every {seconds} seconds.')
+ok('Q10: the settings window says RollsQuiet with its seconds while quiet, RollsFetched after an answer without quiet and after a failed fetch, at once as a hello is answered, and once fetching stops, as the campaign fetches nothing or this client stops, in the words Players\' rolls fetched at {time}. No one has a character or party open in the app, so Sending Stone asks it every {seconds} seconds.')
 
-stopPollers()
 assert.deepEqual(logged, [], 'nothing logged')
 console.log('\nall quiet checks passed')
 process.exit(0)
