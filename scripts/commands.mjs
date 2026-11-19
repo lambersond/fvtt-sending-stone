@@ -747,7 +747,7 @@ class Poller {
  * dice ask is made at once, as a Midi prompt's answer is: the roll it answers is waiting on it.
  * Since 0.49.0 coins added or taken away wait for their character's earlier commands, as a removal
  * does, and their next ones for them; and a character's coins handed out wait for every character
- * given them, as a distribution does, and theirs for it.
+ * given them, and since 0.51.0 every party, as a distribution does, and theirs for it.
  * @param {object} command
  * @param {Campaign} campaign
  * @returns {void}

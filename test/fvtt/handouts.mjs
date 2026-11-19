@@ -1,5 +1,6 @@
-// A character's coins handed out to the characters picked (module 0.49.0): the hello's
-// `features.transfers.handOut` and `.change`; the `transfer` command's `each`, its check and who may
+// A character's coins handed out to the characters picked (module 0.49.0), and since 0.51.0, the
+// campaign's parties among them: the hello's `features.transfers.handOut`, `.change` and
+// `.handOutParties`; the `transfer` command's `each`, its check and who may
 // make it; the total paid as coins taken away are, exactly and with other coins, and what the
 // campaign's setting off does; the writes and their order, and what a failure leaves; the whispers,
 // one to each character given coins that has a player and one to the Gamemasters, both of the two
@@ -509,11 +510,11 @@ const EACH = { pp: 200, gp: 50 }
 /*  The hello                                   */
 /* -------------------------------------------- */
 
-const ON = { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true, handOut: true, change: true }
-const off = reason => ({ enabled: false, kinds: [], reason, partySends: false, distribute: false, handOut: false, change: false })
-const KEYS = ['enabled', 'kinds', 'reason', 'partySends', 'distribute', 'handOut', 'change']
+const ON = { enabled: true, kinds: ['transfer'], reason: null, partySends: true, distribute: true, handOut: true, change: true, handOutParties: true }
+const off = reason => ({ enabled: false, kinds: [], reason, partySends: false, distribute: false, handOut: false, change: false, handOutParties: false })
+const KEYS = ['enabled', 'kinds', 'reason', 'partySends', 'distribute', 'handOut', 'change', 'handOutParties']
 assert.deepEqual(helloOf().data.features.transfers, ON)
-assert.deepEqual(Object.keys(helloOf().data.features.transfers), KEYS, 'ending with handOut and change')
+assert.deepEqual(Object.keys(helloOf().data.features.transfers), KEYS, 'ending with handOut, change and handOutParties')
 const [campaign] = getCampaigns()
 assert.deepEqual(transferFeatures({ ...campaign, coinChange: false }), { ...ON, change: false })
 assert.deepEqual(transferFeatures({ ...campaign, coins: false }), ON, "whatever the switch for coins added and taken away")
@@ -526,7 +527,7 @@ await hello()
 assert.deepEqual(helloOf().data.features.transfers, { ...ON, change: false })
 campaignAs()
 await hello()
-okay("the hello's features.transfers ends with `handOut`, true wherever moves are made, and `change`, the campaign's Pay with other coins there; both false while moves are off or under another system, whatever the switch for coins added and taken away")
+okay("the hello's features.transfers ends with `handOut`, true wherever moves are made, `change`, the campaign's Pay with other coins there, and since 0.51.0 `handOutParties`, true wherever moves are made; all three false while moves are off or under another system, whatever the switch for coins added and taken away")
 
 /* -------------------------------------------- */
 /*  The command                                 */
@@ -586,7 +587,9 @@ for (const [actorId, transfer, fields, reason, why, before] of [
   ['thorin', { from: 'party', each: ['vex'], currency: one }, { by: 'gm' }, 'not-yours', "the Gamemaster's from a party"],
   ['vex', { from: 'party', each: ['bram'], currency: one }, {}, 'not-owner', 'from a party its player observes'],
   ['thorin', { from: 'silent', each: ['vex'], currency: one }, {}, 'unknown', "from a party its player can't see"],
-  ['thorin', { from: 'thorin', each: ['vex', 'party'], currency: one }, {}, 'unknown', 'a party among those picked'],
+  ['vex', { from: 'vex', each: ['party'], currency: one }, {}, 'not-owner', 'to a party its player observes'],
+  ['vex', { from: 'vex', each: ['bram', 'party'], currency: one }, {}, 'not-owner', 'a party its player observes among them'],
+  ['thorin', { from: 'thorin', each: ['silent'], currency: one }, {}, 'unknown', "to a party its player can't see"],
   ['thorin', { from: 'thorin', each: ['vex', 'silent'], currency: one }, {}, 'unknown', "a party its player can't see among them"],
   ['thorin', { from: 'thorin', each: ['vex', 'stranger'], currency: one }, {}, 'unknown', 'an actor outside the campaign among them'],
   ['thorin', { from: 'thorin', each: ['vex', 'grumble'], currency: one }, {}, 'unknown', 'an NPC among them'],
@@ -609,7 +612,33 @@ campaignAs({ coins: false })
 let made = await handed('thorin', ['vex'], one)
 assert.equal(made.result.status, 'done', 'made with coins added and taken away off: it follows Players move items and coins')
 campaignAs()
-okay("refuses a hand-out from another's character, or the Gamemaster's made as another than the giver, `not-yours`; from a party, `not-yours` where its player owns it and for the Gamemaster, `not-owner` where they observe it, `unknown` where they can't see it; with a party, an actor outside the campaign, an NPC or no one among those picked, `unknown`; to or from a character transformed, `shaped`; with moves off, `transfers-off`, the Gamemaster's too: none writes, posts or sends a sheet; and it's made whatever the switch for coins added and taken away")
+okay("refuses a hand-out from another's character, or the Gamemaster's made as another than the giver, `not-yours`; from a party, `not-yours` where its player owns it and for the Gamemaster, `not-owner` where they observe it, `unknown` where they can't see it; to a party, or with one among those picked, `not-owner` where its player observes it and `unknown` where they can't see it; with an actor outside the campaign, an NPC or no one among those picked, `unknown`; to or from a character transformed, `shaped`; with moves off, `transfers-off`, the Gamemaster's too: none writes, posts or sends a sheet; and it's made whatever the switch for coins added and taken away")
+
+// Since 0.51.0 a party its player owns may be among those picked: Thorin's to Vex and the Company is
+// made, the Company given as Vex is, in the order named, its line for everyone.
+restock()
+await settle()
+{
+  const start = writes.length
+  const given = await handed('thorin', ['vex', 'party'], one)
+  assert.equal(given.result.status, 'done', JSON.stringify(given.result))
+  assert.deepEqual(writes.slice(start).map(([, id, changes]) => [id, changes]), [
+    ['thorin', { 'system.currency.gp': 38 }], ['vex', { 'system.currency.gp': 13 }], ['party', { 'system.currency.gp': COMPANY_GP + 1 }],
+  ], "the giver's, then each one's in the order named, the party's too")
+  assert.deepEqual(saidBy(given).map(told), [
+    ['Vex received 1 gp from Thorin', ['bob'], 'thorin', 'alice'],
+    ['Gives 1 gp to The Iron Company', [], 'thorin', 'alice'],
+    ['Thorin handed out 1 gp each to Vex and The Iron Company: 2 gp in all', GMS, 'thorin', 'alice'],
+  ])
+  assert.deepEqual(given.result.transfer.each, ['vex', 'party'])
+  // The Gamemaster's to the Order, which no player can see: made, its line for everyone, as any move to
+  // it posts one; no sheet but the giver's, as the app is sent none of a party no player sees.
+  const order = await handed('thorin', ['silent'], one, { by: 'gm' })
+  assert.deepEqual([order.result.status, saidBy(order).map(told), sheetsIn(order), purse(silent)], [
+    'done', [['Gives 1 gp to The Silent Order', [], 'thorin', 'alice']], [['character.updated', 'thorin']], { gp: 31 },
+  ], JSON.stringify(order.result))
+}
+okay("since 0.51.0 a party its player owns may be among those picked: Thorin's 1 gp each to Vex and the Company writes his, then Vex's, then the Company's, whispers Vex, posts \"Gives 1 gp to The Iron Company\" for everyone in its place, and tells the Gamemasters of both; the Gamemaster's to the Silent Order, which no player sees, is made, its line for everyone and no sheet of it sent")
 
 /* -------------------------------------------- */
 /*  Handed out exactly                          */
@@ -646,6 +675,103 @@ assert.deepEqual(made.result, {
 })
 assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ['character.updated', 'vex'], ['character.updated', 'bram']], "the giver's, then each one's given, in order")
 okay('Thorin hands out 10 gp each to Vex and Bram: 20 gp taken from him in one write, then 10 added to each in the order named; "Vex received 10 gp from Thorin" whispered to Bob alone, though the Assistant Gamemaster has Owner on her too, "Bram received 10 gp from Thorin" to Carol, and "Thorin handed out 10 gp each to Vex and Bram: 20 gp in all" to both Gamemasters, the bridge\'s and the Assistant, each as Thorin, by Alice, none for everyone; his sheet, then theirs, ahead of the result, whose `transfer` says what each was given, `each` and `used` null, its message the Gamemasters\'')
+
+/* -------------------------------------------- */
+/*  To parties and characters                   */
+/* -------------------------------------------- */
+
+// Since 0.51.0 a party is given coins as a character is, in its place in the order named: its line is
+// for everyone, as a give to it posts one, spoken by the giver; each character is whispered theirs,
+// and the Gamemasters are told of all of them.
+restock()
+await settle()
+at = writes.length
+lines = messages.size
+made = await handed('thorin', ['party', 'vex', 'bram'], { gp: 2 })
+assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+assert.deepEqual(writes.slice(at), [
+  ['updateActor', 'thorin', { 'system.currency.gp': 34 }],
+  ['updateActor', 'party', { 'system.currency.gp': COMPANY_GP + 2 }],
+  ['updateActor', 'vex', { 'system.currency.gp': 14 }], ['updateActor', 'bram', { 'system.currency.gp': 2 }],
+], `the giver's first, then the party's and each character's in the order named${DND5E6 ? ", the party's half a gold kept" : ''}`)
+said = saidBy(made)
+assert.deepEqual(said.map(told), [
+  ['Gives 2 gp to The Iron Company', [], 'thorin', 'alice'],
+  ['Vex received 2 gp from Thorin', ['bob'], 'thorin', 'alice'],
+  ['Bram received 2 gp from Thorin', ['carol'], 'thorin', 'alice'],
+  ['Thorin handed out 2 gp each to The Iron Company, Vex, and Bram: 6 gp in all', GMS, 'thorin', 'alice'],
+])
+assert.equal(messages.size, lines + 4, 'and no other')
+assert.deepEqual([said[0].blind, chatOf(said[0].id).data.message.audience.public], [false, true], "the party's line for everyone, and the app told so")
+assert.deepEqual(made.result, {
+  id: made.command.id, status: 'done', reason: null, error: null, messageId: said.at(-1).id, visible: true, rolls: [],
+  transfer: { from: 'thorin', to: null, items: [], currency: { gp: 2 }, each: ['party', 'vex', 'bram'], used: null },
+})
+assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ['group.updated', 'party'], ['character.updated', 'vex'], ['character.updated', 'bram']], "the giver's, then each one's given, the party's as a group")
+okay(`Thorin hands out 2 gp each to the Company, Vex and Bram: 6 gp taken from him, then 2 added to the Company${DND5E6 ? ' (105.5, its half a gold kept)' : ''}, Vex and Bram in the order named; "Gives 2 gp to The Iron Company" for everyone, as Thorin, by Alice, in its place, then each character whispered theirs, and the Gamemasters "Thorin handed out 2 gp each to The Iron Company, Vex, and Bram: 6 gp in all"; the sheets in order, the Company's as a group; the result's \`each\` names the Company too, its message the Gamemasters'`)
+
+// A party alone: its line and nothing else, which the result's message is.
+restock()
+await settle()
+lines = messages.size
+made = await handed('thorin', ['party'], { gp: 2 })
+said = saidBy(made)
+assert.deepEqual([said.map(told), messages.size], [[['Gives 2 gp to The Iron Company', [], 'thorin', 'alice']], lines + 1], 'no whisper, and nothing for the Gamemasters')
+assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, made.result.transfer.each, purse(thorin), coinsOf(party).gp], ['done', said[0].id, true, ['party'], { gp: 38 }, COMPANY_GP + 2])
+assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ['group.updated', 'party']])
+okay("2 gp to the Company alone posts its line for everyone and nothing else, no Gamemasters' message: the result's message is the line, `visible` true")
+
+// With other coins: the party is paid as a character is, the giver's platinum broken for the gold.
+restock()
+stock(thorin, [], RICH)
+await settle()
+at = writes.length
+made = await handed('thorin', ['party', 'vex'], EACH)
+assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+assert.deepEqual(writes.slice(at).map(([, id, changes]) => [id, changes]), [
+  ['thorin', { 'system.currency.pp': 292, 'system.currency.gp': 0 }],
+  ['party', { 'system.currency.pp': 204, 'system.currency.gp': COMPANY_GP + 50 }],
+  ['vex', { 'system.currency.pp': 200, 'system.currency.gp': 62 }],
+])
+assert.deepEqual(saidBy(made).map(message => told(message)[0]), [
+  'Gives 200 pp and 50 gp to The Iron Company', 'Vex received 200 pp and 50 gp from Thorin',
+  'Thorin handed out 200 pp and 50 gp each to The Iron Company and Vex: 400 pp and 100 gp in all',
+])
+assert.deepEqual(made.result.transfer, { from: 'thorin', to: null, items: [], currency: EACH, each: ['party', 'vex'], used: { pp: 8 } })
+okay("700 pp and 20 gp, 200 pp and 50 gp each to the Company and Vex: 8 pp broken for the gold, 292 pp left, the Company given 200 pp and 50 gp as Vex is, `used: { pp: 8 }`")
+
+// The party's write refused, the first: all of it goes back to Thorin in one write, Vex is given none,
+// and nothing is posted.
+restock()
+await settle()
+at = writes.length
+lines = messages.size
+faults.refuse = (what, target) => (what === 'update') && (target === party)
+made = await handed('thorin', ['party', 'vex'], { gp: 2 })
+clearFaults()
+assert.deepEqual([refusal(made), 'transfer' in made.result, messages.size, sheetsIn(made)], [['failed', 'error', 'An update was refused'], false, lines, []])
+assert.deepEqual(writes.slice(at).map(([, id, changes]) => [id, changes]), [
+  ['thorin', { 'system.currency.gp': 36 }], ['party', { 'system.currency.gp': COMPANY_GP + 2 }], ['thorin', { 'system.currency.gp': 40 }],
+], 'no write of Vex')
+assert.deepEqual([purse(thorin), purse(vex), coinsOf(party).gp], [{ gp: 40 }, { gp: 12 }, COMPANY_GP])
+// Vex's refused, after the party's: the party keeps its coins, what wasn't given goes back, its line is
+// posted and no Gamemasters' message, as no character was given coins.
+restock()
+await settle()
+at = writes.length
+lines = messages.size
+faults.refuse = (what, target) => (what === 'update') && (target === vex)
+made = await handed('thorin', ['party', 'vex', 'bram'], { gp: 2 })
+clearFaults()
+assert.deepEqual([refusal(made), made.result.transfer.each], [['failed', 'error', 'An update was refused'], ['party']])
+assert.deepEqual(writes.slice(at).map(([, id, changes]) => [id, changes]), [
+  ['thorin', { 'system.currency.gp': 34 }], ['party', { 'system.currency.gp': COMPANY_GP + 2 }],
+  ['vex', { 'system.currency.gp': 14 }], ['thorin', { 'system.currency.gp': 38 }],
+], 'no write of Bram')
+assert.deepEqual([purse(thorin), purse(vex), purse(bram), coinsOf(party).gp], [{ gp: 38 }, { gp: 12 }, {}, COMPANY_GP + 2])
+assert.deepEqual([saidBy(made).map(told), messages.size], [[['Gives 2 gp to The Iron Company', [], 'thorin', 'alice']], lines + 1])
+assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ['group.updated', 'party']])
+okay("where the party's write is refused, the first, all goes back to the giver in one write and nothing is posted or sent; where Vex's is, after the party's, the party keeps its 2 gp, 4 gp go back, its line alone is posted, no Gamemasters' message, `transfer.each` the party alone")
 
 /* -------------------------------------------- */
 /*  With other coins                            */
@@ -858,7 +984,15 @@ assert.deepEqual(said.map(told), [
 assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, purse(lia)], ['done', said.at(-1).id, false, { sp: 1 }])
 assert.deepEqual(said.slice(0, 2).map(message => { const { audience } = chatOf(message.id).data.message; return [audience.gmOnly, audience.users, audience.characters] }), [[false, ['bob'], ['vex']], [false, ['carol'], ['bram']]])
 assert.equal(chatOf(said.at(-1).id), undefined, "the Gamemasters' own isn't sent to the app")
-okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver with no one player of its own, none owning it or two with neither having it as their character, has the bridge's Gamemaster as its author, so the Gamemasters' message, whispered to both of them still, is theirs alone, the result's `visible` false, a player's own hand-out too, and the app is sent the whispers but not that; a Gamemasters' message a module's hook stops leaves the hand-out made, `messageId` null and `visible` true")
+// Since 0.51.0 Lia, by the Gamemaster, gives the Company alone: its line, for everyone, is the
+// bridge's Gamemaster's, listed as theirs, and everyone may read it.
+stock(lia, [], { sp: 5 })
+await settle()
+made = await handed('lia', ['party'], { sp: 2 }, { by: 'gm' })
+said = saidBy(made)
+assert.deepEqual(said.map(told), [['Gives 2 sp to The Iron Company', [], 'lia', 'gm']])
+assert.deepEqual([made.result.status, made.result.messages, made.result.messageId, made.result.visible, purse(lia), coinsOf(party).sp], ['done', [said[0].id], said[0].id, true, { sp: 3 }, 10])
+okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver with no one player of its own, none owning it or two with neither having it as their character, has the bridge's Gamemaster as its author, so the Gamemasters' message, whispered to both of them still, is theirs alone, the result's `visible` false, a player's own hand-out too, and the app is sent the whispers but not that; a Gamemasters' message a module's hook stops leaves the hand-out made, `messageId` null and `visible` true; Lia's to the Company alone, by the Gamemaster, posts its line for everyone as the bridge's Gamemaster, listed in the result, `visible` true")
 
 /* -------------------------------------------- */
 /*  A hand-out that fails                       */
@@ -956,6 +1090,32 @@ const [earlier, afterwards] = await fetched(handOut('thorin', ['vex'], { gp: 6 }
 assert.deepEqual([earlier.result.status, refusal(afterwards), purse(thorin)], ['done', ['failed', 'short', null], { gp: 4 }])
 okay("a hand-out waits for a command of a character it gives to, and that one's next waits for it, as it's keyed on each of them; a hand-out and coins taken away of the same gold, or two hand-outs, are made one after the other, the second `short` where too little is left")
 
+// Since 0.51.0 a hand-out to a party waits for a move of the party's fetched ahead of it, held at its
+// write of the party, and a move of the party's fetched after it waits for it: the second send finds
+// the gold the hand-out gave, which it needs.
+restock()
+await settle()
+{
+  const sending = hold((target, changes) => (target === party) && ('system.currency.gp' in (changes ?? {})))
+  const [sendAhead, giving, sendBehind] = [
+    move('thorin', { from: 'party', to: 'vex', currency: { gp: 100 } }), handOut('thorin', ['party'], { gp: 5 }),
+    move('thorin', { from: 'party', to: 'bram', currency: { gp: 8 } }),
+  ]
+  const queued = writes.length
+  app.waiting.set('camp-a', [sendAhead, giving, sendBehind])
+  app.wake?.()
+  await until(() => sending.held, "the send's write of the Company")
+  await wait(100)
+  assert.ok(!writes.slice(queued).some(([what, id]) => (what === 'updateActor') && (id === 'thorin')), 'the hand-out waits')
+  assert.deepEqual([resultsOf(giving.id).length, resultsOf(sendBehind.id).length], [0, 0])
+  sending.release()
+  await until(() => [sendAhead, giving, sendBehind].every(command => resultsOf(command.id).length), 'all three')
+  assert.deepEqual([sendAhead, giving, sendBehind].map(command => resultsOf(command.id)[0].status), ['done', 'done', 'done'])
+  assert.ok((resultIndex(sendAhead.id) < resultIndex(giving.id)) && (resultIndex(giving.id) < resultIndex(sendBehind.id)), 'in the order fetched')
+  assert.deepEqual([coinsOf(party).gp, purse(thorin), purse(vex), purse(bram)], [COMPANY_GP - 103, { gp: 35 }, { gp: 112 }, { gp: 8 }])
+}
+okay("a hand-out to the Company waits for a send of the Company's fetched ahead of it, and a send fetched after it waits for it, finding the 5 gp it gave")
+
 // The campaign is read again as a hand-out's turn comes, not as it was when fetched: one waiting in
 // the line of moves behind another's move while the Gamemaster turns Pay with other coins off is
 // made by the setting as it then is, and with moves turned off meanwhile it isn't made.
@@ -996,9 +1156,17 @@ made = await handed('thorin', ['vex'], { gp: 1 })
 assert.deepEqual(saidBy(made).map(message => told(message)[0]), [
   'Vex &lt;i&gt; received 1 gp from Thorin &lt;b&gt;&amp;&lt;/b&gt;', 'Thorin &lt;b&gt;&amp;&lt;/b&gt; handed out 1 gp each to Vex &lt;i&gt;: 1 gp in all',
 ])
+// Since 0.51.0 a party's too, in its line for everyone and in the Gamemasters' message.
+party.name = 'The <b>Company</b>'
+made = await handed('thorin', ['vex', 'party'], { gp: 1 })
+assert.deepEqual(saidBy(made).map(message => told(message)[0]), [
+  'Vex &lt;i&gt; received 1 gp from Thorin &lt;b&gt;&amp;&lt;/b&gt;', 'Gives 1 gp to The &lt;b&gt;Company&lt;/b&gt;',
+  'Thorin &lt;b&gt;&amp;&lt;/b&gt; handed out 1 gp each to Vex &lt;i&gt; and The &lt;b&gt;Company&lt;/b&gt;: 2 gp in all',
+])
+party.name = 'The Iron Company'
 thorin.name = 'Thorin'
 vex.name = 'Vex'
-okay('every name is escaped in the whispers and the Gamemasters\' message')
+okay('every name is escaped in the whispers, the Gamemasters\' message and, since 0.51.0, a party\'s line')
 
 // ---- END ----
 console.log(`handouts${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

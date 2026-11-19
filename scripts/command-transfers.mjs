@@ -68,7 +68,10 @@ import { inventoryTypes, localize } from "./sheet-values.mjs";
  * characters picked, the total taken from the giver as coins taken away are (coin-change.mjs), other
  * coins paying where it's short of one, unless the campaign's Gamemaster has turned that off. No line
  * for everyone: each one given is whispered what they received, "Vex received 200 pp and 50 gp from
- * Thorin", and the Gamemasters what was handed out, in one message.
+ * Thorin", and the Gamemasters what was handed out, in one message. Since 0.51.0 the parties of the
+ * campaign may be among them, a player's only those they own: each party's share is posted for
+ * everyone, as a give to it is, "Gives 2 gp to The Iron Company", and the Gamemasters' message names
+ * it too, posted only where a character was given coins.
  */
 
 /**
@@ -118,20 +121,22 @@ export function transfersOn(campaign) {
  * Owner, party to party too (`partySends`), and a party's coin distributed among its characters
  * (`distribute`). Since 0.49.0, wherever they're made, that a character's coins may be handed out to
  * the characters picked (`handOut`), and whether its other coins pay where it's short of one
- * (`change`), as the campaign's Gamemaster has set it.
+ * (`change`), as the campaign's Gamemaster has set it. Since 0.51.0, wherever they're made, that a
+ * hand-out may give to the campaign's parties too (`handOutParties`).
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: "off"|"system"|null, partySends: boolean,
- *   distribute: boolean, handOut: boolean, change: boolean}}
+ *   distribute: boolean, handOut: boolean, change: boolean, handOutParties: boolean}}
  */
 export function transferFeatures(campaign) {
   const off = reason => ({
-    enabled: false, kinds: [], reason, partySends: false, distribute: false, handOut: false, change: false
+    enabled: false, kinds: [], reason, partySends: false, distribute: false, handOut: false, change: false,
+    handOutParties: false
   });
   if ( campaign.transfers !== true ) return off("off");
   if ( game.system?.id !== "dnd5e" ) return off("system");
   return {
     enabled: true, kinds: [...TRANSFER_KINDS], reason: null, partySends: true, distribute: true,
-    handOut: true, change: campaign.coinChange === true
+    handOut: true, change: campaign.coinChange === true, handOutParties: true
   };
 }
 
@@ -273,10 +278,12 @@ async function transferNow(command, passed) {
  * to, from or by a character transformed, as by Wild Shape (`shaped`). Since 0.49.0 a hand-out's
  * characters are read as a distribution's are, any of the campaign's (`unknown`), none of them
  * transformed (`shaped`); it's a character's own coins, made as that character, the Gamemaster's too,
- * and never a party's, which a player is told only of a party they own (`not-yours`).
+ * and never a party's, which a player is told only of a party they own (`not-yours`). Since 0.51.0 a
+ * hand-out's ends are read as a move's, a character or one of the campaign's parties (`unknown`), a
+ * player's party only one they own (`not-owner`).
  * @param {object} command
  * @param {Campaign} campaign
- * @returns {{refusal: string}|{from: MoveEnd, to: MoveEnd|null, among: Actor[], each: Actor[], mover: Actor}}
+ * @returns {{refusal: string}|{from: MoveEnd, to: MoveEnd|null, among: Actor[], each: MoveEnd[], mover: Actor}}
  */
 function whoMoves(command, campaign) {
   const { transfer } = command;
@@ -298,7 +305,7 @@ function whoMoves(command, campaign) {
   const from = endOf(transfer.from);
   const to = (sharing || handing) ? null : endOf(transfer.to);
   const among = sharing ? transfer.among.map(characterOf) : [];
-  const each = handing ? transfer.each.map(characterOf) : [];
+  const each = handing ? transfer.each.map(endOf) : [];
   if ( !from || (!sharing && !handing && !to) || among.includes(null) || each.includes(null) ) return { refusal: "unknown" };
 
   // A character's things are moved only as one of the move's ends, the Gamemaster's too.
@@ -306,16 +313,17 @@ function whoMoves(command, campaign) {
     ? (game.actors.get(command.actorId) ?? null) : null;
   // Since 0.40.0 nothing moves to, from or by a character while she's transformed: her things aren't
   // on her form, which dnd5e gives none of them.
-  const characters = [from, to].filter(end => end && !end.group).map(end => end.actor).concat(among, each, mover ?? []);
+  const characters = [from, to, ...each].filter(end => end && !end.group).map(end => end.actor).concat(among, mover ?? []);
   if ( characters.some(actor => activeForm(actor)) ) return { refusal: "shaped" };
   if ( !mover ) return { refusal: "not-yours" };
   if ( !from.group && ![from, to].some(end => end?.actor.id === mover.id) ) return { refusal: "not-yours" };
   if ( sharing && !from.group ) return { refusal: "not-yours" };
 
   if ( command.by !== "gm" ) {
-    // A player moves a character's things only from their own; and with a party, only one they own.
+    // A player moves a character's things only from their own; and with a party, only one they own,
+    // since 0.51.0 one a hand-out gives to too.
     if ( !from.group && (from.actor.id !== mover.id) ) return { refusal: "not-yours" };
-    for ( const end of [from, to] ) {
+    for ( const end of [from, to, ...each] ) {
       if ( !end?.group ) continue;
       const access = accessFor(end.actor, mover);
       if ( !access ) return { refusal: "unknown" };
@@ -433,14 +441,15 @@ async function distributeNow(command, campaign, { from, among, mover }) {
  * The total, each count times how many are picked, is taken from the giver as coins taken away are
  * (coin-change.mjs's `takenCoins`), its other coins paying where it's short of one unless the
  * campaign's setting is off, refused where they can't (`short`). The giver's one update first:
- * refused, nothing is written, said or sent. Then each one's, in the order named, adding its coins
- * to what it stores. Where one's fails, what wasn't given goes back to the giver in one update, in
- * the coins handed out, and no more are given; where that fails too, those coins are lost, never
- * made twice. Then the whispers, of those given alone (`handOutLines`); the giver's sheet and each
- * one's given, ahead of the result, which says what each was given, never the total, and to whom.
+ * refused, nothing is written, said or sent. Then each one's, a character's or since 0.51.0 a
+ * party's, in the order named, adding its coins to what it stores. Where one's fails, what wasn't
+ * given goes back to the giver in one update, in the coins handed out, and no more are given; where
+ * that fails too, those coins are lost, never made twice. Then the lines, of those given alone
+ * (`handOutLines`); the giver's sheet and each one's given, ahead of the result, which says what
+ * each was given, never the total, and to whom.
  * @param {object} command
  * @param {Campaign} campaign
- * @param {{from: MoveEnd, each: Actor[], mover: Actor}} ends
+ * @param {{from: MoveEnd, each: MoveEnd[], mover: Actor}} ends
  * @returns {Promise<CommandResult>}
  */
 async function handOutNow(command, campaign, { from, each }) {
@@ -460,10 +469,10 @@ async function handOutNow(command, campaign, { from, each }) {
   }
   const credited = [];
   let error = null;
-  for ( const actor of each ) {
+  for ( const end of each ) {
     try {
-      await updated(actor, coinUpdate(actor, given));
-      credited.push(actor);
+      await updated(end.actor, coinUpdate(end.actor, given));
+      credited.push(end);
     } catch (err) {
       // What wasn't given goes back to the giver, in one write, in the coins handed out.
       try {
@@ -477,13 +486,13 @@ async function handOutNow(command, campaign, { from, each }) {
 
   const line = credited.length ? await handOutLines(command, giver, credited, given, times(credited.length)) : null;
   sheetFirst(giver);
-  for ( const actor of credited ) sheetFirst(actor);
+  for ( const { actor } of credited ) sheetFirst(actor);
   const transfer = {
     from: giver.id,
     to: null,
     items: [],
     currency: given,
-    each: credited.map(actor => actor.id),
+    each: credited.map(({ actor }) => actor.id),
     used: ((error === null) && Object.keys(plan.used).length) ? plan.used : null
   };
   if ( error !== null ) {
@@ -500,32 +509,41 @@ async function handOutNow(command, campaign, { from, each }) {
 }
 
 /**
- * Say what a character handed out, to those it concerns alone, never to everyone: each one given
- * coins that has a player is whispered what it received, to that character's own players
- * (`characterPlayers`), "Vex received 200 pp and 50 gp from Thorin", one with no player none; then
- * the Gamemasters, in one message, what was handed out, to whom and how much in all, "Thorin handed
- * out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all". Each is spoken by the
- * giver and written by its player, as every line of a character's is, who so reads them all, while
- * the Gamemasters are sent the one. A giver with no one player of its own, none owning it or several
- * with none of them having it as their character, is written for by the bridge's Gamemaster
- * (`authorFor`): its own players then read none of them. Every name is escaped.
+ * Say what a character handed out, to those it concerns alone: each character given coins that has
+ * a player is whispered what it received, to that character's own players (`characterPlayers`),
+ * "Vex received 200 pp and 50 gp from Thorin", one with no player none; since 0.51.0 each party
+ * given coins has its line for everyone, in its place in the order, as a give to it has, "Gives
+ * 200 pp and 50 gp to The Iron Company"; then the Gamemasters, in one message, what was handed out,
+ * to whom, parties too, and how much in all, "Thorin handed out 200 pp and 50 gp each to Vex, Bram,
+ * and Lia: 600 pp and 150 gp in all", only where a character was given coins, as a party's line
+ * already says to everyone what it was given. Each is spoken by the giver and written by its
+ * player, as every line of a character's is, who so reads them all, while the Gamemasters are sent
+ * the one. A giver with no one player of its own, none owning it or several with none of them
+ * having it as their character, is written for by the bridge's Gamemaster (`authorFor`): its own
+ * players then read none of the whispers. Every name is escaped.
  * @param {object} command
  * @param {Actor} giver
- * @param {Actor[]} credited               Those given their coins, in order.
+ * @param {MoveEnd[]} credited             Those given their coins, in order.
  * @param {Record<string, number>} given   What each was given.
  * @param {Record<string, number>} total   What they were given in all.
- * @returns {Promise<ChatMessage|null>}    The Gamemasters' message.
+ * @returns {Promise<ChatMessage|null>}    The Gamemasters' message; where none was due, the last party's line.
  */
 async function handOutLines(command, giver, credited, given, total) {
   const things = coinsWords(given);
-  for ( const actor of credited ) {
+  let last = null;
+  for ( const { actor, group } of credited ) {
+    if ( group ) {
+      last = await postLine(command, giver, game.i18n.format("SENDINGSTONE.Chat.Gives", { things, target: escape(actor.name) }));
+      continue;
+    }
     const text = game.i18n.format("SENDINGSTONE.Chat.ReceivedFrom", {
       name: escape(actor.name), things, giver: escape(giver.name)
     });
     await postLine(command, giver, text, characterPlayers(actor).map(user => user.id));
   }
+  if ( credited.every(({ group }) => group) ) return last;
   const text = game.i18n.format("SENDINGSTONE.Chat.HandsOut", {
-    name: escape(giver.name), each: things, names: listOf(credited.map(actor => escape(actor.name))), total: coinsWords(total)
+    name: escape(giver.name), each: things, names: listOf(credited.map(({ actor }) => escape(actor.name))), total: coinsWords(total)
   });
   return postLine(command, giver, text, game.users.filter(user => user.isGM).map(user => user.id));
 }

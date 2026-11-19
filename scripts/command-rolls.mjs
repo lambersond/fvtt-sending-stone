@@ -727,9 +727,9 @@ const FIELDS = Object.freeze(new Set(["from", "to", "items", "currency", "among"
  * least one of them, and nothing a roll names, and throws no dice. Since 0.32.0 a distribution names
  * the characters it shares among in place of the end it goes to: from one to MOST_AMONG of them,
  * each once, never the party itself, and coins of one kind alone, no items. Since 0.49.0 a hand-out
- * names the characters each given the coins, `each`, in place of either: from one to MOST_AMONG of
- * them, each once, never the giver, and coins as a move names them, no items. Exactly one of `to`,
- * `among` and `each` is named.
+ * names those each given the coins, `each`, characters and since 0.51.0 parties too, in place of
+ * either: from one to MOST_AMONG of them, each once, never the giver, and coins as a move names them,
+ * no items. Exactly one of `to`, `among` and `each` is named.
  * @param {object} command
  * @returns {string|null}
  */
