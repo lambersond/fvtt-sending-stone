@@ -282,14 +282,17 @@ export function rollFeatures(campaign) {
  * companion's command may be, as the campaign takes them now, those of its rolls but what an NPC
  * has none of, what isn't asked and what edits it; none where its rolls are off. And since the
  * Gamemaster chooses it per campaign, how its companions enter initiative, whether or not its rolls
- * are made here: each its own roll, or right after its character (creature-initiative.mjs).
+ * are made here: each its own roll, or right after its character (creature-initiative.mjs). And
+ * since 0.51.0 `away`, that it lists companions on every scene, each saying whether it's away, to
+ * an app that answers `companions` 3 (creatures.mjs).
  * @param {Campaign} campaign
- * @returns {{kinds: string[], initiative: string}}
+ * @returns {{kinds: string[], initiative: string, away: boolean}}
  */
 export function companionFeatures(campaign) {
   return {
     kinds: rollFeatures(campaign).kinds.filter(kind => !COMPANION_UNTAKEN.includes(kind)),
-    initiative: campaign.companionInitiative
+    initiative: campaign.companionInitiative,
+    away: true
   };
 }
 

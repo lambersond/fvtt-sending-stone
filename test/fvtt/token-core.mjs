@@ -83,6 +83,22 @@ export function scene(id, { active = false, name = id } = {}) {
 }
 
 /**
+ * A scene made with its tokens, as core makes one duplicated or imported: the scene and each of its
+ * tokens placed, then `createScene` alone, with no `createToken` for a token made with its scene
+ * [core, unverified]. Since module 0.51.0, whose companions are found on every scene.
+ * @param {string} id
+ * @param {{base: Actor}[]} [tokens]   Each token's world actor, `base`, beside placeToken's options.
+ * @param {object} [options]           scene()'s.
+ * @returns {Promise<object>}
+ */
+export async function createScene(id, tokens = [], options = {}) {
+  const made = scene(id, options)
+  for (const { base, ...each } of tokens) placeToken(made, base, each)
+  await Hooks.callAll('createScene', made, {}, userId())
+  return made
+}
+
+/**
  * Make a scene the active one, as core's `activate`: the one that was active updated first.
  * @param {object} next
  */

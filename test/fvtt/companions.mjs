@@ -12,7 +12,8 @@
 // them, slims and expands back). Since module 0.45.0, two campaigns in one world: a character's
 // players by their own ids, never through `default`, else whom it's assigned to; and a public card
 // another campaign's alone kept from a campaign's chat. Since module 0.46.0, those players wherever a
-// campaign reads who plays a character.
+// campaign reads who plays a character. Since module 0.51.0, to an app that answers companions: 3,
+// companions on every scene, each saying whether it's away, and the hello's companionsEverywhere.
 import assert from 'node:assert/strict'
 import { isDeepStrictEqual } from 'node:util'
 import { settings, user, users, actors } from './stub.mjs'
@@ -110,7 +111,7 @@ foundry.applications.ux.TextEditor = { implementation: { async enrichHTML(html, 
 port.targets = true
 
 const {
-  activate, changeActor, changeBaseItem, changeDelta, combatOf, companionActor, createToken, faults, placeToken, scene, scenes,
+  activate, changeActor, changeBaseItem, changeDelta, combatOf, companionActor, createScene, createToken, faults, placeToken, scene, scenes,
 } = await import('./token-core.mjs')
 
 // ---- The users ----
@@ -395,8 +396,10 @@ ok("Vex's list is none: Bob owns none of them")
 // Changed on purpose (round 0.42.1 §P.6.1): and a spell prepared or unprepared, after the charges.
 // Changed on purpose (module 0.44.0, the v0.44 plan's item 7): and a plain roll of the dice tray, its
 // character's player's.
+// Changed on purpose (module 0.51.0, the app's item 18): and `away`, that companions are listed on
+// every scene, each saying whether it's away, to an app that answers 3.
 const UNTAKEN = ['inspiration', 'hitDie', 'hitDice', 'spend', 'spellSlot', 'prepare', 'transfer', 'remove', 'note', 'endTurn', 'undoEndTurn', 'plainRoll']
-assert.deepEqual(hello.data.features.companions, { kinds: hello.data.features.rolls.kinds.filter(kind => !UNTAKEN.includes(kind)), initiative: 'own' })
+assert.deepEqual(hello.data.features.companions, { kinds: hello.data.features.rolls.kinds.filter(kind => !UNTAKEN.includes(kind)), initiative: 'own', away: true })
 assert.ok(hello.data.features.companions.kinds.includes('itemDamage') && hello.data.features.companions.kinds.includes('recharge'))
 assert.ok(!hello.data.features.companions.kinds.some(kind => UNTAKEN.includes(kind)))
 ok("features.companions: the campaign's kinds less inspiration, hit dice, spending, spell slots, spells prepared, moves, removals, notes, ending a turn and taking one back, and the dice tray's plain roll, and each its own initiative")
@@ -1692,6 +1695,308 @@ if (MIDI) {
   assert.deepEqual([showsChallenge({ author: carol }, orla), showsChallenge({ author: bob }, orla)], [true, false], "Carol's and Bob's cards' DCs")
   settings.delete('challengeVisibility')
   ok("module 0.46.0: Orla owned by Carol and Alice by their own ids: under Hide all, Carol's card's DC is her player's own, Bob's isn't")
+}
+
+/* -------------------------------------------- */
+/*  Every scene (module 0.51.0)                 */
+/* -------------------------------------------- */
+
+// The app's ROADMAP item 18, as its owner answered it: companions found on every scene, each away
+// where none of its tokens is on the active scene and one is on another, to an app that answers
+// `companions: 3` alone. Wideholm, Thorin's alone, answers 3; Ashlands answers 2 from here, and
+// Bigtown and the rest 1, and theirs are as before. The Bat on the den, summoned by Thorin, is the
+// companion away.
+const WIDE = { commands: true, companions: 3 }
+const NARROW = { commands: true, companions: 2 }
+const wideholm = () => getCampaigns().find(campaign => campaign.id === 'camp-w')
+const bigtown = () => getCampaigns().find(campaign => campaign.id === 'camp-big')
+const awayOf = list => Object.fromEntries(list.map(each => [each.key, each.away]))
+const ENTRY_KEYS = ['key', 'of', 'kind', 'actorId', 'tokenId', 'sceneId', 'uuid', 'name', 'img', 'summon']
+const { noteCompanionReader } = await import(`${MODULE}/scripts/creature-sync.mjs`)
+const { awayReader } = await import(`${MODULE}/scripts/creatures.mjs`)
+const denBat = den.tokens.get('bat2')
+const AT_ARENA = { brakka: false, 'arena-hound1': false, 'arena-wolf1': false, 'arena-wolf2': false, 'arena-bat1': false, 'den-bat2': true, 'arena-spirit1': false }
+settings.set('campaignSecrets', { ...settings.get('campaignSecrets'), 'camp-w': 'w-secret' })
+app.answers['camp-w'] = WIDE
+app.answers['camp-a'] = NARROW
+from = app.events.length
+await game.settings.set('sending-stone', 'campaigns', [...settings.get('campaigns'), { id: 'camp-w', title: 'Wideholm', characters: ['thorin'], rolls: true, attacks: true }])
+await until(() => sheetsSent(from, 'camp-w').some(e => e.data.companion.key === 'den-bat2'), "Wideholm's hello answered, and the den's Bat's sheet")
+await settle(); await settle()
+
+// 1. The list, to an app that answers 3: every scene's, each entry ending with away.
+{
+  const list = companionList(wideholm())
+  assert.deepEqual(awayOf(list), AT_ARENA, "the den's Bat away; the arena's, and Brakka, placed nowhere, not")
+  assert.deepEqual(keysOf(list), keysOf(EXPECTED).toSpliced(5, 0, 'den-bat2'), "in today's order: owned, then summoned, each by name, then key")
+  assert.ok(list.every(each => isDeepStrictEqual(Object.keys(each), [...ENTRY_KEYS, 'away'])), 'away last in each')
+  assert.deepEqual(helloOf('camp-w').data.companionsEverywhere, list, "the hello's companionsEverywhere")
+  assert.deepEqual(listed(from, 'camp-w'), [], 'kept as the hello listed it: no companions.listed')
+  ok("to an app that answers companions: 3, a campaign's companions are found on every scene: the Bat on the den listed with away true, the arena's and Brakka, linked and placed nowhere, with away false; owned, then summoned, each by name, as ever; away the last key of each; the hello's companionsEverywhere")
+}
+
+// 2. Formats 1 and 2: as before, byte for byte, with no away.
+{
+  assert.deepEqual(companionList(ashlands()), EXPECTED, 'Ashlands, at 2')
+  assert.deepEqual(helloOf().data.companions, EXPECTED, "Ashlands' last hello's companions")
+  assert.deepEqual(helloOf('camp-w').data.companions, EXPECTED, "Wideholm's own hello's companions, the active scene's")
+  assert.ok([bigtown(), ashlands()].every(campaign => companionList(campaign).every(each => !('away' in each))), 'no away at 1 or 2')
+  const keys = Object.keys(helloOf().data)
+  assert.equal(keys.indexOf('companionsEverywhere'), keys.indexOf('companions') + 1, 'companionsEverywhere right after companions, to every app')
+  ok("an app that answers companions: 1 or 2 is listed the active scene's companions as before, byte for byte, with no away, in its hello's companions too, which every hello carries beside companionsEverywhere")
+}
+
+// 6. The hello built before any answer, as at every Gamemaster's page load (the critic's C1): its
+// companions the active scene's, its companionsEverywhere every scene's. An app that answers 3 keeps
+// companionsEverywhere, so no companions.listed follows and the den's Bat's sheet goes; one that
+// answers 2 keeps companions, and nothing more follows either.
+{
+  const hello = async answer => {
+    app.answers['camp-w'] = answer
+    noteCompanionReader('camp-w', null)
+    const at = app.events.length
+    announce({ campaignId: 'camp-w' })
+    await until(() => since(at).some(e => (e.type === 'bridge.hello') && (e.campaign.id === 'camp-w')), "Wideholm's hello")
+    await until(() => sheetsSent(at, 'camp-w').some(e => e.data.companion.key === 'brakka'), "Brakka's sheet after it")
+    await settle(); await settle()
+    return at
+  }
+  let at = await hello(WIDE)
+  const built = helloOf('camp-w').data
+  assert.deepEqual(built.companions, companionList(wideholm(), { everywhere: false }), 'companions: as an app that reads 2 is listed them')
+  assert.ok(!keysOf(built.companions).includes('den-bat2') && built.companions.every(each => !('away' in each)), 'without the den\'s Bat, and no away')
+  assert.deepEqual(awayOf(built.companionsEverywhere), AT_ARENA, 'companionsEverywhere: every scene\'s')
+  assert.deepEqual(listed(at, 'camp-w'), [], 'answered 3: no companions.listed follows')
+  assert.ok(sheetsSent(at, 'camp-w').some(e => e.data.companion.key === 'den-bat2'), "and the den's Bat's sheet goes")
+  at = await hello(NARROW)
+  assert.deepEqual(listed(at, 'camp-w'), [], 'answered 2: none follows either')
+  assert.ok(!sheetsSent(at, 'camp-w').some(e => e.data.companion.key === 'den-bat2'), "nor the den's Bat's sheet")
+  ok("a hello built before its app's answer, as at a Gamemaster's page load: its companions the active scene's, its companionsEverywhere every scene's; answered 3, no companions.listed follows and the den's Bat's sheet goes after it; answered 2, nothing more follows, and no sheet of it")
+}
+
+// 7. A heartbeat's answer that moves to 3, then back to 2, as an app deployed and rolled back: the
+// list as it now reads it, at once.
+{
+  for (const [answer, wide] of [[WIDE, true], [NARROW, false]]) {
+    app.answers['camp-w'] = answer
+    const at = app.events.length
+    clock += 31_000
+    heartbeat()
+    await until(() => listed(at, 'camp-w').length, `the list at ${answer.companions}`, 1000)
+    await settle()
+    const [list, ...more] = listed(at, 'camp-w')
+    assert.equal(more.length, 0, 'once')
+    assert.deepEqual(keysOf(list.data.companions).includes('den-bat2'), wide, `the den's Bat at ${answer.companions}`)
+    assert.ok(list.data.companions.every(each => ('away' in each) === wide), `away at ${answer.companions}`)
+    if (wide) assert.ok(sheetsSent(at, 'camp-w').some(e => e.data.companion.key === 'den-bat2'), "the den's Bat's sheet after it")
+  }
+  app.answers['camp-w'] = WIDE
+  clock += 31_000
+  heartbeat()
+  await until(() => awayReader('camp-w'), 'Wideholm at 3 again')
+  await settle(); await settle()
+  ok("a heartbeat's answer moving to 3 sends the list of every scene at once, the den's Bat with its sheet after it; moving back to 2, the active scene's, at once, without it")
+}
+
+// 3. The den made the active scene: the arena's companions stay, away now, the den's Bat not, in
+// one companions.listed; Ashlands, at 2, is listed the den's as before.
+{
+  from = app.events.length
+  await activate(den)
+  await until(() => listed(from, 'camp-w').length && listed(from).length, 'the lists on the den')
+  await settle(); await settle()
+  assert.equal(listed(from, 'camp-w').length, 1, 'one companions.listed')
+  assert.deepEqual(awayOf(listed(from, 'camp-w')[0].data.companions), Object.fromEntries(Object.keys(AT_ARENA).map(key => [key, key.startsWith('arena-')])))
+  assert.deepEqual(keysOf(lastList()), ['brakka', 'den-bat2'], 'Ashlands, at 2, as before')
+  from = app.events.length
+  await activate(arena)
+  await until(() => listed(from, 'camp-w').length, 'the list back')
+  await settle(); await settle()
+  assert.deepEqual(awayOf(listed(from, 'camp-w').at(-1).data.companions), AT_ARENA)
+  ok("the den made the active scene: Wideholm's companions on the arena stay, away now, and the den's Bat isn't, in one companions.listed; Ashlands, at 2, is listed the den's alone, as before; and back")
+}
+
+// 4. Linked companions, by where their tokens are: an owned one away while its one token is on the
+// den, here once a hidden token of it is on the arena; a linked summon on the den, listed summoned
+// and away, gone once its token is, though dnd5e keeps its sheet.
+{
+  const moth = companionActor('moth', 'Moth', { owners: ['alice'], linked: true, spec: creature() })
+  await createToken(den, moth, { id: 'moth1', actorLink: true, name: 'Moth' })
+  await settle()
+  assert.equal(awayOf(companionList(wideholm())).moth, true, 'its one token on the den: away')
+  await createToken(arena, moth, { id: 'moth2', actorLink: true, name: 'Moth', hidden: true })
+  await settle()
+  assert.equal(awayOf(companionList(wideholm())).moth, false, 'a hidden token of it on the arena: here')
+  const owl = companionActor('owl', 'Owl', { linked: true, flags: { dnd5e: { summon: { origin: 'Actor.thorin.Item.findFamiliar', activity: 'ff-summon' }, isAutoImported: true } } })
+  const owlToken = await createToken(den, owl, { id: 'owl1', actorLink: true, name: 'Owl' })
+  await settle()
+  const entryOfOwl = companionList(wideholm()).find(each => each.key === 'owl')
+  assert.deepEqual([entryOfOwl?.kind, entryOfOwl?.tokenId, entryOfOwl?.away], ['summoned', null, true], 'the linked summon on the den')
+  assert.ok(!keysOf(companionList(ashlands())).includes('owl'), 'not Ashlands\', at 2')
+  from = app.events.length
+  await owlToken.delete()
+  await until(() => listed(from, 'camp-w').length, 'the list without the Owl')
+  assert.ok(!keysOf(listed(from, 'camp-w').at(-1).data.companions).includes('owl') && game.actors.get('owl'), 'gone, its world actor kept')
+  for (const id of ['moth1', 'moth2']) await (den.tokens.get(id) ?? arena.tokens.get(id)).delete()
+  for (const id of ['moth', 'owl']) {
+    const actor = actors.get(id)
+    actors.delete(id)
+    await Hooks.callAll('deleteActor', actor, {}, 'gm')
+  }
+  await settle(); await settle()
+  ok("a linked NPC Alice owns whose one token is on the den is away, and not once a hidden token of it is on the arena; a linked summon of Thorin's on the den is listed summoned and away, not to Ashlands, at 2; its token deleted, it leaves, though its world actor stays")
+}
+
+// 5. Commands: the den's Bat rolled for from Wideholm, on its own creature; from Ashlands, at 2, the
+// same key is no one's companion, and nothing is rolled.
+{
+  const made = await send(skill({ actorId: 'den-bat2', of: 'thorin' }), 'camp-w')
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.equal(messageOf(made.id).speakerActor, denBat.actor, "the den's Bat's own creature")
+  const count = messages.size
+  const refused = await send(skill({ actorId: 'den-bat2', of: 'thorin' }))
+  assert.deepEqual([refused.status, refused.reason, messages.size], ['failed', 'unknown', count], 'from Ashlands, at 2')
+  ok("a skill for the den's Bat, of: thorin, from Wideholm is rolled on its own creature, away though it is; from Ashlands, at 2, refused unknown, nothing rolled")
+}
+
+// 8. A character's twenty: those not away kept first, in today's order. Thorin with 22 Rats on the den
+// and 3 Vipers on the arena, beside his own.
+{
+  const rat = companionActor('rat', 'Rat', { owners: ['alice'], linked: false, spec: creature() })
+  const viper = companionActor('viper', 'Viper', { owners: ['alice'], linked: false, spec: creature() })
+  const rats = Array.from({ length: 22 }, (_, i) => placeToken(den, rat, { id: `rat${String(i + 1).padStart(2, '0')}`, name: 'Rat' }))
+  const vipers = [1, 2, 3].map(n => placeToken(arena, viper, { id: `viper${n}`, name: 'Viper' }))
+  const list = companionList(wideholm())
+  const ratKeys = rats.slice(0, 11).map(token => `den-${token.id}`)
+  assert.deepEqual(keysOf(list), ['brakka', 'arena-hound1', ...ratKeys, 'arena-viper1', 'arena-viper2', 'arena-viper3', 'arena-wolf1', 'arena-wolf2', 'arena-bat1', 'arena-spirit1'],
+    'every one not away kept, then the first eleven away, in their order')
+  assert.equal(companionList(ashlands()).filter(each => each.of.includes('thorin')).length, 9, 'Ashlands, at 2: the arena\'s, the Vipers among them')
+  for (const token of [...rats, ...vipers]) token.parent.tokens.delete(token.id)
+  for (const id of ['rat', 'viper']) actors.delete(id)
+  ok("a character with 22 owned tokens on the den and 3 on the arena beside his own keeps every one not away among his twenty, then the first of those away, all in today's order")
+}
+
+// 9. The campaign's fifty: those not away kept first. Bigtown's Big 1's twenty on the den, Big 3's on
+// the arena; Big 2's placed nowhere.
+{
+  const placed = []
+  for (const [n, on] of [[1, den], [3, arena]]) {
+    for (const actor of game.actors.filter(each => (each.type === 'npc') && (each.ownership?.[`b${n}`] === 3))) {
+      placed.push(placeToken(on, actor, { id: `t${actor.id}`, actorLink: true, name: actor.name }))
+    }
+  }
+  const wide = companionList(bigtown(), { everywhere: true })
+  const of = n => wide.filter(each => each.of[0] === `big${n}`)
+  assert.deepEqual([wide.length, of(1).length, of(2).length, of(3).length], [50, 10, 20, 20], 'Big 3\'s twenty within the fifty')
+  assert.ok(of(1).every(each => each.away) && [...of(2), ...of(3)].every(each => !each.away))
+  assert.deepEqual(wide.map(each => each.of[0]), [...Array(10).fill('big1'), ...Array(20).fill('big2'), ...Array(20).fill('big3')], 'in its characters\' order')
+  assert.deepEqual([1, 2, 3].map(n => companionList(bigtown()).filter(each => each.of[0] === `big${n}`).length), [20, 20, 10], 'at 1, as before')
+  for (const token of placed) token.parent.tokens.delete(token.id)
+  ok("a campaign's fifty keep those not away first: Big 1's twenty on the den leave room for Big 3's on the arena, each character's in its order; at 1, as before")
+}
+
+// 10. A scene made with its tokens, as the den duplicated: its copy of the Bat listed within the
+// settle, though no createToken told of it.
+{
+  await settle(); await settle()
+  from = app.events.length
+  const copy = await createScene('den2', [{ base: bat, id: 'bat2', name: 'Bat', delta: { flags: SUMMONED } }])
+  await until(() => listed(from, 'camp-w').length, "the list with the copy's Bat", 1000)
+  assert.equal(awayOf(listed(from, 'camp-w').at(-1).data.companions)['den2-bat2'], true, 'listed, away')
+  from = app.events.length
+  await copy.delete()
+  await until(() => listed(from, 'camp-w').length, 'the list without it')
+  assert.ok(!keysOf(listed(from, 'camp-w').at(-1).data.companions).includes('den2-bat2'))
+  ok("a scene made with its tokens, as one duplicated, tells of its own tokens by createScene alone: the copy's Bat listed, away, within the settle; the copy deleted, it's gone")
+}
+
+// 11-12. What it costs: every token of every scene looked at, each call (rule 4 of the batch's
+// brief). Tokens that can't be companions, none owned or summoned, have no creature made up; tokens
+// that can, a Wolf Alice owns on every map, are made up once and kept.
+{
+  const timeOf = fn => { const started = performance.now(); fn(); return performance.now() - started }
+  const mob = companionActor('mob', 'Orc', { linked: false, spec: creature() })
+  const before = companionList(wideholm())
+  const mobs = Array.from({ length: 200 }, (_, n) => {
+    const each = scene(`mob${n}`)
+    for (let t = 0; t < 50; t++) placeToken(each, mob, { id: `m${n}x${t}`, name: 'Orc' })
+    return each
+  })
+  const tokensOf = list => list.flatMap(each => each.tokens.contents)
+  const wideMs = timeOf(() => assert.deepEqual(companionList(wideholm()), before, 'the list unchanged'))
+  const narrowMs = timeOf(() => companionList(ashlands()))
+  assert.ok(tokensOf(mobs).length === 10_000 && tokensOf(mobs).every(token => !token._synthetic), 'no creature made up for any of the 10,000')
+  for (const each of mobs) scenes.delete(each.id)
+  ok(`200 scenes of 50 tokens no player owns and nothing summoned: Wideholm's companions found in ${wideMs.toFixed(1)} ms, none of the 10,000 made up, the list unchanged (Ashlands', the active scene's, ${narrowMs.toFixed(1)} ms)`)
+
+  const wolves = Array.from({ length: 200 }, (_, n) => {
+    const each = scene(`wolves${n}`)
+    placeToken(each, wolf, { id: `w${n}`, name: 'Wolf' })
+    return each
+  })
+  const firstMs = timeOf(() => companionsOf(wideholm()))
+  const made = tokensOf(wolves).map(token => token._synthetic)
+  const secondMs = timeOf(() => assert.equal(companionList(wideholm()).length, 20, 'Thorin\'s twenty'))
+  assert.ok(made.every(Boolean) && tokensOf(wolves).every((token, i) => token._synthetic === made[i]), 'each made up once, and kept')
+  for (const each of wolves) scenes.delete(each.id)
+  actors.delete('mob')
+  ok(`200 scenes, a Wolf Alice owns on each: the first call makes up 200 creatures, in ${firstMs.toFixed(1)} ms; the next makes none, in ${secondMs.toFixed(1)} ms; Thorin's list twenty`)
+}
+
+// 13. A fight on the den with only the Bat away in it reaches Wideholm, its companion told; never
+// Ashlands, at 2.
+{
+  from = app.events.length
+  const denfight = combatOf('denfight', [{ id: 'cb-df-bat2', token: denBat }])
+  await Hooks.callAll('createCombat', denfight, {}, 'gm')
+  await settle()
+  const created = ofType(since(from), 'combat.created', 'camp-w').find(e => e.data.combat.id === 'denfight')
+  assert.deepEqual(created?.data.combat.combatants.map(each => each.companion), ['den-bat2'], 'Wideholm told, its companion named')
+  assert.ok(!ofType(since(from), 'combat.created').some(e => e.data.combat.id === 'denfight'), 'Ashlands not')
+  game.combats.delete('denfight')
+  await Hooks.callAll('deleteCombat', denfight, {}, 'gm')
+  await settle()
+  ok("a fight on the den with only the Bat in it reaches Wideholm, its combatant's companion den-bat2; Ashlands, at 2, isn't told of it")
+}
+
+// 14. Under Midi-QOL, a companion away attacks and uses as ever: what the Gamemaster's canvas
+// doesn't draw, as the den's tokens while they view the arena, is refused "scene", unless they allow
+// targets off their screen, and then only where Midi doesn't need a target. A Wolf of Alice's and a
+// goblin, both on the den.
+if (MIDI) {
+  const denWolf = await createToken(den, wolf, { id: 'wolf9', name: 'Wolf' })
+  const denGoblin = placeToken(den, goblin, { id: 'gob9', name: 'Goblin', actorLink: true })
+  // The Gamemaster's canvas draws the arena: no placeable for a token on the den.
+  denWolf.object = null
+  denGoblin.object = null
+  await settle()
+  const brawl = combatOf('denbrawl', [{ id: 'cb-db-wolf', token: denWolf }, { id: 'cb-db-gob', token: denGoblin }])
+  const bite = () => send(attack({ actorId: 'den-wolf9', of: 'thorin', item: 'jaws', activity: 'bite', target: { combatId: 'denbrawl', combatantId: 'cb-db-gob' } }), 'camp-w')
+  const howlAt = () => send(use({ actorId: 'den-wolf9', of: 'thorin', item: 'howl', activity: 'howl-use', self: true }), 'camp-w')
+  const flowOf = () => [...(midi.made.at(-1)?.targets ?? [])]
+  const required = midi.settings.requiresTargets
+  try {
+    const unseen = await bite()
+    assert.deepEqual([unseen.status, unseen.reason], ['failed', 'scene'], 'at a goblin the canvas doesn\'t draw')
+    midi.settings.requiresTargets = 'none'
+    await game.settings.set('sending-stone', 'offCanvasTargets', true)
+    const allowed = await bite()
+    assert.equal(allowed.status, 'done', JSON.stringify(allowed))
+    assert.deepEqual([madeBy(allowed).flags.dnd5e.targets.map(t => t.name), flowOf()], [['Goblin'], []], 'its card names the goblin, Midi works on no one')
+    const own = await howlAt()
+    assert.equal(own.status, 'done', JSON.stringify(own))
+    assert.deepEqual([useCard(own.id).flags.dnd5e.targets.map(t => t.name), flowOf()], [['Wolf'], []], 'at itself: its card names it, Midi works on no one')
+    midi.settings.requiresTargets = 'always'
+    for (const made of [await bite(), await howlAt()]) assert.deepEqual([made.status, made.reason], ['failed', 'scene'], 'where Midi needs a target it can draw')
+  } finally {
+    midi.settings.requiresTargets = required
+    await game.settings.set('sending-stone', 'offCanvasTargets', false)
+  }
+  game.combats.delete(brawl.id)
+  den.tokens.delete(denGoblin.id)
+  await denWolf.delete()
+  await settle()
+  ok("under Midi-QOL, a Wolf away on the den: its bite at a goblin there, which the Gamemaster's canvas doesn't draw, refused scene; with targets off the screen allowed, and Midi needing none, made, its card naming the goblin and Midi working on no one, and its howl at itself the same; where Midi needs a target, both refused scene")
 }
 
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
