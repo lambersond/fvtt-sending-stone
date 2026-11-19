@@ -387,14 +387,15 @@ fight.getCombatantsByActor = actor => fight.combatants.filter(cb => cb.actor?.id
 game.combat = fight
 
 // ---- The app ----
-const app = { events: [], polls: [], waiting: new Map(), wake: null }
+// What it answers a hello or heartbeat with: since 0.52.0, `anyAbility` where a case says.
+const app = { events: [], polls: [], waiting: new Map(), wake: null, features: { commands: true } }
 const json = body => ({ ok: true, status: 200, statusText: 'OK', headers: new Headers({ 'content-type': 'application/json' }), json: async () => body })
 globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body)
   if (String(url).endsWith('/api/events')) {
     app.events.push(body)
     const announcing = ['bridge.hello', 'bridge.heartbeat'].includes(body.type)
-    return announcing ? json({ features: { commands: true } }) : { ok: true, status: 204, statusText: 'No Content', headers: new Headers() }
+    return announcing ? json({ features: app.features }) : { ok: true, status: 204, statusText: 'No Content', headers: new Headers() }
   }
   if (String(url).endsWith('/api/bridge/commands')) {
     app.polls.push(body)
@@ -475,14 +476,16 @@ const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)
 await until(() => app.polls.length > 0, 'the first fetch')
 assert.equal(diceStatus.ready, true, `self-test: ${diceStatus.error}`)
 assert.equal(diceStatus.attacks, true, `attack self-test: ${diceStatus.attacksError}`)
-const { describeActivity, rollsOf } = await import(`${MODULE}/scripts/sheet-rolls.mjs`)
+const { describeActivity, rollsOf, tablingSheet } = await import(`${MODULE}/scripts/sheet-rolls.mjs`)
 const { favoritesOf } = await import(`${MODULE}/scripts/sheet-favorites.mjs`)
 const { serializeMessage } = await import(`${MODULE}/scripts/chat-data.mjs`)
 const { getCampaigns } = await import(`${MODULE}/scripts/campaigns.mjs`)
 
 const hellos = () => app.events.filter(e => e.type === 'bridge.hello')
 assert.equal(hellos().at(-1).data.features.rolls.activityChecks, true)
-ok('the hello says a check activity\'s checks may be rolled for it under dnd5e 5')
+// Since 0.52.0: and that checks on any ability are sent to an app that reads them.
+assert.equal(hellos().at(-1).data.features.rolls.anyAbility, true)
+ok('the hello says a check activity\'s checks may be rolled for it under dnd5e 5, and on any ability to an app that reads them')
 
 // ---- The sheet: check activities ----
 const entryOf = (actor, itemId, activityId) => {
@@ -553,6 +556,10 @@ assert.deepEqual([edge(rook, 'sanity').activity?.type, edge(rook, 'sanity').chec
 CONFIG.DND5E.abilities.hon = { label: 'Honor', abbreviation: 'HON' }
 CONFIG.DND5E.skills.eti = skill('Etiquette', 'hon')
 assert.deepEqual([edge(rook, 'manners').activity?.type, edge(rook, 'manners').check], ['check', undefined], 'Insight or Etiquette on Honor, whole or not at all')
+// To an app that reads them, since 0.52.0: Sanity's check, and Insight or Etiquette whole.
+const anyEdge = itemId => tablingSheet(() => rollsOf(rook.items.get(itemId)), { anyAbility: true })
+assert.deepEqual(anyEdge('sanity').check, { checks: [{ type: 'check', ability: 'san' }], dc: 12, own: true }, 'Sanity, to an app that reads it')
+assert.deepEqual(anyEdge('manners').check, { checks: [{ type: 'skill', ability: 'wis', key: 'ins' }, { type: 'skill', ability: 'hon', key: 'eti' }], dc: 12, own: true }, 'Insight or Etiquette, to an app that reads them')
 delete CONFIG.DND5E.abilities.hon
 delete CONFIG.DND5E.skills.eti
 assert.deepEqual([edge(rook, 'eleven').activity?.type, edge(rook, 'eleven').check], ['check', undefined], 'eleven checks')
@@ -563,6 +570,7 @@ assert.deepEqual([edge(rook, 'hat').activity, edge(rook, 'hat').check], [null, u
 assert.deepEqual(edge(rook, 'vault').check, { checks: [{ type: 'skill', ability: 'str', key: 'ath' }], dc: null, own: true }, 'a DC above 99 isn\'t shown')
 game.system.version = '6.0.5'
 assert.deepEqual([entryOf(rook, 'hands', 'slt-check').activity, entryOf(rook, 'hands', 'slt-check').check], [null, undefined], 'dnd5e 6')
+assert.equal(tablingSheet(() => rollsOf(rook.items.get('sanity')), { anyAbility: true }).check, undefined, 'dnd5e 6, to an app that reads any ability')
 game.system.version = '5.3.0'
 ok('no check where the app can\'t roll one; no use for an unidentified item, a check that scales, or under dnd5e 6')
 
@@ -940,6 +948,30 @@ nothingAsked()
 const opened = await roll('rook', 'skill', 'slt', { item: 'locked', activity: 'open-check', dice: [{ faces: 20, results: [7] }] })
 assert.deepEqual([opened.status, opened.rolls[0]?.total, opened.outcome], ['done', 12, 'success'], 'the one beside them that\'s to be used')
 ok('refuses another\'s check, one not offered, one not to be used, a check activity that isn\'t one made here, an item not the character\'s, and anything malformed; the hello under dnd5e 6 says no')
+
+// ---- Since 0.52.0: a check activity on any ability, to an app that reads them ----
+{
+  // Rook's Sanity, as dnd5e gives every character a world's abilities.
+  rook.system.abilities.san = foundry.utils.deepClone(rook.system.abilities.wis)
+  const sanity = { item: 'sanity', activity: 'mad', dice: [{ faces: 20, results: [11] }] }
+  await refused(roll('rook', 'ability', 'san', sanity), 'activity', 'to an app before 0.52.0, as it was sent none')
+  const before = app.events.filter(e => (e.type === 'character.updated') && (e.data.character.id === 'rook')).length
+  // A heartbeat's answer that says it reads them sends the campaign's sheets again, with it.
+  app.features = { commands: true, anyAbility: 1 }
+  const { noteListenerFeatures } = await import(`${MODULE}/scripts/commands.mjs`)
+  noteListenerFeatures('camp-a', app.features, 'bridge.heartbeat')
+  await until(() => app.events.filter(e => (e.type === 'character.updated') && (e.data.character.id === 'rook')).length > before, 'Rook\'s sheet sent again')
+  const sent = sheetOf('rook').actions.flatMap(section => section.actions).find(action => action.id === 'sanity')
+  assert.deepEqual(sent?.check, { checks: [{ type: 'check', ability: 'san' }], dc: 12, own: true }, `sent again with its check: ${JSON.stringify(sent?.check)}`)
+  const made = await roll('rook', 'ability', 'san', sanity)
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  const total = made.rolls[0]?.total
+  assert.equal(made.outcome, total >= 12 ? 'success' : 'failure', `rolled against its DC 12: ${total}`)
+  app.features = { commands: true }
+  noteListenerFeatures('camp-a', app.features, 'bridge.heartbeat')
+  delete rook.system.abilities.san
+}
+ok('a check activity on Sanity: refused to an app before 0.52.0; sent again with it once a heartbeat\'s answer says the app reads it, and rolled against its DC')
 
 console.log(`${MIDI ? 'midi' : 'dnd5e'}: done`)
 process.exit(0)

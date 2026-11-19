@@ -287,13 +287,16 @@ let plain = null;
  *                                          each damage link by, by its link's number, where it does:
  *                                          never in the HTML, for the module alone to roll its
  *                                          critical hit as dnd5e's own link does.
+ * @param {boolean} [options.anyAbility]    Since 0.52.0, does the campaign's app read checks on any
+ *                                          ability the game has? Else a check on any past the six
+ *                                          is text.
  * @returns {string}
  */
-export function normaliseLinks(html, { relativeTo, rollData, actionable=true, hiddenDCs, activities }={}) {
+export function normaliseLinks(html, { relativeTo, rollData, actionable=true, hiddenDCs, activities, anyAbility=false }={}) {
   const doc = new DOMParser().parseFromString(String(html ?? "").slice(0, LONGEST_READ), "text/html");
   const body = doc.body;
   const context = {
-    doc, relativeTo, actionable,
+    doc, relativeTo, actionable, anyAbility,
     rollData: rollData ?? {},
     actor: actorOf(relativeTo),
     made: new Set(),
@@ -511,7 +514,7 @@ function enrichedCheck(el, label, context) {
     ...skillKeys.map(offered("skill", skills)),
     ...(data.usingTool ? [] : toolKeys).map(offered("tool", tools))
   ];
-  const checks = checkOptions(named);
+  const checks = checkOptions(named, { anyAbility: context.anyAbility });
   if ( !checks ) return null;
   const usingTool = usingToolOf(checks, data.usingTool);
   if ( data.hideDC === "true" ) {
@@ -783,7 +786,7 @@ function plainCheck(match, patterns, context) {
     const ability = patterns.abilities.get(name.toLowerCase());
     if ( !skill ) return { type: "check", ability };
     return { type: "skill", ability, key: patterns.skills.get(skill.toLowerCase()) };
-  }));
+  }), { anyAbility: context.anyAbility });
   if ( !checks ) return null;
   const dc = challenge(before) ?? challenge(after) ?? (spell ? spellDCOf(context.actor) : null)
     ?? checkActivityDC(context.relativeTo, checks);
@@ -1155,7 +1158,8 @@ function checkName({ type, ability, key }) {
 }
 
 /**
- * The checks a span names, as `checkName` names them, checked again.
+ * The checks a span names, as `checkName` names them, checked again: on any ability the game still
+ * has, the module's own copy having been made for its campaign's app.
  * @param {string} [value]
  * @returns {CheckOption[]|null}
  */
@@ -1167,7 +1171,7 @@ function readChecks(value) {
     const [type, ability, key] = parts;
     return (parts.length === ((type === "check") ? 2 : 3)) ? { type, ability, key } : null;
   });
-  return options.every(Boolean) ? checkOptions(options) : null;
+  return options.every(Boolean) ? checkOptions(options, { anyAbility: true }) : null;
 }
 
 /**

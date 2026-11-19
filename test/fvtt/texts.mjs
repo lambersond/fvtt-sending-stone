@@ -1676,6 +1676,32 @@ made = await ask(blessedHash, 1)
 assert.deepEqual([made.result.status, made.message.flavor, made.message.flags.dnd5e], ['done', 'Roll Request: Blessed', undefined])
 ok("through the module's own findLink, an item's description names its item, a spell an item casts the spell and the item, and an effect's the effect; its checks are asked and rolled; a DC its author hid is rolled against and shown no one")
 
+// ---- Since 0.52.0: [[/check honor 12]], to an app that reads checks on any ability ----
+{
+  // dnd5e's Honor, as its setting turns it on (D5 config.mjs DND5E.abilities.hon), on Thorin too,
+  // and his biography with [[/check honor 12]] in dnd5e 5.3.3's markup (enrichers.mjs:488-492).
+  CONFIG.DND5E.abilities.hon = { label: 'Honor', abbreviation: 'hon', type: 'mental', fullKey: 'honor' }
+  thorin.system.abilities.hon = foundry.utils.deepClone(thorin.system.abilities.wis)
+  thorin.system.details.biography.value = '<p>His oath binds him: a <span class="roll-link-group" data-type="check" data-ability="hon" data-dc="12"><a class="roll-link" data-action="roll"><i class="fa-solid fa-dice-d20" inert=""></i>DC 12 Honor</a><a class="enricher-action" data-action="postRequest" data-tooltip="EDITOR.DND5E.Inline.RequestRoll" aria-label="Request Roll"><i class="fa-solid fa-comment-dots"></i></a></span> check.</p>'
+  const { noteAnyAbilityFormat } = await import(`${MODULE}/scripts/check-abilities.mjs`)
+  const { characterSheet } = await import(`${MODULE}/scripts/sheet.mjs`)
+  const { SheetTexts } = await import(`${MODULE}/scripts/sheet-texts.mjs`)
+  const hashFor = anyAbility => characterSheet(thorin, new SheetTexts({ anyAbility })).details.biography
+  const honor = hashFor(true)
+  assert.notEqual(honor, hashFor(false), 'its hash, apart from the one an older app is sent')
+  noteAnyAbilityFormat('camp-a', { anyAbility: 1 })
+  made = await rollCheck('ability', 'hon', honor, 0, [9])
+  assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+  assert.deepEqual([made.roll.options.target, made.result.outcome], [12, (made.roll.total >= 12) ? 'success' : 'failure'], 'rolled against its DC 12')
+  // Read as its campaign's app was sent it: to one that reads only the six, no such description.
+  noteAnyAbilityFormat('camp-a', {})
+  assert.deepEqual(refused(await rollCheck('ability', 'hon', honor, 0, [9])), ['failed', 'gone', null])
+  thorin.system.details.biography.value = BIOGRAPHY
+  delete thorin.system.abilities.hon
+  delete CONFIG.DND5E.abilities.hon
+}
+ok("since 0.52.0, a description's Honor check, to an app that reads checks on any ability, rolled against its DC; gone to one that doesn't")
+
 // ---- Damage dnd5e's own link rolls through one of the item's activities ----
 // A critical hit's only as that activity allows, with what it adds to each part, as the activity's
 // own class reads it, both or neither of the span's attributes, marked never one too where that

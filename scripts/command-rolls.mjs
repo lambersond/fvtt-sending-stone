@@ -7,6 +7,7 @@ import {
 } from "./constants.mjs";
 import { characterPlayers, originalOf, seatActor, standingFor } from "./characters.mjs";
 import { chatAudience, summarizeRoll } from "./chat-data.mjs";
+import { anyAbilityReader } from "./check-abilities.mjs";
 import { checkHitPointsCommand, isId, isObject, namesRollFields, throwsNoDice } from "./command-checks.mjs";
 import { findLink } from "./command-links.mjs";
 import { midiIntegration } from "./config.mjs";
@@ -176,17 +177,20 @@ export async function runRollCommand(command, campaign, { signal }={}) {
   // A companion no player of its characters owns in Foundry was sent its descriptions without the
   // Gamemaster's secrets, and its links are read from those.
   const secrets = companion ? ownedByPlayers(actor, companion.of) : true;
+  // Since 0.52.0 a check is read as its campaign's app was sent it: on any ability, to one that
+  // reads them, else on the six.
+  const anyAbility = anyAbilityReader(campaign.id);
   let link = null;
   let check = null;
   if ( CHECK_TYPES[command.kind] && (typeof command.item === "string") ) {
-    const checked = activityCheck(command, actor);
+    const checked = activityCheck(command, actor, anyAbility);
     if ( checked.refusal ) return failed(checked.refusal);
     link = { dc: checked.dc, usingTool: null, tool: checked.tool };
     check = checked.check;
   }
   else if ( isTextHash(command.text) ) {
-    const linked = (command.kind === "save") ? await linkedSave(command, actor, secrets)
-      : await linkedCheck(command, actor, secrets);
+    const linked = (command.kind === "save") ? await linkedSave(command, actor, secrets, anyAbility)
+      : await linkedCheck(command, actor, secrets, anyAbility);
     if ( linked.refusal ) return failed(linked.refusal);
     link = linked.link;
     check = linked.check ?? null;
@@ -1399,15 +1403,16 @@ export function activityNamed(command, item) {
  * is one another creature makes, as a spell's is, or doesn't offer that check (`activity`).
  * @param {object} command
  * @param {Actor} actor
+ * @param {boolean} [anyAbility]   Does the campaign's app read checks on any ability, since 0.52.0?
  * @returns {{refusal?: string, check?: {type: string, ability: string, key?: string}, dc?: number|null,
  *   tool?: {bonus: string, prof: object, item: Item}|null}}
  */
-function activityCheck(command, actor) {
+function activityCheck(command, actor, anyAbility=false) {
   const item = actor.items?.get(command.item);
   if ( !item || (item.system?.identified === false) || (castFrom(item)?.usable === false) ) return { refusal: "item" };
   const activity = activityNamed(command, item);
   const owner = activity?.item ?? item;
-  const offered = (activity?.type === "check") ? checkOf(owner, activity) : null;
+  const offered = (activity?.type === "check") ? checkOf(owner, activity, { anyAbility }) : null;
   if ( !offered?.own ) return { refusal: "activity" };
   const type = CHECK_TYPES[command.kind];
   const check = offered.checks.find(each => (each.type === type) && ((each.key ?? each.ability) === command.key));
@@ -1434,10 +1439,11 @@ function activityCheck(command, actor) {
  * @param {Actor} actor
  * @param {boolean} [secrets]   Were its descriptions sent with their secrets, as since 0.36.0 a
  *                              companion's none of whose players own it weren't?
+ * @param {boolean} [anyAbility]   Were its checks on any ability links, since 0.52.0?
  * @returns {Promise<{link?: object, refusal?: string}>}
  */
-async function linkedSave(command, actor, secrets=true) {
-  const found = await findLink(actor, command.text, command.link, { secrets });
+async function linkedSave(command, actor, secrets=true, anyAbility=false) {
+  const found = await findLink(actor, command.text, command.link, { secrets, anyAbility });
   if ( found.refusal ) return { refusal: found.refusal };
   const { link } = found;
   if ( !["save", "concentration"].includes(link?.kind) ) return { refusal: "link" };
@@ -1456,11 +1462,12 @@ async function linkedSave(command, actor, secrets=true) {
  * @param {object} command
  * @param {Actor} actor
  * @param {boolean} [secrets]   Were its descriptions sent with their secrets?
+ * @param {boolean} [anyAbility]   Were its checks on any ability links, since 0.52.0?
  * @returns {Promise<{link?: object, check?: {type: string, ability: string, key?: string},
  *   refusal?: string}>}
  */
-async function linkedCheck(command, actor, secrets=true) {
-  const found = await findLink(actor, command.text, command.link, { secrets });
+async function linkedCheck(command, actor, secrets=true, anyAbility=false) {
+  const found = await findLink(actor, command.text, command.link, { secrets, anyAbility });
   if ( found.refusal ) return { refusal: found.refusal };
   const { link } = found;
   if ( link?.kind !== "check" ) return { refusal: "link" };

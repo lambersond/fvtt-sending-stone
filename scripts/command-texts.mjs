@@ -1,5 +1,6 @@
 import { MODULE_ID, ROLL_TAG } from "./constants.mjs";
 import { askFlavor } from "./chat-data.mjs";
+import { anyAbilityReader } from "./check-abilities.mjs";
 import { findLink } from "./command-links.mjs";
 import { appFlags, authorFor, checkCommand, describeResult, failedResult, PUBLIC } from "./command-rolls.mjs";
 import { commandActor, ownedByPlayers } from "./creatures.mjs";
@@ -109,7 +110,9 @@ export async function runAskCommand(command, campaign) {
   const who = commandActor(command, campaign);
   if ( !who ) return failed("unknown");
   const { actor, character } = who;
-  const found = await findLink(actor, command.text, command.link, { secrets: secretsOf(who) });
+  const found = await findLink(actor, command.text, command.link, {
+    secrets: secretsOf(who), anyAbility: anyAbilityReader(campaign.id)
+  });
   if ( found.refusal ) return failed(found.refusal);
   const { link, origin } = found;
   if ( !["save", "concentration", "check"].includes(link?.kind) ) return failed("link");
@@ -272,7 +275,9 @@ export async function runTextDamageCommand(command, campaign) {
   const who = commandActor(command, campaign);
   if ( !who ) return failed("unknown");
   const { actor, character } = who;
-  const found = await findLink(actor, command.text, command.link, { secrets: secretsOf(who) });
+  const found = await findLink(actor, command.text, command.link, {
+    secrets: secretsOf(who), anyAbility: anyAbilityReader(campaign.id)
+  });
   if ( found.refusal ) return failed(found.refusal);
   const { link, origin } = found;
   if ( (link?.kind !== "damage") || !link.parts?.length ) return failed("link");
@@ -329,7 +334,9 @@ export async function runTextRollCommand(command, campaign) {
   const who = commandActor(command, campaign);
   if ( !who ) return failed("unknown");
   const { actor, character } = who;
-  const found = await findLink(actor, command.text, command.link, { secrets: secretsOf(who) });
+  const found = await findLink(actor, command.text, command.link, {
+    secrets: secretsOf(who), anyAbility: anyAbilityReader(campaign.id)
+  });
   if ( found.refusal ) return failed(found.refusal);
   const { link, origin } = found;
   if ( (link?.kind !== "roll") || (typeof link.formula !== "string") ) return failed("link");

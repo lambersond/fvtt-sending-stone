@@ -259,6 +259,22 @@ const checksOf = html => spans(html).map(({ class: c, n, text, ...data }) => [c,
   // Saves on any ability the game has are sent to every app, as since 0.17.0.
   assert.deepEqual(spans(norm('<p>Make a DC 13 Sanity saving throw, then a Wisdom or Sanity saving throw.</p>')).map(({ class: c, ability, dc }) => [c, ability, dc]),
     [['ss-save roll', 'san', '13'], ['ss-save roll', 'wis|san', undefined]])
+  // To an app that reads them, since 0.52.0: checks on any ability the game has, by a key it takes,
+  // whole: Honor, Etiquette on Honor, Luck, and Wisdom or Honor; never one by a key it can't take,
+  // nor a choice with one.
+  const any = { anyAbility: true }
+  assert.deepEqual(checksOf(norm(request('data-type="check" data-ability="hon" data-dc="10"', 'DC 10 Honor'), any)), [['ss-check roll', '0', 'DC 10 Honor', { checks: 'check:hon', dc: '10' }]])
+  assert.deepEqual(checksOf(norm(request('data-type="skill" data-ability="hon" data-skill="eti"', 'Honor (Etiquette)'), any)), [['ss-check roll', '0', 'Honor (Etiquette)', { checks: 'skill:hon:eti' }]])
+  assert.deepEqual(checksOf(norm(request('data-type="check" data-ability="luck"', 'Luck'), any)), [['ss-check roll', '0', 'Luck', { checks: 'check:luck' }]])
+  assert.deepEqual(spans(norm('<p>Make a DC 12 Wisdom or Honor check.</p>', any)).map(({ checks, dc }) => [checks, dc]), [['check:wis|check:hon', '12']], 'Wisdom or Honor, to an app that reads them')
+  assert.equal(norm(group('data-type="check" data-skill="ins|eti"', 'Insight or Etiquette'), any).includes('data-checks="skill:wis:ins|skill:hon:eti"'), true)
+  assert.equal(norm(request('data-type="check" data-ability="my.luck"', 'Fortune'), any), 'Fortune')
+  assert.equal(norm(group('data-type="check" data-ability="my.luck" data-skill="ath|acr"', 'Athletics or Acrobatics with Fortune'), any), 'Athletics or Acrobatics with Fortune')
+  // Its own copy read back for a command takes any ability the game still has, whole.
+  const readBack = checks => readLink(`<span class="ss-check roll" data-n="0" data-checks="${checks}">x</span>`, 0)
+  assert.deepEqual(readBack('check:hon')?.checks, [{ type: 'check', ability: 'hon' }])
+  assert.deepEqual(readBack('check:wis|check:hon')?.checks, [{ type: 'check', ability: 'wis' }, { type: 'check', ability: 'hon' }])
+  assert.equal(readBack('check:wis|check:my.luck'), null)
   for (const key of Object.keys(added)) delete CONFIG.DND5E.abilities[key]
   delete CONFIG.DND5E.skills.eti
   assert.equal(norm(request('data-type="check" data-ability="spellcasting" data-dc="10"', 'DC 10 Spellcasting')), 'DC 10 Spellcasting')
@@ -849,6 +865,11 @@ ok('enriching: effects with their actor\'s roll data, rules pages without links,
   //                                                                      fire   stored saving spellDC effect rule
   changes('the rules', () => settings.set('rulesVersion', 'legacy'), () => settings.delete('rulesVersion'), [true, true, true, true, true, true])
   changes('the language', () => { game.i18n.lang = 'de' }, () => { game.i18n.lang = 'en' }, [true, true, true, true, true, true])
+  // Since 0.52.0, whether its checks on any ability are links: never the hash of the six's alone,
+  // and only where they are, so that a character's hashes don't change for an older app.
+  const anyHash = source => new SheetTexts({ anyAbility: true }).add(source)
+  assert.ok(all.every(source => anyHash(source) !== hashOf(source)), 'with checks on any ability, apart')
+  assert.deepEqual(all.map(source => new SheetTexts({ anyAbility: false }).add(source)), before, 'without, as before')
   // Since 0.52.0: an ability or skill the game turns on or adds, which may make a check a link.
   changes("the game's abilities", () => { CONFIG.DND5E.abilities.hon = { label: 'Honor' } }, () => { delete CONFIG.DND5E.abilities.hon }, [true, true, true, true, true, true])
   changes("the game's skills", () => { CONFIG.DND5E.skills.eti = { label: 'Etiquette', ability: 'hon' } }, () => { delete CONFIG.DND5E.skills.eti }, [true, true, true, true, true, true])

@@ -1,5 +1,6 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
+import { anyAbilityReader, noteAnyAbilityFormat } from "./check-abilities.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm, campaignActors, noteFormDeleted, originalOf, rosterEntry, transformed } from "./characters.mjs";
 import {
@@ -196,6 +197,22 @@ export function noteAloneReader(campaignId, features, type) {
  */
 export function aloneReader(campaignId) {
   return readers.has(campaignId);
+}
+
+/**
+ * Note whether a campaign's app reads checks on any ability the game has, since 0.52.0:
+ * `features.anyAbility`, 1 or later, kept by check-abilities.mjs, whose sheets' descriptions and
+ * check activities then carry them. One that says nothing of it, as an older app, is sent checks on
+ * the six alone. An answer to a heartbeat that changes it sends the campaign's sheets and its
+ * companions' again; a hello's are sent after it anyway.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @param {string} [type]   The event answered.
+ * @returns {void}
+ */
+export function noteAnyAbilityReader(campaignId, features, type) {
+  const was = noteAnyAbilityFormat(campaignId, features);
+  if ( (was !== anyAbilityReader(campaignId)) && (type !== EVENTS.HELLO) ) sendSheetsAgain(campaignId);
 }
 
 /* -------------------------------------------- */
@@ -468,7 +485,8 @@ function sendSheet(campaign, actor) {
   sendActor(campaign, actor, {
     event: EVENTS.CHARACTER_UPDATED,
     build: ({ sheet=true }={}) => {
-      const texts = new SheetTexts();
+      // Since 0.52.0 its checks on any ability are links, to an app that reads them.
+      const texts = new SheetTexts({ anyAbility: anyAbilityReader(campaign.id) });
       const manualDice = typesDice(actor, campaign);
       return { texts, data: { character: sheet
         ? { ...rosterEntry(actor), manualDice, sheet: seatSheet(campaign, actor, texts) }
@@ -480,7 +498,8 @@ function sendSheet(campaign, actor) {
 /**
  * A character's sheet as a campaign's app is sent it: to one that takes Wild Shape, its active form's
  * while it has one, with `form`, and her `wildShape` where she's a 2024 druid; else her own, as before.
- * Since 0.41.0, to one that reads damage on its own's choices, with them.
+ * Since 0.41.0, to one that reads damage on its own's choices, with them; and since 0.52.0, to one
+ * that reads checks on any ability the game has, with its check activities on any.
  * @param {Campaign} campaign
  * @param {Actor} actor
  * @param {SheetTexts} texts
@@ -488,9 +507,11 @@ function sendSheet(campaign, actor) {
  */
 function seatSheet(campaign, actor, texts) {
   const aloneChoices = aloneReader(campaign.id);
-  if ( !wildShapeReader(campaign.id) ) return characterSheet(actor, texts, { aloneChoices });
+  const anyAbility = anyAbilityReader(campaign.id);
+  if ( !wildShapeReader(campaign.id) ) return characterSheet(actor, texts, { aloneChoices, anyAbility });
   const form = activeForm(actor);
-  const sheet = form ? characterSheet(form, texts, { ops: false, aloneChoices }) : characterSheet(actor, texts, { aloneChoices });
+  const sheet = form ? characterSheet(form, texts, { ops: false, aloneChoices, anyAbility })
+    : characterSheet(actor, texts, { aloneChoices, anyAbility });
   if ( !sheet ) return sheet;
   const shape = form ? formBlock(form, actor, campaign) : undefined;
   const block = wildShapeBlock(actor, form ?? actor, campaign);
@@ -524,6 +545,17 @@ export function wildShapeTermsChanged(campaignId) {
  * @returns {void}
  */
 export function aloneTermsChanged(campaignId) {
+  sendSheetsAgain(campaignId);
+}
+
+/**
+ * Send a campaign whose app has changed how it reads its sheets, in answer to a heartbeat, every
+ * character and companion again, as it's now sent them: since 0.41.0 with or without damage on its
+ * own's choices, and since 0.52.0 with or without checks on any ability.
+ * @param {string} campaignId
+ * @returns {void}
+ */
+function sendSheetsAgain(campaignId) {
   const campaign = getCampaigns().find(c => c.id === campaignId);
   if ( !campaign || !canSend() || helloPending(campaign.id) ) return;
   for ( const actor of campaignActors(campaign) ) sendSheet(campaign, actor);

@@ -317,7 +317,9 @@ const WOLF2 = 'arena-wolf2'
   assert.equal(keys[keys.indexOf('aloneChoices') + 1], 'companionPrompts', 'after aloneChoices')
   // Changed on purpose (round 0.42.0 §8.2): `effectDice` and `keptRerolls` follow it, last.
   // Changed on purpose (module 0.44.0): `diceAsks` and `diceAsksReason` after them.
-  assert.deepEqual(keys.slice(keys.indexOf('companionPrompts')), ['companionPrompts', 'effectDice', 'keptRerolls', 'diceAsks', 'diceAsksReason'])
+  // Changed on purpose (module 0.52.0, item 65): and `anyAbility`, true, last.
+  assert.deepEqual(keys.slice(keys.indexOf('companionPrompts')), ['companionPrompts', 'effectDice', 'keptRerolls', 'diceAsks', 'diceAsksReason', 'anyAbility'])
+  assert.equal(rolls.anyAbility, true, 'the hello says it sends checks on any ability to an app that reads them')
   assert.deepEqual([helloOf('camp-b').data.features.rolls.prompts, helloOf('camp-b').data.features.rolls.companionPrompts], [false, false], 'off where its players are asked nothing')
   // An app answering companions: 1 is asked nothing of them.
   app.answers.set('camp-a', { ...FEATURES, companions: 1 })

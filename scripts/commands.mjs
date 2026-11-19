@@ -28,7 +28,7 @@ import { runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { isId } from "./command-checks.mjs";
 import { attacksUnavailable, failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
-import { noteAloneReader } from "./character-sync.mjs";
+import { noteAloneReader, noteAnyAbilityReader } from "./character-sync.mjs";
 import { gmRollOf } from "./chat-data.mjs";
 import { healthReader, noteHealthReader } from "./creature-health.mjs";
 import { noteCompanionReader } from "./creature-sync.mjs";
@@ -224,13 +224,16 @@ const made = new Map();
  * utility's roll and wherever it is, a plain roll of the app's dice tray; and, last,
  * whether its players typing in their dice are asked for the dice the game rolls later
  * (`diceAsks`), under dnd5e 5 wherever they type them and the self-test passed, and if not, why not
- * (`diceAsksReason`); with it, the answer to such an ask, `"dice"`, last among the kinds.
+ * (`diceAsksReason`); with it, the answer to such an ask, `"dice"`, last among the kinds. And
+ * since 0.52.0, last, `anyAbility`, true whatever the rolls, as descriptions and request cards carry
+ * checks whatever they are: checks on any ability the game has are sent to an app that answers
+ * `anyAbility` 1 or later.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
  *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean, manualDice: boolean,
  *   midiPrompts: boolean, aloneChoices: boolean, companionPrompts: boolean, effectDice: boolean,
- *   keptRerolls: boolean, diceAsks: boolean, diceAsksReason: string|null}}
+ *   keptRerolls: boolean, diceAsks: boolean, diceAsksReason: string|null, anyAbility: boolean}}
  */
 export function rollFeatures(campaign) {
   const asks = diceAskFeatures(campaign);
@@ -238,7 +241,7 @@ export function rollFeatures(campaign) {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
     signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false,
     midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false,
-    diceAsks: false, diceAsksReason: asks.diceAsksReason
+    diceAsks: false, diceAsksReason: asks.diceAsksReason, anyAbility: true
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -273,7 +276,8 @@ export function rollFeatures(campaign) {
     effectDice: manualDiceOn(campaign) && diceStatus.effectDice && effectDiceSystem(),
     keptRerolls: manualDiceOn(campaign) && diceStatus.keptRerolls,
     diceAsks: asks.diceAsks,
-    diceAsksReason: asks.diceAsksReason
+    diceAsksReason: asks.diceAsksReason,
+    anyAbility: true
   };
 }
 
@@ -339,8 +343,10 @@ export function registerCommandHooks() {
  * whether it takes coins added and taken away, for which it's fetched from where the campaign's
  * Gamemaster lets its players, under dnd5e, with everything else off; and since 0.50.0, whether it
  * reads how hurt other creatures are, `health`, to which its combats are sent again where it first
- * says so (health-sync.mjs), and whether it answers fetches quietly while nobody is in it, `quiet`.
- * A hello's answer wakes the campaign's fetching, which may be waiting as an answer given before
+ * says so (health-sync.mjs), and whether it answers fetches quietly while nobody is in it, `quiet`;
+ * and since 0.52.0, whether it reads checks on any ability the game has, `anyAbility`, to which the
+ * campaign's sheets, its companions' too, are sent again where it starts or stops in a heartbeat's
+ * answer (character-sync.mjs). A hello's answer wakes the campaign's fetching, which may be waiting as an answer given before
  * the hello was taken asked; since 0.50.0 it fetches in full at its usual pace again, for two
  * minutes at least.
  * @param {string} campaignId
@@ -363,6 +369,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteHitPointReader(campaignId, features);
   noteCoinReader(campaignId, features);
   noteAloneReader(campaignId, features, type);
+  noteAnyAbilityReader(campaignId, features, type);
   noteNotesReader(campaignId, features, type);
   noteTidyReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);

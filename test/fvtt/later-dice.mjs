@@ -585,7 +585,8 @@ if (BREAK_ASK) {
 
 assert.deepEqual([later.laterDiceStatus.ready, later.laterDiceStatus.error], [true, null], 'the self-test passed')
 const keys = Object.keys(rollsOf('camp-a'))
-assert.deepEqual(keys.slice(keys.indexOf('keptRerolls')), ['keptRerolls', 'diceAsks', 'diceAsksReason'])
+// Changed on purpose (module 0.52.0, item 65): `anyAbility` after them, last.
+assert.deepEqual(keys.slice(keys.indexOf('keptRerolls')), ['keptRerolls', 'diceAsks', 'diceAsksReason', 'anyAbility'])
 assert.deepEqual([rollsOf('camp-a').diceAsks, rollsOf('camp-a').diceAsksReason, rollsOf('camp-a').kinds.at(-1)], [true, null, 'dice'])
 assert.equal(helloOf('camp-a').data.features.companions.kinds.at(-1), 'dice', "among companions' kinds")
 assert.deepEqual(helloOf('camp-a').data.diceAsks, [], 'none open')

@@ -1,5 +1,5 @@
 import { MODULE_ID } from "./constants.mjs";
-import { CHECK_KEY, isAbilitySent } from "./check-abilities.mjs";
+import { anyAbilityReader, CHECK_KEY, isAbilitySent } from "./check-abilities.mjs";
 import { includeGmContent } from "./config.mjs";
 import { campaignActors, charactersSeenBy, speakerCharacterId } from "./characters.mjs";
 import { messageCompanion } from "./creature-sync.mjs";
@@ -140,7 +140,7 @@ export function serializeMessage(message, campaign, audience=chatAudience(messag
     flavor: message.flavor ?? "",
     content,
     text: htmlToText(content, { challenge: challengeShown(message) }),
-    ask: askOf(message),
+    ask: askOf(message, campaign),
     blind: message.blind,
     audience,
     rolls: trimRolls(message, message.rolls.map(summarizeRoll), trim),
@@ -398,13 +398,15 @@ function askedCheck(message, anyAbility=false) {
  * The save or check a roll request card asks the table for, as the app shows it: the Gamemaster's,
  * posted from a description, or a player's, posted from the app. Its DC only where players may see
  * it, as dnd5e shows it: never one the card keeps from everyone; and for a player's, what asks for
- * it, such as their item. Null for any other message.
+ * it, such as their item. Since 0.52.0 a check on any ability the game has, to a campaign's app that
+ * reads them. Null for any other message.
  * @param {ChatMessage} message
+ * @param {Campaign} campaign   The campaign it's described for.
  * @returns {{type: string, abilities?: string[], checks?: object[], dc?: number, label?: string}|null}
  */
-function askOf(message) {
+function askOf(message, campaign) {
   const save = askedSave(message);
-  const check = save ? null : askedCheck(message);
+  const check = save ? null : askedCheck(message, anyAbilityReader(campaign?.id));
   if ( (save?.source !== "request") && !check ) return null;
   const asked = save ?? check;
   const label = askLabel(message);

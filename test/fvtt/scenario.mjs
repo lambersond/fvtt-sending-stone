@@ -276,6 +276,19 @@ assert.equal((await card('c13', { content: checkRequestHtml([{ ability: 'str', s
 // A save on any ability the game has is asked, as since 0.17.0: dnd5e's Sanity too.
 CONFIG.DND5E.abilities.san = { label: 'Sanity' }
 assert.deepEqual((await card('c14', { content: requestHtml([{ ability: 'wis', dc: 13 }, { ability: 'san', dc: 13 }]) })).ask, { type: 'save', abilities: ['wis', 'san'] })
+// To an app that says it reads checks on any ability, since 0.52.0: Honor, a world's own skill on
+// it and a world's own Luck, whole; c9's Honor, its unknown skill passed over; a save as ever.
+const { noteAnyAbilityFormat } = await import(`${MODULE}/scripts/check-abilities.mjs`)
+noteAnyAbilityFormat('camp-a', { anyAbility: 1 })
+CONFIG.DND5E.abilities.luck = { label: 'Luck' }
+CONFIG.DND5E.skills.eti = { label: 'Etiquette', ability: 'hon' }
+sent2 = await card('c15', { content: checkRequestHtml([{ type: 'check', ability: 'hon', dc: 12 }, { ability: 'hon', skill: 'eti', dc: 12 }, { type: 'check', ability: 'luck', dc: 12 }]) })
+assert.deepEqual(sent2.ask, { type: 'check', checks: [{ type: 'check', ability: 'hon' }, { type: 'skill', ability: 'hon', skill: 'eti' }, { type: 'check', ability: 'luck' }] })
+assert.deepEqual((await card('c16', { content: checkRequestHtml([{ type: 'check', ability: 'hon' }, { ability: 'str', skill: 'nope' }]) })).ask, { type: 'check', checks: [{ type: 'check', ability: 'hon' }] })
+assert.deepEqual((await card('c17', { content: requestHtml([{ ability: 'wis', dc: 13 }, { ability: 'san', dc: 13 }]) })).ask, { type: 'save', abilities: ['wis', 'san'] })
+noteAnyAbilityFormat('camp-a', {})
+delete CONFIG.DND5E.abilities.luck
+delete CONFIG.DND5E.skills.eti
 delete CONFIG.DND5E.abilities.san
 const eleven = [...['str', 'dex', 'con', 'int', 'wis', 'cha'].map(ability => ({ type: 'check', ability })),
   ...['ath', 'acr', 'slt', 'prc'].map(skill => ({ skill, ability: CONFIG.DND5E.skills[skill].ability })), { type: 'tool', ability: 'dex', tool: 'thief' }]

@@ -81,6 +81,8 @@ const sent = new Map();
  * @property {boolean} [secrets]        Is it enriched with its secrets, as for its owner? Since
  *                                      0.30.0 a Group's are not: see SheetTexts.
  * @property {boolean} [actionable]     May its links be acted on from the app? A Group's may not.
+ * @property {boolean} [anyAbility]     Since 0.52.0, are its checks on any ability the game has
+ *                                      links, for an app that reads them? Else only the six's.
  */
 
 /**
@@ -116,13 +118,22 @@ export class SheetTexts {
   #actionable;
 
   /**
+   * Are checks on any ability the game has links in these descriptions, since 0.52.0?
+   * @type {boolean}
+   */
+  #anyAbility;
+
+  /**
    * @param {object} [options]
    * @param {boolean} [options.secrets]      Enrich them with their secrets, as for their owner.
    * @param {boolean} [options.actionable]   Make their links ones the app can act on.
+   * @param {boolean} [options.anyAbility]   Since 0.52.0, link checks on any ability the game has,
+   *                                         for an app that reads them; else only the six's.
    */
-  constructor({ secrets=true, actionable=true }={}) {
+  constructor({ secrets=true, actionable=true, anyAbility=false }={}) {
     this.#secrets = secrets !== false;
     this.#actionable = actionable !== false;
+    this.#anyAbility = anyAbility === true;
   }
 
   /**
@@ -133,7 +144,8 @@ export class SheetTexts {
    * since 0.30.0 whether it goes without its secrets or links to act on. A change to any of them is
    * a new description, sent anew. Those two are hashed only where they differ from a character's,
    * so that no character's description has a new hash for them, and the same HTML enriched both
-   * ways never shares one.
+   * ways never shares one; and since 0.52.0 whether its checks on any ability are links, hashed
+   * where they are, so that a link is never read by a number another app's copy gave it.
    * @param {TextSource} source
    * @returns {string|null}   Its hash, or null if there is nothing to describe.
    */
@@ -143,10 +155,11 @@ export class SheetTexts {
     this.#format ??= textFormat();
     const from = reference ? `ref:${reference}`
       : `${relativeTo?.uuid ?? ""}\n${shownSafely(html, relativeTo)}\n${html}`;
-    const options = `${this.#secrets ? "" : "\nsecrets:false"}${this.#actionable ? "" : "\nactionable:false"}`;
+    const options = `${this.#secrets ? "" : "\nsecrets:false"}${this.#actionable ? "" : "\nactionable:false"}`
+      + (this.#anyAbility ? "\nabilities:any" : "");
     const hash = textHash(`${this.#format}\n${from}${options}`);
     if ( !this.sources.has(hash) ) {
-      this.sources.set(hash, { ...source, secrets: this.#secrets, actionable: this.#actionable });
+      this.sources.set(hash, { ...source, secrets: this.#secrets, actionable: this.#actionable, anyAbility: this.#anyAbility });
     }
     return hash;
   }
@@ -278,7 +291,7 @@ async function render(sources) {
  *   The HTML sent, the DCs its authors hid, and the activities its damage is rolled by, by link
  *   number.
  */
-async function enrich({ html, relativeTo, reference, secrets, actionable }) {
+async function enrich({ html, relativeTo, reference, secrets, actionable, anyAbility }) {
   let text = html ?? "";
   let rollData;
   let result = null;
@@ -299,7 +312,8 @@ async function enrich({ html, relativeTo, reference, secrets, actionable }) {
     const hiddenDCs = new Map();
     const activities = new Map();
     const normalised = normaliseLinks(enrichedText, {
-      relativeTo, rollData, actionable: (actionable !== false) && !reference, hiddenDCs, activities
+      relativeTo, rollData, actionable: (actionable !== false) && !reference, hiddenDCs, activities,
+      anyAbility: anyAbility === true
     });
     return { html: cutShort(normalised), hiddenDCs, activities };
   } catch (err) {

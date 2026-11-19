@@ -149,24 +149,36 @@ let tabled = null;
 let tablingChoices = false;
 
 /**
+ * Does the sheet being built offer, since 0.52.0, check activities on any ability the game has,
+ * for an app that reads them? Else only on the six.
+ * @type {boolean}
+ */
+let tablingAbilities = false;
+
+/**
  * Build a sheet, working out each activity's damage on its own once; since 0.41.0 with its choices
- * where asked. A sheet built within another on other terms works out its own.
+ * where asked, and since 0.52.0 its check activities on any ability where asked. A sheet built
+ * within another on other terms works out its own damage; its checks, which aren't kept, need not.
  * @template T
  * @param {() => T} build
  * @param {object} [options]
- * @param {boolean} [options.choices]   With `choices` and `spends`?
+ * @param {boolean} [options.choices]      With `choices` and `spends`?
+ * @param {boolean} [options.anyAbility]   With checks on any ability the game has?
  * @returns {T}
  */
-export function tablingSheet(build, { choices=false }={}) {
+export function tablingSheet(build, { choices=false, anyAbility=false }={}) {
   const outer = tabled;
   const outerChoices = tablingChoices;
+  const outerAbilities = tablingAbilities;
   tabled = (outer && (outerChoices === choices)) ? outer : new Map();
   tablingChoices = choices;
+  tablingAbilities = anyAbility;
   try {
     return build();
   } finally {
     tabled = outer;
     tablingChoices = outerChoices;
+    tablingAbilities = outerAbilities;
   }
 }
 
@@ -290,7 +302,7 @@ function activityRolls(item, activity, texts) {
   const attack = activity.type === "attack";
   const area = attack ? attackAreaOf(item, activity) : null;
   const roll = formulaRoll(activity);
-  const check = checkOf(item, activity);
+  const check = checkOf(item, activity, { anyAbility: tablingAbilities });
   return {
     toHit: attack ? toHitOf(activity) : null,
     // The attack the bonus is for, so the app can have it made here.
@@ -914,18 +926,20 @@ export function checkUsable(item, activity) {
  * of each skill or tool it names, or of the tool a tool item is, made with the ability dnd5e makes
  * it with; or else an ability check of the ability it names. A key that's neither a skill nor a
  * tool is an ability check, as dnd5e's card makes it. Each kind of check once, as a description's
- * checks are: since 0.52.0 whole or not at all, none where one is on an ability the campaign's app
- * isn't sent checks on (`checkOptions`). A tool item's check of its own tool adds
+ * checks are: since 0.52.0 on an ability the campaign's app is sent checks on, whole or not at
+ * all, none where one is on another (`checkOptions`). A tool item's check of its own tool adds
  * the item's bonus, as the card's button does; one whose bonus throws dice, which the app can't
  * add, is left out. With its DC, and whether the character makes it: not a spell's, whose target
  * makes it, such as Maze's. Null for a check activity not used here, or one with no check the app
  * can roll, such as one that names none.
  * @param {Item} item
  * @param {Activity} activity
+ * @param {object} [options]
+ * @param {boolean} [options.anyAbility]   Does the campaign's app read checks on any ability?
  * @returns {{checks: {type: string, ability: string, key?: string, bonus?: number}[], dc: number|null,
  *   own: boolean}|null}
  */
-export function checkOf(item, activity) {
+export function checkOf(item, activity, { anyAbility=false }={}) {
   if ( (activity?.type !== "check") || !checkUsable(item, activity) ) return null;
   const skills = CONFIG.DND5E?.skills ?? {};
   const tools = CONFIG.DND5E?.tools ?? {};
@@ -939,7 +953,7 @@ export function checkOf(item, activity) {
     }))
     : [{ type: "check", ability: activity.check?.ability || null }];
   const baseItem = (item.type === "tool") ? (item.system?.type?.baseItem || null) : undefined;
-  const checks = (checkOptions(named) ?? []).flatMap(check => {
+  const checks = (checkOptions(named, { anyAbility }) ?? []).flatMap(check => {
     // As dnd5e's button adds it: to a tool item's own tool, or any tool of one that's of none.
     const own = (check.type === "tool") && (baseItem !== undefined) && (!baseItem || (check.key === baseItem));
     if ( !own ) return [check];

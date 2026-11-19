@@ -1,8 +1,8 @@
 /**
  * Which abilities a check sent to a campaign's app may be made with: dnd5e's six to an app before
- * 0.52.0, and since 0.52.0 any the game has, by a key the app takes, to one that reads them. A
- * script of its own, below every script that sends a check, a description's, a check activity's or
- * a request card's, so that each asks the one rule.
+ * 0.52.0, and since 0.52.0 any the game has, by a key the app takes, to one that says `anyAbility`;
+ * and which apps say so. A script of its own, below every script that sends a check, a
+ * description's, a check activity's or a request card's, so that each asks the one rule.
  */
 
 /**
@@ -29,4 +29,36 @@ export const CHECK_KEY = /^[A-Za-z][\w-]{0,31}$/;
 export function isAbilitySent(ability, anyAbility) {
   if ( SIX_ABILITIES.includes(ability) ) return true;
   return (anyAbility === true) && (typeof ability === "string") && CHECK_KEY.test(ability);
+}
+
+/**
+ * The campaigns whose app reads checks on any ability the game has, by id, as their latest answer
+ * to a hello or heartbeat said: `anyAbility` 1 or later, since 0.52.0.
+ * @type {Set<string>}
+ */
+const readers = new Set();
+
+/**
+ * Note whether a campaign's app reads checks on any ability the game has, from what it said in
+ * answer to its hello or heartbeat: `features.anyAbility`, an integer, 1 or more; not where it said
+ * anything else, or nothing. The one writer of the readers.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @returns {boolean}   Did it read them before?
+ */
+export function noteAnyAbilityFormat(campaignId, features) {
+  const was = readers.has(campaignId);
+  const format = features?.anyAbility;
+  if ( Number.isInteger(format) && (format >= 1) ) readers.add(campaignId);
+  else readers.delete(campaignId);
+  return was;
+}
+
+/**
+ * Does a campaign's app read checks on any ability the game has, as its latest answer said?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function anyAbilityReader(campaignId) {
+  return readers.has(campaignId);
 }
