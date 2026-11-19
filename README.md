@@ -491,17 +491,20 @@ either is missing.
   shared evenly stays with the party: "Distributes 100 gp among Bram, Lia, Thorin, and Vex (25 gp
   each); 3 gp stays with The Iron Company". Its members changing in the meantime stops it.
 - **Handing out coins.** Since 0.49.0, a player can give a set amount of their own character's
-  coins to each of the campaign's characters they tick, one or several at once: **Give**, on the
-  Inventory tab's Currency row. The total is taken from the giver as coins
-  [taken away](#adding-and-taking-away-coins) are, other coins paying where they're short of one,
-  unless **Pay with other coins when a character is short of one** is off. No line is posted for
-  everyone: each character given coins is whispered what they received, "Vex received 200 pp and 50
-  gp from Thorin", you and any other Gamemaster of the world are whispered one message with all of
-  it, "Thorin handed out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all",
-  and the giver's player sees each of them. A character no player owns is whispered nothing, though
-  your message names it. A giver with no one player of its own, one no player owns, or one several
-  own with none of them having it as their character, is written for by you, as its rolls are: its
-  own players then see none of these messages, only you and each one given.
+  coins to each of the campaign's characters they tick, and since 0.51.0 to the parties they own
+  too, one or several at once: **Give**, on the Inventory tab's Currency row. The total is taken
+  from the giver as coins [taken away](#adding-and-taking-away-coins) are, other coins paying where
+  they're short of one, unless **Pay with other coins when a character is short of one** is off. For
+  a character, no line is posted for everyone: each character given coins is whispered what they
+  received, "Vex received 200 pp and 50 gp from Thorin", you and any other Gamemaster of the world
+  are whispered one message with all of it, "Thorin handed out 200 pp and 50 gp each to Vex, Bram,
+  and Lia: 600 pp and 150 gp in all", and the giver's player sees each of them. A party given coins
+  has its line for everyone, "Gives 2 gp to The Iron Company", as a give to it always has; your
+  message names it too, and is sent only where a character was given coins. A character no player
+  owns is whispered nothing, though your message names it. A giver with no one player of its own,
+  one no player owns, or one several own with none of them having it as their character, is written
+  for by you, as its rolls are: its own players then see none of these messages, only you and each
+  one given.
 - **You** can move anything between the campaign's characters and parties from the app's Gamemaster
   pages, party to party too, distribute any party's coin, and hand out a character's coins at its
   page. The switch counts for your moves too.
@@ -509,12 +512,12 @@ either is missing.
   drop moves it. Each item arrives unequipped and unattuned, what a container held too, with its
   uses, effects and identification. A potion joins a stack of the same potion, but never an
   unidentified one, one with uses spent or one enchanted. Coins are moved exactly: never more than
-  there are, and dnd5e 6's fractions stay; coins given to characters, as above, are taken from the
-  giver as coins taken away are. An item in a container that hides what it holds, or deeper than
+  there are, and dnd5e 6's fractions stay; coins handed out, as above, to characters and since 0.51.0
+  parties, are taken from the giver as coins taken away are. An item in a container that hides what it holds, or deeper than
   five containers, isn't offered.
 - **A line in chat** for each move, as the character who moved it, for everyone, such as "Takes 50
   gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM". Coins given to
-  characters, as above, are whispered instead.
+  characters, as above, are whispered instead; a party's is for everyone.
 - **One at a time.** Moves are made one after another, so two players taking the last potion at once
   never both get it. A move is written in steps, the copy before the original is deleted; one that
   fails, or that another module stops, puts back what it can and moves nothing more. A browser
@@ -1322,7 +1325,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent; and what a note command from the app must look like, which `command-rolls.mjs` asks before `command-notes.mjs` makes it |
 | `scripts/tidy-journal.mjs` | From 0.44.0, Tidy 5e Sheets' journal on a campaign's characters, read only: its current sheet's entries and its Classic sheet's boxes, read straight off the character's flags whether Tidy is active or not, in Tidy's order, without secrets where no player owns the character; what the hello says of it; sending each character's in `journal.tidy` after a hello's books and 500 ms after its Tidy flags or ownership change, never twice the same, withheld when too large |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
-| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch, and from 0.49.0 a character's coins handed out to the characters picked, each whispered what they received and the Gamemasters all of it; and the one line that moves, removals and coins added or taken away stand in |
+| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch, and from 0.49.0 a character's coins handed out to the characters picked, each whispered what they received and the Gamemasters all of it, and from 0.51.0 to the parties picked too, each party's line for everyone; and the one line that moves, removals and coins added or taken away stand in |
 | `scripts/coin-change.mjs` | The rule of paying in coins, from 0.49.0, which the coins' commands read: dnd5e's coins that have a rate, and the whole coins an actor holds; a coin paid from its own, then a larger coin broken and its change given back, then smaller coins; which of the coins held went beyond those asked for; and the update that changes an actor's coins from what it stores. It imports nothing and writes nothing |
 | `scripts/command-coins.mjs` | A character's coins added and taken away from the app, from 0.49.0, by the campaign's switch, on by default, under dnd5e: fetching them from an app that takes them; its player's, or the Gamemaster's at its page; other coins paying where it's short of one, by the campaign's setting; one update of the coins that change, made in the line of moves, with its line in chat |
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch, and from 0.47.0 putting them in order, writing dnd5e's own sorts; nothing posted |
