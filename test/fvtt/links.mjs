@@ -276,6 +276,17 @@ const checksOf = html => spans(html).map(({ class: c, n, text, ...data }) => [c,
   assert.deepEqual(readBack('check:wis|check:hon')?.checks, [{ type: 'check', ability: 'wis' }, { type: 'check', ability: 'hon' }])
   assert.equal(readBack('check:wis|check:my.luck'), null)
   for (const key of Object.keys(added)) delete CONFIG.DND5E.abilities[key]
+  // Honor turned off again, as dnd5e's settings leave it (D5 deletes DND5E.abilities.hon), with
+  // Etiquette still a world's own skill on it, and its Lore on its Fortune, by a key the app can't
+  // take, gone too: a check on an ability the game hasn't is passed over, as before 0.52.0, and the
+  // rest of the choice sent, to an app before 0.52.0 and to one that reads them alike; never the
+  // whole made text, as one on an ability the game has but the app isn't sent makes it.
+  CONFIG.DND5E.skills.lor = { label: 'Lore', ability: 'my.luck' }
+  for (const [options, app] of [[undefined, 'to an app before 0.52.0'], [any, 'to an app that reads them']]) {
+    assert.deepEqual(checksOf(norm(group('data-type="check" data-skill="ins|eti|lor" data-dc="12"', 'DC 12 Insight, Etiquette or Lore'), options)),
+      [['ss-check roll', '0', 'DC 12 Insight, Etiquette or Lore', { checks: 'skill:wis:ins', dc: '12' }]], `Etiquette and Lore on abilities the game hasn't, ${app}`)
+  }
+  delete CONFIG.DND5E.skills.lor
   delete CONFIG.DND5E.skills.eti
   assert.equal(norm(request('data-type="check" data-ability="spellcasting" data-dc="10"', 'DC 10 Spellcasting')), 'DC 10 Spellcasting')
   assert.equal(norm(request('data-type="check" data-dc="10"', 'DC 10')), 'DC 10')

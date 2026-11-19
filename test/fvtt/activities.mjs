@@ -562,6 +562,14 @@ assert.deepEqual(anyEdge('sanity').check, { checks: [{ type: 'check', ability: '
 assert.deepEqual(anyEdge('manners').check, { checks: [{ type: 'skill', ability: 'wis', key: 'ins' }, { type: 'skill', ability: 'hon', key: 'eti' }], dc: 12, own: true }, 'Insight or Etiquette, to an app that reads them')
 assert.equal(edge(rook, 'manners').check, undefined, 'and to an older app again, once that sheet is built')
 delete CONFIG.DND5E.abilities.hon
+// Honor turned off again, as dnd5e's settings leave it, with Etiquette still a world's own skill on
+// it, and then on an ability by a key the app can't take, gone too: Etiquette is passed over, as a
+// check on an ability the game hasn't was before 0.52.0, and Insight sent, to an app before 0.52.0
+// and to one that reads them alike; never no check at all, as Honor in the game but not sent makes.
+const insightAlone = { checks: [{ type: 'skill', ability: 'wis', key: 'ins' }], dc: 12, own: true }
+assert.deepEqual([edge(rook, 'manners').check, anyEdge('manners').check], [insightAlone, insightAlone], 'Etiquette on Honor, turned off')
+CONFIG.DND5E.skills.eti = skill('Etiquette', 'my.hon')
+assert.deepEqual([edge(rook, 'manners').check, anyEdge('manners').check], [insightAlone, insightAlone], 'Etiquette on "my.hon", which the game hasn\'t')
 delete CONFIG.DND5E.skills.eti
 assert.deepEqual([edge(rook, 'eleven').activity?.type, edge(rook, 'eleven').check], ['check', undefined], 'eleven checks')
 assert.deepEqual([edge(rook, 'pipes').activity?.type, edge(rook, 'pipes').check], ['check', undefined], 'a check that names none')
