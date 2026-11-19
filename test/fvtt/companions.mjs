@@ -1747,10 +1747,14 @@ await settle(); await settle()
 }
 
 // 6. The hello built before any answer, as at every Gamemaster's page load (the critic's C1): its
-// companions the active scene's, its companionsEverywhere every scene's. An app that answers 3 keeps
-// companionsEverywhere, so no companions.listed follows and the den's Bat's sheet goes; one that
-// answers 2 keeps companions, and nothing more follows either.
+// companions the active scene's, its companionsEverywhere every scene's, and its combats described by
+// the active scene's, as for any app. An app that answers 3 keeps companionsEverywhere, so no
+// companions.listed follows, the den's Bat's sheet goes, and a fight on the den with only the Bat in
+// it follows; one that answers 2 keeps companions, and nothing more follows, of the Bat or its fight.
 {
+  const denfight = combatOf('denhello', [{ id: 'cb-dh-bat2', token: denBat }])
+  const fightIn = data => data.combats.find(each => each.id === 'denhello')?.combatants.map(each => each.companion)
+  const fightSent = at => since(at).filter(e => e.type.startsWith('combat.') && (e.campaign.id === 'camp-w') && (e.data.combat?.id === 'denhello'))
   const hello = async answer => {
     app.answers['camp-w'] = answer
     noteCompanionReader('camp-w', null)
@@ -1761,17 +1765,49 @@ await settle(); await settle()
     await settle(); await settle()
     return at
   }
+  // The hello built again, the app's last answer kept, as when a setting changes or the app asks
+  // for it (`resend: hello`).
+  const helloAgain = async () => {
+    const at = app.events.length
+    announce({ campaignId: 'camp-w' })
+    await until(() => since(at).some(e => (e.type === 'bridge.hello') && (e.campaign.id === 'camp-w')), "Wideholm's hello again")
+    await until(() => sheetsSent(at, 'camp-w').some(e => e.data.companion.key === 'brakka'), "Brakka's sheet after it")
+    await settle(); await settle()
+    return at
+  }
   let at = await hello(WIDE)
   const built = helloOf('camp-w').data
   assert.deepEqual(built.companions, companionList(wideholm(), { everywhere: false }), 'companions: as an app that reads 2 is listed them')
   assert.ok(!keysOf(built.companions).includes('den-bat2') && built.companions.every(each => !('away' in each)), 'without the den\'s Bat, and no away')
   assert.deepEqual(awayOf(built.companionsEverywhere), AT_ARENA, 'companionsEverywhere: every scene\'s')
+  assert.equal(fightIn(built), undefined, 'its combats without the fight on the den')
   assert.deepEqual(listed(at, 'camp-w'), [], 'answered 3: no companions.listed follows')
   assert.ok(sheetsSent(at, 'camp-w').some(e => e.data.companion.key === 'den-bat2'), "and the den's Bat's sheet goes")
+  assert.deepEqual(fightSent(at).map(e => [e.type, e.data.combat.combatants.map(each => each.companion)]), [['combat.created', ['den-bat2']]], 'and the fight on the den, the Bat named')
+  // Built again while the app's last answer is 3: its companions still the active scene's, byte for
+  // byte, for any app; its companionsEverywhere every scene's; and those noted as told, which its
+  // combats are described by, every scene's, so the fight on the den is in it, and isn't sent again.
+  at = await helloAgain()
+  const again = helloOf('camp-w').data
+  assert.deepEqual(again.companions, built.companions, "companions: the active scene's, as an app that reads 2 is listed them, at 3 too")
+  assert.deepEqual(again.companionsEverywhere, built.companionsEverywhere, "companionsEverywhere: every scene's")
+  assert.deepEqual(fightIn(again), ['den-bat2'], 'its combats with the fight on the den, the Bat named')
+  assert.deepEqual([listed(at, 'camp-w'), fightSent(at)], [[], []], 'nothing follows, of the list or the fight')
   at = await hello(NARROW)
-  assert.deepEqual(listed(at, 'camp-w'), [], 'answered 2: none follows either')
+  assert.equal(fightIn(helloOf('camp-w').data), undefined, 'answered 2: its combats without the fight on the den')
+  assert.deepEqual(listed(at, 'camp-w'), [], 'none follows either')
   assert.ok(!sheetsSent(at, 'camp-w').some(e => e.data.companion.key === 'den-bat2'), "nor the den's Bat's sheet")
-  ok("a hello built before its app's answer, as at a Gamemaster's page load: its companions the active scene's, its companionsEverywhere every scene's; answered 3, no companions.listed follows and the den's Bat's sheet goes after it; answered 2, nothing more follows, and no sheet of it")
+  assert.deepEqual(fightSent(at), [], 'nor anything of the fight')
+  // Built again while its last answer is 2: those noted as told the active scene's, so its combats
+  // are still without the fight on the den.
+  at = await helloAgain()
+  assert.equal(fightIn(helloOf('camp-w').data), undefined, 'built again at 2: its combats without the fight on the den')
+  assert.deepEqual([listed(at, 'camp-w'), fightSent(at)], [[], []], 'and nothing follows, of the list or the fight')
+  game.combats.delete(denfight.id)
+  await Hooks.callAll('deleteCombat', denfight, {}, 'gm')
+  await settle()
+  assert.deepEqual(fightSent(at), [], 'nor its end')
+  ok("a hello built before its app's answer, as at a Gamemaster's page load: its companions the active scene's, its companionsEverywhere every scene's, its combats without a fight with only the den's Bat in it; answered 3, no companions.listed follows, and the Bat's sheet and the fight follow; built again while the app's answer is 3, its companions still the active scene's and its combats with the fight, and nothing follows; answered 2, nothing more follows, of the Bat or its fight, nor when it's built again")
 }
 
 // 7. A heartbeat's answer that moves to 3, then back to 2, as an app deployed and rolled back: the
@@ -1814,6 +1850,38 @@ await settle(); await settle()
   await settle(); await settle()
   assert.deepEqual(awayOf(listed(from, 'camp-w').at(-1).data.companions), AT_ARENA)
   ok("the den made the active scene: Wideholm's companions on the arena stay, away now, and the den's Bat isn't, in one companions.listed; Ashlands, at 2, is listed the den's alone, as before; and back")
+}
+
+// 3, with no scene active (PROTOCOL's rule 8): no companion is away, neither a token's creature nor a
+// linked NPC Alice owns whose one token is on the den; Brakka, placed nowhere, as it was; Ashlands, at
+// 2, keeps only the linked ones, as before; and the arena active again, as they were.
+{
+  const newt = companionActor('newt', 'Newt', { owners: ['alice'], linked: true, spec: creature() })
+  await createToken(den, newt, { id: 'newt1', actorLink: true, name: 'Newt' })
+  await settle(); await settle()
+  const before = companionList(wideholm())
+  const AT_ARENA_NEWT = { ...AT_ARENA, newt: true }
+  assert.deepEqual(awayOf(before), AT_ARENA_NEWT, 'the Newt, its one token on the den, away')
+  from = app.events.length
+  await arena.update({ active: false })
+  await until(() => listed(from, 'camp-w').length && listed(from).length, 'the lists with no scene active')
+  await settle(); await settle()
+  const [list, ...more] = listed(from, 'camp-w')
+  assert.equal(more.length, 0, 'one companions.listed')
+  assert.deepEqual(awayOf(list.data.companions), Object.fromEntries(Object.keys(AT_ARENA_NEWT).map(key => [key, false])), 'none away')
+  assert.deepEqual(list.data.companions.find(each => each.key === 'brakka'), before.find(each => each.key === 'brakka'), 'Brakka as it was')
+  assert.deepEqual(keysOf(lastList()), ['brakka', 'newt'], 'Ashlands, at 2: the linked ones alone')
+  assert.ok(lastList().every(each => !('away' in each)), 'and no away')
+  from = app.events.length
+  await activate(arena)
+  await until(() => listed(from, 'camp-w').length, 'the list back')
+  await settle(); await settle()
+  assert.deepEqual(awayOf(listed(from, 'camp-w').at(-1).data.companions), AT_ARENA_NEWT)
+  await den.tokens.get('newt1').delete()
+  actors.delete('newt')
+  await Hooks.callAll('deleteActor', newt, {}, 'gm')
+  await settle(); await settle()
+  ok("with no scene active, none of Wideholm's companions is away, the arena's tokens' creatures nor a linked one Alice owns whose one token is on the den, and Brakka, placed nowhere, is as it was; Ashlands, at 2, keeps only the linked ones; the arena active again, they're as they were")
 }
 
 // 4. Linked companions, by where their tokens are: an owned one away while its one token is on the
