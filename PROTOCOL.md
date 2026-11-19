@@ -3497,14 +3497,14 @@ campaign's characters, or to another of its parties they own, and the Gamemaster
 party too (the hello's `partySends`); and either can share one kind of a party's coin among its
 characters (`distribute`), as below. Since module 0.49.0 a character's coins can be handed out, a
 set amount to each of the campaign's characters picked, by its player or by the Gamemaster
-(`handOut`), and since module 0.51.0 to its parties too (`handOutParties`), as below. The
-Gamemaster turns it on for each campaign with **Players
-move items and coins**, on its Player actions tab, off until they do and apart from the rolls; the hello's
-[`features.transfers`](#bridgehello) says whether it's on. A move is fetched as a roll is, but for
-a campaign whose rolls are off too, from a listener that says `"transfers": 1` in the `features` of
-its answers to the campaign's hello or heartbeat, as an integer of 1 or more, besides
-`"commands": true`; one that stops saying it isn't fetched from for moves. A roll fetched while only
-moves are, which a listener shouldn't hand over, is refused `"off"`, as one while rolls are off.
+(`handOut`), and since module 0.51.0 to its parties too (`handOutParties`), as below. The Gamemaster
+turns it on for each campaign with **Players move items and coins**, on its Player actions tab, off
+until they do and apart from the rolls; the hello's [`features.transfers`](#bridgehello) says
+whether it's on. A move is fetched as a roll is, but for a campaign whose rolls are off too, from a
+listener that says `"transfers": 1` in the `features` of its answers to the campaign's hello or
+heartbeat, as an integer of 1 or more, besides `"commands": true`; one that stops saying it isn't
+fetched from for moves. A roll fetched while only moves are, which a listener shouldn't hand over,
+is refused `"off"`, as one while rolls are off.
 
 It's no roll: sent with `mode` `0`, `explicit` `false` and no `extras` or `dice`, and naming none of
 a roll's fields (`item`, `activity`, `target`, `targets`, `self`, `slot`, `enchant`, `prompt`,
@@ -3597,42 +3597,39 @@ leaves it 3.5.
 `transfer` with `each` in place of `to` hands out a character's coins, as the app's Give does for
 the characters ticked: `currency` to each of the characters `each` names, any of the campaign's
 characters but the giver, none of them transformed, and before module 0.51.0 no party among them.
-It's a character's own
-coins, made as that character (`actorId` is `from`), by its player or, `by` `"gm"`, the Gamemaster;
-never a party's. The total, each count times the number named, is taken from the giver exactly as
-[coins taken away](#coins-added-and-taken-away) are, by the same rule and the same setting, the
-hello's `change`: where it's on, a larger coin is broken and smaller coins pay where the giver is
-short of one, so that 700 pp and 20 gp, 200 pp and 50 gp each to three, leaves 87 pp; refused
-`"short"` only where all its coins are worth too little, at dnd5e's own rates, as there, and with
-the setting off wherever the total is more of a coin than it holds. Each character is given the
-coins named, never others: handing out platinum paid for in gold gives platinum. The giver's coins
-are written first, in one update of only the coins that change, each from what it stores; then each
-character's in the order named, one update each, its coins added to what it stores, a fraction kept
-as it's written. Where the giver's update fails, nothing is written
-and the move is `"failed"`, `"error"`, with no `transfer`, message or sheet. Where a character's
-fails, what wasn't given, to it and to those after it, is put back on the giver in one update, in the
-coins handed out, and no more is given: `"failed"`, `"error"`, its `transfer` listing those given;
-where the put back fails too, `error` holds both messages joined by " / ", and those coins are lost,
-never made twice. Since module 0.51.0, where the hello says `handOutParties`, `each` may name the
-campaign's parties too, a player's only those their character's users own: each party is given the
-coins named, as a character is, in its place in the order named, one update of its own, a fraction
-kept as it's written.
+It's a character's own coins, made as that character (`actorId` is `from`), by its player or, `by`
+`"gm"`, the Gamemaster; never a party's. The total, each count times the number named, is taken from
+the giver exactly as [coins taken away](#coins-added-and-taken-away) are, by the same rule and the
+same setting, the hello's `change`: where it's on, a larger coin is broken and smaller coins pay
+where the giver is short of one, so that 700 pp and 20 gp, 200 pp and 50 gp each to three, leaves 87
+pp; refused `"short"` only where all its coins are worth too little, at dnd5e's own rates, as there,
+and with the setting off wherever the total is more of a coin than it holds. Each character is given
+the coins named, never others: handing out platinum paid for in gold gives platinum. The giver's
+coins are written first, in one update of only the coins that change, each from what it stores; then
+each character's in the order named, one update each, its coins added to what it stores, a fraction
+kept as it's written. Where the giver's update fails, nothing is written and the move is `"failed"`,
+`"error"`, with no `transfer`, message or sheet. Where a character's fails, what wasn't given, to it
+and to those after it, is put back on the giver in one update, in the coins handed out, and no more
+is given: `"failed"`, `"error"`, its `transfer` listing those given; where the put back fails too,
+`error` holds both messages joined by " / ", and those coins are lost, never made twice. Since
+module 0.51.0, where the hello says `handOutParties`, `each` may name the campaign's parties too, a
+player's only those their character's users own: each party is given the coins named, as a character
+is, in its place in the order named, one update of its own, a fraction kept as it's written.
 
 **One at a time.** A move waits for the moves before it, whoever made them, and for every roll of
 each of its ends, and each end's next roll waits for it; since module 0.32.0, also for every roll of
 the character it's made as, and a distribution for every roll of each character it's shared among,
 whose next rolls wait for it; since module 0.49.0, so too a hand-out for every roll of each character
 it gives to, and theirs for it, and it stands in one line with coins added and taken away; since
-module 0.51.0, so too for every move of each party it gives to, and theirs for it. Two
-players taking the last potion at once are made one after the other, the second refused `"gone"` or
-`"short"`; two distributions, or a
-distribution and a send of the same coin, the second refused `"short"` or `"split"` where too little
-is left. A distribution sent again, as after a `"timeout"` or from a second device, carries the
-count its dialog showed, so it's `"short"` once the first has shared the coin; and the party's
-members changing meanwhile make it `"members"`, nothing written. A move whose writes take
-longer than a minute is told `"timeout"`, as a roll is, and the rolls waiting on it go ahead; the
-next move still waits for its writes, and its late `"done"` follows. A move whose writes never end
-holds the next until the page is reloaded.
+module 0.51.0, so too for every move of each party it gives to, and theirs for it. Two players
+taking the last potion at once are made one after the other, the second refused `"gone"` or
+`"short"`; two distributions, or a distribution and a send of the same coin, the second refused
+`"short"` or `"split"` where too little is left. A distribution sent again, as after a `"timeout"`
+or from a second device, carries the count its dialog showed, so it's `"short"` once the first has
+shared the coin; and the party's members changing meanwhile make it `"members"`, nothing written. A
+move whose writes take longer than a minute is told `"timeout"`, as a roll is, and the rolls waiting
+on it go ahead; the next move still waits for its writes, and its late `"done"` follows. A move
+whose writes never end holds the next until the page is reloaded.
 
 **The line.** A move that moved anything posts one public chat message, by the character's player as
 a roll is, marked on its card, the Gamemaster's `by` `"gm"` and listed in their result's `messages`:
@@ -3650,15 +3647,14 @@ unidentified one's, then each coin, `{count} {abbreviation}`, in dnd5e's order, 
 language lists them: "Gives 2 Potion of Healing, 1 Rope, and 5 sp to The Iron Company". Every name is
 escaped; a container is named alone, never what it held. A refusal posts nothing.
 
-Since module 0.49.0 a hand-out posts no public message for a character. Each character given
-coins that has a
-[player](#a-characters-players) is whispered what it received, to its own players alone: `{name}
-received {things} from {giver}`, "Vex received 200 pp and 50 gp from Thorin"; one with no player is
-whispered nothing, as a whisper to no one would be for everyone. Then every Gamemaster is whispered
-one message, `{name} handed out {each} each to {names}: {total} in all`: "Thorin handed out 200 pp
-and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all", naming only those given, in order,
-and totalling only theirs. Every Gamemaster of the world, an Assistant too, not the one whose
-browser is the bridge alone; and none of them is whispered what a character received, whatever
+Since module 0.49.0 a hand-out posts no public message for a character. Each character given coins
+that has a [player](#a-characters-players) is whispered what it received, to its own players alone:
+`{name} received {things} from {giver}`, "Vex received 200 pp and 50 gp from Thorin"; one with no
+player is whispered nothing, as a whisper to no one would be for everyone. Then every Gamemaster is
+whispered one message, `{name} handed out {each} each to {names}: {total} in all`: "Thorin handed
+out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all", naming only those given,
+in order, and totalling only theirs. Every Gamemaster of the world, an Assistant too, not the one
+whose browser is the bridge alone; and none of them is whispered what a character received, whatever
 ownership of it they have by name. Each is spoken by the giver and written by the giver's player, as
 every line is, marked on its card, the Gamemaster's `by` `"gm"` and listed in their result's
 `messages`. So the giver's player reads every one of them, as Foundry shows a whisper to who wrote
@@ -3687,17 +3683,16 @@ given its share, in order, and none where nothing was written; its `transfer` is
 items: [], currency, among }`, the coins given out and the characters given them, in order. Since
 module 0.49.0, a hand-out's sheets are the giver's, then each character's given coins, since module
 0.51.0 each party's too, in `group.updated` to a listener that reads groups, in order, and none
-where nothing was written; `messageId` and `visible` are the Gamemasters' message's,
-`visible` `false` where the giver has no one player of its own, as above, for a player's own
-hand-out too, who then reads nothing of it in chat; and its `transfer` is `{ from, to: null,
-items: [], currency, each, used }`: `currency` what **each** was given, the command's own, in dnd5e's
-order, never the total; `each` the characters given it, and since module 0.51.0 the parties, in
-order, every one of them when done; and
-`used`, which of the giver's other coins went beyond those handed out, as a
-[`coins`](#coins-added-and-taken-away) result's, or `null` where none did. Its counts may be far above
-10,000,000, as where the giver's gold pays for platinum. On `"error"` after some were given, `each`
-lists those, and `used` is `null`; where none was, there is no `transfer`. Since module 0.51.0,
-where no character was given coins, `messageId` and `visible` are the last party line's.
+where nothing was written; `messageId` and `visible` are the Gamemasters' message's, `visible`
+`false` where the giver has no one player of its own, as above, for a player's own hand-out too, who
+then reads nothing of it in chat; and its `transfer` is `{ from, to: null, items: [], currency,
+each, used }`: `currency` what **each** was given, the command's own, in dnd5e's order, never the
+total; `each` the characters given it, and since module 0.51.0 the parties, in order, every one of
+them when done; and `used`, which of the giver's other coins went beyond those handed out, as a
+[`coins`](#coins-added-and-taken-away) result's, or `null` where none did. Its counts may be far
+above 10,000,000, as where the giver's gold pays for platinum. On `"error"` after some were given,
+`each` lists those, and `used` is `null`; where none was, there is no `transfer`. Since module
+0.51.0, where no character was given coins, `messageId` and `visible` are the last party line's.
 
 A listener before module 0.49.0 sends no `each`, and may ignore the hello's `handOut` and `change`.
 A module before 0.49.0 says neither, so a listener offers no hand-out, and refuses one handed it
