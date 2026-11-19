@@ -1219,8 +1219,10 @@ async function effectsCarriedBack(formId) {
 
 /**
  * Since 0.52.0, over the live form: a world's own ability with no type, Luck, is the creature's, as
- * dnd5e keeps only a physical or a mental one; Honor, mental, hers under Wild Shape; and with her
- * whole self kept, as Appearance keeps it, none. dnd5e's configuration of both is put back after.
+ * dnd5e keeps only a physical or a mental one; Honor, mental, hers under Wild Shape; with her
+ * physical kept, as a transformation of the Gamemaster's may keep them, the mental ones, Honor and
+ * Luck the creature's; and with her whole self kept, as Appearance keeps it, none. dnd5e's
+ * configuration of both is put back after.
  * Under dnd5e 6.0.5 in section 18, which ends that run; under 5.3.3 with the Wolf's sheet, case 7.
  */
 function untypedAbilityCase() {
@@ -1234,13 +1236,15 @@ function untypedAbilityCase() {
     const form = Object.create(shape, { system: { value: system } })
     assert.deepEqual(formBlock(form, elowen, getCampaigns()[0]).beast.abilities, ['str', 'dex', 'con', 'luc'], 'Luck the form\'s, Honor hers')
     const options = shape.getFlag('dnd5e', 'transformOptions')
-    const whole = Object.create(form, { getFlag: { value: (scope, key) =>
-      ((scope === 'dnd5e') && (key === 'transformOptions')) ? { ...options, keep: ['self'] } : shape.getFlag(scope, key) } })
-    assert.deepEqual(formBlock(whole, elowen, getCampaigns()[0]).beast.abilities, [], 'her whole self kept: none the form\'s')
+    /** The form, its flag saying its transformation kept `keep` of her. */
+    const keeping = keep => Object.create(form, { getFlag: { value: (scope, key) =>
+      ((scope === 'dnd5e') && (key === 'transformOptions')) ? { ...options, keep } : shape.getFlag(scope, key) } })
+    assert.deepEqual(formBlock(keeping(['physical']), elowen, getCampaigns()[0]).beast.abilities, ['int', 'wis', 'cha', 'luc', 'hon'], 'her physical kept: her mental ones, Luck and Honor the form\'s')
+    assert.deepEqual(formBlock(keeping(['self']), elowen, getCampaigns()[0]).beast.abilities, [], 'her whole self kept: none the form\'s')
   } finally {
     for (const [key, value] of Object.entries(before)) if (value === undefined) delete config[key]; else config[key] = value
   }
-  ok("since 0.52.0, a world's own ability with no type is the form's, as dnd5e keeps only a physical or a mental one; Honor, mental, hers; her whole self kept, as Appearance keeps it, none")
+  ok("since 0.52.0, a world's own ability with no type is the form's, as dnd5e keeps only a physical or a mental one; Honor, mental, hers; her physical kept, the mental ones, Honor and Luck the form's; her whole self kept, as Appearance keeps it, none")
 }
 
 if (DND5E6) {
