@@ -6,6 +6,8 @@ import { wildShapeReader } from "./wild-shape.mjs";
  * A campaign's characters' companions, since 0.36.0: the creatures each summoned in Foundry, whose
  * tokens are on the active scene, and the NPCs its players own there by name (round 0.36.0 §2.1), its
  * players since 0.45.0 those who own it by name, else those it's assigned to (`characterPlayers`).
+ * Since 0.51.0, for an app that reads them there (`"companions": 3`), on every scene, each saying
+ * whether it's away, on another scene than the active one.
  * dnd5e has no companion, familiar or sidekick type; it marks a summoned creature with the item
  * that summoned it, `flags.dnd5e.summon.origin`, which this reads itself, as dnd5e's own registry
  * misses linked summons and fills lazily, per client.
@@ -14,6 +16,10 @@ import { wildShapeReader } from "./wild-shape.mjs";
  * flags, hit points and ownership are its delta's over its base's, and the world actor otherwise.
  * Nothing ever reads the base actor of a token's creature. Not "companions.mjs", which is the
  * author's other Foundry modules.
+ *
+ * It keeps, too, the format each campaign's app reads companions in, as its latest answer said it,
+ * which creature-sync.mjs reads to send them: here, beside the rule of what's listed, so that the
+ * rule can follow it.
  */
 
 /**
@@ -22,6 +28,19 @@ import { wildShapeReader } from "./wild-shape.mjs";
  */
 const LONGEST_NAME = 200;
 const LONGEST_IMG = 2_000;
+
+/**
+ * The campaigns whose app's latest answer said it reads companions, `features.companions` 1 or more,
+ * and the format it said, 2 or more since 0.41.0 for one that reads what the game asks of them.
+ * @type {Map<string, number>}
+ */
+const readers = new Map();
+
+/**
+ * The format from which an app reads companions on every scene, each with `away`: since 0.51.0.
+ * @type {number}
+ */
+const AWAY_FORMAT = 3;
 
 /**
  * A companion as a campaign lists it, without its sheet, which follows to an app that reads them.
@@ -37,8 +56,51 @@ const LONGEST_IMG = 2_000;
  * @property {string|null} img        Its live actor's portrait, where it has one short enough.
  * @property {{itemId: string, item: string, activityId: string|null}|null} summon
  *                                    For a summoned one: the item that summoned it, and its activity.
+ * @property {boolean} [away]         Since 0.51.0, to an app that reads companions on every scene
+ *                                    only: none of its tokens is on the active scene, and one is on another.
  */
 
+/* -------------------------------------------- */
+/*  The listener's format                       */
+/* -------------------------------------------- */
+
+/**
+ * Note the format a campaign's app reads companions in, from what it said in answer to its hello or
+ * heartbeat: `features.companions`, an integer, 1 or more; none where it said anything else, or
+ * nothing. The one writer of the formats.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @returns {number}   The format it read them in before, 0 for none.
+ */
+export function noteCompanionFormat(campaignId, features) {
+  const was = readers.get(campaignId) ?? 0;
+  const format = features?.companions;
+  if ( Number.isInteger(format) && (format >= 1) ) readers.set(campaignId, format);
+  else readers.delete(campaignId);
+  return was;
+}
+
+/**
+ * The format a campaign's app reads companions in, as its latest answer said: 0 for none.
+ * @param {string} campaignId
+ * @returns {number}
+ */
+export function companionFormat(campaignId) {
+  return readers.get(campaignId) ?? 0;
+}
+
+/**
+ * Does a campaign's app read its companions on every scene, each with `away`, since 0.51.0: its
+ * latest answer said `companions` 3 or more?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function awayReader(campaignId) {
+  return companionFormat(campaignId) >= AWAY_FORMAT;
+}
+
+/* -------------------------------------------- */
+/*  The list                                    */
 /* -------------------------------------------- */
 
 /**
@@ -77,14 +139,24 @@ export function companionPart(entry) {
  * them, one of several characters' listed once, at the first, naming each it's a companion of. A
  * token is looked at once, summoned before owned, and is skipped by what its source says before its
  * actor is read, which makes up a delta Foundry keeps unread until then.
+ *
+ * Since 0.51.0, `everywhere`, as for an app that reads them there: the tokens of every scene, each
+ * entry ending with `away`, and both cuts keeping those not away first, in the list's order. An
+ * unlinked token there is skipped before its actor is made up where neither its delta nor its base
+ * actor could make it one, a summon or owned by one of the campaign's players by id
+ * (`mayBeCompanion`), so that the NPCs of old maps cost nothing more than a look. Otherwise today's
+ * list, of the active scene's tokens, byte for byte.
  * @param {Campaign} campaign
+ * @param {object} [options]
+ * @param {boolean} [options.everywhere]   Every scene, each with `away`: as the campaign's app reads them.
  * @returns {{entry: CompanionEntry, actor: Actor}[]}
  */
-export function companionsOf(campaign) {
+export function companionsOf(campaign, { everywhere=awayReader(campaign.id) }={}) {
   const characters = campaignActors(campaign);
   if ( !characters.length ) return [];
   const owner = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
   const players = characters.map(character => ({ character, users: characterPlayers(character) }));
+  const playerIds = Array.from(new Set(players.flatMap(({ users }) => users.map(user => user.id))));
   // The characters whose players own a live actor in Foundry by name, never through its default.
   const ownersOf = actor => players
     .filter(({ users }) => users.some(user => actor.ownership?.[user.id] === owner))
@@ -104,22 +176,36 @@ export function companionsOf(campaign) {
     found.set(key, { key, kind, actor, token, of });
   };
 
-  // The active scene's tokens: summoned ones of every kind, and owned unlinked ones.
-  const tokens = game.scenes?.active?.tokens ?? [];
-  for ( const token of tokens ) {
-    if ( token.hidden ) continue;
-    if ( game.actors.get(token.actorId)?.type !== "npc" ) continue;
-    const actor = token.actor;
-    // A transformed actor is never one: dnd5e copies its original's type, ownership and flags onto it.
-    if ( !actor || (actor.type !== "npc") || transformed(actor) || campaign.characters.has(actor.id) ) continue;
-    const key = creatureKey(token);
-    const summoner = summonerOf(actor);
-    if ( summoner ) {
-      note(key, "summoned", actor, token.actorLink ? null : token, [summoner]);
-      continue;
+  // The active scene's tokens, or since 0.51.0 every scene's: summoned ones of every kind, and owned
+  // unlinked ones; and, on every scene, where each linked actor's tokens are, hidden or not.
+  const active = game.scenes?.active ?? null;
+  const scenes = everywhere ? Array.from(game.scenes ?? []) : [active].filter(Boolean);
+  const places = new Map();
+  for ( const scene of scenes ) {
+    const here = Boolean(active) && (scene.id === active.id);
+    for ( const token of scene.tokens ?? [] ) {
+      if ( everywhere && token.actorLink ) {
+        const place = places.get(token.actorId) ?? { here: false, elsewhere: false };
+        if ( here ) place.here = true;
+        else place.elsewhere = true;
+        places.set(token.actorId, place);
+      }
+      if ( token.hidden ) continue;
+      const base = game.actors.get(token.actorId);
+      if ( base?.type !== "npc" ) continue;
+      if ( everywhere && !token.actorLink && !mayBeCompanion(token, base, playerIds, owner) ) continue;
+      const actor = token.actor;
+      // A transformed actor is never one: dnd5e copies its original's type, ownership and flags onto it.
+      if ( !actor || (actor.type !== "npc") || transformed(actor) || campaign.characters.has(actor.id) ) continue;
+      const key = creatureKey(token);
+      const summoner = summonerOf(actor);
+      if ( summoner ) {
+        note(key, "summoned", actor, token.actorLink ? null : token, [summoner]);
+        continue;
+      }
+      if ( token.actorLink || !ownable(actor) ) continue;
+      note(key, "owned", actor, token, ownersOf(actor));
     }
-    if ( token.actorLink || !ownable(actor) ) continue;
-    note(key, "owned", actor, token, ownersOf(actor));
   }
 
   // The world's linked NPCs its players own, wherever their tokens are.
@@ -129,24 +215,32 @@ export function companionsOf(campaign) {
     note(actor.id, "owned", actor, null, ownersOf(actor));
   }
 
+  // Since 0.51.0, where each is: a token's creature by its token's scene, a world actor's by its
+  // tokens', away where none is on the active scene and one is on another. None is with no scene active.
+  for ( const each of found.values() ) {
+    const place = each.token ? null : places.get(each.actor.id);
+    each.away = everywhere && Boolean(active)
+      && (each.token ? (each.token.parent?.id !== active.id) : Boolean(place?.elsewhere && !place.here));
+  }
+
   // Each character's, capped, then the campaign's, in its characters' order.
   const byName = (a, b) => (a.name.localeCompare(b.name, game.i18n.lang) || a.key.localeCompare(b.key));
   const listed = new Map();
   for ( const character of characters ) {
     const own = Array.from(found.values()).filter(each => each.of.includes(character))
       .map(each => ({ ...each, name: nameOf(each.actor, each.token) }));
-    const kept = [
+    const kept = presentFirst([
       ...own.filter(each => each.kind === "owned").sort(byName),
       ...own.filter(each => each.kind === "summoned").sort(byName)
-    ].slice(0, MOST_COMPANIONS_EACH);
+    ], MOST_COMPANIONS_EACH);
     for ( const each of kept ) {
       const entry = listed.get(each.key);
       if ( entry ) entry.of.push(character.id);
       else listed.set(each.key, { ...each, of: [character.id], summoner: (each.kind === "summoned") ? character : null });
     }
   }
-  return Array.from(listed.values()).slice(0, MOST_COMPANIONS).map(each => ({
-    entry: entryOf(each),
+  return presentFirst(Array.from(listed.values()), MOST_COMPANIONS).map(each => ({
+    entry: entryOf(each, everywhere),
     actor: each.actor
   }));
 }
@@ -154,10 +248,11 @@ export function companionsOf(campaign) {
 /**
  * A campaign's list of companions, as the hello and `companions.listed` send it.
  * @param {Campaign} campaign
+ * @param {object} [options]   As `companionsOf`'s.
  * @returns {CompanionEntry[]}
  */
-export function companionList(campaign) {
-  return companionsOf(campaign).map(({ entry }) => entry);
+export function companionList(campaign, options) {
+  return companionsOf(campaign, options).map(({ entry }) => entry);
 }
 
 /**
@@ -249,6 +344,38 @@ export function commandActor(command, campaign) {
 /* -------------------------------------------- */
 
 /**
+ * May an unlinked token's creature be a companion, by what its token holds, before its actor is made
+ * up, since 0.51.0: a summon by its delta's or its base actor's `flags.dnd5e.summon.origin`, or owned
+ * by one of the players given, by id, in its delta's or its base actor's `ownership`. Wider than the
+ * rules themselves, which its live actor is then read by, so that it never leaves a companion out.
+ * @param {TokenDocument} token
+ * @param {Actor} base               Its world actor.
+ * @param {string[]} playerIds       The campaign's characters' players, by user id.
+ * @param {number} owner             Foundry's Owner level.
+ * @returns {boolean}
+ */
+function mayBeCompanion(token, base, playerIds, owner) {
+  const sources = [token.delta, base].filter(Boolean);
+  if ( sources.some(source => typeof foundry.utils.getProperty(source, "flags.dnd5e.summon.origin") === "string") ) return true;
+  return sources.some(source => playerIds.some(id => source.ownership?.[id] === owner));
+}
+
+/**
+ * The first of a list, at most `most`, those not away kept first, in the list's own order: since
+ * 0.51.0, so that a companion on the active scene is never left out for one on another. Where none
+ * is away, the first `most`.
+ * @template {{away?: boolean}} T
+ * @param {T[]} list
+ * @param {number} most
+ * @returns {T[]}
+ */
+function presentFirst(list, most) {
+  if ( list.length <= most ) return list;
+  const kept = new Set([...list.filter(each => !each.away), ...list.filter(each => each.away)].slice(0, most));
+  return list.filter(each => kept.has(each));
+}
+
+/**
  * May a live actor be an owned companion: neither a summon nor a summon's template?
  * @param {Actor} actor
  * @returns {boolean}
@@ -269,12 +396,14 @@ function nameOf(actor, token) {
 }
 
 /**
- * A creature found, as its entry lists it.
+ * A creature found, as its entry lists it: since 0.51.0, for an app that reads companions on every
+ * scene, ending with `away`.
  * @param {{key: string, kind: string, actor: Actor, token: TokenDocument|null, of: string[],
- *   name: string, summoner: Actor|null}} found
+ *   name: string, summoner: Actor|null, away: boolean}} found
+ * @param {boolean} everywhere
  * @returns {CompanionEntry}
  */
-function entryOf({ key, kind, actor, token, of, name, summoner }) {
+function entryOf({ key, kind, actor, token, of, name, summoner, away }, everywhere) {
   const img = (typeof actor.img === "string") && actor.img && (actor.img.length <= LONGEST_IMG) ? actor.img : null;
   return {
     key,
@@ -286,7 +415,8 @@ function entryOf({ key, kind, actor, token, of, name, summoner }) {
     uuid: actor.uuid,
     name,
     img,
-    summon: summoner ? summonOf(actor, summoner) : null
+    summon: summoner ? summonOf(actor, summoner) : null,
+    ...(everywhere ? { away } : {})
   };
 }
 

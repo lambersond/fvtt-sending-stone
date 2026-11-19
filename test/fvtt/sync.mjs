@@ -174,7 +174,8 @@ assert.deepEqual(hellos[1].data.characters.map(c => c.id), ['grim', 'vex'])
 // Module 0.30.0 (its contract §2.2): the hello also lists the campaign's groups and its settings.
 // Changed on purpose (round 0.36.0 §4.1): and the characters' companions.
 // Changed on purpose (module 0.44.0): and the dice asks open, `diceAsks`, none here.
-assert.deepEqual(Object.keys(hellos[0].data).sort(), ['bridge', 'characters', 'combats', 'companions', 'config', 'diceAsks', 'features', 'foundry', 'groups', 'module', 'prompts', 'settings', 'sheetsApart', 'system'])
+// Changed on purpose (module 0.51.0): and the companions on every scene, `companionsEverywhere`.
+assert.deepEqual(Object.keys(hellos[0].data).sort(), ['bridge', 'characters', 'combats', 'companions', 'companionsEverywhere', 'config', 'diceAsks', 'features', 'foundry', 'groups', 'module', 'prompts', 'settings', 'sheetsApart', 'system'])
 assert.deepEqual(hellos[0].data.diceAsks, [])
 // Grim's sheet, which can't be described, goes as none, and costs Vex nothing.
 const mirkwood = first.filter(e => e.campaign.id === 'camp-b').map(describe)

@@ -78,6 +78,7 @@ for v in X=1 "X=1 DND5E6=1"; do run tidy-journal $v; done
 # found, sent and commanded on their own tokens (dnd5e 5.3.3 and 6.0.5 stand-ins, and Midi-QOL's);
 # and damage on its own and recharges. Module 0.41.0: damage on its own at the level, in the mode and
 # with the ammunition chosen, spending what its use would, Midi's Bonus Action or reaction counted.
+# Module 0.51.0: on every scene, each saying whether it's away, to an app at 3.
 for v in "X=1 SLIM_CHECK=1" MIDI=1 "X=1 DND5E6=1"; do run companions $v; done
 for v in X=1 MIDI=1 "X=1 DND5E6=1"; do run alone $v; done
 # Module 0.41.0: the saves the game asks of companions, by dnd5e's cards and Midi-QOL's (dnd5e 5.3.3 and 6.0.5).

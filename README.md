@@ -108,8 +108,10 @@ involves its characters, described for it alone:
   is is decided as it's made: its edits go where it went, even once its fight is over, and its
   deletion to every campaign that may hold it. A card a campaign was sent before 0.45.0 stays in its
   chat until you clear the chat.
-- **Combat:** encounters while any of its characters are in them. A fight reaches the campaign
-  when its first character joins and ends for it when its last one leaves.
+- **Combat:** encounters while any of its characters are in them, or, to an app that reads
+  companions, any of their companions, on any scene. A fight reaches the campaign when the first of
+  them joins and ends for it when the last one leaves, so a sidekick fighting on another scene
+  without its character brings its fight beside the party's.
 - **Hit points and audiences** cover only its own characters and, since 0.50.0, how hurt other
   creatures are, where you allow it.
 
@@ -145,6 +147,10 @@ Edition, and an app that reads them.
 as a familiar from Find Familiar, while their tokens are on the active scene, whoever cast the
 spell; and the NPCs its player owns in Foundry (give the player Owner on the NPC by name, or on one
 placed token). A linked NPC shows always; an unlinked one while its token is on the active scene.
+Since 0.51.0, to an app that reads them there, a summoned or unlinked one shows while its token is
+on any scene, even one left on an old map, until you delete or hide it; and a companion on another
+scene and not on the active one, a linked NPC too, is marked so. Before 0.51.0, or to an older app,
+a summoned or unlinked one shows only while its token is on the active scene.
 Its player is a player you gave Owner on the character by name; since 0.45.0 a character shared with
 All Players as Owner isn't everyone's for this, so another campaign's sidekicks never show beside it,
 and where no player owns it by name, its player is the one it's assigned to in User Configuration.
@@ -275,6 +281,10 @@ while the roll is being made.
   recovered, a recharge rolled, an effect that ended with the turn, Midi-QOL's saves and damage over
   time, initiative Midi-QOL rerolled at a new round) stays as it is, and so does whatever the next to
   act did meanwhile.
+- **Initiative in another encounter, since 0.51.0.** An initiative from the app also goes into the
+  character's or companion's own encounter on another scene, once that encounter has begun and is
+  its scene's chosen one, whichever scene you're viewing. Before Begin Combat, only the encounter
+  you have up takes it, as before.
 
 The app's address must be able to answer the module's fetches of players' rolls, which only the
 Sending Stone app, or a listener that says it can, is asked for; see
@@ -481,17 +491,20 @@ either is missing.
   shared evenly stays with the party: "Distributes 100 gp among Bram, Lia, Thorin, and Vex (25 gp
   each); 3 gp stays with The Iron Company". Its members changing in the meantime stops it.
 - **Handing out coins.** Since 0.49.0, a player can give a set amount of their own character's
-  coins to each of the campaign's characters they tick, one or several at once: **Give**, on the
-  Inventory tab's Currency row. The total is taken from the giver as coins
-  [taken away](#adding-and-taking-away-coins) are, other coins paying where they're short of one,
-  unless **Pay with other coins when a character is short of one** is off. No line is posted for
-  everyone: each character given coins is whispered what they received, "Vex received 200 pp and 50
-  gp from Thorin", you and any other Gamemaster of the world are whispered one message with all of
-  it, "Thorin handed out 200 pp and 50 gp each to Vex, Bram, and Lia: 600 pp and 150 gp in all",
-  and the giver's player sees each of them. A character no player owns is whispered nothing, though
-  your message names it. A giver with no one player of its own, one no player owns, or one several
-  own with none of them having it as their character, is written for by you, as its rolls are: its
-  own players then see none of these messages, only you and each one given.
+  coins to each of the campaign's characters they tick, and since 0.51.0 to the parties they own
+  too, one or several at once: **Give**, on the Inventory tab's Currency row. The total is taken
+  from the giver as coins [taken away](#adding-and-taking-away-coins) are, other coins paying where
+  they're short of one, unless **Pay with other coins when a character is short of one** is off. For
+  a character, no line is posted for everyone: each character given coins is whispered what they
+  received, "Vex received 200 pp and 50 gp from Thorin", you and any other Gamemaster of the world
+  are whispered one message with all of it, "Thorin handed out 200 pp and 50 gp each to Vex, Bram,
+  and Lia: 600 pp and 150 gp in all", and the giver's player sees each of them. A party given coins
+  has its line for everyone, "Gives 2 gp to The Iron Company", as a give to it always has; your
+  message names it too, and is sent only where a character was given coins. A character no player
+  owns is whispered nothing, though your message names it. A giver with no one player of its own,
+  one no player owns, or one several own with none of them having it as their character, is written
+  for by you, as its rolls are: its own players then see none of these messages, only you and each
+  one given.
 - **You** can move anything between the campaign's characters and parties from the app's Gamemaster
   pages, party to party too, distribute any party's coin, and hand out a character's coins at its
   page. The switch counts for your moves too.
@@ -499,12 +512,12 @@ either is missing.
   drop moves it. Each item arrives unequipped and unattuned, what a container held too, with its
   uses, effects and identification. A potion joins a stack of the same potion, but never an
   unidentified one, one with uses spent or one enchanted. Coins are moved exactly: never more than
-  there are, and dnd5e 6's fractions stay; coins given to characters, as above, are taken from the
-  giver as coins taken away are. An item in a container that hides what it holds, or deeper than
-  five containers, isn't offered.
+  there are, and dnd5e 6's fractions stay; coins handed out, as above, to characters and since
+  0.51.0 parties, are taken from the giver as coins taken away are. An item in a container that
+  hides what it holds, or deeper than five containers, isn't offered.
 - **A line in chat** for each move, as the character who moved it, for everyone, such as "Takes 50
   gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM". Coins given to
-  characters, as above, are whispered instead.
+  characters, as above, are whispered instead; a party's is for everyone.
 - **One at a time.** Moves are made one after another, so two players taking the last potion at once
   never both get it. A move is written in steps, the copy before the original is deleted; one that
   fails, or that another module stops, puts back what it can and moves nothing more. A browser
@@ -1132,7 +1145,8 @@ Gamemaster-only information switched on.
   active, so that a roll made for a player from the app takes their dice. Every other roll is left alone. No core
   or system class is otherwise overridden.
 - **Summons are placed on the scene the summoner is viewing:** one summoned while you view a prep
-  scene shows once its token is on the active scene.
+  scene shows once its token is on the active scene; it shows at once, marked on another scene, to
+  an app from v0.51.0.
 - **View the active scene while companions act:** Foundry, and Midi-QOL, find a creature's token on
   your canvas.
 - **With dnd5e's *Automatic Recharge* on,** Foundry rolls a companion's recharge at the start of its
@@ -1281,8 +1295,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-group.mjs` | A group's sheet: its members' names and portraits, its description, and its inventory without what items roll or are used through |
 | `scripts/sheet-slim.mjs` | A sheet in the smaller shape the app expands: actions by reference, defaults left out, and since 0.41.0 damage on its own's choices with only what isn't their row's own |
 | `scripts/character-sync.mjs` | The hello's roster of a campaign's characters; sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes, then each of the campaign's groups, again when it, its members' names or portraits, or its characters' ownership change, or one of its characters is deleted, and its removal when deleted, after the hello if one was on its way; withholding a sheet too large to post or a group's no player sees; sending again what was lost; from 0.41.0, which apps read damage on its own's choices |
-| `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene, and the NPCs its players own by name, its players from 0.45.0 those who own it by name, else those it's assigned to, each read as its live actor, a token's synthetic actor for an unlinked token; their keys, the characters each is a companion of, and the creature a command names |
-| `scripts/creature-sync.mjs` | Sending each campaign's companions to an app that reads them: the list in its hello and in `companions.listed` when it changes, each companion's sheet in `companion.updated` after the hello and when it changes, without secrets where its players don't own it in Foundry; from 0.41.0, whether the app reads what the game asks of companions, and who left the list, for the prompts |
+| `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene (from 0.51.0, for an app that reads them there, on every scene, each saying whether it's away), and the NPCs its players own by name, its players from 0.45.0 those who own it by name, else those it's assigned to, each read as its live actor, a token's synthetic actor for an unlinked token; their keys, the characters each is a companion of, and the creature a command names; and the format each campaign's app reads them in, as its latest answer said |
+| `scripts/creature-sync.mjs` | Sending each campaign's companions to an app that reads them: the list in its hello and in `companions.listed` when it changes, each companion's sheet in `companion.updated` after the hello and when it changes, without secrets where its players don't own it in Foundry; from 0.41.0, whether the app reads what the game asks of companions (by the format `creatures.mjs` keeps), and who left the list, for the prompts |
 | `scripts/chat.mjs` | Chat hooks, and which campaigns a message belongs to: from 0.45.0, not a public one that's another campaign's alone as it's made, nor its edits |
 | `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack; whether an attack hit each target, who saved and whether a save or check succeeded, by the rules of `results.mjs`; dnd5e 6's typed messages, and their data without what players don't see; its content without what cards keep from players; the Gamemaster's rolls on Midi-QOL's cards trimmed as Midi shows them to players |
 | `scripts/results.mjs` | The rules of what players see of chat results, as dnd5e and Midi-QOL show them, or always where the Gamemaster has players told so, read once per message, and the verdict on them that Manage Campaigns and the app show; whether an attack hit its target, and whether a character's player may see a card's DC |
@@ -1311,7 +1325,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/journals.mjs` | Journal notes in Foundry: each character's and party's journal for a campaign, found by its flag and made the first time it's written to, with its folder; who may see it and own each note, kept in step with the actors' ownership; reading a journal for the app, only what's shared as the journal is and never a secret its readers couldn't read in Foundry, and sending it in `journal.updated` after a hello, a change heard of in Foundry, or a note command, with who last deleted or reordered a page the app is sent; and what a note command from the app must look like, which `command-rolls.mjs` asks before `command-notes.mjs` makes it |
 | `scripts/tidy-journal.mjs` | From 0.44.0, Tidy 5e Sheets' journal on a campaign's characters, read only: its current sheet's entries and its Classic sheet's boxes, read straight off the character's flags whether Tidy is active or not, in Tidy's order, without secrets where no player owns the character; what the hello says of it; sending each character's in `journal.tidy` after a hello's books and 500 ms after its Tidy flags or ownership change, never twice the same, withheld when too large |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
-| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch, and from 0.49.0 a character's coins handed out to the characters picked, each whispered what they received and the Gamemasters all of it; and the one line that moves, removals and coins added or taken away stand in |
+| `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch, and from 0.49.0 a character's coins handed out to the characters picked, each whispered what they received and the Gamemasters all of it, and from 0.51.0 to the parties picked too, each party's line for everyone; and the one line that moves, removals and coins added or taken away stand in |
 | `scripts/coin-change.mjs` | The rule of paying in coins, from 0.49.0, which the coins' commands read: dnd5e's coins that have a rate, and the whole coins an actor holds; a coin paid from its own, then a larger coin broken and its change given back, then smaller coins; which of the coins held went beyond those asked for; and the update that changes an actor's coins from what it stores. It imports nothing and writes nothing |
 | `scripts/command-coins.mjs` | A character's coins added and taken away from the app, from 0.49.0, by the campaign's switch, on by default, under dnd5e: fetching them from an app that takes them; its player's, or the Gamemaster's at its page; other coins paying where it's short of one, by the campaign's setting; one update of the coins that change, made in the line of moves, with its line in chat |
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch, and from 0.47.0 putting them in order, writing dnd5e's own sorts; nothing posted |

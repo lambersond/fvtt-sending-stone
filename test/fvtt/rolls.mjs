@@ -286,6 +286,8 @@ assert.equal(diceStatus.hitDice, true, `hit die self-test: ${diceStatus.hitDiceE
 // Changed on purpose (module 0.44.0, the v0.44 plan's items 4 and 7): never a companion's plain roll;
 // and `features.hitPoints` says its players set their hit points from the app, on for a campaign saved
 // without the switch, as both are, whatever its rolls.
+// Changed on purpose (module 0.51.0, the app's item 18): `features.companions` ends with `away`, that
+// companions are listed on every scene to an app that reads them there, in both.
 const UNTAKEN = ['inspiration', 'hitDie', 'hitDice', 'spend', 'transfer', 'remove', 'note', 'endTurn', 'undoEndTurn', 'plainRoll']
 const HIT_POINTS = { enabled: true, kinds: ['hitPoints'], reason: null }
 // Changed on purpose (module 0.49.0): and of coins, `coins`, added and taken away from the app, on for a campaign saved without the switch.
@@ -294,8 +296,8 @@ const COINS = { enabled: true, kinds: ['coins'], reason: null, change: true }
 // a campaign saved without the switch, as both are, with no hit points.
 const HEALTH = { enabled: false, reason: 'off', hitPoints: false }
 assert.deepEqual(hellos, {
-  Ashlands: { rolls: { enabled: true, kinds: [...checks, ...concentration, ...texts], reason: null, modifiers: false, areaAttacks: false, prompts: false, activityChecks: true, signedDice: true, selfTargets: false, gmRolls: true, gmRollMessages: true, manualDice: false, midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false, diceAsks: false, diceAsksReason: 'manualDice' }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false, handOut: false, change: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [...checks, ...concentration, ...texts].filter(kind => !UNTAKEN.includes(kind)), initiative: 'own' }, favorites: { enabled: true, kinds: ['favorite'], reason: null, orders: true }, dishes: { enabled: false, kinds: [], reason: 'off', versions: [] }, effects: { enabled: false, kinds: [], reason: 'off' }, wildShape: { enabled: false, kinds: [], reason: 'off' }, hitPoints: HIT_POINTS, coins: COINS, health: HEALTH },
-  Mirkwood: { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false, diceAsks: false, diceAsksReason: 'manualDice' }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false, handOut: false, change: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [], initiative: 'own' }, favorites: { enabled: true, kinds: ['favorite'], reason: null, orders: true }, dishes: { enabled: false, kinds: [], reason: 'off', versions: [] }, effects: { enabled: false, kinds: [], reason: 'off' }, wildShape: { enabled: false, kinds: [], reason: 'off' }, hitPoints: HIT_POINTS, coins: COINS, health: HEALTH },
+  Ashlands: { rolls: { enabled: true, kinds: [...checks, ...concentration, ...texts], reason: null, modifiers: false, areaAttacks: false, prompts: false, activityChecks: true, signedDice: true, selfTargets: false, gmRolls: true, gmRollMessages: true, manualDice: false, midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false, diceAsks: false, diceAsksReason: 'manualDice' }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false, handOut: false, change: false, handOutParties: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [...checks, ...concentration, ...texts].filter(kind => !UNTAKEN.includes(kind)), initiative: 'own', away: true }, favorites: { enabled: true, kinds: ['favorite'], reason: null, orders: true }, dishes: { enabled: false, kinds: [], reason: 'off', versions: [] }, effects: { enabled: false, kinds: [], reason: 'off' }, wildShape: { enabled: false, kinds: [], reason: 'off' }, hitPoints: HIT_POINTS, coins: COINS, health: HEALTH },
+  Mirkwood: { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false, diceAsks: false, diceAsksReason: 'manualDice' }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false, handOut: false, change: false, handOutParties: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [], initiative: 'own', away: true }, favorites: { enabled: true, kinds: ['favorite'], reason: null, orders: true }, dishes: { enabled: false, kinds: [], reason: 'off', versions: [] }, effects: { enabled: false, kinds: [], reason: 'off' }, wildShape: { enabled: false, kinds: [], reason: 'off' }, hitPoints: HIT_POINTS, coins: COINS, health: HEALTH },
 })
 ok("passes its self-test, hit dice's too, and tells each campaign whether its players' rolls are made here: a utility's formula always, a hit die once its self-test has passed, a check activity's checks under dnd5e 5, and the Gamemaster's as a character wherever rolls are made")
 if (process.env.LIBWRAPPER) {
@@ -451,6 +453,51 @@ assert.deepEqual([made.result.status, made.result.reason], ['failed', 'not-in-co
 made = await roll({ actorId: 'vex', kind: 'initiative', key: undefined, combatId: 'cmbt1', dice: [{ faces: 20, results: [9] }] })
 assert.deepEqual([made.result.status, made.result.reason], ['failed', 'not-in-combat'])
 ok('refuses initiative already rolled, or for a combat the character is not in')
+
+// Since module 0.51.0 (item 36): an encounter on another scene, begun and chosen for its scene,
+// takes the app's initiative while the Gamemaster has another up; one not chosen, or not begun,
+// takes none.
+const den = combat('cmbt-den')
+den._source.scene = 'den'
+den.round = 1
+den.started = true
+den.rollInitiative = rollCombatInitiative
+const denThorin = combatant(den, 'c-den-thorin', thorin, { sceneId: 'den' })
+{
+  const heard = []
+  const before = (actor, roll) => { heard.push(['pre', actor.id, Boolean(roll)]) }
+  const after = (actor, combatants) => { heard.push(['roll', actor.id, combatants.map(c => c.id)]) }
+  Hooks.on('dnd5e.preRollInitiative', before)
+  Hooks.on('dnd5e.rollInitiative', after)
+  made = await roll({ kind: 'initiative', key: undefined, combatId: 'cmbt-den', dice: [{ faces: 20, results: [12] }] })
+  Hooks.off('dnd5e.preRollInitiative', before)
+  Hooks.off('dnd5e.rollInitiative', after)
+  assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+  assert.deepEqual([denThorin.initiative, thorinTurn.initiative], [13, 17], "the den's Thorin set, the arena's 17 untouched")
+  assert.equal(made.message.flags['core.initiativeRoll'], true)
+  assert.deepEqual(heard, [['pre', 'thorin', true], ['roll', 'thorin', ['c-den-thorin']]], "dnd5e's two hooks, once each")
+  assert.equal(thorin._cachedInitiativeRoll, undefined)
+  ok("since module 0.51.0, initiative into a begun encounter its scene has chosen, on another scene, while the Gamemaster has another up: rolled by the combat between dnd5e's two hooks, that combatant set, the other combat's untouched")
+}
+{
+  den.active = false
+  denThorin.initiative = null
+  const count = messages.size
+  made = await roll({ kind: 'initiative', key: undefined, combatId: 'cmbt-den', dice: [{ faces: 20, results: [12] }] })
+  assert.deepEqual([made.result.status, made.result.reason], ['failed', 'not-in-combat'])
+  assert.deepEqual([denThorin.initiative, messages.size], [null, count], 'nothing set, no message')
+  ok("since module 0.51.0, initiative into a begun encounter on another scene is refused not-in-combat where that begun encounter isn't its scene's chosen one")
+}
+{
+  den.active = true
+  den.round = 0
+  den.started = false
+  made = await roll({ kind: 'initiative', key: undefined, combatId: 'cmbt-den', dice: [{ faces: 20, results: [12] }] })
+  assert.deepEqual([made.result.status, made.result.reason], ['failed', 'not-in-combat'])
+  assert.equal(denThorin.initiative, null, 'nothing set')
+  ok("since module 0.51.0, initiative into an encounter on another scene is refused not-in-combat where it's chosen but not begun, as before")
+}
+game.combats.delete('cmbt-den')
 
 // ---- Hit dice ----
 const hitDie = (denomination, rolled, fields = {}) => roll({
@@ -1215,7 +1262,8 @@ const off = app.events.filter(e => e.type === 'bridge.hello' && e.campaign.id ==
 // Changed on purpose (round 0.42.0 §8.2): with `effectDice` and `keptRerolls`, off, last; and since
 // 0.44.0 `diceAsks` and `diceAsksReason` after them, off, as no player types in their dice here.
 // Changed on purpose (module 0.50.0, item 58): with `health`, off, last.
-assert.deepEqual(off.data.features, { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false, diceAsks: false, diceAsksReason: 'manualDice' }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false, handOut: false, change: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [], initiative: 'own' }, favorites: { enabled: true, kinds: ['favorite'], reason: null, orders: true }, dishes: { enabled: false, kinds: [], reason: 'off', versions: [] }, effects: { enabled: false, kinds: [], reason: 'off' }, wildShape: { enabled: false, kinds: [], reason: 'off' }, hitPoints: HIT_POINTS, coins: COINS, health: HEALTH })
+// Changed on purpose (module 0.51.0, item 18): `companions` ends with `away`, whatever the rolls.
+assert.deepEqual(off.data.features, { rolls: { enabled: false, kinds: [], reason: 'off', modifiers: false, areaAttacks: false, prompts: false, activityChecks: false, signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false, midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false, diceAsks: false, diceAsksReason: 'manualDice' }, transfers: { enabled: false, kinds: [], reason: 'off', partySends: false, distribute: false, handOut: false, change: false, handOutParties: false }, removals: { enabled: true, kinds: ['remove'], reason: null }, notes: { enabled: true, kinds: ['personal', 'party'], reason: null, journals: [], orders: true, changes: true }, companions: { kinds: [], initiative: 'own', away: true }, favorites: { enabled: true, kinds: ['favorite'], reason: null, orders: true }, dishes: { enabled: false, kinds: [], reason: 'off', versions: [] }, effects: { enabled: false, kinds: [], reason: 'off' }, wildShape: { enabled: false, kinds: [], reason: 'off' }, hitPoints: HIT_POINTS, coins: COINS, health: HEALTH })
 const offAt = app.polls.length
 await settle(); await settle()
 assert.equal(app.polls.length, offAt)

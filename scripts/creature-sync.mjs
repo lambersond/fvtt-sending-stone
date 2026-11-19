@@ -3,7 +3,9 @@ import { canSend } from "./bridge-role.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { combatEnabled } from "./config.mjs";
-import { companionKeyOf, companionOfActor, companionsOf, ownedByPlayers } from "./creatures.mjs";
+import {
+  awayReader, companionFormat, companionKeyOf, companionOfActor, companionsOf, noteCompanionFormat, ownedByPlayers
+} from "./creatures.mjs";
 import { characterSheet } from "./sheet.mjs";
 import { SheetTexts } from "./sheet-texts.mjs";
 import { helloPending, send } from "./transport.mjs";
@@ -16,7 +18,8 @@ import { helloPending, send } from "./transport.mjs";
  * the whole list goes again in `companions.listed` whenever it changes, as when a familiar is
  * summoned onto the active scene, its token is hidden or deleted, the active scene changes, or a
  * player is given or loses Owner of an NPC; and a companion's sheet goes again when it changes, as
- * when it takes damage or spends a use.
+ * when it takes damage or spends a use. Since 0.51.0, to an app that reads them there, the list is of
+ * every scene's, each saying whether it's away, and goes again as a scene is made or made active.
  *
  * A token's creature is heard of through its token and its ActorDelta, whichever core tells, and
  * through its items and effects, whatever parent core gives them; every way settles to one post per
@@ -48,13 +51,6 @@ const DELTA_KEYS = ["ownership", "flags", "name", "img"];
  * @type {string[]}
  */
 const NPC_KEYS = ["ownership", "name", "img", "type", "prototypeToken", "flags"];
-
-/**
- * The campaigns whose app's latest answer said it reads companions, `features.companions` 1 or more,
- * and the format it said, 2 or more since 0.41.0 for one that reads what the game asks of them.
- * @type {Map<string, number>}
- */
-const readers = new Map();
 
 /**
  * What's told when companions leave a campaign's list, with their keys: since 0.41.0, prompts.mjs's
@@ -161,21 +157,22 @@ export function registerSheetSync(sync) {
  * sheet at once; after a hello's, they follow its character and group sheets. Since 0.41.0 the format
  * is kept: 2 or more says it reads what the game asks of companions, and where it first says so, from
  * less or from nothing, as after a reload, whose hello left those out, or in the hello's own answer,
- * their prompts open now are sent again (round 0.41.0 §3.6.6).
+ * their prompts open now are sent again (round 0.41.0 §3.6.6). Since 0.51.0, one whose heartbeat's
+ * answer moves to or from 3, as an app deployed or rolled back mid-session, is sent its list as it
+ * now reads it at once, of every scene or of the active one; a hello's answer is compared once the
+ * hello is delivered.
  * @param {string} campaignId
  * @param {object|null} features
  * @param {string} [type]   The event answered.
  * @returns {void}
  */
 export function noteCompanionReader(campaignId, features, type) {
-  const format = features?.companions;
-  if ( !(Number.isInteger(format) && (format >= 1)) ) {
-    readers.delete(campaignId);
-    return;
-  }
-  const was = readers.get(campaignId) ?? 0;
-  readers.set(campaignId, format);
+  const wide = awayReader(campaignId);
+  const was = noteCompanionFormat(campaignId, features);
+  const format = companionFormat(campaignId);
+  if ( !format ) return;
   if ( !was && (type === EVENTS.HEARTBEAT) ) companionsWanted(campaignId);
+  else if ( was && (type === EVENTS.HEARTBEAT) && (awayReader(campaignId) !== wide) ) companionsRelisted(campaignId);
   if ( (format >= 2) && (was < 2) ) {
     for ( const fn of promptReaderListeners ) fn(campaignId);
   }
@@ -187,7 +184,7 @@ export function noteCompanionReader(campaignId, features, type) {
  * @returns {boolean}
  */
 export function companionReader(campaignId) {
-  return readers.has(campaignId);
+  return companionFormat(campaignId) >= 1;
 }
 
 /**
@@ -197,7 +194,7 @@ export function companionReader(campaignId) {
  * @returns {boolean}
  */
 export function companionPromptReader(campaignId) {
-  return (readers.get(campaignId) ?? 0) >= 2;
+  return companionFormat(campaignId) >= 2;
 }
 
 /**
@@ -271,7 +268,7 @@ export function forgetListed(campaignId) {
  * @returns {string|null|undefined}
  */
 export function messageCompanion(message, campaign) {
-  if ( !readers.has(campaign.id) ) return undefined;
+  if ( !companionReader(campaign.id) ) return undefined;
   const list = toldList(campaign.id);
   const marked = message.flags?.[MODULE_ID]?.companion;
   if ( (typeof marked === "string") && list.some(entry => entry.key === marked) ) return marked;
@@ -285,7 +282,7 @@ export function messageCompanion(message, campaign) {
  * @returns {string|null|undefined}
  */
 export function combatantCompanion(combatant, campaign) {
-  if ( !readers.has(campaign.id) ) return undefined;
+  if ( !companionReader(campaign.id) ) return undefined;
   return companionKeyOf(toldList(campaign.id), combatant);
 }
 
@@ -307,7 +304,7 @@ export function combatantCompanion(combatant, campaign) {
  * @returns {void}
  */
 export function sendCompanion(campaign, entry, actor) {
-  if ( !canSend() || !readers.has(campaign.id) || helloPending(campaign.id) ) return;
+  if ( !canSend() || !companionReader(campaign.id) || helloPending(campaign.id) ) return;
   if ( !toldList(campaign.id).some(listed => listed.key === entry.key) ) return;
   const secrets = ownedByPlayers(actor, entry.of);
   sendActor(campaign, actor, {
@@ -360,19 +357,35 @@ export function companionsWanted(campaignId) {
 }
 
 /**
+ * Send a campaign whose app has just moved to or from reading its companions on every scene, in a
+ * heartbeat's answer, its list as it now reads it, at once, since 0.51.0: those that came with their
+ * sheets, those gone dropped, and its combats checked again.
+ * @param {string} campaignId
+ * @returns {void}
+ */
+function companionsRelisted(campaignId) {
+  const campaign = getCampaigns().find(c => c.id === campaignId);
+  if ( campaign && canSend() ) compareList(campaign);
+}
+
+/**
  * Send a campaign whose hello was answered its companions, after its characters' and groups'
  * sheets: the hello's own list counts as told, each companion it lists that still is one has its
  * sheet sent, and then the list is compared with the campaign's now, at once, so that a companion
  * that came or went while the hello was on its way is told of. A hello built before its app was
  * known to read companions described its combats without them: those it knows of with a companion
- * among them are sent again, whole.
+ * among them are sent again, whole. Since 0.51.0 the hello's own list is the one its app keeps: its
+ * `companionsEverywhere` for an app that reads companions on every scene, as it was built before the
+ * app was known to, else its `companions`.
  * @param {Campaign} campaign
  * @param {object} [hello]   The hello answered.
  * @returns {void}
  */
 export function companionsDelivered(campaign, hello) {
-  if ( !readers.has(campaign.id) ) return;
-  const listed = Array.isArray(hello?.data?.companions) ? hello.data.companions : [];
+  if ( !companionReader(campaign.id) ) return;
+  const everywhere = hello?.data?.companionsEverywhere;
+  const kept = (awayReader(campaign.id) && Array.isArray(everywhere)) ? everywhere : hello?.data?.companions;
+  const listed = Array.isArray(kept) ? kept : [];
   noteListed(campaign.id, listed);
   const found = companionsOf(campaign);
   for ( const entry of toldList(campaign.id) ) {
@@ -391,7 +404,7 @@ export function companionsDelivered(campaign, hello) {
  * @returns {void}
  */
 export function companionTermsChanged(campaign) {
-  if ( !readers.has(campaign.id) ) return;
+  if ( !companionReader(campaign.id) ) return;
   for ( const { entry, actor } of companionsOf(campaign) ) sendCompanion(campaign, entry, actor);
 }
 
@@ -403,7 +416,7 @@ export function companionTermsChanged(campaign) {
 export function toldCompanions() {
   const actors = new Map();
   for ( const campaign of getCampaigns() ) {
-    if ( !readers.has(campaign.id) ) continue;
+    if ( !companionReader(campaign.id) ) continue;
     const keys = new Set(toldList(campaign.id).map(entry => entry.key));
     if ( !keys.size ) continue;
     for ( const { entry, actor } of companionsOf(campaign) ) {
@@ -463,7 +476,7 @@ function compareLists() {
  * @returns {void}
  */
 function compareList(campaign, { found, before }={}) {
-  if ( !readers.has(campaign.id) || helloPending(campaign.id) ) return;
+  if ( !companionReader(campaign.id) || helloPending(campaign.id) ) return;
   const told = toldLists.get(campaign.id);
   const was = before ?? told?.entries ?? [];
   found ??= companionsOf(campaign);
@@ -521,7 +534,7 @@ function forgetCompanion(campaignId, key) {
 export function creatureChanged(actor) {
   if ( !actor || !canSend() ) return;
   for ( const campaign of getCampaigns() ) {
-    if ( !readers.has(campaign.id) ) continue;
+    if ( !companionReader(campaign.id) ) continue;
     const list = toldList(campaign.id);
     const entries = new Set([companionOfActor(list, actor)]);
     if ( !actor.isToken ) {
@@ -584,13 +597,16 @@ export function listingDropped(campaignId, envelope) {
  * Listen for what may change a campaign's companions: tokens placed, changed or deleted, their
  * deltas, the active scene switched or deleted, NPCs given or taken from players, actors made or
  * deleted, users changed; and, after the world is ready, compare the list once, as a token's actor
- * is made up only once documents are. Every client listens; only the bridge sends.
+ * is made up only once documents are. Since 0.51.0 a scene made, as one duplicated or imported with
+ * its tokens, whose own tokens may tell of themselves no other way. Every client listens; only the
+ * bridge sends.
  * @returns {void}
  */
 export function registerCreatureHooks() {
   const has = (changes, keys) => Boolean(changes) && (typeof changes === "object")
     && keys.some(key => Object.hasOwn(changes, key));
-  for ( const hook of ["createToken", "deleteToken", "deleteScene", "createActor", "deleteActor", "createUser", "deleteUser"] ) {
+  const hooks = ["createToken", "deleteToken", "createScene", "deleteScene", "createActor", "deleteActor", "createUser", "deleteUser"];
+  for ( const hook of hooks ) {
     Hooks.on(hook, () => listsChanged());
   }
   Hooks.on("updateToken", (token, changes) => {

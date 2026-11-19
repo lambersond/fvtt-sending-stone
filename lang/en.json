@@ -180,7 +180,7 @@
         "ViewModules": "View modules",
         "Transfers": "Items and coins",
         "TransfersPlayers": "Players move items and coins",
-        "TransfersHint": "From the app, they take from and give to the campaign's parties they own in Foundry, and give to each other's characters. You can move anything between its characters and parties. Each move posts a line in chat. A character can also hand out a set amount of coins to each of several characters at once: each is whispered what they received, and you are whispered all of it.",
+        "TransfersHint": "From the app, they take from and give to the campaign's parties they own in Foundry, and give to each other's characters. You can move anything between its characters and parties. Each move posts a line in chat. A character can also give a set amount of coins to each of several characters and parties at once: a party's line is posted for everyone, each character is whispered what they received, and where a character is among them you are whispered all of it.",
         "TransfersApp": "The app this campaign sends to doesn't take moves yet.",
         "Coins": "Coins",
         "CoinsPlayers": "Allow Players to add and take away coins from the app",
