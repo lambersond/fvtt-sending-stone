@@ -560,6 +560,7 @@ assert.deepEqual([edge(rook, 'manners').activity?.type, edge(rook, 'manners').ch
 const anyEdge = itemId => tablingSheet(() => rollsOf(rook.items.get(itemId)), { anyAbility: true })
 assert.deepEqual(anyEdge('sanity').check, { checks: [{ type: 'check', ability: 'san' }], dc: 12, own: true }, 'Sanity, to an app that reads it')
 assert.deepEqual(anyEdge('manners').check, { checks: [{ type: 'skill', ability: 'wis', key: 'ins' }, { type: 'skill', ability: 'hon', key: 'eti' }], dc: 12, own: true }, 'Insight or Etiquette, to an app that reads them')
+assert.equal(edge(rook, 'manners').check, undefined, 'and to an older app again, once that sheet is built')
 delete CONFIG.DND5E.abilities.hon
 delete CONFIG.DND5E.skills.eti
 assert.deepEqual([edge(rook, 'eleven').activity?.type, edge(rook, 'eleven').check], ['check', undefined], 'eleven checks')
@@ -953,25 +954,50 @@ ok('refuses another\'s check, one not offered, one not to be used, a check activ
 {
   // Rook's Sanity, as dnd5e gives every character a world's abilities.
   rook.system.abilities.san = foundry.utils.deepClone(rook.system.abilities.wis)
+  // Its description, hashed apart for an app that reads checks on any ability (sheet-texts.mjs),
+  // and enriched as written, as Foundry's TextEditor would leave it, when it's sent.
+  rook.items.get('sanity').system.description = { value: '<p>Keep your wits about you.</p>' }
+  foundry.applications.ux.TextEditor = { implementation: { async enrichHTML(html) { return html } } }
+  const { characterSheet } = await import(`${MODULE}/scripts/sheet.mjs`)
+  const { SheetTexts } = await import(`${MODULE}/scripts/sheet-texts.mjs`)
+  const textFor = anyAbility => characterSheet(rook, new SheetTexts({ anyAbility }), { anyAbility }).actions
+    .flatMap(section => section.actions).find(action => action.id === 'sanity')?.text
+  assert.ok(textFor(true) && (textFor(true) !== textFor(false)), 'its description hashed apart')
   const sanity = { item: 'sanity', activity: 'mad', dice: [{ faces: 20, results: [11] }] }
   await refused(roll('rook', 'ability', 'san', sanity), 'activity', 'to an app before 0.52.0, as it was sent none')
-  const before = app.events.filter(e => (e.type === 'character.updated') && (e.data.character.id === 'rook')).length
-  // A heartbeat's answer that says it reads them sends the campaign's sheets again, with it.
-  app.features = { commands: true, anyAbility: 1 }
+  const rookSheets = () => app.events.filter(e => (e.type === 'character.updated') && (e.data.character.id === 'rook')).length
   const { noteListenerFeatures } = await import(`${MODULE}/scripts/commands.mjs`)
+  const { anyAbilityReader } = await import(`${MODULE}/scripts/check-abilities.mjs`)
+  // Only an integer, 1 or more, says it: true, "1", 0 or 1.5 don't.
+  for (const anyAbility of [true, '1', 0, 1.5]) {
+    noteListenerFeatures('camp-a', { commands: true, anyAbility }, 'bridge.heartbeat')
+    assert.equal(anyAbilityReader('camp-a'), false, `anyAbility: ${JSON.stringify(anyAbility)} doesn't count`)
+  }
+  // A hello's answer that says it sends nothing again of itself: the hello's own sheets follow it.
+  let before = rookSheets()
+  noteListenerFeatures('camp-a', { commands: true, anyAbility: 1 }, 'bridge.hello')
+  await new Promise(resolve => realSetTimeout(resolve, 50))
+  assert.deepEqual([anyAbilityReader('camp-a'), rookSheets()], [true, before], 'a hello\'s answer: read, nothing sent again')
+  noteListenerFeatures('camp-a', { commands: true }, 'bridge.hello')
+  // A heartbeat's answer that says it reads them sends the campaign's sheets again, with it.
+  before = rookSheets()
+  app.features = { commands: true, anyAbility: 1 }
   noteListenerFeatures('camp-a', app.features, 'bridge.heartbeat')
-  await until(() => app.events.filter(e => (e.type === 'character.updated') && (e.data.character.id === 'rook')).length > before, 'Rook\'s sheet sent again')
+  await until(() => rookSheets() > before, 'Rook\'s sheet sent again')
   const sent = sheetOf('rook').actions.flatMap(section => section.actions).find(action => action.id === 'sanity')
   assert.deepEqual(sent?.check, { checks: [{ type: 'check', ability: 'san' }], dc: 12, own: true }, `sent again with its check: ${JSON.stringify(sent?.check)}`)
+  assert.equal(sent?.text, textFor(true), 'its description as hashed for that app')
   const made = await roll('rook', 'ability', 'san', sanity)
   assert.equal(made.status, 'done', JSON.stringify(made))
   const total = made.rolls[0]?.total
   assert.equal(made.outcome, total >= 12 ? 'success' : 'failure', `rolled against its DC 12: ${total}`)
   app.features = { commands: true }
   noteListenerFeatures('camp-a', app.features, 'bridge.heartbeat')
+  delete rook.items.get('sanity').system.description
+  delete foundry.applications.ux.TextEditor
   delete rook.system.abilities.san
 }
-ok('a check activity on Sanity: refused to an app before 0.52.0; sent again with it once a heartbeat\'s answer says the app reads it, and rolled against its DC')
+ok('a check activity on Sanity: refused to an app before 0.52.0; sent again with it, its description hashed for that app, once a heartbeat\'s answer says the app reads it (an integer, 1 or more; a hello\'s answer sends nothing again of itself), and rolled against its DC')
 
 console.log(`${MIDI ? 'midi' : 'dnd5e'}: done`)
 process.exit(0)

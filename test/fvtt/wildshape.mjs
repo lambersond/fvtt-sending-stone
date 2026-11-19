@@ -1613,6 +1613,41 @@ assert.deepEqual(refusal(await made(learn(uuidOf('Crocodile'), wolfId))), ['fail
 await shapeItem().update({ 'flags.sending-stone.wildShape.swap': false })
 ok('transform into the Wolf: one use spent on her own Wild Shape (2 → 1) before the form exists; transformInto with the preset, tempFormula "5", minimumAC "0", transformTokens false, renderSheet false; "Elowen (Wolf)" with its record {kind, name, hours 2, endsAt startedAt + 7200, profile, request, baseline}; her tokens switched on both scenes from dnd5e\'s partial token data with previousTokenData; the combat sent again, her combatant hers; the chat line; her sheet under her own id the form\'s (AC 12, walk 40, her hit points, 5 temporary) with form {minutesLeft 120, flooredAc false, beast} and no effect ops; done {form, temp 5, hours 2}; a sheet a world minute, not 30 s, on; a replacement of the form she\'s in "shaped"')
 
+// Since 0.52.0 (item 65): a form's check activity on Sanity is sent with its check to an app that
+// reads checks on any ability the game has, as a heartbeat's answer says, and never to one before
+// it; as is one of Rowan's own, unshaped, to an app that takes Wild Shape. This run is dnd5e 5's:
+// under dnd5e 6 the harness ends at case 18, and no check activity is offered there.
+{
+  const { Item5e } = await import('./activity5e.mjs')
+  CONFIG.DND5E.abilities.san = { label: 'Sanity', abbreviation: 'san' }
+  const witsItem = (actor, id) => new Item5e(actor, {
+    id, name: 'Keen Wits', type: 'feat', system: { properties: [] },
+    activities: [{ id: `${id.slice(0, 13)}Chk`, type: 'check', affects: '', range: 'self', check: { ability: 'san', associated: [], dc: { formula: '12' } } }],
+  })
+  wolf.items.set('wolfKeenWits0000', witsItem(wolf, 'wolfKeenWits0000'))
+  rowan.items.set('rowanKeenWits000', witsItem(rowan, 'rowanKeenWits000'))
+  const witsOf = (id, itemId) => lastSheet(id).actions?.flatMap(section => section.actions).find(action => action.id === itemId)
+  const answered = async (features, why) => {
+    const from = app.events.length
+    if (features) app.features.set('camp-a', features)
+    else app.features.delete('camp-a')
+    send('bridge.heartbeat', {}, campaign(), { sequenced: false })
+    await until(() => sheetsSince(from).length && sent('character.updated').some(e => (app.events.indexOf(e) >= from) && (e.data.character.id === 'rowan')), why)
+    await settle(80)
+  }
+  const SANITY = { checks: [{ type: 'check', ability: 'san' }], dc: 12, own: true }
+  await answered({ commands: true, wildShape: 1, anyAbility: 1 }, "her form's sheet and Rowan's again, with checks on any ability")
+  assert.deepEqual([lastSheet().form?.name, witsOf('elowen', 'wolfKeenWits0000')?.check], ['Wolf', SANITY], `the form's Sanity check: ${JSON.stringify(witsOf('elowen', 'wolfKeenWits0000'))}`)
+  assert.deepEqual([lastSheet('rowan').form, witsOf('rowan', 'rowanKeenWits000')?.check], [undefined, SANITY], "Rowan's own, unshaped")
+  await answered(null, "her form's sheet and Rowan's again, without them")
+  assert.deepEqual([lastSheet().form?.name, Boolean(witsOf('elowen', 'wolfKeenWits0000')), witsOf('elowen', 'wolfKeenWits0000')?.check], ['Wolf', true, undefined], 'to an app before 0.52.0, no check')
+  assert.deepEqual([Boolean(witsOf('rowan', 'rowanKeenWits000')), witsOf('rowan', 'rowanKeenWits000')?.check], [true, undefined], "nor Rowan's")
+  wolf.items.delete('wolfKeenWits0000')
+  rowan.items.delete('rowanKeenWits000')
+  delete CONFIG.DND5E.abilities.san
+}
+ok("since 0.52.0, a form's check activity on Sanity, and one of an unshaped character's, sent with its check once a heartbeat's answer says the app reads checks on any ability, and without it once it doesn't")
+
 /* -------------------------------------------- */
 /*  11. revert                                  */
 /* -------------------------------------------- */

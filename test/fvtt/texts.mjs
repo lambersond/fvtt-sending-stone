@@ -1679,10 +1679,13 @@ ok("through the module's own findLink, an item's description names its item, a s
 // ---- Since 0.52.0: [[/check honor 12]], to an app that reads checks on any ability ----
 {
   // dnd5e's Honor, as its setting turns it on (D5 config.mjs DND5E.abilities.hon), on Thorin too,
-  // and his biography with [[/check honor 12]] in dnd5e 5.3.3's markup (enrichers.mjs:488-492).
+  // and his biography with [[/check honor 12]] in dnd5e 5.3.3's markup (enrichers.mjs:488-492),
+  // then a damage link and a roll of its own, as BIOGRAPHY's and an inline roll are.
   CONFIG.DND5E.abilities.hon = { label: 'Honor', abbreviation: 'hon', type: 'mental', fullKey: 'honor' }
   thorin.system.abilities.hon = foundry.utils.deepClone(thorin.system.abilities.wis)
-  thorin.system.details.biography.value = '<p>His oath binds him: a <span class="roll-link-group" data-type="check" data-ability="hon" data-dc="12"><a class="roll-link" data-action="roll"><i class="fa-solid fa-dice-d20" inert=""></i>DC 12 Honor</a><a class="enricher-action" data-action="postRequest" data-tooltip="EDITOR.DND5E.Inline.RequestRoll" aria-label="Request Roll"><i class="fa-solid fa-comment-dots"></i></a></span> check.</p>'
+  thorin.system.details.biography.value = '<p>His oath binds him: a <span class="roll-link-group" data-type="check" data-ability="hon" data-dc="12"><a class="roll-link" data-action="roll"><i class="fa-solid fa-dice-d20" inert=""></i>DC 12 Honor</a><a class="enricher-action" data-action="postRequest" data-tooltip="EDITOR.DND5E.Inline.RequestRoll" aria-label="Request Roll"><i class="fa-solid fa-comment-dots"></i></a></span> check,'
+    + ' or <a class="roll-link-group" data-action="roll" data-type="damage" data-formulas="2d6" data-damage-types="fire" data-roll-type="damage"><span class="roll-link"><i class="fa-solid fa-dice-d20" inert=""></i>2d6</span> Fire</a> damage,'
+    + ' and <a class="inline-roll roll" data-mode="roll" data-flavor="" data-formula="1d4"><i class="fas fa-dice-d20"></i>1d4</a> more.</p>'
   const { noteAnyAbilityFormat } = await import(`${MODULE}/scripts/check-abilities.mjs`)
   const { characterSheet } = await import(`${MODULE}/scripts/sheet.mjs`)
   const { SheetTexts } = await import(`${MODULE}/scripts/sheet-texts.mjs`)
@@ -1693,14 +1696,26 @@ ok("through the module's own findLink, an item's description names its item, a s
   made = await rollCheck('ability', 'hon', honor, 0, [9])
   assert.equal(made.result.status, 'done', JSON.stringify(made.result))
   assert.deepEqual([made.roll.options.target, made.result.outcome], [12, (made.roll.total >= 12) ? 'success' : 'failure'], 'rolled against its DC 12')
+  // Every other command that reads a link reads it as its campaign's app was sent it
+  // (command-texts.mjs): the Honor check asked of the table, the damage, and the text's own roll.
+  wait(31_000)
+  const asked = await ask(honor, 0)
+  assert.deepEqual([asked.result.status, asked.message?.flags['sending-stone'].ask], ['done', { actorId: 'thorin', text: honor, link: 0 }], JSON.stringify(asked.result))
+  made = await textDamage(honor, 1, [{ faces: 6, results: [3, 4] }])
+  assert.deepEqual([made.result.status, made.roll?.total], ['done', 7], JSON.stringify(made.result))
+  made = await textRoll(honor, 2, [{ faces: 4, results: [3] }])
+  assert.deepEqual([made.result.status, made.roll?.total], ['done', 3], JSON.stringify(made.result))
   // Read as its campaign's app was sent it: to one that reads only the six, no such description.
   noteAnyAbilityFormat('camp-a', {})
   assert.deepEqual(refused(await rollCheck('ability', 'hon', honor, 0, [9])), ['failed', 'gone', null])
+  assert.deepEqual(refused(await ask(honor, 0)), ['failed', 'gone', null])
+  assert.deepEqual(refused(await textDamage(honor, 1, [{ faces: 6, results: [3, 4] }])), ['failed', 'gone', null])
+  assert.deepEqual(refused(await textRoll(honor, 2, [{ faces: 4, results: [3] }])), ['failed', 'gone', null])
   thorin.system.details.biography.value = BIOGRAPHY
   delete thorin.system.abilities.hon
   delete CONFIG.DND5E.abilities.hon
 }
-ok("since 0.52.0, a description's Honor check, to an app that reads checks on any ability, rolled against its DC; gone to one that doesn't")
+ok("since 0.52.0, a description's Honor check, to an app that reads checks on any ability, rolled against its DC, asked of the table, and its damage and roll made; each gone to one that doesn't")
 
 // ---- Damage dnd5e's own link rolls through one of the item's activities ----
 // A critical hit's only as that activity allows, with what it adds to each part, as the activity's
