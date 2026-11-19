@@ -958,8 +958,9 @@ through `default` too, so a character shared with *All Players: Owner* had every
    another; `false` otherwise, as for a linked NPC placed nowhere, or with no scene active. Levels
    aren't read: a token on another level of the active scene is on it. Commands name a companion
    away as any other, and its rolls are made on its own live actor; under Midi-QOL a target the
-   Gamemaster's canvas doesn't draw is refused [`"scene"`](#commandresult) as ever, unless they allow
-   targets off their screen. A token left on an old map is a companion until it's deleted or hidden.
+   Gamemaster's canvas doesn't draw is refused [`"scene"`](#commandresult) as ever, unless they
+   allow targets off their screen. A token left on an old map is a companion until it's deleted or
+   hidden.
 
 **Keys:** a world actor's companion is keyed by its actor id; a token's creature by
 `<sceneId>-<tokenId>`, a hyphen never occurring in Foundry's ids, so two wolves placed from one Wolf
