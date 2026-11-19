@@ -913,8 +913,9 @@ export function checkUsable(item, activity) {
  * The checks a check activity calls for, as dnd5e's card for it offers them, a button each: one
  * of each skill or tool it names, or of the tool a tool item is, made with the ability dnd5e makes
  * it with; or else an ability check of the ability it names. A key that's neither a skill nor a
- * tool is an ability check, as dnd5e's card makes it. Each kind of check once, with one of the six
- * abilities the app knows, as a description's checks are. A tool item's check of its own tool adds
+ * tool is an ability check, as dnd5e's card makes it. Each kind of check once, as a description's
+ * checks are: since 0.52.0 whole or not at all, none where one is on an ability the campaign's app
+ * isn't sent checks on (`checkOptions`). A tool item's check of its own tool adds
  * the item's bonus, as the card's button does; one whose bonus throws dice, which the app can't
  * add, is left out. With its DC, and whether the character makes it: not a spell's, whose target
  * makes it, such as Maze's. Null for a check activity not used here, or one with no check the app

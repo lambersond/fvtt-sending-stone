@@ -25,10 +25,12 @@ import { sendLater } from "./transport.mjs";
  * never a critical hit's marked, since 0.19.0. 5: with what a critical hit adds, and damage as
  * resolved, since 0.20.0. 6: with damage whose dice this world can't plan for a player left as
  * text, since 0.21.0, so that no link is numbered as it was. 7: with damage and rolls whose dice
- * have comparisons, such as `2d6r<=2`, as links, since 0.22.0.
+ * have comparisons, such as `2d6r<=2`, as links, since 0.22.0. 8: a check linked whole or not at
+ * all, and since 0.52.0, to an app that reads them, on any ability the game has; with the game's
+ * abilities and skills in the hash, so that no link is numbered as it was.
  * @type {number}
  */
-const TEXT_FORMAT = 7;
+const TEXT_FORMAT = 8;
 
 /**
  * The most a character.texts payload should hold, in bytes of JSON, well within the 1 MB any
@@ -354,7 +356,9 @@ function chunk(texts) {
 /**
  * The format descriptions are sent in, and what they are enriched in that every one shows: the
  * rules, which name conditions' pages and damage types, and the game's language, which labels
- * everything and decides whether plain text is read.
+ * everything and decides whether plain text is read; and since 0.52.0 the game's abilities and
+ * skills, which decide which checks are links, and so every later link's number, as a world that
+ * turns Honor on, or adds a skill, does after its reload.
  * @returns {string}
  */
 function textFormat() {
@@ -364,7 +368,9 @@ function textFormat() {
   } catch {
     rules = "";
   }
-  return `format:${TEXT_FORMAT}\nrules:${rules}\nlang:${game.i18n?.lang ?? ""}`;
+  const keys = list => Object.keys(list ?? {}).sort().join(",");
+  return `format:${TEXT_FORMAT}\nrules:${rules}\nlang:${game.i18n?.lang ?? ""}`
+    + `\nabilities:${keys(CONFIG.DND5E?.abilities)}\nskills:${keys(CONFIG.DND5E?.skills)}`;
 }
 
 /**

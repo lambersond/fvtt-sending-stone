@@ -1,0 +1,32 @@
+/**
+ * Which abilities a check sent to a campaign's app may be made with: dnd5e's six to an app before
+ * 0.52.0, and since 0.52.0 any the game has, by a key the app takes, to one that reads them. A
+ * script of its own, below every script that sends a check, a description's, a check activity's or
+ * a request card's, so that each asks the one rule.
+ */
+
+/**
+ * dnd5e's six abilities, the only ones an app before 0.52.0 takes a check on.
+ * @type {string[]}
+ */
+export const SIX_ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
+
+/**
+ * A key dnd5e names a skill or tool by, and since 0.52.0 an ability past the six, as the app accepts
+ * one: never ":" or "|", which separate the checks a span offers.
+ * @type {RegExp}
+ */
+export const CHECK_KEY = /^[A-Za-z][\w-]{0,31}$/;
+
+/**
+ * Is a check on this ability, one the game has, sent to a campaign's app: one of the six; or, to an
+ * app that reads checks on any ability, since 0.52.0, any whose key the app takes, so that none it
+ * would drop alone is sent and cuts a choice short. The caller asks first whether the game has it.
+ * @param {string} ability
+ * @param {boolean} anyAbility   Does the app read checks on any ability?
+ * @returns {boolean}
+ */
+export function isAbilitySent(ability, anyAbility) {
+  if ( SIX_ABILITIES.includes(ability) ) return true;
+  return (anyAbility === true) && (typeof ability === "string") && CHECK_KEY.test(ability);
+}

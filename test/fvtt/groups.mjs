@@ -248,13 +248,20 @@ assert.notEqual(hashWith({ secrets: false, actionable: false }), hashWith({ acti
 assert.notEqual(hashWith({ actionable: false }), hashWith({}), 'links to act on alone change the hash')
 const summary = asCharacter.add({ html: party.system.description.summary, relativeTo: party })
 assert.match(await textOf(summary, asCharacter.sources.get(summary)), /class="ss-save roll"/, "a character's: a link to act on")
-// A character's hash, as 0.29.0 made it, byte for byte.
-const { SheetTexts: OldTexts } = await import(`${oldModule('0.29.0')}/scripts/sheet-texts.mjs`)
+// A character's hash, as 0.29.0 made it, of its format and its source alone. Changed on purpose
+// (module 0.52.0): format 8, with the game's abilities and skills in it, gives every description a
+// new hash once, so none is 0.29.0's any more; a character's own is still hashed by 0.29.0's
+// textHash of that format and its source, nothing else, as a reference shows byte for byte.
+const { SheetTexts: OldTexts, textHash: oldHash } = await import(`${oldModule('0.29.0')}/scripts/sheet-texts.mjs`)
 for (const [source, why] of [[{ html, relativeTo: party }, 'a description'], [{ html: '<p>Take [[/save dex dc=15]].</p>', relativeTo: thorin }, 'one with a save'], [{ reference: 'Compendium.rules.JournalEntryPage.prone' }, 'a reference']]) {
-  assert.equal(new SheetTexts().add(source), new OldTexts().add(source), `${why}: a character's hash unchanged`)
+  assert.notEqual(new SheetTexts().add(source), new OldTexts().add(source), `${why}: a character's hash new in format 8`)
 }
+const rulesVersion = (() => { try { return game.settings.get('dnd5e', 'rulesVersion') ?? '' } catch { return '' } })()
+const keysOf = list => Object.keys(list ?? {}).sort().join(',')
+const format8 = `format:8\nrules:${rulesVersion}\nlang:${game.i18n?.lang ?? ''}\nabilities:${keysOf(CONFIG.DND5E.abilities)}\nskills:${keysOf(CONFIG.DND5E.skills)}`
+assert.equal(new SheetTexts().add({ reference: 'Compendium.rules.JournalEntryPage.prone' }), oldHash(`${format8}\nref:Compendium.rules.JournalEntryPage.prone`), "a reference: a character's hash, 0.29.0's of format 8 and its source")
 assert.ok(enriched.some(options => options.secrets === false), 'enriched without secrets')
-ok("a group's descriptions and its items' are sent without their secrets, and with no link to act on; the same HTML on a character keeps both, under another hash; and every character's hash is 0.29.0's, byte for byte")
+ok("a group's descriptions and its items' are sent without their secrets, and with no link to act on; the same HTML on a character keeps both, under another hash; and every character's hash is new in format 8, made as 0.29.0 made it of its format and its source alone")
 
 // ---- A private group ----
 const privateOne = updates[1]

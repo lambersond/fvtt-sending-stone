@@ -1,5 +1,6 @@
 import { DIE_FACES } from "./constants.mjs";
 import { damageRollsFor, diceForEach, plannableDamage, plannedDice } from "./dice-plan.mjs";
+import { CHECK_KEY, isAbilitySent } from "./check-abilities.mjs";
 
 /**
  * The links in a description that the app can act on: saving throws, checks, damage and healing,
@@ -88,20 +89,6 @@ const MOST_CHECKS = 10;
  * @type {string[]}
  */
 const CHECK_TYPES = ["check", "skill", "tool"];
-
-/**
- * A key dnd5e names a skill or tool by, as the app accepts one: never ":" or "|", which separate
- * the checks a span offers.
- * @type {RegExp}
- */
-const CHECK_KEY = /^[A-Za-z][\w-]{0,31}$/;
-
-/**
- * The abilities a check may be made with: the six the app knows. A link to a check with any other,
- * such as a world's own, is text.
- * @type {string[]}
- */
-const SIX_ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
 
 /**
  * Where text is never marked: links, headings, and the spans this makes.
@@ -1130,21 +1117,26 @@ function abilityKeys(keys) {
  */
 
 /**
- * The checks a link offers, each one dnd5e has, with one of the six abilities the app knows, and
- * each kind of check once, the first it names; or null if it offers none of them, or more than
- * the most a link may offer.
- * @param {{type: string, ability?: string|null, key?: string|null}[]} options
+ * The checks a link offers, each one dnd5e has, and each kind of check once, the first it names;
+ * or null if it offers none of them, or more than the most a link may offer. A choice is sent
+ * whole or not at all, since 0.52.0: one way on an ability the game has that the campaign's app
+ * isn't sent checks on (`isAbilitySent`) makes the whole null, never a choice of the rest, while a
+ * way of no kind of check, or on an ability, skill or tool the game hasn't, is passed over.
+ * @param {{type: string, ability?: string|null, key?: string|null}[]} offered
+ * @param {object} [options]
+ * @param {boolean} [options.anyAbility]   Does the app read checks on any ability, since 0.52.0?
  * @returns {CheckOption[]|null}
  */
-export function checkOptions(options) {
+export function checkOptions(offered, { anyAbility=false }={}) {
   const config = CONFIG.DND5E ?? {};
   const known = new Set();
   const checks = [];
-  for ( const { type, ability, key } of options ) {
-    if ( !CHECK_TYPES.includes(type) || !SIX_ABILITIES.includes(ability) ) continue;
+  for ( const { type, ability, key } of offered ) {
+    if ( !CHECK_TYPES.includes(type) || (typeof ability !== "string") ) continue;
     if ( !Object.hasOwn(config.abilities ?? {}, ability) ) continue;
     if ( (type === "skill") && !(CHECK_KEY.test(key ?? "") && Object.hasOwn(config.skills ?? {}, key)) ) continue;
     if ( (type === "tool") && !isTool(key) ) continue;
+    if ( !isAbilitySent(ability, anyAbility) ) return null;
     const id = (type === "check") ? `check:${ability}` : `${type}:${key}`;
     if ( known.has(id) ) continue;
     known.add(id);

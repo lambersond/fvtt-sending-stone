@@ -166,6 +166,8 @@ equip(rook, {
       check('unknown-spell', 'Unknown Spell Check', { associated: ['arc'], ability: '', dc: { formula: '10 + @scaling' } }, { affects: 'self', scaling: { allowed: true, max: '9' } }),
     ] },
     { id: 'sanity', name: 'Sanity Test', type: 'feat', system: { properties: [] }, activities: [check('mad', 'Keep Your Wits', { ability: 'san', associated: [], dc: { formula: '12' } })] },
+    // Insight or a world's own Etiquette, on dnd5e's Honor where the world has them (since 0.52.0).
+    { id: 'manners', name: 'Court Manners', type: 'feat', system: { properties: [] }, activities: [check('court', 'Read the Court', { ability: '', associated: ['ins', 'eti'], dc: { formula: '12' } })] },
     { id: 'eleven', name: 'Jack of Many Trades', type: 'feat', system: { properties: [] }, activities: [check('many', 'Many Things', { ability: '', associated: ELEVEN, dc: { formula: '10' } })] },
     { id: 'helm', name: "Pilot's Helm", type: 'feat', system: { properties: [] }, activities: [check('steer', 'Steer', { ability: 'str', associated: ['water'], dc: { formula: '10' } })] },
     { id: 'gem', name: 'Odd Gem', type: 'consumable', system: { properties: [], identified: false, quantity: 1 }, activities: [check('glint', 'Glint', { associated: ['arc'], ability: '', dc: { formula: '12' } })] },
@@ -546,6 +548,13 @@ ok('Entangle in its pack\'s order leads with its save, its Escape Plants check a
 
 const edge = (actor, itemId) => rollsOf(actor.items.get(itemId))
 assert.deepEqual([edge(rook, 'sanity').activity?.type, edge(rook, 'sanity').check], ['check', undefined], 'an ability the app doesn\'t know')
+// Since 0.52.0, whole or not at all: to an app before 0.52.0, a choice of Insight or Etiquette on
+// Honor has no check, never Insight alone.
+CONFIG.DND5E.abilities.hon = { label: 'Honor', abbreviation: 'HON' }
+CONFIG.DND5E.skills.eti = skill('Etiquette', 'hon')
+assert.deepEqual([edge(rook, 'manners').activity?.type, edge(rook, 'manners').check], ['check', undefined], 'Insight or Etiquette on Honor, whole or not at all')
+delete CONFIG.DND5E.abilities.hon
+delete CONFIG.DND5E.skills.eti
 assert.deepEqual([edge(rook, 'eleven').activity?.type, edge(rook, 'eleven').check], ['check', undefined], 'eleven checks')
 assert.deepEqual([edge(rook, 'pipes').activity?.type, edge(rook, 'pipes').check], ['check', undefined], 'a check that names none')
 assert.deepEqual(edge(rook, 'helm').check, { checks: [{ type: 'check', ability: 'str' }], dc: 10, own: true }, 'a vehicle is an ability check')
