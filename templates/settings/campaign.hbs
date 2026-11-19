@@ -422,6 +422,27 @@
             <p class="hint">{{localize "SENDINGSTONE.Config.Actions.CompanionInitiativeHint"}}</p>
         </div>
     </fieldset>
+
+    <fieldset class="sending-stone-health">
+        <legend>{{localize "SENDINGSTONE.Config.Actions.Health"}}</legend>
+        <div class="form-group">
+            <label for="sending-stone-health">{{localize "SENDINGSTONE.Config.Actions.HealthPlayers"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-health" name="campaign.health" {{#if campaign.health}}checked{{/if}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.HealthHint"}}</p>
+            {{#if campaign.healthUnavailable}}<p class="hint sending-stone-warning">{{campaign.healthUnavailable}}</p>{{/if}}
+            {{#if campaign.healthApp}}<p class="hint sending-stone-warning">{{localize "SENDINGSTONE.Config.Actions.HealthApp"}}</p>{{/if}}
+        </div>
+        <div class="form-group sending-stone-nested {{#unless campaign.health}}disabled{{/unless}}">
+            <label for="sending-stone-health-hit-points">{{localize "SENDINGSTONE.Config.Actions.HealthHitPoints"}}</label>
+            <div class="form-fields">
+                <input type="checkbox" id="sending-stone-health-hit-points" name="campaign.healthHitPoints"
+                       {{#if campaign.healthHitPoints}}checked{{/if}} {{#unless campaign.health}}disabled{{/unless}}>
+            </div>
+            <p class="hint">{{localize "SENDINGSTONE.Config.Actions.HealthHitPointsHint"}}</p>
+        </div>
+    </fieldset>
 </div>
 
 {{else if campaign.tabs.connection}}

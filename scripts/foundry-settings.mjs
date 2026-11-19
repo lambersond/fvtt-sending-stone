@@ -171,7 +171,8 @@ function toggle(id, label, value, note=null) {
  * may turn off and delete their own effects, since 0.40.0 whether they may use Wild Shape, since 0.44.0
  * whether they may set their hit points, since 0.49.0 whether they may add and take away their coins
  * and whether other coins pay where a character is short of one, since 0.36.0 how its characters'
- * companions enter initiative, and its groups.
+ * companions enter initiative, since 0.50.0 whether they see other creatures' health and their hit
+ * points, and its groups.
  * @param {Campaign} campaign
  * @returns {object[]}
  */
@@ -195,6 +196,8 @@ function campaignRows(campaign) {
     ? localize("SENDINGSTONE.Config.Actions.RollsReason.system") : null;
   const coinsWhy = (campaign.coins && (game.system?.id !== "dnd5e"))
     ? localize("SENDINGSTONE.Config.Actions.RollsReason.system") : null;
+  const healthWhy = (campaign.health && (game.system?.id !== "dnd5e"))
+    ? localize("SENDINGSTONE.Config.Actions.RollsReason.system") : null;
   return [
     toggle("rolls", localize("SENDINGSTONE.Config.Actions.Rolls"), campaign.rolls, rollsWhy),
     toggle("attacks", localize("SENDINGSTONE.Config.Actions.Attacks"), campaign.attacks, attacksWhy),
@@ -209,6 +212,8 @@ function campaignRows(campaign) {
     toggle("coinChange", localize("SENDINGSTONE.Config.Actions.CoinChange"), campaign.coinChange),
     row("companionInitiative", localize("SENDINGSTONE.Config.Actions.CompanionInitiative"), campaign.companionInitiative,
       localize(`SENDINGSTONE.Config.Actions.CompanionInitiative${(campaign.companionInitiative === COMPANION_INITIATIVE.AFTER) ? "After" : "Own"}`)),
+    toggle("health", localize("SENDINGSTONE.Config.Actions.HealthPlayers"), campaign.health, healthWhy),
+    toggle("healthHitPoints", localize("SENDINGSTONE.Config.Actions.HealthHitPoints"), campaign.healthHitPoints),
     row("groups", localize("SENDINGSTONE.Settings.Groups"), groups.length,
       groups.length ? groups.map(group => group.name).join(", ") : localize("SENDINGSTONE.Settings.None"))
   ];

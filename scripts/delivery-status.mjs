@@ -101,6 +101,13 @@ const lastDelivered = new Map();
 const lastFetched = new Map();
 
 /**
+ * Since 0.50.0, how long each campaign's fetches wait while nobody is in its app, as its last fetch
+ * said, in milliseconds, by campaign id.
+ * @type {Map<string, number>}
+ */
+const quietFetches = new Map();
+
+/**
  * When each cause was last told, or, once told, last cleared, by `app:<reason>`,
  * `<campaignId>:<reason>`, or `<campaignId>:<reason>:<type>` for an event's. Events and players'
  * rolls share the first two.
@@ -175,16 +182,32 @@ export function noteFailed(envelope, err) {
 }
 
 /**
- * Note a campaign's players' rolls fetched: they reach the game again, if they didn't.
+ * Note a campaign's players' rolls fetched: they reach the game again, if they didn't. Since 0.50.0,
+ * and whether its fetches now wait as nobody is in its app, as the settings window says.
  * @param {string} campaignId
+ * @param {object} [options]
+ * @param {number} [options.quiet]   How long its fetches now wait while nobody is in its app, in
+ *                                   milliseconds; 0 where they're made at their usual pace.
  * @returns {void}
  */
-export function noteFetched(campaignId) {
+export function noteFetched(campaignId, { quiet=0 }={}) {
   lastFetched.set(campaignId, Date.now());
+  if ( quiet > 0 ) quietFetches.set(campaignId, quiet);
+  else quietFetches.delete(campaignId);
   recover(`commands:${campaignId}`, () => game.i18n.format("SENDINGSTONE.Notify.RollsRecovered", {
     campaign: getCampaigns().find(({ id }) => id === campaignId)?.title ?? ""
   }));
   changed();
+}
+
+/**
+ * Since 0.50.0, note a campaign's fetches no longer quiet, as the settings window says: its fetching
+ * stopped, or its hello was answered and it fetches in full at its usual pace again.
+ * @param {string} campaignId
+ * @returns {void}
+ */
+export function noteQuietEnded(campaignId) {
+  if ( quietFetches.delete(campaignId) ) changed();
 }
 
 /**
@@ -198,6 +221,8 @@ export function noteFetched(campaignId) {
  * @returns {void}
  */
 export function noteFetchFailed(campaign, err, { stopped=false, failures=1 }={}) {
+  // The next fetch, after the back-off, is in full: nothing is said of quiet until an answer says it.
+  quietFetches.delete(campaign.id);
   const reason = reasonOf(err);
   const key = (REASONS[reason] === "app") ? `app:${reason}` : `${campaign.id}:${reason}`;
   const { entry, fresh } = fail(`commands:${campaign.id}`, err, reason, { cause: key, stopped, count: failures });
@@ -285,7 +310,8 @@ export function describeProblem(err, { campaign=null, destination=getDestination
 /**
  * What the settings window says of a saved campaign's posts and fetches, a line each: whether its
  * events are delivered, its last refused event, its sheets withheld, and whether its players'
- * rolls are fetched. Only the browser sending events knows; any other says whose that is.
+ * rolls are fetched, since 0.50.0 quietly while nobody is in its app. Only the browser sending
+ * events knows; any other says whose that is.
  * @param {Campaign} campaign
  * @returns {{state: "ok"|"error"|"warning"|"idle", text: string}[]}
  */
@@ -321,6 +347,12 @@ export function campaignStatus(campaign) {
     if ( rolls?.stopped ) line("error", "RollsStopped", { time: timeOf(rolls.last), problem: problemOf(rolls) });
     else if ( rolls && (rolls.count >= FAILING_AFTER) ) {
       line("warning", "RollsFailing", { time: timeOf(rolls.since), problem: problemOf(rolls) });
+    }
+    else if ( quietFetches.has(campaign.id) ) {
+      line("ok", "RollsQuiet", {
+        time: timeOf(lastFetched.get(campaign.id)),
+        seconds: Math.round(quietFetches.get(campaign.id) / 1000)
+      });
     }
     else if ( lastFetched.has(campaign.id) ) line("ok", "RollsFetched", { time: timeOf(lastFetched.get(campaign.id)) });
   }

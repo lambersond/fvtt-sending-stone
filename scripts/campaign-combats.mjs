@@ -43,6 +43,17 @@ export function noteCombatSent(combatId, campaignId) {
 }
 
 /**
+ * Has a campaign been told about a combat, since 0.50.0, as health-sync.mjs asks before it sends one
+ * of its combatants again?
+ * @param {string} combatId
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function knowsCombat(combatId, campaignId) {
+  return told.get(combatId)?.has(campaignId) ?? false;
+}
+
+/**
  * Send a combat event to each campaign it concerns. A campaign whose characters have just joined
  * the fight is sent the whole combat instead; one whose last character has just left is told the
  * fight is over for it.

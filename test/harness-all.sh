@@ -37,6 +37,10 @@ for v in X=1 MIDI=1; do run chat-rolls $v; done
 run activities X=1 SLIM_CHECK=1; run activities MIDI=1 SLIM_CHECK=1; run activities LIBWRAPPER=1; run activities OMIT_ROOT=1
 for v in X=1 MIDI=1; do run enchant $v SLIM_CHECK=1; done
 run errors X=1
+# Module 0.50.0: quiet looks while nobody is in the app, its usual pace for two minutes after a hello,
+# while a command is made or after an answer without quiet, a full fetch after a failed one, and the
+# settings window's line. dnd5e 5.3.3 alone: the fetcher reads nothing of dnd5e.
+run quiet X=1
 # Ending a concentration, spending charges and Heroic Inspiration, and hits, misses and saves in chat
 # (module 0.29.0), and since 0.42.1 spell slots spent and restored: dnd5e's alone, and with Midi-QOL's
 # stand-ins.
@@ -117,4 +121,7 @@ for v in X=1 "X=1 DND5E6=1"; do run coins $v SLIM_CHECK=1; done
 # received and the Gamemasters all of it, and what a failure part way leaves (dnd5e 5.3.3 and 6.0.5
 # stand-ins).
 for v in X=1 "X=1 DND5E6=1"; do run handouts $v SLIM_CHECK=1; done
+# Module 0.50.0: other creatures' health in the app: who is shown, dnd5e's bands under 5.3.3 and
+# 6.0.5, the watch that follows hit points between combat events, and older apps sent nothing new.
+for v in X=1 "X=1 DND5E6=1"; do run health $v; done
 exit $fail

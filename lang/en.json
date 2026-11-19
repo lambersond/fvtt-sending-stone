@@ -211,7 +211,13 @@
         "CompanionInitiative": "Companions' initiative",
         "CompanionInitiativeOwn": "Its own roll",
         "CompanionInitiativeAfter": "Right after its character",
-        "CompanionInitiativeHint": "A character's companions are the creatures it summons and the NPCs its player owns. Its own roll: each rolls its own initiative, from its tab in the app or here. Right after its character: in a combat with its character, each is set just below the character's initiative whenever that's rolled, changed or cleared, here or in the app, and isn't rolled on its own."
+        "CompanionInitiativeHint": "A character's companions are the creatures it summons and the NPCs its player owns. Its own roll: each rolls its own initiative, from its tab in the app or here. Right after its character: in a combat with its character, each is set just below the character's initiative whenever that's rolled, changed or cleared, here or in the app, and isn't rolled on its own.",
+        "Health": "Other creatures' health",
+        "HealthPlayers": "Allow Players to see other creatures' health in the app",
+        "HealthHint": "Off by default. On the app's Combat tab, each creature in a fight that isn't the party's shows how hurt it is: Unhurt, Hurt, Bloodied (at dnd5e's Bloodied threshold, usually half its hit points) or Down (at 0). The party is this campaign's characters, their companions and any creature a player owns. Never a hidden combatant, nor one whose token is hidden or Secret. Where dnd5e's Bloodied Status is Never Display, Bloodied isn't used. Changes reach the app within a few seconds.",
+        "HealthHitPoints": "Show their hit points too",
+        "HealthHitPointsHint": "Off by default, as it gives away how much each creature can still take. On: those creatures show their hit points instead, out of their maximum and with any temporary hit points, as the party's do.",
+        "HealthApp": "The app this campaign sends to doesn't show other creatures' health yet."
       },
       "Connection": {
         "Title": "Title",
@@ -349,6 +355,7 @@
       "Refused": "Last refused at {time}: {problem}",
       "Withheld": "{name}'s sheet is withheld: it came to {size}, more than the {limit} the app takes.",
       "RollsFetched": "Players' rolls fetched at {time}.",
+      "RollsQuiet": "Players' rolls fetched at {time}. No one has a character or party open in the app, so Sending Stone asks it every {seconds} seconds.",
       "RollsStopped": "Players' rolls stopped at {time}: {problem}",
       "RollsFailing": "Players' rolls failing since {time}: {problem}",
       "OtherBrowser": "Events go from {name}'s browser, the active Gamemaster's, which is told of any problem."

@@ -1,9 +1,27 @@
 import { includeGmContent } from "./config.mjs";
 import { campaignCharacterId, combatantCharacterId, endedForms, hitPoints } from "./characters.mjs";
+import { healthOf, healthOn, healthReader, isHealthShown } from "./creature-health.mjs";
 
 /**
- * Turning combats and combatants into plain data for the listener.
+ * Turning combats and combatants into plain data for the listener. Since 0.50.0, and so here, what
+ * each campaign whose app reads health was last told of each combatant's hit points, health and
+ * defeat, by every description it was sent, so that health-sync.mjs sends one again only where that
+ * differs.
  */
+
+/**
+ * What each campaign whose app reads health was last described of each combatant, since 0.50.0: by
+ * combat id, then `<campaign id>.<combatant id>`, the JSON of its `{ hp, health, defeated }`.
+ * @type {Map<string, Map<string, string>>}
+ */
+const described = new Map();
+
+/**
+ * The fields of a combatant's description health-sync.mjs follows, since 0.50.0, in the order a
+ * change names them.
+ * @type {readonly string[]}
+ */
+const FOLLOWED = Object.freeze(["hp", "health", "defeated"]);
 
 /**
  * What says which companion a combatant is, for an app that reads companions: creature-sync.mjs's
@@ -75,11 +93,27 @@ function isCharacter(combatant, campaign) {
  * last told, and a companion's hit points as a character's; for any other app, exactly as before.
  * Since 0.40.0 a form's combatant is its character's, and stays so where it names the form once
  * deleted with no token to read another actor through: the character's own actor then stands in.
+ * Since 0.50.0, for an app that reads health, where the campaign's Gamemaster shows it, how hurt a
+ * creature not of the party is, `health`, and its hit points too where they show them; and what the
+ * campaign is told of each combatant's hit points, health and defeat is noted, whichever event
+ * tells it. Every description sent passes here.
  * @param {Combatant} combatant
  * @param {Campaign} campaign
  * @returns {object}
  */
 export function summarizeCombatant(combatant, campaign) {
+  const summary = describe(combatant, campaign);
+  if ( healthReader(campaign.id) ) noteDescribed(combatant, campaign, summary);
+  return summary;
+}
+
+/**
+ * A combatant as a campaign would be told it now, noting nothing.
+ * @param {Combatant} combatant
+ * @param {Campaign} campaign
+ * @returns {object}
+ */
+function describe(combatant, campaign) {
   const character = combatantCharacterId(combatant, campaign);
   const actor = combatant.actor ?? (character ? game.actors.get(character) : null) ?? null;
   const companion = combatantCompanion(combatant, campaign);
@@ -99,9 +133,61 @@ export function summarizeCombatant(combatant, campaign) {
     playerOwned: actor?.hasPlayerOwner ?? false,
     disposition: dispositionOf(combatant)
   };
+  // The campaign's own: one of its characters or a companion it was listed.
+  const own = Boolean(character || companion);
+  const shown = !own && healthReader(campaign.id) && healthOn(campaign) && isHealthShown(combatant, actor);
   if ( gmContent ) summary.hidden = combatant.hidden;
-  if ( character || companion || gmContent ) summary.hp = hitPoints(actor);
+  if ( own || gmContent || (shown && (campaign.healthHitPoints === true)) ) summary.hp = hitPoints(actor);
+  if ( shown ) summary.health = healthOf(actor);
   return summary;
+}
+
+/**
+ * Note what a campaign is told of a combatant's hit points, health and defeat, since 0.50.0.
+ * @param {Combatant} combatant
+ * @param {Campaign} campaign
+ * @param {object} summary   Its description as sent.
+ * @returns {void}
+ */
+function noteDescribed(combatant, campaign, summary) {
+  const combatId = combatant.parent?.id;
+  if ( !combatId ) return;
+  if ( !described.has(combatId) ) described.set(combatId, new Map());
+  described.get(combatId).set(`${campaign.id}.${combatant.id}`, followedOf(summary));
+}
+
+/**
+ * A description's hit points, health and defeat, as noted.
+ * @param {object} summary
+ * @returns {string}
+ */
+function followedOf(summary) {
+  return JSON.stringify(Object.fromEntries(FOLLOWED.map(key => [key, summary[key]])));
+}
+
+/**
+ * Which of a combatant's hit points, health and defeat, `"hp"`, `"health"` and `"defeated"` in that
+ * order, a campaign would be told otherwise now than it was last told, since 0.50.0: none where it
+ * was told nothing of it with health read, as nothing it holds is known. It notes nothing.
+ * @param {Combatant} combatant
+ * @param {Campaign} campaign
+ * @returns {string[]}
+ */
+export function healthChanges(combatant, campaign) {
+  const was = described.get(combatant.parent?.id)?.get(`${campaign.id}.${combatant.id}`);
+  if ( was === undefined ) return [];
+  const before = JSON.parse(was);
+  const now = JSON.parse(followedOf(describe(combatant, campaign)));
+  return FOLLOWED.filter(key => JSON.stringify(now[key]) !== JSON.stringify(before[key]));
+}
+
+/**
+ * Forget what campaigns were told of a combat's combatants, since 0.50.0, as it's deleted.
+ * @param {string} combatId
+ * @returns {void}
+ */
+export function forgetDescribed(combatId) {
+  described.delete(combatId);
 }
 
 /**

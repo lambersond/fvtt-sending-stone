@@ -84,7 +84,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; since 0.44.0 whether Tidy 5e Sheets is active, turned off or not installed, none of which is a fault; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
-| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Allow Players to add and take away coins from the app, Pay with other coins when a character is short of one, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Allow Players to change their hit points from the app, Companions' initiative | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Coins**, whether its players may [add coins to their characters and take them away](#adding-and-taking-away-coins) from the app, on until you turn it off, and whether a character short of a coin pays with its other coins, on until you turn it off too. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Hit points**, whether its players may set their characters', forms' and companions' hit points and temporary hit points from the app, on by default ([Hit points](#hit-points)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. |
+| A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Allow Players to add and take away coins from the app, Pay with other coins when a character is short of one, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Allow Players to change their hit points from the app, Companions' initiative, Allow Players to see other creatures' health in the app, Show their hit points too | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Coins**, whether its players may [add coins to their characters and take them away](#adding-and-taking-away-coins) from the app, on until you turn it off, and whether a character short of a coin pays with its other coins, on until you turn it off too. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Hit points**, whether its players may set their characters', forms' and companions' hit points and temporary hit points from the app, on by default ([Hit points](#hit-points)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. Under **Other creatures' health**, whether its players see in the app how hurt the other creatures in a fight are, and their hit points too, both off by default ([Other creatures' health](#other-creatures-health)). |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
 
@@ -110,7 +110,8 @@ involves its characters, described for it alone:
   chat until you clear the chat.
 - **Combat:** encounters while any of its characters are in them. A fight reaches the campaign
   when its first character joins and ends for it when its last one leaves.
-- **Hit points and audiences** cover only its own characters.
+- **Hit points and audiences** cover only its own characters and, since 0.50.0, how hurt other
+  creatures are, where you allow it.
 
 **A character's players.** Give each player Owner on their own character by name, or assign it to
 them in User Configuration. Since 0.46.0 Sending Stone reads a character's players as it has for its
@@ -479,9 +480,9 @@ either is missing.
   among its members that are the campaign's characters, each the same whole share; what can't be
   shared evenly stays with the party: "Distributes 100 gp among Bram, Lia, Thorin, and Vex (25 gp
   each); 3 gp stays with The Iron Company". Its members changing in the meantime stops it.
-- **Handing out coins.** Since 0.49.0, a player can hand out a set amount of their own character's
-  coins to each of several of the campaign's characters at once: **Hand out**, on the Inventory
-  tab's Currency row. The total is taken from the giver as coins
+- **Handing out coins.** Since 0.49.0, a player can give a set amount of their own character's
+  coins to each of the campaign's characters they tick, one or several at once: **Give**, on the
+  Inventory tab's Currency row. The total is taken from the giver as coins
   [taken away](#adding-and-taking-away-coins) are, other coins paying where they're short of one,
   unless **Pay with other coins when a character is short of one** is off. No line is posted for
   everyone: each character given coins is whispered what they received, "Vex received 200 pp and 50
@@ -498,10 +499,12 @@ either is missing.
   drop moves it. Each item arrives unequipped and unattuned, what a container held too, with its
   uses, effects and identification. A potion joins a stack of the same potion, but never an
   unidentified one, one with uses spent or one enchanted. Coins are moved exactly: never more than
-  there are, and dnd5e 6's fractions stay. An item in a container that hides what it holds, or
-  deeper than five containers, isn't offered.
+  there are, and dnd5e 6's fractions stay; coins given to characters, as above, are taken from the
+  giver as coins taken away are. An item in a container that hides what it holds, or deeper than
+  five containers, isn't offered.
 - **A line in chat** for each move, as the character who moved it, for everyone, such as "Takes 50
-  gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM".
+  gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM". Coins given to
+  characters, as above, are whispered instead.
 - **One at a time.** Moves are made one after another, so two players taking the last potion at once
   never both get it. A move is written in steps, the copy before the original is deleted; one that
   fails, or that another module stops, puts back what it can and moves nothing more. A browser
@@ -523,7 +526,7 @@ removed. An item in a container that hides what it holds isn't offered.
 ### Adding and taking away coins
 
 Since 0.49.0 a player can add coins to their own character in the app, or take them away, as when
-you say "you're paid 5 gp" or "that costs 5 gp": **Add or take away**, on the Inventory tab's
+you say "you're paid 5 gp" or "that costs 5 gp": **Add or remove**, on the Inventory tab's
 Currency row, then how many of each coin. **Allow Players to add and take away coins from the app**,
 under **Coins** on the campaign's Player actions tab, is **on by default**, for campaigns saved
 before 0.49.0 too, apart from players' rolls and moves, under D&D Fifth Edition 5 and 6; untick it
@@ -680,6 +683,35 @@ its players for their saves, resets death saves on the way up from 0, and under 
 downed conditions in combat where its Auto-Apply Downed setting asks; and a Wild Shape form set to 0
 ends, as at 0 any other way. The Gamemaster's page in the app doesn't offer it: you change hit points
 here.
+
+### Other creatures' health
+
+Since 0.50.0 a campaign's players can see in the app how hurt the other creatures in a fight are.
+**Allow Players to see other creatures' health in the app**, under **Other creatures' health** on the
+campaign's Player actions tab, is **off by default**, for campaigns saved before 0.50.0 too, apart
+from players' rolls, under D&D Fifth Edition 5 and 6. With it on, each creature in a fight that isn't
+the party's shows one word on its row of the app's Combat tab, and in the turn panel on its turn:
+**Unhurt** at its maximum, **Hurt** below it, **Bloodied** at dnd5e's Bloodied threshold (half its
+hit points; under dnd5e 6 the creature's own, which an effect can change, and never a vehicle's) and
+**Down** at 0. Temporary hit points don't count, as in dnd5e. Where dnd5e's *Bloodied Status* is
+*Never Display*, Bloodied isn't used: Hurt instead. *Only Display for Allies* doesn't hide it: the
+switch is your own permission for the app. Tick **Show their hit points too**, nested under it and
+off by default too, and those creatures show their hit points instead, out of their maximum and with
+any temporary hit points, as the party's do; it gives away how much each can still take.
+
+The party is the campaign's characters, their companions and any creature a player owns: their rows
+show their hit points as before, never a word. Never shown: a hidden combatant, a creature whose
+token is hidden from players or Secret, or one of any other disposition; a combatant with no token
+is shown. A creature that changes sides follows its token and its owner: turned Secret or hidden, it
+loses its word; given to a player, it's the party's. **GM-only details** still sends every
+combatant's hit points, but the app shows another creature's only beside its word, where both
+switches allow it, and so never a Secret or hidden one's.
+
+The words follow the game: a quarter of a second after the creatures in a fight, their tokens and
+their effects stop changing, what each campaign's app would be told of them now is compared with
+what it was told, and a combatant that differs is sent again, the party's own too, so their hit
+points on the Combat tab no longer wait for the next turn. An app before 0.50.0 is sent none of
+this, and a campaign whose app doesn't show other creatures' health yet says so under the switch.
 
 ### Hit, miss and save results
 
@@ -918,7 +950,7 @@ With **GM-only details** off, the listener receives what players could see:
 | A blind roll the Gamemaster later reveals | Yes, from then on, as an update. |
 | A message made private after it was sent | The listener is told to delete it. |
 | Hidden combatants | No. Their turns are reported with no combatant. Revealing one reports it joining; hiding one reports it leaving. |
-| Hit points | The campaign's own characters only and, to an app that reads companions, their companions'. |
+| Hit points | The campaign's own characters only and, to an app that reads companions, their companions'. Since 0.50.0, to an app that reads it, where you allow it, how hurt other creatures in a fight are, and with **Show their hit points too** their hit points; never a hidden combatant's, nor a hidden or Secret token's ([Other creatures' health](#other-creatures-health)). |
 | Character sheets | The campaign's own characters only: what their players can already see in Foundry, and their companions' sheets, to an app that reads them: without secrets where their players don't own the creature in Foundry. A character in Wild Shape, or otherwise transformed, to an app that takes Wild Shape, is sent its form's sheet, under the character's own name. |
 | Party sheets | Only to characters whose players have Observer or Owner on the group in Foundry: names and portraits of its members, its inventory and its description, without secrets. |
 | Journal notes | A character's journal for a campaign to that campaign, a party's to it while one of its characters can see the party; a page only Gamemasters, or only some of the journal's players, can see is never sent, and nor is a secret its readers couldn't read in Foundry: a party page's, or one on a character's page its players don't all own; and who last deleted or reordered a page the app is sent, by name, and when. |
@@ -1159,6 +1191,14 @@ Gamemaster-only information switched on.
 - **Module 0.38.x's dish dialog served only the characters ticked as it opened,** whatever you
   ticked, and a card whose cook had left the campaign could never be served: if you used it, check
   who ate each dish served then.
+- **While nobody is in the app, your Foundry asks it less.** A minute or two after the last page of a
+  campaign in the app closes or goes to the background, yours or a player's, Sending Stone asks it
+  every 20 seconds whether there is anything to fetch, where it fetched every 10, with a full fetch
+  every five minutes. Someone opening the app is noticed within about 20 seconds, and their first
+  roll, note or move reaches the game then; after that, at once. A dish from the Magical Recipe Book
+  reaches you within about 20 seconds. For two minutes after Foundry connects it fetches as usual,
+  and notes written in the app while Foundry was closed reach it as it connects. With an older app,
+  nothing changes.
 
 ## Reporting a problem or an idea
 
@@ -1219,7 +1259,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/bridge-role.mjs` | Which browser sends: whether this one is the active Gamemaster's, and whether it has somewhere to post; apart from `bridge.mjs`, as the scripts the hello is built from ask it too |
 | `scripts/heartbeat.mjs` | Heartbeats to campaigns sent nothing lately, so the app knows the game is connected |
 | `scripts/transport.mjs` | Envelope, ordered delivery queue and retries, each post's outcome counted into `delivery-status.mjs`'s tally; what the app says it takes of sheets, and no post larger; why the app refused a post or fetch |
-| `scripts/delivery-status.mjs` | The tally of recent deliveries, which `transport.mjs` counts into; what the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window; a size in megabytes, as the Gamemaster and the app are told it |
+| `scripts/delivery-status.mjs` | The tally of recent deliveries, which `transport.mjs` counts into; what the Gamemaster is told when posts or fetches fail, once per cause, and when they work again; each campaign's status in the settings window, quiet fetching among it; a size in megabytes, as the Gamemaster and the app are told it |
 | `scripts/campaigns.mjs` | Campaigns, and moving pre-campaign connected characters into one |
 | `scripts/characters.mjs` | A campaign's characters and who owns them; a character's players, those who own it by name, else those it's assigned to: from 0.45.0 for its companions, from 0.46.0 for what its campaign is sent of other players and a dish's card, and from 0.47.0 for who a roll from the app is made as |
 | `scripts/typed-dice.mjs` | Whether a character's player may type in what their own dice show in the app: its primary players, and core's Make Manual Rolls permission |
@@ -1248,10 +1288,12 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/results.mjs` | The rules of what players see of chat results, as dnd5e and Midi-QOL show them, or always where the Gamemaster has players told so, read once per message, and the verdict on them that Manage Campaigns and the app show; whether an attack hit its target, and whether a character's player may see a card's DC |
 | `scripts/foundry-settings.mjs` | A campaign's Foundry settings for its Gamemaster in the app: versions, its switches, the visibility settings that decide chat results and the verdict; sent again when one changes or a listed group is renamed or deleted, and after a hello if they changed while it was on its way |
 | `scripts/combat.mjs` | Combat hooks |
-| `scripts/combat-data.mjs` | Combat and combatant serialization, each combatant's token's disposition as players see it |
+| `scripts/combat-data.mjs` | Combat and combatant serialization, each combatant's token's disposition as players see it, and from 0.50.0 how hurt one not of the party is, and what each campaign was last told of each |
 | `scripts/campaign-combats.mjs` | Which campaigns each combat has reached, and sending to them |
+| `scripts/health-sync.mjs` | From 0.50.0, to an app that reads health, each fight's combatants sent again outside the combat events, once the changes in that fight settle (250 ms), where their hit points, health or defeat differ from what the app was last told; and its combats afresh where it first says it does |
+| `scripts/creature-health.mjs` | From 0.50.0, how hurt a creature is, by dnd5e's own Bloodied rule, for the app's Combat tab; whether a campaign's app reads it, and what its hello says of the campaign's two switches |
 | `scripts/creature-initiative.mjs` | Companions' initiative "Right after its character": each of a character's companions in its combat set just below the character's initiative whenever it's set, rerolled or cleared, by the active Gamemaster's Foundry alone, its own writes marked so that they're never followed |
-| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells, descriptions' links, moves of items and coins, removals and journal notes from the app, one campaign at a time, with which characters it has open, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes, of its players' rolls and of their companions' |
+| `scripts/commands.mjs` | Fetching players' rolls, attacks, spells, descriptions' links, moves of items and coins, removals and journal notes from the app, one campaign at a time, with which characters it has open, and reporting what became of each, a Gamemaster's roll with the chat messages it made; what a campaign's hello says it makes, of its players' rolls and of their companions'; and, while nobody is in the app, quiet looks in place of full fetches |
 | `scripts/prompts.mjs` | The saves the game asks of a campaign's characters on chat cards, and from 0.41.0 of their companions, to an app that reads them, told to the app as prompts, and closed as they're answered, or a concentration card's once its character no longer concentrates on what it asked about, or a companion's as it leaves the list |
 | `scripts/midi-prompts.mjs` | Midi-QOL's own saves, concentration checks and OverTime turn saves, asked in the app while the character is open there, and from 0.41.0 a companion's while one of its characters is, answered with the player's dice, or left to Midi |
 | `scripts/command-rolls.mjs` | Making a player's roll through dnd5e, as the player, and marking its card, as the Gamemaster's where they made it; a prompt's save on its card, or Midi-QOL's as Midi rolls it; a description's save or check, or a check activity's check, against its DC; several hit dice spent at once, a die at a time; what a command fetched from the app must look like, with each kind's own check but three: a note's, hit points', and that of a dice ask's answer, which is `later-dice.mjs`'s; why attacks can't be made here, and why a use isn't to be made |
@@ -1261,7 +1303,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name; an enchant activity used, by dnd5e's card or Midi-QOL's workflow, with what `command-enchant.mjs` chose and applies |
 | `scripts/command-alone.mjs` | An action's damage or healing on its own, dnd5e's card with no targets for the Gamemaster to apply, and a spent recharge rolled, each with the player's dice, outside Midi-QOL's workflow; from 0.41.0, at the level, in the attack mode and with the ammunition chosen, spending what its use would where asked |
 | `scripts/midi-economy.mjs` | Midi-QOL's Bonus Actions and reactions, from 0.41.0: whether Midi makes uses and enforces them for an actor, whether one is used, and marking one used, for uses, damage on its own and Wild Shape |
-| `scripts/dnd5e-generation.mjs` | Which generation of dnd5e the world runs, 5 or 6, by the first number of the system's version: for damage on its own, a plain roll and the dishes |
+| `scripts/dnd5e-generation.mjs` | Which generation of dnd5e the world runs, 5 or 6, by the first number of the system's version: for damage on its own, a plain roll, the dishes and, from 0.50.0, how hurt a creature is |
 | `scripts/command-enchant.mjs` | Enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items: the profile and item a use is made with, as the player chose them, the enchantment applied as the card's tray would, and enchantments ended; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
 | `scripts/command-turn.mjs` | Ending the current turn from the app, the character's or one of its companions', where it's still the turn the app was shown, by Foundry's own Next Turn; and taking back the turn one just ended, with Foundry's turn events off |

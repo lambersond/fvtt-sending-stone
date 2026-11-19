@@ -743,7 +743,8 @@ const ON = { enabled: true, kinds: ['coins'], reason: null, change: true }
 const OFF = { enabled: false, kinds: [], reason: 'off', change: false }
 assert.ok(!Object.hasOwn(settings.get('campaigns')[0], 'coins') && !Object.hasOwn(settings.get('campaigns')[0], 'coinChange'), 'a campaign saved before 0.49.0, with neither key')
 assert.deepEqual(helloOf().data.features.coins, ON, 'on for a campaign saved without it')
-assert.deepEqual(Object.keys(helloOf().data.features).slice(-2), ['hitPoints', 'coins'], 'last, after hitPoints')
+// Changed on purpose (module 0.50.0, item 58): `features.health`, whether its players see how hurt other creatures are, after coins.
+assert.deepEqual(Object.keys(helloOf().data.features).slice(-3), ['hitPoints', 'coins', 'health'], 'after hitPoints')
 const [campaign] = getCampaigns()
 assert.deepEqual([campaign.coins, campaign.coinChange], [true, true], 'each read as on')
 assert.deepEqual(coinFeatures({ ...campaign, coins: false }), OFF)

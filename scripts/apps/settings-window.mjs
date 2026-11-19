@@ -7,6 +7,7 @@ import { transferReader } from "../command-transfers.mjs";
 import { effectReader } from "../command-effects.mjs";
 import { hitPointReader } from "../command-hit-points.mjs";
 import { coinReader } from "../command-coins.mjs";
+import { healthReader } from "../creature-health.mjs";
 import { attacksUnavailable } from "../command-rolls.mjs";
 import { commandsOffered } from "../commands.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
@@ -53,6 +54,7 @@ const GENERAL = Object.freeze({
  */
 const DEPENDENTS = Object.freeze({
   "campaign.rolls": ["campaign.attacks", "campaign.prompts", "campaign.manualDice"],
+  "campaign.health": ["campaign.healthHitPoints"],
   chatEvents: ["chatScope", "chatResults"],
   midiIntegration: ["offCanvasTargets"]
 });
@@ -161,7 +163,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * @type {{id: string, title: string, secret: string, characters: Set<string>, groups: Set<string>,
    *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean,
    *   dishes: boolean, effects: boolean, wildShape: boolean, wildShapePacks: string[], hitPoints: boolean,
-   *   coins: boolean, coinChange: boolean, companionInitiative: string}[]}
+   *   coins: boolean, coinChange: boolean, health: boolean, healthHitPoints: boolean,
+   *   companionInitiative: string}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({
     ...campaign, wildShapePacks: [...campaign.wildShapePacks], secret: getSecret(campaign.id)
@@ -281,6 +284,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         hitPoints: campaign.hitPoints,
         coins: campaign.coins,
         coinChange: campaign.coinChange,
+        health: campaign.health,
+        healthHitPoints: campaign.healthHitPoints,
         companionInitiative: campaign.companionInitiative
       }))
     });
@@ -316,7 +321,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       if ( has("campaign.secret") ) campaign.secret = String(data["campaign.secret"] ?? "");
       for ( const name of [
         "rolls", "attacks", "prompts", "manualDice", "transfers", "dishes", "effects", "wildShape", "hitPoints", "coins",
-        "coinChange"
+        "coinChange", "health", "healthHitPoints"
       ] ) {
         if ( has(`campaign.${name}`) ) campaign[name] = data[`campaign.${name}`] === true;
       }
@@ -758,7 +763,9 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    * an older one answering with commands but not with `hitPoints`; and since 0.49.0, whether they may
    * add coins to their characters and take them away, which needs D&D Fifth Edition and an app that
    * takes them, an older one answering with commands but not with `coins`, and whether a character's
-   * other coins pay where it's short of one.
+   * other coins pay where it's short of one; and since 0.50.0, whether they see how hurt other
+   * creatures are, which needs D&D Fifth Edition and an app that shows it, an older one answering with
+   * commands but not with `health`, and their hit points too.
    * @param {SettingsWindow["#campaigns"][number]} campaign
    * @returns {object}
    */
@@ -822,6 +829,15 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         }) : null,
       coinsApp: campaign.coins && commandsOffered(campaign.id) && !coinReader(campaign.id),
       coinChange: campaign.coinChange,
+      // Since 0.50.0, whether its players see other creatures' health, and their hit points, which is
+      // nested under it and greyed while it's off.
+      health: campaign.health,
+      healthHitPoints: campaign.healthHitPoints,
+      healthUnavailable: (game.system?.id !== "dnd5e")
+        ? game.i18n.format("SENDINGSTONE.Config.Actions.Unavailable", {
+          reason: game.i18n.localize("SENDINGSTONE.Config.Actions.RollsReason.system")
+        }) : null,
+      healthApp: campaign.health && commandsOffered(campaign.id) && !healthReader(campaign.id),
       // Since 0.36.0, how its companions enter initiative, which needs no app: it's kept here.
       initiativeChoices: [
         { value: COMPANION_INITIATIVE.OWN, key: "CompanionInitiativeOwn" },
@@ -1142,7 +1158,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
       attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false,
       wildShape: false, wildShapePacks: [...WILD_SHAPE_PACKS], hitPoints: true, coins: true, coinChange: true,
-      companionInitiative: COMPANION_INITIATIVE.OWN
+      health: false, healthHitPoints: false, companionInitiative: COMPANION_INITIATIVE.OWN
     };
     this.#campaigns.push(campaign);
     await this.#show({ section: "campaign", campaignId: campaign.id, tab: "connection" }, "[name='campaign.title']");
@@ -1450,6 +1466,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       hitPoints: campaign.hitPoints,
       coins: campaign.coins,
       coinChange: campaign.coinChange,
+      health: campaign.health,
+      healthHitPoints: campaign.healthHitPoints,
       companionInitiative: campaign.companionInitiative
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {

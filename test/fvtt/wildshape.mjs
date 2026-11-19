@@ -257,7 +257,8 @@ const ON = { enabled: true, kinds: ['wildShape'], reason: null }
 const SYSTEM = { enabled: false, kinds: [], reason: 'system' }
 assert.deepEqual(helloOf().features.wildShape, OFF, 'off by default, a campaign saved without the field')
 // Changed on purpose (module 0.44.0, the v0.44 plan's item 4): `features.hitPoints`, whether its players set their hit points from the app, after Wild Shape.
-assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape', 'hitPoints', 'coins'])
+// Changed on purpose (module 0.50.0, item 58): `features.health`, whether its players see how hurt other creatures are, after coins.
+assert.deepEqual(Object.keys(helloOf().features), ['rolls', 'transfers', 'removals', 'notes', 'companions', 'favorites', 'dishes', 'effects', 'wildShape', 'hitPoints', 'coins', 'health'])
 await campaignAs({ wildShape: true })
 assert.deepEqual(helloOf().features.wildShape, ON, 'a saved switch sends the hello again, on')
 assert.ok(!helloOf().features.rolls.kinds.includes('wildShape') && !helloOf().features.companions.kinds.includes('wildShape'), "never among the rolls' kinds, nor a companion's")
@@ -2979,7 +2980,8 @@ game.system.id = 'dnd5e'
 const rowsOf = () => helloOf().settings.sections.find(section => section.id === 'campaign').rows
 await hello()
 // Changed on purpose (module 0.44.0, the v0.44 plan's item 4): the hit points switch's row, after Wild Shape's.
-assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'hitPoints', 'coins', 'coinChange', 'companionInitiative', 'groups'])
+// Changed on purpose (module 0.50.0, item 58): the rows of other creatures' health and their hit points, after companions' initiative.
+assert.deepEqual(rowsOf().map(each => each.id), ['rolls', 'attacks', 'prompts', 'manualDice', 'transfers', 'dishes', 'effects', 'wildShape', 'hitPoints', 'coins', 'coinChange', 'companionInitiative', 'health', 'healthHitPoints', 'groups'])
 assert.deepEqual(rowsOf().find(each => each.id === 'wildShape'), { id: 'wildShape', label, value: true, text: 'On' })
 game.system.id = 'pf2e'
 await hello()

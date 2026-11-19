@@ -58,6 +58,11 @@ import { diceStatus } from "./dice-plan.mjs";
  *                                    0.49.0: a larger coin broken, then smaller ones? On until the
  *                                    Gamemaster turns it off, and then more of a coin than is held is
  *                                    refused.
+ * @property {boolean} health         May its players see in the app how hurt the other creatures in a
+ *                                    fight are, since 0.50.0: Unhurt, Hurt, Bloodied or Down? Off until
+ *                                    the Gamemaster turns it on, under dnd5e.
+ * @property {boolean} healthHitPoints  And their hit points too, since 0.50.0? Off until the Gamemaster
+ *                                    turns it on, and only with `health`.
  * @property {string[]} wildShapePacks  The Actor compendiums, by collection, its druids learn Beasts
  *                                    from, since 0.40.0: dnd5e's 2024 Actors until the Gamemaster
  *                                    chooses; one missing since, as a module's uninstalled, left out.
@@ -75,7 +80,7 @@ export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
   return stored.map(({
     id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, dishes, effects, wildShape, wildShapePacks,
-    companionInitiative, hitPoints, coins, coinChange
+    companionInitiative, hitPoints, coins, coinChange, health, healthHitPoints
   }) => ({
     id,
     title,
@@ -100,6 +105,9 @@ export function getCampaigns() {
     // new campaign's do.
     coins: coins !== false,
     coinChange: coinChange !== false,
+    // A campaign saved before 0.50.0 has neither: its players see no other creature's health.
+    health: health === true,
+    healthHitPoints: healthHitPoints === true,
     wildShapePacks: Array.isArray(wildShapePacks) ? wildShapePacks.filter(pack => !game.packs || game.packs.get(pack))
       : [...WILD_SHAPE_PACKS],
     // A campaign saved before 0.36.0, or holding anything else, rolls its companions' own.

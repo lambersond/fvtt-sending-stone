@@ -101,6 +101,11 @@ export function registerSettings() {
       // then smaller ones? On until the Gamemaster turns it off; a campaign saved before has none,
       // read as on. Coins taken away follow it.
       coinChange: new BooleanField({ initial: true }),
+      // May its players see how hurt other creatures in a fight are in the app, since 0.50.0? Off until
+      // the Gamemaster turns it on, under dnd5e; a campaign saved before has none, read as off.
+      health: new BooleanField({ initial: false }),
+      // And their hit points, since 0.50.0? Off until the Gamemaster turns it on, and only with `health`.
+      healthHitPoints: new BooleanField({ initial: false }),
       // The compendiums its druids learn Beasts from, since 0.40.0.
       wildShapePacks: new ArrayField(new StringField({ blank: false }), { initial: () => [...WILD_SHAPE_PACKS] }),
       // How its characters' companions enter initiative, since 0.36.0: each its own roll, or right
