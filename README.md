@@ -923,10 +923,10 @@ description's damage or roll aren't offered yet.
   of checks is a link whole or not at all: "Wisdom or Honor" is text to an older app, never a
   Wisdom check alone. Saving throws on any ability have been links since 0.17.0.
 
-Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0, 0.22.0 and 0.52.0 each send every description
-again once, in its new form; since 0.52.0 so does a world that turns an ability or skill on, such
-as Honor, after its reload. Since 0.20.0 a description with damage links is also sent again when the damage it
-shows changes, as with Rage.
+Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0, 0.22.0 and 0.52.0 each send every description again
+once, in its new form; since 0.52.0 so does a world that turns an ability or skill on, such as
+Honor, after its reload. Since 0.20.0 a description with damage links is also sent again when the
+damage it shows changes, as with Rage.
 
 ### The listener must allow cross-origin requests
 
