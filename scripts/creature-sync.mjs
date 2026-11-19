@@ -3,7 +3,7 @@ import { canSend } from "./bridge-role.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { combatEnabled } from "./config.mjs";
-import { companionKeyOf, companionOfActor, companionsOf, ownedByPlayers } from "./creatures.mjs";
+import { companionFormat, companionKeyOf, companionOfActor, companionsOf, noteCompanionFormat, ownedByPlayers } from "./creatures.mjs";
 import { characterSheet } from "./sheet.mjs";
 import { SheetTexts } from "./sheet-texts.mjs";
 import { helloPending, send } from "./transport.mjs";
@@ -48,13 +48,6 @@ const DELTA_KEYS = ["ownership", "flags", "name", "img"];
  * @type {string[]}
  */
 const NPC_KEYS = ["ownership", "name", "img", "type", "prototypeToken", "flags"];
-
-/**
- * The campaigns whose app's latest answer said it reads companions, `features.companions` 1 or more,
- * and the format it said, 2 or more since 0.41.0 for one that reads what the game asks of them.
- * @type {Map<string, number>}
- */
-const readers = new Map();
 
 /**
  * What's told when companions leave a campaign's list, with their keys: since 0.41.0, prompts.mjs's
@@ -168,13 +161,9 @@ export function registerSheetSync(sync) {
  * @returns {void}
  */
 export function noteCompanionReader(campaignId, features, type) {
-  const format = features?.companions;
-  if ( !(Number.isInteger(format) && (format >= 1)) ) {
-    readers.delete(campaignId);
-    return;
-  }
-  const was = readers.get(campaignId) ?? 0;
-  readers.set(campaignId, format);
+  const was = noteCompanionFormat(campaignId, features);
+  const format = companionFormat(campaignId);
+  if ( !format ) return;
   if ( !was && (type === EVENTS.HEARTBEAT) ) companionsWanted(campaignId);
   if ( (format >= 2) && (was < 2) ) {
     for ( const fn of promptReaderListeners ) fn(campaignId);
@@ -187,7 +176,7 @@ export function noteCompanionReader(campaignId, features, type) {
  * @returns {boolean}
  */
 export function companionReader(campaignId) {
-  return readers.has(campaignId);
+  return companionFormat(campaignId) >= 1;
 }
 
 /**
@@ -197,7 +186,7 @@ export function companionReader(campaignId) {
  * @returns {boolean}
  */
 export function companionPromptReader(campaignId) {
-  return (readers.get(campaignId) ?? 0) >= 2;
+  return companionFormat(campaignId) >= 2;
 }
 
 /**
@@ -271,7 +260,7 @@ export function forgetListed(campaignId) {
  * @returns {string|null|undefined}
  */
 export function messageCompanion(message, campaign) {
-  if ( !readers.has(campaign.id) ) return undefined;
+  if ( !companionReader(campaign.id) ) return undefined;
   const list = toldList(campaign.id);
   const marked = message.flags?.[MODULE_ID]?.companion;
   if ( (typeof marked === "string") && list.some(entry => entry.key === marked) ) return marked;
@@ -285,7 +274,7 @@ export function messageCompanion(message, campaign) {
  * @returns {string|null|undefined}
  */
 export function combatantCompanion(combatant, campaign) {
-  if ( !readers.has(campaign.id) ) return undefined;
+  if ( !companionReader(campaign.id) ) return undefined;
   return companionKeyOf(toldList(campaign.id), combatant);
 }
 
@@ -307,7 +296,7 @@ export function combatantCompanion(combatant, campaign) {
  * @returns {void}
  */
 export function sendCompanion(campaign, entry, actor) {
-  if ( !canSend() || !readers.has(campaign.id) || helloPending(campaign.id) ) return;
+  if ( !canSend() || !companionReader(campaign.id) || helloPending(campaign.id) ) return;
   if ( !toldList(campaign.id).some(listed => listed.key === entry.key) ) return;
   const secrets = ownedByPlayers(actor, entry.of);
   sendActor(campaign, actor, {
@@ -371,7 +360,7 @@ export function companionsWanted(campaignId) {
  * @returns {void}
  */
 export function companionsDelivered(campaign, hello) {
-  if ( !readers.has(campaign.id) ) return;
+  if ( !companionReader(campaign.id) ) return;
   const listed = Array.isArray(hello?.data?.companions) ? hello.data.companions : [];
   noteListed(campaign.id, listed);
   const found = companionsOf(campaign);
@@ -391,7 +380,7 @@ export function companionsDelivered(campaign, hello) {
  * @returns {void}
  */
 export function companionTermsChanged(campaign) {
-  if ( !readers.has(campaign.id) ) return;
+  if ( !companionReader(campaign.id) ) return;
   for ( const { entry, actor } of companionsOf(campaign) ) sendCompanion(campaign, entry, actor);
 }
 
@@ -403,7 +392,7 @@ export function companionTermsChanged(campaign) {
 export function toldCompanions() {
   const actors = new Map();
   for ( const campaign of getCampaigns() ) {
-    if ( !readers.has(campaign.id) ) continue;
+    if ( !companionReader(campaign.id) ) continue;
     const keys = new Set(toldList(campaign.id).map(entry => entry.key));
     if ( !keys.size ) continue;
     for ( const { entry, actor } of companionsOf(campaign) ) {
@@ -463,7 +452,7 @@ function compareLists() {
  * @returns {void}
  */
 function compareList(campaign, { found, before }={}) {
-  if ( !readers.has(campaign.id) || helloPending(campaign.id) ) return;
+  if ( !companionReader(campaign.id) || helloPending(campaign.id) ) return;
   const told = toldLists.get(campaign.id);
   const was = before ?? told?.entries ?? [];
   found ??= companionsOf(campaign);
@@ -521,7 +510,7 @@ function forgetCompanion(campaignId, key) {
 export function creatureChanged(actor) {
   if ( !actor || !canSend() ) return;
   for ( const campaign of getCampaigns() ) {
-    if ( !readers.has(campaign.id) ) continue;
+    if ( !companionReader(campaign.id) ) continue;
     const list = toldList(campaign.id);
     const entries = new Set([companionOfActor(list, actor)]);
     if ( !actor.isToken ) {

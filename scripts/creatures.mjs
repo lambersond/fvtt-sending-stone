@@ -14,6 +14,10 @@ import { wildShapeReader } from "./wild-shape.mjs";
  * flags, hit points and ownership are its delta's over its base's, and the world actor otherwise.
  * Nothing ever reads the base actor of a token's creature. Not "companions.mjs", which is the
  * author's other Foundry modules.
+ *
+ * It keeps, too, the format each campaign's app reads companions in, as its latest answer said it,
+ * which creature-sync.mjs reads to send them: here, beside the rule of what's listed, so that the
+ * rule can follow it.
  */
 
 /**
@@ -22,6 +26,13 @@ import { wildShapeReader } from "./wild-shape.mjs";
  */
 const LONGEST_NAME = 200;
 const LONGEST_IMG = 2_000;
+
+/**
+ * The campaigns whose app's latest answer said it reads companions, `features.companions` 1 or more,
+ * and the format it said, 2 or more since 0.41.0 for one that reads what the game asks of them.
+ * @type {Map<string, number>}
+ */
+const readers = new Map();
 
 /**
  * A companion as a campaign lists it, without its sheet, which follows to an app that reads them.
@@ -39,6 +50,37 @@ const LONGEST_IMG = 2_000;
  *                                    For a summoned one: the item that summoned it, and its activity.
  */
 
+/* -------------------------------------------- */
+/*  The listener's format                       */
+/* -------------------------------------------- */
+
+/**
+ * Note the format a campaign's app reads companions in, from what it said in answer to its hello or
+ * heartbeat: `features.companions`, an integer, 1 or more; none where it said anything else, or
+ * nothing. The one writer of the formats.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @returns {number}   The format it read them in before, 0 for none.
+ */
+export function noteCompanionFormat(campaignId, features) {
+  const was = readers.get(campaignId) ?? 0;
+  const format = features?.companions;
+  if ( Number.isInteger(format) && (format >= 1) ) readers.set(campaignId, format);
+  else readers.delete(campaignId);
+  return was;
+}
+
+/**
+ * The format a campaign's app reads companions in, as its latest answer said: 0 for none.
+ * @param {string} campaignId
+ * @returns {number}
+ */
+export function companionFormat(campaignId) {
+  return readers.get(campaignId) ?? 0;
+}
+
+/* -------------------------------------------- */
+/*  The list                                    */
 /* -------------------------------------------- */
 
 /**
