@@ -225,9 +225,9 @@ const made = new Map();
  * whether its players typing in their dice are asked for the dice the game rolls later
  * (`diceAsks`), under dnd5e 5 wherever they type them and the self-test passed, and if not, why not
  * (`diceAsksReason`); with it, the answer to such an ask, `"dice"`, last among the kinds. And
- * since 0.52.0, last, `anyAbility`, true whatever the rolls, as descriptions and request cards carry
- * checks whatever they are: checks on any ability the game has are sent to an app that answers
- * `anyAbility` 1 or later.
+ * since 0.52.0, last, `anyAbility`, true whatever the rolls, as descriptions and request cards
+ * carry checks whatever they are: checks on any ability the game has are sent to an app that
+ * answers `anyAbility` 1 or later.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
@@ -346,9 +346,9 @@ export function registerCommandHooks() {
  * says so (health-sync.mjs), and whether it answers fetches quietly while nobody is in it, `quiet`;
  * and since 0.52.0, whether it reads checks on any ability the game has, `anyAbility`, to which the
  * campaign's sheets, its companions' too, are sent again where it starts or stops in a heartbeat's
- * answer (character-sync.mjs). A hello's answer wakes the campaign's fetching, which may be waiting as an answer given before
- * the hello was taken asked; since 0.50.0 it fetches in full at its usual pace again, for two
- * minutes at least.
+ * answer (character-sync.mjs). A hello's answer wakes the campaign's fetching, which may be waiting
+ * as an answer given before the hello was taken asked; since 0.50.0 it fetches in full at its usual
+ * pace again, for two minutes at least.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.

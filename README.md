@@ -920,8 +920,9 @@ description's damage or roll aren't offered yet.
   eyes or the roller's alone (`/gmr`, `/br`, `/sr`). Since 0.52.0 a check on any ability your game
   has, dnd5e's Honor and Sanity where its settings turn them on and one of your world's own, is a
   link to an app that reads them; to an older app, a check on any but dnd5e's six is text. A choice
-  of checks is a link whole or not at all: "Wisdom or Honor" is text to an older app, never a
-  Wisdom check alone. Saving throws on any ability have been links since 0.17.0.
+  of checks is a link whole or not at all: "Wisdom or Honor" is text to an older app, never a Wisdom
+  check alone. The module has sent saving throws on any ability as links since 0.17.0; the app shows
+  those past the six from v0.52.0.
 
 Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0, 0.22.0 and 0.52.0 each send every description again
 once, in its new form; since 0.52.0 so does a world that turns an ability or skill on, such as

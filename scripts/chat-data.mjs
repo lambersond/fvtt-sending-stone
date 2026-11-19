@@ -398,8 +398,8 @@ function askedCheck(message, anyAbility=false) {
  * The save or check a roll request card asks the table for, as the app shows it: the Gamemaster's,
  * posted from a description, or a player's, posted from the app. Its DC only where players may see
  * it, as dnd5e shows it: never one the card keeps from everyone; and for a player's, what asks for
- * it, such as their item. Since 0.52.0 a check on any ability the game has, to a campaign's app that
- * reads them. Null for any other message.
+ * it, such as their item. Since 0.52.0 a check on any ability the game has, to a campaign's app
+ * that reads them. Null for any other message.
  * @param {ChatMessage} message
  * @param {Campaign} campaign   The campaign it's described for.
  * @returns {{type: string, abilities?: string[], checks?: object[], dc?: number, label?: string}|null}

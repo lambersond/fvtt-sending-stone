@@ -12,8 +12,8 @@
 export const SIX_ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
 
 /**
- * A key dnd5e names a skill or tool by, and since 0.52.0 an ability past the six, as the app accepts
- * one: never ":" or "|", which separate the checks a span offers.
+ * A key dnd5e names a skill or tool by, and since 0.52.0 an ability past the six, as the app
+ * accepts one: never ":" or "|", which separate the checks a span offers.
  * @type {RegExp}
  */
 export const CHECK_KEY = /^[A-Za-z][\w-]{0,31}$/;
