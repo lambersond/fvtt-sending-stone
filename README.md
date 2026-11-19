@@ -181,10 +181,6 @@ alone as yours, never a copy a player posts from their own browser. A module tha
 messages from your browser for players, as Midi-QOL does, could still let a player have one marked
 while the roll is being made.
 
-Since 0.51.0 an initiative from the app also goes into the character's or companion's own encounter
-on another scene once that encounter has begun, whichever scene you're viewing. Before Begin Combat,
-only the encounter you have up takes it, as before.
-
 - **Under D&D Fifth Edition only.** The Gamemaster's browser makes the rolls, so a Gamemaster must
   have the game open, as for everything else.
 - **How it's rolled.** A tap in the app rolls as the character's sheet has it, so Foundry decides
@@ -281,6 +277,10 @@ only the encounter you have up takes it, as before.
   recovered, a recharge rolled, an effect that ended with the turn, Midi-QOL's saves and damage over
   time, initiative Midi-QOL rerolled at a new round) stays as it is, and so does whatever the next to
   act did meanwhile.
+- **Initiative in another encounter, since 0.51.0.** An initiative from the app also goes into the
+  character's or companion's own encounter on another scene, once that encounter has begun and is its
+  scene's chosen one, whichever scene you're viewing. Before Begin Combat, only the encounter you have
+  up takes it, as before.
 
 The app's address must be able to answer the module's fetches of players' rolls, which only the
 Sending Stone app, or a listener that says it can, is asked for; see
