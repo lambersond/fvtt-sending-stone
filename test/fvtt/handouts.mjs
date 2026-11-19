@@ -1,16 +1,17 @@
-// A character's coins handed out to the characters picked (module 0.49.0), and since 0.51.0, the
+// A character's coins handed out to the characters picked (module 0.49.0), and since 0.51.0 to the
 // campaign's parties among them: the hello's `features.transfers.handOut`, `.change` and
-// `.handOutParties`; the `transfer` command's `each`, its check and who may
-// make it; the total paid as coins taken away are, exactly and with other coins, and what the
-// campaign's setting off does; the writes and their order, and what a failure leaves; the whispers,
-// one to each character given coins that has a player and one to the Gamemasters, both of the two
-// at this table, none for everyone, and who the app is told may read each; the sheets ahead of the
-// result; a fraction of a coin the giver or one given stores, and a coin a sheet shows more of than
-// is stored; hand-outs and rolls waiting for one another, and the campaign read again as a
-// hand-out's turn comes. On a copy of sends.mjs's stand-ins, with dnd5e's rates: the real module
-// and its language file, dnd5e 5.3.3's real dice classes for its self-test, a stand-in Foundry core
-// and app; 5.3.3's coins or with DND5E6=1 6.0.5's, which may be fractional and are shown rounded
-// down. Run with SLIM_CHECK=1 and --import ./unref-timers.mjs --import ./dnd5e-register.mjs.
+// `.handOutParties`; the `transfer` command's `each`, its check and who may make it; the total paid
+// as coins taken away are, exactly and with other coins, and what the campaign's setting off does;
+// the writes and their order, and what a failure leaves; the whispers, one to each character given
+// coins that has a player and one to the Gamemasters, both of the two at this table, none for
+// everyone, but since 0.51.0 a party's line, and who the app is told may read each; the sheets
+// ahead of the result; a fraction of a coin the giver or one given stores, and a coin a sheet shows
+// more of than is stored; hand-outs and rolls, and since 0.51.0 a party's moves, waiting for one
+// another, and the campaign read again as a hand-out's turn comes. On a copy of sends.mjs's
+// stand-ins, with dnd5e's rates: the real module and its language file, dnd5e 5.3.3's real dice
+// classes for its self-test, a stand-in Foundry core and app; 5.3.3's coins or with DND5E6=1
+// 6.0.5's, which may be fractional and are shown rounded down. Run with SLIM_CHECK=1 and --import
+// ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { settings, user, users, actors } from './stub.mjs'
@@ -449,6 +450,7 @@ await Hooks.callAll('ready')
 const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)
 const { announce } = await import(`${MODULE}/scripts/bridge.mjs`)
 const { getCampaigns } = await import(`${MODULE}/scripts/campaigns.mjs`)
+const { queueBusy } = await import(`${MODULE}/scripts/commands.mjs`)
 await until(() => app.events.some(e => e.type === 'bridge.hello'), 'the hello')
 await wait(60)
 assert.equal(diceStatus.ready, true, `self-test: ${diceStatus.error}`)
@@ -1090,16 +1092,20 @@ const [earlier, afterwards] = await fetched(handOut('thorin', ['vex'], { gp: 6 }
 assert.deepEqual([earlier.result.status, refusal(afterwards), purse(thorin)], ['done', ['failed', 'short', null], { gp: 4 }])
 okay("a hand-out waits for a command of a character it gives to, and that one's next waits for it, as it's keyed on each of them; a hand-out and coins taken away of the same gold, or two hand-outs, are made one after the other, the second `short` where too little is left")
 
-// Since 0.51.0 a hand-out to a party waits for a move of the party's fetched ahead of it, held at its
-// write of the party, and a move of the party's fetched after it waits for it: the second send finds
-// the gold the hand-out gave, which it needs.
+// Since 0.51.0 a hand-out to a party waits for a move of the party's fetched ahead of it, held at
+// its write of the party, and a move of the party's fetched after it waits for it: the second send
+// finds the gold the hand-out gave, which it needs. The sends are the Gamemaster's, as Vex and as
+// Bram, so that the party is all the hand-out shares with them: the order is held by the one line
+// every move stands in, and by the party's own key, which the hand-out takes as it does each
+// character's.
 restock()
 await settle()
 {
   const sending = hold((target, changes) => (target === party) && ('system.currency.gp' in (changes ?? {})))
   const [sendAhead, giving, sendBehind] = [
-    move('thorin', { from: 'party', to: 'vex', currency: { gp: 100 } }), handOut('thorin', ['party'], { gp: 5 }),
-    move('thorin', { from: 'party', to: 'bram', currency: { gp: 8 } }),
+    move('vex', { from: 'party', to: 'vex', currency: { gp: 100 } }, { by: 'gm' }),
+    handOut('thorin', ['party'], { gp: 5 }),
+    move('bram', { from: 'party', to: 'bram', currency: { gp: 8 } }, { by: 'gm' }),
   ]
   const queued = writes.length
   app.waiting.set('camp-a', [sendAhead, giving, sendBehind])
@@ -1114,7 +1120,23 @@ await settle()
   assert.ok((resultIndex(sendAhead.id) < resultIndex(giving.id)) && (resultIndex(giving.id) < resultIndex(sendBehind.id)), 'in the order fetched')
   assert.deepEqual([coinsOf(party).gp, purse(thorin), purse(vex), purse(bram)], [COMPANY_GP - 103, { gp: 35 }, { gp: 112 }, { gp: 8 }])
 }
-okay("a hand-out to the Company waits for a send of the Company's fetched ahead of it, and a send fetched after it waits for it, finding the 5 gp it gave")
+// The party's key itself: a hand-out to it alone, held at its write of the party, keeps the party's
+// queue busy, as each character's it gives to, until it's made.
+restock()
+await settle()
+{
+  const giving = hold((target, changes) => (target === party) && ('system.currency.gp' in (changes ?? {})))
+  const alone = handOut('thorin', ['party'], { gp: 2 })
+  app.waiting.set('camp-a', [alone])
+  app.wake?.()
+  await until(() => giving.held, "the hand-out's write of the Company")
+  assert.deepEqual([queueBusy('thorin'), queueBusy('party')], [true, true], "the giver's queue and the party's")
+  giving.release()
+  await until(() => resultsOf(alone.id).length, "the hand-out's result")
+  await settle()
+  assert.deepEqual([resultsOf(alone.id)[0].status, queueBusy('thorin'), queueBusy('party')], ['done', false, false])
+}
+okay("a hand-out to the Company waits for the Gamemaster's send of the Company's fetched ahead of it, and a send fetched after it waits for it, finding the 5 gp it gave: the party's queue is busy while a hand-out to it is made, as each character's is")
 
 // The campaign is read again as a hand-out's turn comes, not as it was when fetched: one waiting in
 // the line of moves behind another's move while the Gamemaster turns Pay with other coins off is
