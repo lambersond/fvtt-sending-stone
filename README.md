@@ -144,11 +144,13 @@ does. A group no player of the campaign can see goes without its sheet. Party sh
 Edition, and an app that reads them.
 
 **Companions.** A character's companions show beside it in the app: the creatures it summons, such
-as a familiar from Find Familiar, on any scene, since 0.51.0, to an app that reads them there, one
-on another scene marked so; before, or to an older app, while their tokens are on the active scene;
-whoever cast the spell; and the NPCs its player owns in Foundry (give the player Owner on the NPC by
-name, or on one placed token). A linked NPC shows always; an unlinked one while its token is on a
-scene as above. A token left on an old map is a companion until you delete or hide it.
+as a familiar from Find Familiar, while their tokens are on the active scene, whoever cast the
+spell; and the NPCs its player owns in Foundry (give the player Owner on the NPC by name, or on one
+placed token). A linked NPC shows always; an unlinked one while its token is on the active scene.
+Since 0.51.0, to an app that reads them there, a summoned or unlinked one shows while its token is
+on any scene, even one left on an old map, until you delete or hide it; and a companion on another
+scene and not on the active one, a linked NPC too, is marked so. Before 0.51.0, or to an older app,
+a summoned or unlinked one shows only while its token is on the active scene.
 Its player is a player you gave Owner on the character by name; since 0.45.0 a character shared with
 All Players as Owner isn't everyone's for this, so another campaign's sidekicks never show beside it,
 and where no player owns it by name, its player is the one it's assigned to in User Configuration.
@@ -1140,8 +1142,8 @@ Gamemaster-only information switched on.
   active, so that a roll made for a player from the app takes their dice. Every other roll is left alone. No core
   or system class is otherwise overridden.
 - **Summons are placed on the scene the summoner is viewing:** one summoned while you view a prep
-  scene shows once its token is on the active scene; it shows at once, marked on another scene, to an
-  app from v0.51.0.
+  scene shows once its token is on the active scene; it shows at once, marked on another scene, to
+  an app from v0.51.0.
 - **View the active scene while companions act:** Foundry, and Midi-QOL, find a creature's token on
   your canvas.
 - **With dnd5e's *Automatic Recharge* on,** Foundry rolls a companion's recharge at the start of its
