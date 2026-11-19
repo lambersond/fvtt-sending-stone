@@ -1680,19 +1680,37 @@ ok("through the module's own findLink, an item's description names its item, a s
 {
   // dnd5e's Honor, as its setting turns it on (D5 config.mjs DND5E.abilities.hon), on Thorin too,
   // and his biography with [[/check honor 12]] in dnd5e 5.3.3's markup (enrichers.mjs:488-492),
-  // then a damage link and a roll of its own, as BIOGRAPHY's and an inline roll are.
+  // then a damage link and a roll of its own, as BIOGRAPHY's and an inline roll are, and last a
+  // choice of Wisdom or Honor in plain words.
   CONFIG.DND5E.abilities.hon = { label: 'Honor', abbreviation: 'hon', type: 'mental', fullKey: 'honor' }
   thorin.system.abilities.hon = foundry.utils.deepClone(thorin.system.abilities.wis)
   thorin.system.details.biography.value = '<p>His oath binds him: a <span class="roll-link-group" data-type="check" data-ability="hon" data-dc="12"><a class="roll-link" data-action="roll"><i class="fa-solid fa-dice-d20" inert=""></i>DC 12 Honor</a><a class="enricher-action" data-action="postRequest" data-tooltip="EDITOR.DND5E.Inline.RequestRoll" aria-label="Request Roll"><i class="fa-solid fa-comment-dots"></i></a></span> check,'
     + ' or <a class="roll-link-group" data-action="roll" data-type="damage" data-formulas="2d6" data-damage-types="fire" data-roll-type="damage"><span class="roll-link"><i class="fa-solid fa-dice-d20" inert=""></i>2d6</span> Fire</a> damage,'
-    + ' and <a class="inline-roll roll" data-mode="roll" data-flavor="" data-formula="1d4"><i class="fas fa-dice-d20"></i>1d4</a> more.</p>'
+    + ' and <a class="inline-roll roll" data-mode="roll" data-flavor="" data-formula="1d4"><i class="fas fa-dice-d20"></i>1d4</a> more.'
+    + ' To keep it, a DC 12 Wisdom or Honor check.</p>'
   const { noteAnyAbilityFormat } = await import(`${MODULE}/scripts/check-abilities.mjs`)
   const { characterSheet } = await import(`${MODULE}/scripts/sheet.mjs`)
   const { SheetTexts } = await import(`${MODULE}/scripts/sheet-texts.mjs`)
   const hashFor = anyAbility => characterSheet(thorin, new SheetTexts({ anyAbility })).details.biography
   const honor = hashFor(true)
   assert.notEqual(honor, hashFor(false), 'its hash, apart from the one an older app is sent')
+  // As it's sent once Thorin changes: to an app that doesn't read checks on any ability, its Honor
+  // check is text, and so is its choice of Wisdom or Honor, whole or not at all (never Wisdom alone);
+  // to one that does, both are links, numbered among the rest as that app's copy has them.
+  const sentAgain = async () => {
+    await Hooks.callAll('updateActor', thorin, {})
+    await new Promise(resolve => realSetTimeout(resolve, 300))
+    return sheetSent().details.biography
+  }
+  assert.equal(await sentAgain(), hashFor(false))
+  assert.deepEqual(linksIn(hashFor(false)), [[0, 'ss-damage roll', '2d6', undefined], [1, 'ss-roll roll', '1d4', undefined]], sentText(hashFor(false)))
+  assert.ok(sentText(hashFor(false)).includes('a DC 12 Wisdom or Honor check'), sentText(hashFor(false)))
   noteAnyAbilityFormat('camp-a', { anyAbility: 1 })
+  assert.equal(await sentAgain(), honor)
+  assert.deepEqual(linksIn(honor), [
+    [0, 'ss-check roll', 'check:hon', '12'], [1, 'ss-damage roll', '2d6', undefined], [2, 'ss-roll roll', '1d4', undefined],
+    [3, 'ss-check roll', 'check:wis|check:hon', '12'],
+  ], sentText(honor))
   made = await rollCheck('ability', 'hon', honor, 0, [9])
   assert.equal(made.result.status, 'done', JSON.stringify(made.result))
   assert.deepEqual([made.roll.options.target, made.result.outcome], [12, (made.roll.total >= 12) ? 'success' : 'failure'], 'rolled against its DC 12')
@@ -1714,8 +1732,10 @@ ok("through the module's own findLink, an item's description names its item, a s
   thorin.system.details.biography.value = BIOGRAPHY
   delete thorin.system.abilities.hon
   delete CONFIG.DND5E.abilities.hon
+  // Sent again as he was, so that what follows reads hashes made without Honor in the game.
+  await sentAgain()
 }
-ok("since 0.52.0, a description's Honor check, to an app that reads checks on any ability, rolled against its DC, asked of the table, and its damage and roll made; each gone to one that doesn't")
+ok("since 0.52.0, a description's Honor check, and its choice of Wisdom or Honor, text as sent to an app that doesn't read checks on any ability and links to one that does; there rolled against its DC, asked of the table, and its damage and roll made; each gone to one that doesn't")
 
 // ---- Damage dnd5e's own link rolls through one of the item's activities ----
 // A critical hit's only as that activity allows, with what it adds to each part, as the activity's

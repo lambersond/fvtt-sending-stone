@@ -966,6 +966,19 @@ ok('refuses another\'s check, one not offered, one not to be used, a check activ
   const sanity = { item: 'sanity', activity: 'mad', dice: [{ faces: 20, results: [11] }] }
   await refused(roll('rook', 'ability', 'san', sanity), 'activity', 'to an app before 0.52.0, as it was sent none')
   const rookSheets = () => app.events.filter(e => (e.type === 'character.updated') && (e.data.character.id === 'rook')).length
+  // Rook's sheet as it's sent, to an app before 0.52.0: no check on Sanity; Court Manners' Insight
+  // where the world has no Etiquette, which is passed over; and once the game has Honor and
+  // Etiquette on it, sent again as Rook changes, none on Insight or Etiquette, never Insight alone.
+  const sentRow = itemId => sheetOf('rook').actions.flatMap(section => section.actions).find(action => action.id === itemId)
+  const INSIGHT = { type: 'skill', ability: 'wis', key: 'ins' }
+  assert.deepEqual([sentRow('sanity')?.check, sentRow('manners')?.check], [undefined, { checks: [INSIGHT], dc: 12, own: true }], 'as sent before the game has Honor')
+  CONFIG.DND5E.abilities.hon = { label: 'Honor', abbreviation: 'HON' }
+  CONFIG.DND5E.skills.eti = skill('Etiquette', 'hon')
+  const sentBefore = rookSheets()
+  await Hooks.callAll('updateActor', rook, {})
+  await until(() => rookSheets() > sentBefore, 'Rook\'s sheet sent again, with Honor in the game')
+  assert.deepEqual([sentRow('sanity')?.check, sentRow('manners')?.check, sentRow('helm')?.check],
+    [undefined, undefined, { checks: [{ type: 'check', ability: 'str' }], dc: 10, own: true }], 'as sent to an app before 0.52.0, whole or not at all')
   const { noteListenerFeatures } = await import(`${MODULE}/scripts/commands.mjs`)
   const { anyAbilityReader } = await import(`${MODULE}/scripts/check-abilities.mjs`)
   // Only an integer, 1 or more, says it: true, "1", 0 or 1.5 don't.
@@ -987,6 +1000,7 @@ ok('refuses another\'s check, one not offered, one not to be used, a check activ
   const sent = sheetOf('rook').actions.flatMap(section => section.actions).find(action => action.id === 'sanity')
   assert.deepEqual(sent?.check, { checks: [{ type: 'check', ability: 'san' }], dc: 12, own: true }, `sent again with its check: ${JSON.stringify(sent?.check)}`)
   assert.equal(sent?.text, textFor(true), 'its description as hashed for that app')
+  assert.deepEqual(sentRow('manners')?.check, { checks: [INSIGHT, { type: 'skill', ability: 'hon', key: 'eti' }], dc: 12, own: true }, 'Insight or Etiquette, whole')
   const made = await roll('rook', 'ability', 'san', sanity)
   assert.equal(made.status, 'done', JSON.stringify(made))
   const total = made.rolls[0]?.total
@@ -996,8 +1010,10 @@ ok('refuses another\'s check, one not offered, one not to be used, a check activ
   delete rook.items.get('sanity').system.description
   delete foundry.applications.ux.TextEditor
   delete rook.system.abilities.san
+  delete CONFIG.DND5E.abilities.hon
+  delete CONFIG.DND5E.skills.eti
 }
-ok('a check activity on Sanity: refused to an app before 0.52.0; sent again with it, its description hashed for that app, once a heartbeat\'s answer says the app reads it (an integer, 1 or more; a hello\'s answer sends nothing again of itself), and rolled against its DC')
+ok('a check activity on Sanity, and one on Insight or Etiquette on Honor: not on the sheet sent to an app before 0.52.0, and refused there; sent again with them, whole, its description hashed for that app, once a heartbeat\'s answer says the app reads them (an integer, 1 or more; a hello\'s answer sends nothing again of itself), and rolled against its DC')
 
 console.log(`${MIDI ? 'midi' : 'dnd5e'}: done`)
 process.exit(0)
