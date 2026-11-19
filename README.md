@@ -282,9 +282,9 @@ while the roll is being made.
   time, initiative Midi-QOL rerolled at a new round) stays as it is, and so does whatever the next to
   act did meanwhile.
 - **Initiative in another encounter, since 0.51.0.** An initiative from the app also goes into the
-  character's or companion's own encounter on another scene, once that encounter has begun and is its
-  scene's chosen one, whichever scene you're viewing. Before Begin Combat, only the encounter you have
-  up takes it, as before.
+  character's or companion's own encounter on another scene, once that encounter has begun and is
+  its scene's chosen one, whichever scene you're viewing. Before Begin Combat, only the encounter
+  you have up takes it, as before.
 
 The app's address must be able to answer the module's fetches of players' rolls, which only the
 Sending Stone app, or a listener that says it can, is asked for; see

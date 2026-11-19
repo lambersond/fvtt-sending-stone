@@ -1335,24 +1335,23 @@ Dice is switched on or off while a campaign allows its players to enter their di
 | `prompts` | Every [prompt](#prompts) open for the campaign's players, read afresh from the chat log, and since module 0.27.0 every [Midi prompt](#midi-qols-own-saves) waiting on them: any the campaign was told of that isn't among them has closed. Empty while its players aren't asked for their saves. |
 | `diceAsks` | Since module 0.44.0, every [dice ask](#dice-asks) open for the campaign, in the order asked: any the campaign was told of that isn't among them has closed, `"gone"`. `[]` where none is open, as after the Gamemaster reloads, and while its app doesn't read them. |
 
-Since module 0.22.0 nothing comes before it, and once it's answered `2xx`, each character follows
-in the order listed, each in a [`character.updated`](#characterupdated) of its own after the
+Since module 0.22.0 nothing comes before it, and once it's answered `2xx`, each character follows in
+the order listed, each in a [`character.updated`](#characterupdated) of its own after the
 [`character.texts`](#charactertexts) with the descriptions its sheet refers to that haven't gone
 since the hello. Since module 0.30.0, to a listener that reads groups, each of the campaign's groups
 follows its characters in a [`group.updated`](#groupupdated) of its own, in the order listed. Since
 module 0.36.0, to a listener that reads companions, each companion the hello lists that still is one
-follows the groups in a [`companion.updated`](#companionupdated) of its own, in the order listed, and
-then, at once, a [`companions.listed`](#companionslisted) where the list has changed since the hello
-was built; since module 0.51.0, to a listener that answers `"companions": 3`, the list is its
-`companionsEverywhere`, else its `companions`. Since module 0.34.0, to a listener that reads notes, each book whose journal the hello's
-`features.notes` lists follows the groups, and since 0.36.0 the companions, in a
-[`journal.updated`](#journalupdated) of its own. Since
-module 0.44.0, to a listener that reads [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal), each
-character the hello's `features.notes.tidy` lists, and each that holds an entry of it by then,
-follows the books in a [`journal.tidy`](#journaltidy) of its own. A
-hello refused is followed by nothing: ask for another, as ever. Before 0.22.0 a hello came after the
-`character.texts` with every description its characters' sheets refer to, and carried their sheets
-itself.
+follows the groups in a [`companion.updated`](#companionupdated) of its own, in the order listed,
+and then, at once, a [`companions.listed`](#companionslisted) where the list has changed since the
+hello was built; since module 0.51.0, to a listener that answers `"companions": 3`, the list is its
+`companionsEverywhere`, else its `companions`. Since module 0.34.0, to a listener that reads notes,
+each book whose journal the hello's `features.notes` lists follows the groups, and since 0.36.0 the
+companions, in a [`journal.updated`](#journalupdated) of its own. Since module 0.44.0, to a listener
+that reads [Tidy 5e Sheets' journal](#tidy-5e-sheets-journal), each character the hello's
+`features.notes.tidy` lists, and each that holds an entry of it by then, follows the books in a
+[`journal.tidy`](#journaltidy) of its own. A hello refused is followed by nothing: ask for another,
+as ever. Before 0.22.0 a hello came after the `character.texts` with every description its
+characters' sheets refer to, and carried their sheets itself.
 
 ### `character.updated`
 
@@ -1425,16 +1424,17 @@ You may be told of the removal of one you don't have: ignore it.
 
 ### `companions.listed`
 
-Since module 0.36.0, `{ companions }`: the campaign's characters' [companions](#companions), the whole
-list, as the hello's `companions`. Part of the event stream, and sent only to a listener whose latest
-answer said `"companions": 1` or more: whenever the list differs from the last it was told, as a
-familiar is summoned onto the active scene, a token is hidden or deleted, the active scene changes,
-or a player is given or loses Owner of an NPC, 250 ms after the change was heard; and since 0.51.0,
-to a listener that answers `"companions": 3`, when a companion's `away` changes, or a scene is made
-with its tokens, as one duplicated; and at once when a heartbeat's answer moves to or from 3. A delivered hello's
-list counts as told. Replace the list, and drop the sheets of companions no longer in it. One lost to
-failures that might not last is sent again, and so are the sheets of the companions it listed, after
-the list the listener next takes: those posted after the lost one named companions it didn't list.
+Since module 0.36.0, `{ companions }`: the campaign's characters' [companions](#companions), the
+whole list, as the hello's `companions`. Part of the event stream, and sent only to a listener whose
+latest answer said `"companions": 1` or more: whenever the list differs from the last it was told,
+as a familiar is summoned onto the active scene, a token is hidden or deleted, the active scene
+changes, or a player is given or loses Owner of an NPC, 250 ms after the change was heard; and since
+0.51.0, to a listener that answers `"companions": 3`, when a companion's `away` changes, or a scene
+is made with its tokens, as one duplicated; and at once when a heartbeat's answer moves to or
+from 3. A delivered hello's list counts as told. Replace the list, and drop the sheets of companions
+no longer in it. One lost to failures that might not last is sent again, and so are the sheets of
+the companions it listed, after the list the listener next takes: those posted after the lost one
+named companions it didn't list.
 
 ### `companion.updated`
 
@@ -2595,15 +2595,15 @@ An ask:
   at once with nothing only while nothing waits. Heartbeats and events go as before. A listener
   before 0.50.0 never says `"quiet": 1`, is sent no `quiet`, and is fetched from as before. A
   module before 0.50.0 sends no `quiet`: a listener answers it as before, without `quiet`.
-- Module 0.51.0 also rolls an `initiative` from the listener ([Rolls from the app](#rolls-from-the-app))
-  into an encounter that has begun and is its scene's chosen one (`started` and `active`), whichever
-  scene the Gamemaster views, where the character's or companion's combatant has none: by the
-  combat's own `rollInitiative`, between dnd5e's `dnd5e.preRollInitiative` and
-  `dnd5e.rollInitiative`, as it has rolled a token's creature's since 0.36.0. Before an encounter
-  begins, only the one the Gamemaster has up takes it, as before; any other is refused
-  `"not-in-combat"`. Nothing new is sent, and no feature says it. A listener before 0.51.0 sends it
-  as before, and one it sends for a begun encounter on a scene the Gamemaster isn't viewing is now
-  made. A module before 0.51.0 refuses that one `"not-in-combat"`, as before.
+- Module 0.51.0 also rolls an `initiative` from the listener
+  ([Rolls from the app](#rolls-from-the-app)) into an encounter that has begun and is its scene's
+  chosen one (`started` and `active`), whichever scene the Gamemaster views, where the character's
+  or companion's combatant has none: by the combat's own `rollInitiative`, between dnd5e's
+  `dnd5e.preRollInitiative` and `dnd5e.rollInitiative`, as it has rolled a token's creature's
+  since 0.36.0. Before an encounter begins, only the one the Gamemaster has up takes it, as before;
+  any other is refused `"not-in-combat"`. Nothing new is sent, and no feature says it. A listener
+  before 0.51.0 sends it as before, and one it sends for a begun encounter on a scene the Gamemaster
+  isn't viewing is now made. A module before 0.51.0 refuses that one `"not-in-combat"`, as before.
 - Module 0.51.0 lists a campaign's characters' companions on every scene to a listener that
   answers `"companions": 3` ([Companions](#companions)), each entry ending with `away`, whether none
   of its tokens is on the active scene and one is on another. The hello says
