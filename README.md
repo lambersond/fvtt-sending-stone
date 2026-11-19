@@ -108,8 +108,10 @@ involves its characters, described for it alone:
   is is decided as it's made: its edits go where it went, even once its fight is over, and its
   deletion to every campaign that may hold it. A card a campaign was sent before 0.45.0 stays in its
   chat until you clear the chat.
-- **Combat:** encounters while any of its characters are in them. A fight reaches the campaign
-  when its first character joins and ends for it when its last one leaves.
+- **Combat:** encounters while any of its characters are in them, or, to an app that reads
+  companions, any of their companions, on any scene. A fight reaches the campaign when the first of
+  them joins and ends for it when the last one leaves, so a sidekick fighting on another scene
+  without its character brings its fight beside the party's.
 - **Hit points and audiences** cover only its own characters and, since 0.50.0, how hurt other
   creatures are, where you allow it.
 
@@ -178,6 +180,10 @@ them as the player's own. Each tells the app which chat messages it made, so the
 alone as yours, never a copy a player posts from their own browser. A module that posts chat
 messages from your browser for players, as Midi-QOL does, could still let a player have one marked
 while the roll is being made.
+
+Since 0.51.0 an initiative from the app also goes into the character's or companion's own encounter
+on another scene once that encounter has begun, whichever scene you're viewing. Before Begin Combat,
+only the encounter you have up takes it, as before.
 
 - **Under D&D Fifth Edition only.** The Gamemaster's browser makes the rolls, so a Gamemaster must
   have the game open, as for everything else.

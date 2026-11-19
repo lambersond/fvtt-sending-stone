@@ -1471,16 +1471,20 @@ async function linkedCheck(command, actor, secrets=true) {
 
 /**
  * The character's place in the combat a roll of initiative is for: one without initiative yet, in
- * the combat the Gamemaster has up, which is the one dnd5e rolls initiative in. Since 0.36.0 a
- * token's creature, as a companion summoned with an unlinked actor, is that token's combatant, by
- * its token and scene, never the first of its base actor's, as two wolves of one Wolf share an id.
+ * the combat the Gamemaster has up, or since 0.51.0 in any encounter that has begun and is its
+ * scene's chosen one (`started` and `active`), as a sidekick may fight on another scene than its
+ * character's (item 36). Before it begins, an encounter on another scene takes none: the app can't
+ * tell which of two not begun the Gamemaster means. Since 0.36.0 a token's creature, as a companion
+ * summoned with an unlinked actor, is that token's combatant, by its token and scene, never the
+ * first of its base actor's, as two wolves of one Wolf share an id.
  * @param {object} command
  * @param {Actor} actor
  * @returns {{refusal?: string, roller?: Actor, waiting?: Combatant, combat?: Combat}}
  */
 function initiativeTurn(command, actor) {
   const combat = game.combats?.get(command.combatId);
-  if ( !combat || (game.combat?.id !== combat.id) ) return { refusal: "not-in-combat" };
+  const up = Boolean(combat) && (game.combat?.id === combat.id);
+  if ( !combat || !(up || (combat.active && combat.started)) ) return { refusal: "not-in-combat" };
   const token = actor.isToken ? actor.token : null;
   // Since 0.40.0 a character's, shaped or not: the combatant of her form's token, or of her own.
   const self = originalOf(actor)?.id ?? actor.id;
@@ -1908,7 +1912,8 @@ function outcomeAgainstDC(rolls) {
  * actor roll initiative with it in the combat. Since 0.36.0 a token's creature's is rolled by the
  * combat itself, for its own combatant, as dnd5e's actor finds a token's combatants only on the
  * Gamemaster's canvas: with the roll cached on its actor, which the combatant's roll takes, between
- * dnd5e's two hooks, as its actor would fire them.
+ * dnd5e's two hooks, as its actor would fire them. Since 0.51.0 so is any creature's in an encounter
+ * other than the one the Gamemaster has up, which dnd5e's actor roll never reaches.
  * @param {object} command
  * @param {Actor} actor
  * @param {{author: User, flags: object}} message
@@ -1942,7 +1947,7 @@ async function rollInitiative(command, actor, { author, flags }) {
     messageOptions: { rollMode: PUBLIC, author: author.id, flags }
   };
   try {
-    if ( roller.isToken ) {
+    if ( roller.isToken || (combat.id !== game.combat?.id) ) {
       if ( Hooks.call("dnd5e.preRollInitiative", roller, roller._cachedInitiativeRoll) === false ) return null;
       await combat.rollInitiative([waiting.id], initiativeOptions);
       Hooks.callAll("dnd5e.rollInitiative", roller, [waiting]);

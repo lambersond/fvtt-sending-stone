@@ -1341,6 +1341,36 @@ await resetFight()
   ok("the Bat's own initiative under right after its character: refused follows while Thorin is in the combat, nothing rolled; rolled where he isn't; rolled under its own roll")
 }
 
+// Since module 0.51.0 (item 36): a sidekick fighting without its character, on another scene, its
+// fight begun and chosen there while the Gamemaster has the arena's up.
+{
+  const den = combatOf('denfight', [{ id: 'cb-df-brakka', actor: brakka }])
+  den._source.scene = 'den'
+  den.round = 1
+  den.turn = 0
+  game.combat = fight
+  const own = den.combatants.get('cb-df-brakka')
+  const arena = cb('cb-brakka').initiative
+  for (const value of ['after', 'own']) {
+    await saveInitiative(value)
+    await den.setInitiative(own, null)
+    const made = await send(initiative({ actorId: 'brakka', combatId: 'denfight' }))
+    assert.equal(made.status, 'done', `${value}: ${JSON.stringify(made)}`)
+    assert.notEqual(own.initiative, null, `${value}: her den combatant set`)
+    assert.equal(cb('cb-brakka').initiative, arena, `${value}: the arena's untouched`)
+  }
+  await den.setInitiative(own, null)
+  den.active = false
+  const unchosen = await send(initiative({ actorId: 'brakka', combatId: 'denfight' }))
+  den.active = true
+  den.round = 0
+  const unbegun = await send(initiative({ actorId: 'brakka', combatId: 'denfight' }))
+  assert.deepEqual([unchosen.status, unchosen.reason, unbegun.status, unbegun.reason], ['failed', 'not-in-combat', 'failed', 'not-in-combat'], 'not chosen, or not begun: refused')
+  assert.equal(own.initiative, null, 'nothing set')
+  game.combats.delete('denfight')
+  ok("a sidekick fighting without its character: Brakka's initiative, with of, rolled into her own begun fight on the den while the Gamemaster has the arena's up, under its own roll and right after its character alike, Thorin's fight untouched; refused not-in-combat where the den's isn't its scene's chosen one, or hasn't begun")
+}
+
 // Since module 0.40.0 (its contract §4.2): Thorin shaped, his combatant made from his form's token,
 // which keeps the form's id, leads his companions under right after its character as his own does.
 {

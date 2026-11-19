@@ -452,6 +452,51 @@ made = await roll({ actorId: 'vex', kind: 'initiative', key: undefined, combatId
 assert.deepEqual([made.result.status, made.result.reason], ['failed', 'not-in-combat'])
 ok('refuses initiative already rolled, or for a combat the character is not in')
 
+// Since module 0.51.0 (item 36): an encounter on another scene, begun and chosen for its scene,
+// takes the app's initiative while the Gamemaster has another up; one not chosen, or not begun,
+// takes none.
+const den = combat('cmbt-den')
+den._source.scene = 'den'
+den.round = 1
+den.started = true
+den.rollInitiative = rollCombatInitiative
+const denThorin = combatant(den, 'c-den-thorin', thorin, { sceneId: 'den' })
+{
+  const heard = []
+  const before = (actor, roll) => { heard.push(['pre', actor.id, Boolean(roll)]) }
+  const after = (actor, combatants) => { heard.push(['roll', actor.id, combatants.map(c => c.id)]) }
+  Hooks.on('dnd5e.preRollInitiative', before)
+  Hooks.on('dnd5e.rollInitiative', after)
+  made = await roll({ kind: 'initiative', key: undefined, combatId: 'cmbt-den', dice: [{ faces: 20, results: [12] }] })
+  Hooks.off('dnd5e.preRollInitiative', before)
+  Hooks.off('dnd5e.rollInitiative', after)
+  assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+  assert.deepEqual([denThorin.initiative, thorinTurn.initiative], [13, 17], "the den's Thorin set, the arena's 17 untouched")
+  assert.equal(made.message.flags['core.initiativeRoll'], true)
+  assert.deepEqual(heard, [['pre', 'thorin', true], ['roll', 'thorin', ['c-den-thorin']]], "dnd5e's two hooks, once each")
+  assert.equal(thorin._cachedInitiativeRoll, undefined)
+  ok("since module 0.51.0, initiative into a begun encounter its scene has chosen, on another scene, while the Gamemaster has another up: rolled by the combat between dnd5e's two hooks, that combatant set, the other combat's untouched")
+}
+{
+  den.active = false
+  denThorin.initiative = null
+  const count = messages.size
+  made = await roll({ kind: 'initiative', key: undefined, combatId: 'cmbt-den', dice: [{ faces: 20, results: [12] }] })
+  assert.deepEqual([made.result.status, made.result.reason], ['failed', 'not-in-combat'])
+  assert.deepEqual([denThorin.initiative, messages.size], [null, count], 'nothing set, no message')
+  ok("since module 0.51.0, initiative into a begun encounter on another scene is refused not-in-combat where that begun encounter isn't its scene's chosen one")
+}
+{
+  den.active = true
+  den.round = 0
+  den.started = false
+  made = await roll({ kind: 'initiative', key: undefined, combatId: 'cmbt-den', dice: [{ faces: 20, results: [12] }] })
+  assert.deepEqual([made.result.status, made.result.reason], ['failed', 'not-in-combat'])
+  assert.equal(denThorin.initiative, null, 'nothing set')
+  ok("since module 0.51.0, initiative into an encounter on another scene is refused not-in-combat where it's chosen but not begun, as before")
+}
+game.combats.delete('cmbt-den')
+
 // ---- Hit dice ----
 const hitDie = (denomination, rolled, fields = {}) => roll({
   actorId: 'gimli', kind: 'hitDie', key: undefined, denomination, dice: [{ faces: Number(denomination.slice(1)), results: [rolled] }], ...fields,
