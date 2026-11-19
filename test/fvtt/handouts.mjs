@@ -476,6 +476,7 @@ function restock() {
   stock(lia, [], {})
   stock(ash, [], {})
   party.system.members = membersOf([thorin, vex, bram, lia, grumble])
+  wardens.system.members = membersOf([thorin, vex])
 }
 const holds = actor => actor.items.map(item => [item.name, item._source.system.quantity, item._source.system.container ?? null])
 const coinsOf = actor => ({ ...actor._source.system.currency })
@@ -722,6 +723,23 @@ assert.deepEqual([said.map(told), messages.size], [[['Gives 2 gp to The Iron Com
 assert.deepEqual([made.result.status, made.result.messageId, made.result.visible, made.result.transfer.each, purse(thorin), coinsOf(party).gp], ['done', said[0].id, true, ['party'], { gp: 38 }, COMPANY_GP + 2])
 assert.deepEqual(sheetsIn(made), [['character.updated', 'thorin'], ['group.updated', 'party']])
 okay("2 gp to the Company alone posts its line for everyone and nothing else, no Gamemasters' message: the result's message is the line, `visible` true")
+
+// A party neither the giver nor any other given is a member of: no character's sheet sends it, so
+// its own goes ahead of the result, in its place. Thorin, out of the Wardens for this, gives them
+// and Bram 2 gp each; the Gamemaster gives Lia's 1 gp to the Wardens, of which she was never one.
+restock()
+wardens.system.members = membersOf([vex])
+stock(lia, [], { gp: 5 })
+await settle()
+made = await handed('thorin', ['wardens', 'bram'], { gp: 2 })
+assert.deepEqual([made.result.status, sheetsIn(made), purse(wardens)], [
+  'done', [['character.updated', 'thorin'], ['group.updated', 'wardens'], ['character.updated', 'bram']], { gp: 12 },
+], "the Wardens' sheet in its place, though Thorin is none of them")
+made = await handed('lia', ['wardens'], { gp: 1 }, { by: 'gm' })
+assert.deepEqual([made.result.status, sheetsIn(made), purse(wardens)], [
+  'done', [['character.updated', 'lia'], ['group.updated', 'wardens']], { gp: 13 },
+], "the Wardens' sheet after Lia's, though she is none of them")
+okay("a party none of whose members gives or is given is sent for itself, ahead of the result: Thorin, out of the Wardens, gives them and Bram 2 gp each, his sheet, the Wardens' and Bram's sent in that order; the Gamemaster's 1 gp from Lia to the Wardens sends hers, then theirs")
 
 // With other coins: the party is paid as a character is, the giver's platinum broken for the gold.
 restock()
