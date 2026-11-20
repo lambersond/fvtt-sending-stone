@@ -2687,7 +2687,7 @@ An ask:
   cost twice.
 - Module 0.53.0 counts Midi-QOL's reactions and Bonus Actions in the encounter a creature fights
   in, with no new event, field or format: the one the Gamemaster has up, or else one that has begun
-  and is its scene's current one (`started` and `active`), whichever scene the Gamemaster views, as
+  and is its scene's chosen one (`started` and `active`), whichever scene the Gamemaster views, as
   an `initiative` has been rolled into one since 0.51.0; a druid in Wild Shape by her own combatant
   where core matches it to her and not her form. A use or damage on its own is refused
   `"reaction"` or `"bonus-action"` there as in the encounter up, an attack out of the creature's
@@ -3142,7 +3142,7 @@ dialog doesn't offer, or with none left, as for a spell cast from an item a leve
 doesn't offer for its Cast activity, or any for a cantrip (`"slot"`); ammunition that isn't the weapon's, or is used
 up (`"ammo"`); an attack mode that isn't the weapon's (`"mode"`); Midi's Active Defence; a reaction
 or bonus action Midi enforces that's been used (since module 0.53.0 in the encounter the creature
-fights in: the one the Gamemaster has up, or else one that has begun and is its scene's current one,
+fights in: the one the Gamemaster has up, or else one that has begun and is its scene's chosen one,
 `started` and `active`, on any scene, a druid in Wild Shape by her own combatant where core matches
 it to her; in one Midi doesn't see, the module marks the reaction or Bonus Action a use spent, and
 takes a mark it wrote in an encounter the Gamemaster didn't have up off at the creature's next turn
@@ -4734,41 +4734,42 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   marks the use it hands Midi as a check until dnd5e begins spending it
   (`dnd5e.preActivityConsumption`), so the cost the use spends is rolled as ever. So, under dnd5e 5,
   since 0.44.0, is Midi-QOL's own check of the cost of a run's workflow's other activity, which Midi
-  works out and throws away before it spends it; since 0.53.0, any workflow's (below). Since 0.49.0, under dnd5e 5, and under dnd5e 6 where Midi's line
-  for it builds the check as its line for dnd5e 5 does, so is Midi-QOL's check of each reaction it
-  looks for: as a creature is attacked, hit, missed, damaged or healed, or makes a save, Midi works
-  out what each of its reactions would spend, keeps only whether it could be paid, and throws the
-  rest away. On a Gamemaster's Foundry a dice cost rolled for that is Foundry's computer dice, never
-  asked of anyone, for an attack from the app or one made in Foundry with no app in it, in any world
-  the module is active in; so where few uses are left, the computer's roll decides whether the
-  reaction is offered, as the Gamemaster's dice did before. It's told by what dnd5e is given, never
-  by a formula: with Midi-QOL active, an activity a reaction activates, as Midi reads that (its
-  `effectiveActivationType`: a Cast activity's is its spell's, unless it overrides it; the
-  activity's own activation where it isn't one of Midi's, and so has none; and any activation with
-  `reaction` in its name, Midi's older `reactiondamage`, `reactionmanual` and `reactionpreattack`
-  among them), with a configuration that creates nothing (`create: false`), which dnd5e hasn't begun
-  spending (`dnd5e.preActivityConsumption`). So a reaction taken spends as ever, its cost rolled
-  with the dice settings of whoever takes it. A reaction looked for in a player's own Foundry, as
-  they attack there, is rolled as Midi rolls it. The one roll that may be taken wrongly is a check
-  another module makes just as Midi makes this one: where that module then spends what it worked out
-  itself, without dnd5e's own spending, the cost it spends was Foundry's computer dice.
+  works out and throws away before it spends it; since 0.53.0, any workflow's (below). Since 0.49.0,
+  under dnd5e 5, and under dnd5e 6 where Midi's line for it builds the check as its line for dnd5e 5
+  does, so is Midi-QOL's check of each reaction it looks for: as a creature is attacked, hit,
+  missed, damaged or healed, or makes a save, Midi works out what each of its reactions would spend,
+  keeps only whether it could be paid, and throws the rest away. On a Gamemaster's Foundry a dice
+  cost rolled for that is Foundry's computer dice, never asked of anyone, for an attack from the app
+  or one made in Foundry with no app in it, in any world the module is active in; so where few uses
+  are left, the computer's roll decides whether the reaction is offered, as the Gamemaster's dice
+  did before. It's told by what dnd5e is given, never by a formula: with Midi-QOL active, an
+  activity a reaction activates, as Midi reads that (its `effectiveActivationType`: a Cast
+  activity's is its spell's, unless it overrides it; the activity's own activation where it isn't
+  one of Midi's, and so has none; and any activation with `reaction` in its name, Midi's older
+  `reactiondamage`, `reactionmanual` and `reactionpreattack` among them), with a configuration that
+  creates nothing (`create: false`), which dnd5e hasn't begun spending
+  (`dnd5e.preActivityConsumption`). So a reaction taken spends as ever, its cost rolled with the
+  dice settings of whoever takes it. A reaction looked for in a player's own Foundry, as they attack
+  there, is rolled as Midi rolls it. The one roll that may be taken wrongly is a check another
+  module makes just as Midi makes this one: where that module then spends what it worked out itself,
+  without dnd5e's own spending, the cost it spends was Foundry's computer dice.
   Since 0.53.0, on a Gamemaster's Foundry, so is Midi-QOL's check of what a use would spend wherever
   Midi works it out and throws it away: its check of a use where it spends without its dialog (its
-  `checkAutoConsume`: its setting for the Gamemaster's uses, or the activity's own, says to), any use
-  the Gamemaster makes in Foundry with no app in it, a reaction they take among them; and its check
-  of the other activity it pairs with an attack, before it spends it, in any workflow where it spends
-  without its dialog (`checkOtherActivityConsumption`), the Gamemaster's own and any attack from the
-  app, and from its card's button, which checks first whatever its setting
+  `checkAutoConsume`: its setting for the Gamemaster's uses, or the activity's own, says to), any
+  use the Gamemaster makes in Foundry with no app in it, a reaction they take among them; and its
+  check of the other activity it pairs with an attack, before it spends it, in any workflow where it
+  spends without its dialog (`checkOtherActivityConsumption`), the Gamemaster's own and any attack
+  from the app, and from its card's button, which checks first whatever its setting
   (`#consumeOtherActivity`); under dnd5e 5 or 6. It's told by what dnd5e is given, never by a
   formula: with Midi-QOL active, a configuration dnd5e hasn't begun spending
   (`dnd5e.preActivityConsumption`) that carries one of Midi's workflows (`workflow`, a
-  `MidiQOL.Workflow`), as Midi's check of a use is built from the use's own, or that spends resources
-  alone in Midi's words for another activity (`consume` exactly `{ resources: true, spellSlot:
-  false, action: false }`; dnd5e's own lists the targets it spends). The use itself spends as ever,
-  its cost rolled once with the dice settings of whoever makes it; where Midi shows its dialog first,
-  as by default, it makes no check. A use or reaction in a player's own Foundry is rolled as Midi
-  rolls it: the module checks nothing there. A check another module builds just as Midi does is
-  taken for Midi's.
+  `MidiQOL.Workflow`), as Midi's check of a use is built from the use's own, or that spends
+  resources alone in Midi's words for another activity (`consume` exactly `{ resources: true,
+  spellSlot: false, action: false }`; dnd5e's own lists the targets it spends). The use itself
+  spends as ever, its cost rolled once with the dice settings of whoever makes it; where Midi shows
+  its dialog first, as by default, it makes no check. A use or reaction in a player's own Foundry is
+  rolled as Midi rolls it: the module checks nothing there. A check another module builds just as
+  Midi does is taken for Midi's.
 - **A die thrown again** (`"again"`). A die of a typed roll's own, of any kind, or of a roll asked,
   that Foundry throws again: an explosion (`x`, `xo`), or a reroll (`r`, `rr`) where the roll wasn't
   sent [`rerolls`](#fetching-rolls) `"kept"`, as a Halfling's of a 1. It's asked one die at a time,
@@ -5117,7 +5118,7 @@ spent: the slot, the mode and the ammunition as above; with `consume`, a weapon 
 mode named, or its only mode where none is, with no ammunition and not returning, needs one in hand
 (`"consume"`); and, where Midi-QOL makes uses (its activities in place of dnd5e's) and the actor, or
 for a character in [Wild Shape](#wild-shape) the character, is in a combat (since module 0.53.0 the
-encounter the Gamemaster has up, or else one that has begun and is its scene's current one, on any
+encounter the Gamemaster has up, or else one that has begun and is its scene's chosen one, on any
 scene; a mark written in one they didn't have up is taken off at the creature's next turn there), a
 Bonus Action is refused
 `"bonus-action"` and a reaction `"reaction"` where Midi's Enforce setting applies to the actor
@@ -5462,7 +5463,7 @@ Unconscious, Paralyzed, Petrified, Stunned, Asleep or Dead, nor at 0 hit points,
 character is now (`"incapacitated"`); a use left, on that actor (`"consume"`); and since module
 0.41.0, where Midi-QOL makes uses (its activities in place of dnd5e's) and the character or the form
 it's in is in a combat (since module 0.53.0 the encounter the Gamemaster has up, or else one that
-has begun and is its scene's current one, on any scene; a mark written in one they didn't have up is
+has begun and is its scene's chosen one, on any scene; a mark written in one they didn't have up is
 taken off at the creature's next turn there), the Bonus Action Wild Shape takes not used yet on that
 actor, where Midi's
 Enforce bonus actions applies to it (`"all"`, or its type) (`"bonus-action"`). For `revert`: none
@@ -5603,7 +5604,7 @@ ran out." (at levels 2 and 3, "its hour ran out"), "{name}'s Wild Shape ends at 
 | `"full"`, `"swap"` | Every place for a known form taken; a replacement with none since the last Long Rest. |
 | `"shaped"` | A replacement of the form the character is now. |
 | `"consume"` | No use of Wild Shape left. |
-| `"bonus-action"` | Since module 0.41.0: Midi-QOL makes uses and enforces Bonus Actions for the actor the character is now, in a combat (since module 0.53.0 also an encounter the Gamemaster doesn't have up that has begun and is its scene's current one), and its Bonus Action is used. |
+| `"bonus-action"` | Since module 0.41.0: Midi-QOL makes uses and enforces Bonus Actions for the actor the character is now, in a combat (since module 0.53.0 also an encounter the Gamemaster doesn't have up that has begun and is its scene's chosen one), and its Bonus Action is used. |
 | `"incapacitated"` | Incapacitated, at 0 hit points or Dead. |
 | `"transformed"` | A change from, or a return of, a form the module doesn't time: it ends in Foundry. |
 | `"cancelled"` | A write a hook stopped, or the form not made, or not gone, read again. |

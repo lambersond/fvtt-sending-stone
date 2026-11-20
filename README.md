@@ -243,13 +243,14 @@ could still let a player have one marked while the roll is being made.
   line for it looks for reactions as its line for dnd5e 5 does; where it doesn't, those checks are
   rolled as Midi rolls them. The cost the use spends is rolled as ever: your own dice settings, or
   a typing player's dice. A reaction that's taken still rolls its cost with the dice settings of
-  whoever takes it. Since 0.53.0 so is Midi's check of a use you make in Foundry yourself, where
-  Midi spends what it uses without its dialog (its setting for what your uses consume, or the
-  item's own, says so), a reaction you take among them; and its check of the activity it pairs with
-  an attack, as Frost Brand's Rime, in your own attacks, from Midi's card button for it, which
-  always checks first, and in an attack from the app whose player doesn't type their dice. The cost
-  itself is asked once, of your dice settings. Where Midi shows its dialog first, as by default, it
-  makes no check. A player's use in their own Foundry is rolled as Midi rolls it.
+  whoever takes it. Since 0.53.0 Midi's check of a use you make in Foundry yourself is Foundry's
+  computer dice too, where Midi spends what it uses without its dialog (its setting for what your
+  uses consume, or the item's own, says so), a reaction you take among them; and so is its check of
+  the activity it pairs with an attack, as Frost Brand's Rime, in your own attacks, from Midi's card
+  button for it, which always checks first, and in an attack from the app whose player doesn't type
+  their dice, or any attack from the app under dnd5e 6. The cost itself is asked once, of your dice
+  settings. Where Midi shows its dialog first, as by default, it makes no check. A player's use in
+  their own Foundry is rolled as Midi rolls it.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -426,14 +427,14 @@ an attack hit only where the game shows players.
   slot or the item's uses, the ammunition fired, a thrown weapon. Spent, it counts as the cast:
   concentration begins, and under Midi-QOL's Enforce settings a used Bonus Action or reaction
   refuses it, in a fight (the encounter you have up, or since 0.53.0 one you don't that has begun
-  and is its scene's current one), and it marks one used. Foundry's damage card names the level, the
+  and is its scene's chosen one), and it marks one used. Foundry's damage card names the level, the
   mode and the ammunition, and what was spent, or "nothing spent".
 - **Nothing asks you, where it can be helped.** An enchantment's profile and item are chosen in the
   app, so dnd5e's usage dialog never opens. Area attacks Midi targets itself around their user,
   summoning, transforming (but Wild Shape from the app where the campaign allows it) and other
   activities dnd5e asks about, Midi's Active Defence, a used
   reaction or bonus action Midi enforces (in the encounter the creature fights in: the one you have
-  up, or since 0.53.0 one you don't that has begun and is its scene's current one, where the module
+  up, or since 0.53.0 one you don't that has begun and is its scene's chosen one, where the module
   marks it itself and takes the mark off at the creature's next turn there), and an activity set to
   always show Midi's dialogs or to ask which effects to apply are refused in the app with a reason.
   Wild Shape follows Midi-QOL's Enforce bonus actions since 0.41.0: refused once the Bonus Action is
@@ -1096,7 +1097,7 @@ Gamemaster-only information switched on.
 - **Worn gear isn't modelled:** dnd5e gives a form none of the druid's gear, so a ring that should
   work on the form doesn't; you decide.
 - **Bonus Actions are counted only under Midi-QOL's Enforce bonus actions, in a fight (the encounter
-  you have up, or since 0.53.0 one you don't that has begun and is its scene's current one):**
+  you have up, or since 0.53.0 one you don't that has begun and is its scene's chosen one):**
   elsewhere Change and Return say they take one. A return or an ending made in Foundry isn't
   counted, as Midi counts none.
 - **Beast Spells (level 18) and Archdruid (level 20)** are the table's: dnd5e drops every spell but

@@ -38,7 +38,7 @@ export function midiActivities() {
  * The encounter a creature fights in, and its combatant there, since 0.53.0: the one the Gamemaster
  * has up, where Foundry's `Actor#inCombat` finds it there, as Midi-QOL reads it, its combatant as
  * core matches it (`getCombatantsByActor`), as Midi reads a turn; else the first, in Foundry's order,
- * that has begun and is its scene's current one (`started` and `active`), whichever scene, as an
+ * that has begun and is its scene's chosen one (`started` and `active`), whichever scene, as an
  * initiative is rolled into one since 0.51.0. A token's creature by its token and scene; any other
  * by the actor its combatant stored or reads now. One elsewhere not begun counts for nothing: the
  * app can't tell which of two the Gamemaster means.
