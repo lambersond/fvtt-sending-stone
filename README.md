@@ -681,6 +681,11 @@ off by default, apart from players' rolls, under D&D Fifth Edition 5 and 6. A 20
 stays in Foundry, and so does any other transformation, such as Polymorph: the app shows the form,
 and you return it in Foundry.
 
+The form's sheet tells the app which of its abilities are the creature's, as dnd5e took their
+scores from it: in Wild Shape the physical ones and, since 0.52.0, any your world adds with no
+type, whose score dnd5e never keeps; and since 0.52.0 none under a transformation that keeps the
+character's whole self, as Appearance does, where before it named every one.
+
 ### Hit points
 
 Since 0.44.0 a campaign's players can set their character's hit points and temporary hit points from
