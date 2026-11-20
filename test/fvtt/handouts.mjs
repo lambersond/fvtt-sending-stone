@@ -376,14 +376,15 @@ users.get('carol').character = bram
 /*  The app                                     */
 /* -------------------------------------------- */
 
-const app = { events: [], polls: [], waiting: new Map(), wake: null, features: { commands: true, transfers: 1, groups: 1, coins: 1 } }
+// `answers`, by campaign, is what that campaign's app answers in place of `features`.
+const app = { events: [], polls: [], waiting: new Map(), wake: null, features: { commands: true, transfers: 1, groups: 1, coins: 1 }, answers: {} }
 const json = body => ({ ok: true, status: 200, statusText: 'OK', headers: new Headers({ 'content-type': 'application/json' }), json: async () => body })
 globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body)
   if (String(url).endsWith('/api/events')) {
     app.events.push(body)
     const announcing = ['bridge.hello', 'bridge.heartbeat'].includes(body.type)
-    return announcing ? json({ features: app.features }) : { ok: true, status: 204, statusText: 'No Content', headers: new Headers() }
+    return announcing ? json({ features: app.answers[body.campaign?.id] ?? app.features }) : { ok: true, status: 204, statusText: 'No Content', headers: new Headers() }
   }
   if (String(url).endsWith('/api/bridge/commands')) {
     app.polls.push({ at: performance.now(), body })
@@ -1100,10 +1101,37 @@ assert.ok(!made.result.messages.includes(said.at(-1).id), "the Gamemasters' own 
   assert.deepEqual([early.status, early.reason, early.messages, late.status, lines.length, late.messages],
     ['failed', 'timeout', [], 'done', 21, lines.slice(0, 20).map(message => message.id)], 'the late result, the first 20')
 }
+// Two campaigns, each with its own app, one of them at v0.53.0 and the other older: each app's
+// answer is read for its own campaign alone, so the same hand-out lists all 21 in the first and the
+// first 20 in the second, which would drop a list of 21 whole.
+const MIRKWOOD = { ...CAMPAIGN, id: 'camp-b', title: 'Mirkwood', characters: [...CAMPAIGN.characters, ...EXTRAS.map(actor => actor.id)] }
+settings.set('campaignSecrets', { 'camp-a': 'ashlands-secret', 'camp-b': 'mirkwood-secret' })
+settings.set('campaigns', [{ ...CAMPAIGN, characters: MIRKWOOD.characters }, MIRKWOOD])
+app.answers = { 'camp-a': { ...older, gmRollMessages: 1 } }
+const pollsBefore = app.polls.length
+await hello()
+await until(() => app.polls.slice(pollsBefore).some(poll => poll.body.campaign.id === 'camp-b'), "Mirkwood's fetch, its app's answer read")
+for (const [campaignId, listed] of [['camp-a', 21], ['camp-b', 20]]) {
+  restock()
+  await settle()
+  const giving = handOut('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+  app.waiting.set(campaignId, [giving])
+  app.wake?.()
+  await until(() => resultIndex(giving.id) >= 0, `the hand-out in ${campaignId}`)
+  const { campaign: { id: to }, data: result } = app.events[resultIndex(giving.id)]
+  const lines = saidBy({ command: giving })
+  assert.deepEqual([to, result.status, lines.length, result.messages], [campaignId, 'done', 21, lines.slice(0, listed).map(message => message.id)],
+    `two campaigns: ${listed} listed in ${campaignId}`)
+}
+// Everyone as the world began, and told so in Ashlands' hello, before Mirkwood goes.
+restock()
+await settle()
+app.answers = {}
+settings.set('campaignSecrets', { 'camp-a': 'ashlands-secret' })
 campaignAs()
 await hello()
 for (const actor of EXTRAS) actors.delete(actor.id)
-okay("the Gamemaster's hand-out to 20, characters and parties, makes 21 messages, all listed, the Gamemasters' last, to an app that says `gmRollMessages`, a whole number of 1 or more (2 too, never true, \"1\", 0 or 1.5); no more than 21 when more are made; to an app that doesn't, the first 20, as before 0.53.0; a late result, held past its minute, is listed as the first")
+okay("the Gamemaster's hand-out to 20, characters and parties, makes 21 messages, all listed, the Gamemasters' last, to an app that says `gmRollMessages`, a whole number of 1 or more (2 too, never true, \"1\", 0 or 1.5); no more than 21 when more are made; to an app that doesn't, the first 20, as before 0.53.0; a late result, held past its minute, is listed as the first; in a world of two campaigns, each app's answer is read for its own alone: 21 to the one that says it, the first 20 to the other")
 
 /* -------------------------------------------- */
 /*  A hand-out that fails                       */
