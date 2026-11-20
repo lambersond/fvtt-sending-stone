@@ -446,7 +446,9 @@ class Workflow {
   /**
    * Workflow.ts:2494-2575 (module 0.44.0): an other activity that spends something, its damage put
    * off, has its consumption checked first, which rolls its dice cost and throws the roll away, then
-   * spent; then its damage is rolled (2592-2610).
+   * spent; then its damage is rolled (2592-2610). The branch where Midi spends without its dialog
+   * (`shouldAutoConsume`); with its dialog shown it makes no check (Workflow.ts:2505-2511), which no
+   * harness here takes.
    */
   async checkOtherActivityConsumption() {
     const other = this.otherActivity

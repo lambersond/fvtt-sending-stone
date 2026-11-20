@@ -2675,6 +2675,16 @@ An ask:
   link's types are, so a world that adds one has new hashes after its reload. Every description
   gets a new hash and is sent again once, with the next hello. A listener needs no change: it never
   reads a hash's format.
+- Module 0.53.0 rolls Midi-QOL's check of what a use would spend with Foundry's computer dice, on a
+  Gamemaster's Foundry, wherever Midi works it out and throws it away before spending, with no new
+  event, field or format ([dice the game rolls later](#dice-the-game-rolls-later)): its check of a
+  use where it spends without its dialog, any use the Gamemaster makes there and a reaction they
+  take, and its check of the other activity it pairs with an attack, in any workflow, an attack
+  from the app among them (under dnd5e 6, or where its player doesn't type their dice, that check
+  was the Gamemaster's dice before), and from Midi's card button for it. The cost the use spends is
+  rolled once, with the dice settings of whoever makes it. A listener reads nothing new. A module
+  before 0.53.0 leaves those checks to Midi, so under Manual Dice the Gamemaster is asked for such a
+  cost twice.
 
 ## Changes from protocol 1
 
@@ -4703,8 +4713,8 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   the Gamemaster by their Manual Dice window, and it's never taken for a run's cost. The module
   marks the use it hands Midi as a check until dnd5e begins spending it
   (`dnd5e.preActivityConsumption`), so the cost the use spends is rolled as ever. So, under dnd5e 5,
-  is Midi-QOL's own check of the cost of a run's workflow's other activity, which Midi works out and
-  throws away before it spends it. Since 0.49.0, under dnd5e 5, and under dnd5e 6 where Midi's line
+  since 0.44.0, is Midi-QOL's own check of the cost of a run's workflow's other activity, which Midi
+  works out and throws away before it spends it; since 0.53.0, any workflow's (below). Since 0.49.0, under dnd5e 5, and under dnd5e 6 where Midi's line
   for it builds the check as its line for dnd5e 5 does, so is Midi-QOL's check of each reaction it
   looks for: as a creature is attacked, hit, missed, damaged or healed, or makes a save, Midi works
   out what each of its reactions would spend, keeps only whether it could be paid, and throws the
@@ -4718,12 +4728,27 @@ the campaign's `bridge.hello` or `bridge.heartbeat` said `"features": {"diceAsks
   `reaction` in its name, Midi's older `reactiondamage`, `reactionmanual` and `reactionpreattack`
   among them), with a configuration that creates nothing (`create: false`), which dnd5e hasn't begun
   spending (`dnd5e.preActivityConsumption`). So a reaction taken spends as ever, its cost rolled
-  with the dice settings of whoever takes it. A Gamemaster's own workflow's check is rolled as Midi
-  rolls it, and so is Midi's check of any other use not from the app, a reaction's own as it's taken
-  among them; so is a reaction looked for in a player's own Foundry, as they attack there. The one
-  roll that may be taken wrongly is a check another module makes just as Midi makes this one: where
-  that module then spends what it worked out itself, without dnd5e's own spending, the cost it
-  spends was Foundry's computer dice.
+  with the dice settings of whoever takes it. A reaction looked for in a player's own Foundry, as
+  they attack there, is rolled as Midi rolls it. The one roll that may be taken wrongly is a check
+  another module makes just as Midi makes this one: where that module then spends what it worked out
+  itself, without dnd5e's own spending, the cost it spends was Foundry's computer dice.
+  Since 0.53.0, on a Gamemaster's Foundry, so is Midi-QOL's check of what a use would spend wherever
+  Midi works it out and throws it away: its check of a use where it spends without its dialog (its
+  `checkAutoConsume`: its setting for the Gamemaster's uses, or the activity's own, says to), any use
+  the Gamemaster makes in Foundry with no app in it, a reaction they take among them; and its check
+  of the other activity it pairs with an attack, before it spends it, in any workflow where it spends
+  without its dialog (`checkOtherActivityConsumption`), the Gamemaster's own and any attack from the
+  app, and from its card's button, which checks first whatever its setting
+  (`#consumeOtherActivity`); under dnd5e 5 or 6. It's told by what dnd5e is given, never by a
+  formula: with Midi-QOL active, a configuration dnd5e hasn't begun spending
+  (`dnd5e.preActivityConsumption`) that carries one of Midi's workflows (`workflow`, a
+  `MidiQOL.Workflow`), as Midi's check of a use is built from the use's own, or that spends resources
+  alone in Midi's words for another activity (`consume` exactly `{ resources: true, spellSlot:
+  false, action: false }`; dnd5e's own lists the targets it spends). The use itself spends as ever,
+  its cost rolled once with the dice settings of whoever makes it; where Midi shows its dialog first,
+  as by default, it makes no check. A use or reaction in a player's own Foundry is rolled as Midi
+  rolls it: the module checks nothing there. A check another module builds just as Midi does is
+  taken for Midi's.
 - **A die thrown again** (`"again"`). A die of a typed roll's own, of any kind, or of a roll asked,
   that Foundry throws again: an explosion (`x`, `xo`), or a reroll (`r`, `rr`) where the roll wasn't
   sent [`rerolls`](#fetching-rolls) `"kept"`, as a Halfling's of a 1. It's asked one die at a time,
@@ -4822,7 +4847,9 @@ the module's own check of them and Midi-QOL's, are rolled as before 0.44.0.
 **Under dnd5e 6**, `features.rolls.diceAsks` is `false`, `diceAsksReason` `"system"`, and nothing
 is asked, nor any run opened: the game's later dice are Foundry's, as before 0.44.0, but for the
 module's own check of a cost, Midi-QOL's as its use from the app begins, and since 0.49.0 Midi's
-of a reaction it looks for, Foundry's computer dice there too. dnd5e 6 and Midi-QOL's line for it
+of a reaction it looks for, and since 0.53.0 Midi's check of a use and of the other activity it
+pairs with an attack, which Midi's line for dnd5e 6 builds as its line for dnd5e 5 does (read from
+its source, not tried), Foundry's computer dice there too. dnd5e 6 and Midi-QOL's line for it
 are to be supported apart: how that line looks for reactions was not read, and one that builds the
 check another way leaves it to roll as Midi rolls it.
 
