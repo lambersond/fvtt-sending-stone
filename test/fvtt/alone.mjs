@@ -951,6 +951,12 @@ if (MIDI) {
       actors.set('thorin', thorin)
     }
     assert.deepEqual([midi.bonusRemovals.slice(goneOff), midi.usedBonus.has('thorin')], [[], true], 'gone from the world: nothing taken off')
+    // Wren's next turn there, nothing marked on her since hers was taken off: nothing taken off, a
+    // mark taken off once.
+    const laterOff = midi.reactionRemovals.length
+    ridge.turn = 1
+    await Hooks.callAll('combatTurnChange', ridge, { round: 4, turn: 0, combatantId: 'cb-ridge' }, { round: 4, turn: 1, combatantId: 'cb-ridge-wren' })
+    assert.deepEqual(midi.reactionRemovals.slice(laterOff), [], 'her next turn there, nothing marked since: nothing taken off')
     // Marked again on the ridge, which is then deleted: its marks forgotten, so a turn of it heard
     // after takes nothing off.
     midi.usedBonus.delete('thorin')
@@ -971,7 +977,7 @@ if (MIDI) {
   midi.settings.enforceBonusActions = 'none'
   midi.settings.enforceReactions = 'none'
   restorePotion()
-  ok("Midi-QOL's economy with consume: Enforce bonus actions \"all\", Thorin's used, the potion refused \"bonus-action\", nothing rolled; without consume rolled, nothing marked; unused, marked; Enforce reactions \"all\", Wren's used, Hellish Rebuke refused \"reaction\", unused marked; out of a fight neither; since module 0.53.0, in an encounter begun on the ridge with none up, refused, unused marked by the module, the mark taken off as his turn there begins; Wren's Hellish Rebuke there refused reaction, unused marked, taken off as her turn begins; allowed two a round, one used is taken off at the next turn there all the same; nothing taken off Thorin gone from the world; the ridge deleted, its marks forgotten")
+  ok("Midi-QOL's economy with consume: Enforce bonus actions \"all\", Thorin's used, the potion refused \"bonus-action\", nothing rolled; without consume rolled, nothing marked; unused, marked; Enforce reactions \"all\", Wren's used, Hellish Rebuke refused \"reaction\", unused marked; out of a fight neither; since module 0.53.0, in an encounter begun on the ridge with none up, refused, unused marked by the module, the mark taken off as his turn there begins; Wren's Hellish Rebuke there refused reaction, unused marked, taken off as her turn begins; allowed two a round, one used is taken off at the next turn there all the same; nothing taken off Thorin gone from the world; Wren's next turn there, nothing marked since, takes nothing off; the ridge deleted, its marks forgotten")
 }
 {
   // 7. Uses.

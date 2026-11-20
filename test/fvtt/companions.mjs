@@ -2149,9 +2149,14 @@ if (MIDI) {
       let made = midi.made.length
       failedAs(await howlAt(), 'bonus-action', 'its Bonus Action used')
       assert.equal(midi.made.length, made, 'no workflow')
-      // 2. Unused: made, and marked by the module, as Midi would mark it in the encounter up.
+      // 2. Unused: a Howl that never has its card, as one a module's dnd5e.preUseActivity stops, fails
+      // "midi" and marks nothing; one made is marked by the module, as Midi would mark it in the
+      // encounter up.
       midi.usedBonus.delete(wolfId)
       let marks = midi.bonusMarks.length
+      Hooks.once('dnd5e.preUseActivity', () => false)
+      failedAs(await howlAt(), 'midi', 'stopped before its card')
+      assert.deepEqual([midi.bonusMarks.slice(marks), midi.usedBonus.has(wolfId)], [[], false], 'no card: nothing marked')
       doneAs(await howlAt(), 'its Bonus Action unused')
       assert.deepEqual(midi.bonusMarks.slice(marks), [wolfId], 'marked once')
       // 3. A new round, the goblin's turn: the mark stays, and Howl again is refused.
@@ -2248,7 +2253,7 @@ if (MIDI) {
       midi.usedBonus.delete(wolfId)
       midi.usedReaction.delete(wolfId)
     }
-    ok("since module 0.53.0, under Midi-QOL, a Wolf fighting in the den's brawl, begun and chosen, while the Gamemaster has the arena's fight up: its Howl refused bonus-action with its Bonus Action used, unused made and marked by the module; a new round's first turn, another's, leaves the mark and refuses Howl; two Howls at once, one made, one refused; at its own turn the mark taken off, forced; its Bite on its own turn no opportunity attack, on the goblin's refused reaction with its reaction used, never read from a copy of the den whose combatant has its token's id; unused, an attack Midi aborts still marked, one made marked; its Bonus Action and reaction marked in the brawl both taken off at its next turn, each once; its token gone, nothing taken off or logged; the brawl not begun, or not chosen, counts for nothing; the brawl up, Midi's own to mark")
+    ok("since module 0.53.0, under Midi-QOL, a Wolf fighting in the den's brawl, begun and chosen, while the Gamemaster has the arena's fight up: its Howl refused bonus-action with its Bonus Action used; unused, one stopped before its card failing midi and marking nothing, one made marked by the module; a new round's first turn, another's, leaves the mark and refuses Howl; two Howls at once, one made, one refused; at its own turn the mark taken off, forced; its Bite on its own turn no opportunity attack, on the goblin's refused reaction with its reaction used, never read from a copy of the den whose combatant has its token's id; unused, an attack Midi aborts still marked, one made marked; its Bonus Action and reaction marked in the brawl both taken off at its next turn, each once; its token gone, nothing taken off or logged; the brawl not begun, or not chosen, counts for nothing; the brawl up, Midi's own to mark")
   }
   game.combats.delete(brawl.id)
   den.tokens.delete(denGoblin.id)

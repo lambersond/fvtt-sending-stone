@@ -991,6 +991,11 @@ if (MIDI) {
   Object.assign(ridge, { started: true, round: 1, turn: 0 })
   midi.settings.enforceBonusActions = 'all'
   const bonusFrom = midi.bonusMarks.length
+  // One that never has its card, as one a module's dnd5e.preUseActivity stops: "midi", nothing marked.
+  Hooks.once('dnd5e.preUseActivity', () => false)
+  const stopped = await use('flametongue', 'engulf', { enchant: { profile: P.ablaze } })
+  assert.deepEqual([stopped.status, stopped.reason], ['failed', 'midi'], JSON.stringify(stopped))
+  assert.deepEqual([midi.bonusMarks.slice(bonusFrom), midi.usedBonus.has('ari')], [[], false], 'no card: nothing marked')
   const lit = await use('flametongue', 'engulf', { enchant: { profile: P.ablaze } })
   assert.equal(lit.status, 'done', JSON.stringify(lit))
   assert.equal(enchantmentsOn('flametongue', ORIGIN.engulf).length, 1)
@@ -1004,7 +1009,7 @@ if (MIDI) {
   assert.deepEqual([again.status, again.reason, again.messageId], ['failed', 'applied', null], JSON.stringify(again))
   assert.equal(midi.usages.length, usages, 'no workflow')
   assert.equal(enchantmentsOn('flametongue', ORIGIN.engulf).length, 1, 'still alight')
-  ok('Engulf in Flames lit through Midi-QOL, since module 0.53.0 its Bonus Action marked by the module where Ari fights in an encounter begun on the ridge, not up; used again with its profile, refused before any workflow')
+  ok('Engulf in Flames lit through Midi-QOL, since module 0.53.0 its Bonus Action marked by the module where Ari fights in an encounter begun on the ridge, not up, and one stopped before its card failing midi, nothing marked; used again with its profile, refused before any workflow')
 
   const madeBefore = madeEnchantments()
   midiEnchant.abortDeleting = true
