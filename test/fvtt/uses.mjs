@@ -757,12 +757,31 @@ try {
   assert.equal(near.status, 'done', JSON.stringify(near))
   assert.deepEqual(named(near.id), ['Thorin'])
   if (MIDI) assert.deepEqual(flowTargets(near.id), ['tok-thorin'])
+  // Since module 0.53.0, an encounter begun elsewhere, on the ridge, with none up: his combatant's
+  // token there, which the Gamemaster's canvas doesn't draw, named on the card where no token of his
+  // is drawn; a token it draws is never passed over for it.
+  const ridge = combat('ridge')
+  Object.assign(ridge, { started: true, round: 1 })
+  combatant(ridge, 'cb-ridge', thorin, {
+    token: { id: 'tok-ridge', name: 'Thorin on the ridge', actor: thorin, parent: { id: 'ridge' }, object: undefined }, tokenId: 'tok-ridge', sceneId: 'ridge',
+  })
+  thorin.getActiveTokens = () => []
+  const ridged = await use('potion', 'quaff', { self: true })
+  assert.equal(ridged.status, 'done', JSON.stringify(ridged))
+  assert.deepEqual(named(ridged.id), ['Thorin on the ridge'], 'none drawn: his token on the ridge')
+  if (MIDI) assert.deepEqual(flowTargets(ridged.id), [])
+  thorin.getActiveTokens = (linked, document) => ((linked && document) ? [tokens.thorin] : [])
+  const drawn = await use('potion', 'quaff', { self: true })
+  assert.equal(drawn.status, 'done', JSON.stringify(drawn))
+  assert.deepEqual(named(drawn.id), ['Thorin'], 'one drawn: that one, never the ridge\'s')
+  if (MIDI) assert.deepEqual(flowTargets(drawn.id), ['tok-thorin'])
 } finally {
   delete thorin.getActiveTokens
+  game.combats.delete('ridge')
   game.combat = fighting
 }
 nothingAsked()
-ok(`out of combat, a use at its user is made at their token on the scene the Gamemaster views, or else names the character alone${MIDI ? ', made by Midi at no one unless it needs a target' : ''}`)
+ok(`out of combat, a use at its user is made at their token on the scene the Gamemaster views, or else names the character alone${MIDI ? ', made by Midi at no one unless it needs a target' : ''}; since module 0.53.0, with no token of theirs drawn, their combatant's token in an encounter begun elsewhere, never in place of one drawn`)
 
 for (const [label, make, reason, error] of [
   ['its user twice', () => use('potion', 'quaff', { self: true, targets: [target('cb-thorin')] }), 'target', null],

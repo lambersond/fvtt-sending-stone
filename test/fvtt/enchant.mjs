@@ -984,16 +984,27 @@ if (MIDI) {
   assert.equal(twice.enchantment.enchanted.effect, once[0].id)
   ok('one Midi-QOL applies itself is reported, not applied again')
 
+  // Since module 0.53.0 Ari fights on the ridge, begun and its scene's chosen one, which the
+  // Gamemaster hasn't up: Engulf in Flames's Bonus Action, Midi enforcing them, marked by the module.
+  const ridge = combat('ridge')
+  combatant(ridge, 'cb-ridge-ari', ari)
+  Object.assign(ridge, { started: true, round: 1, turn: 0 })
+  midi.settings.enforceBonusActions = 'all'
+  const bonusFrom = midi.bonusMarks.length
   const lit = await use('flametongue', 'engulf', { enchant: { profile: P.ablaze } })
   assert.equal(lit.status, 'done', JSON.stringify(lit))
   assert.equal(enchantmentsOn('flametongue', ORIGIN.engulf).length, 1)
   assert.equal(engulfApplied(sheetBefore(lit.id)).length, 1, 'the sheet with it alight sent first')
+  assert.deepEqual(midi.bonusMarks.slice(bonusFrom), ['ari'], 'its Bonus Action marked by the module, on the ridge')
+  midi.usedBonus.clear()
+  midi.settings.enforceBonusActions = 'none'
+  game.combats.delete('ridge')
   const usages = midi.usages.length
   const again = await use('flametongue', 'engulf', {})
   assert.deepEqual([again.status, again.reason, again.messageId], ['failed', 'applied', null], JSON.stringify(again))
   assert.equal(midi.usages.length, usages, 'no workflow')
   assert.equal(enchantmentsOn('flametongue', ORIGIN.engulf).length, 1, 'still alight')
-  ok('Engulf in Flames lit through Midi-QOL; used again with its profile, refused before any workflow')
+  ok('Engulf in Flames lit through Midi-QOL, since module 0.53.0 its Bonus Action marked by the module where Ari fights in an encounter begun on the ridge, not up; used again with its profile, refused before any workflow')
 
   const madeBefore = madeEnchantments()
   midiEnchant.abortDeleting = true

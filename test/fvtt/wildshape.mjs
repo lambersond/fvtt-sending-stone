@@ -3070,11 +3070,13 @@ ok("Manage Campaigns: the Wild Shape fieldset, the user's words, between Active 
 // Round 0.41.0 §8.2.1: where Midi-QOL makes uses and enforces Bonus Actions, a change and a return
 // are refused once one is used in a fight, and mark one used: on the form, or on her once back.
 {
+  // Since module 0.53.0 it imports constants.mjs alone, for the module's id in a failure's words.
   const leaf = readFileSync(`${MODULE}/scripts/midi-economy.mjs`, 'utf8')
-  assert.ok(!/^\s*import\b/m.test(leaf) && !/\bimport\s*\(/.test(leaf), 'midi-economy.mjs imports nothing')
+  const imports = leaf.split('\n').filter(line => /^\s*import\b/.test(line))
+  assert.ok(imports.every(line => line === 'import { MODULE_ID } from "./constants.mjs";') && !/\bimport\s*\(/.test(leaf), 'midi-economy.mjs imports only constants.mjs')
   const uses = await import(`${MODULE}/scripts/command-uses.mjs`)
   assert.equal(typeof uses.midiActivities, 'function', 'command-uses.mjs still exports midiActivities')
-  ok('the economy is a leaf: midi-economy.mjs imports nothing, and command-uses.mjs still exports midiActivities')
+  ok('the economy is a leaf but for constants.mjs: midi-economy.mjs imports only that, and command-uses.mjs still exports midiActivities')
 }
 if (MIDI) {
   const { midi } = await import('./midi-fake.mjs')
@@ -3135,18 +3137,40 @@ if (MIDI) {
   shape = await made(transform(wolfId))
   assert.deepEqual([shape.result.status, marks().slice(from)], ['done', []], '"npc": neither refused nor marked')
   await back()
-  // 7. Out of a fight: neither checked nor marked.
+  // 7. Out of a fight: neither checked nor marked. Since module 0.53.0 a fight begun counts though
+  // the Gamemaster hasn't it up (7b): out of every fight, it hasn't begun.
   midi.settings.enforceBonusActions = 'all'
   game.combat = null
+  const roundWas = fight.round
+  fight.round = 0
   used('elowen')
   from = marks().length
   shape = await made(transform(wolfId))
   assert.deepEqual([shape.result.status, marks().slice(from)], ['done', []], 'out of a fight: neither')
   shape = await made(revert())
   assert.deepEqual([shape.result.status, marks().slice(from)], ['done', []], 'nor its return')
+  fight.round = roundWas
   game.combat = fight
   await reset()
   ok('"displayOnly": never refused, the form marked once; "character" enforced for her; "npc" neither refused nor marked; out of a fight, neither checked nor marked, a change or a return')
+
+  // 7b. Since module 0.53.0, a fight begun and its scene's chosen one, which the Gamemaster hasn't up:
+  // a change checked and marked there as in the encounter up, and the module's mark on the form taken
+  // off as her next turn there begins.
+  game.combat = null
+  used('elowen')
+  assert.deepEqual(refusal(await made(transform(wolfId))), ['failed', 'bonus-action', null], 'none up, the fight begun: her Bonus Action used, refused')
+  used()
+  from = marks().length
+  shape = await made(transform(wolfId))
+  const away = formOf()
+  assert.deepEqual([shape.result.status, marks().slice(from)], ['done', [away.id]], 'unused: changed, marked once, on the form')
+  const removals = midi.bonusRemovals.length
+  await fight.setTurn(fight.round + 1, fight.turns.findIndex(cb => cb.id === 'cbElowen'))
+  assert.deepEqual([midi.bonusRemovals.slice(removals), midi.usedBonus.has(away.id)], [[away.id], false], 'taken off as her next turn there begins')
+  game.combat = fight
+  await back()
+  ok("since module 0.53.0, the fight begun and chosen while the Gamemaster has none up: a change refused bonus-action with her Bonus Action used, unused made and marked once on the form by the module, the mark taken off as her next turn there begins")
 
   // 8. A change while shaped: the Wolf's Bonus Action used, refused, the Wolf kept and no use spent;
   // at its next turn the Black Bear, one Bonus Action and one mark, on the new form.
@@ -3198,6 +3222,55 @@ if (MIDI) {
   settings.delete('ReplaceDefaultActivities')
   await back()
   ok("core matching a combatant by its stored actor: a change while shaped still checked, by her own actor in the fight; Midi-QOL not making uses: neither checked nor marked")
+
+  // 11b. Since module 0.53.0, core matching a combatant by the actor it stored (her own), and Midi
+  // reading her turn by it: the form's Bite from the app is checked by her own combatant, so on her
+  // turn it's no opportunity attack, and on another's it is.
+  {
+    const { combatant } = await import('./stub.mjs')
+    const cbFoe = combatant(fight, 'cbFoe', thorin, { initiative: 99 })
+    const byActor = fight.getCombatantsByActor
+    const was = { aoo: midi.settings.recordAOO, reactions: midi.settings.enforceReactions, turn: fight.turn }
+    port.faults.storedActorId = true
+    fight.getCombatantsByActor = actor => [...fight.combatants.values()].filter(cb => cb.actorId === actor.id)
+    Object.assign(midi.settings, { recordAOO: 'all', enforceReactions: 'all' })
+    await campaignAs({ rolls: true, attacks: true })
+    try {
+      used()
+      assert.equal((await made(transform(wolfId))).result.status, 'done')
+      const shaped = formOf()
+      const bite = [...shaped.items].find(item => item.name === 'Bite')
+      const biting = [...bite.system.activities].find(activity => activity.type === 'attack')
+      assert.equal(typeof biting.setupTargets, 'function', "the form's Bite one of Midi's activities")
+      const bitten = () => made({ id: `seat-${++ids}`, actorId: 'elowen', kind: 'attack', item: bite.id, activity: biting.id, mode: 0, explicit: false, extras: [], dice: [{ faces: 20, results: [15] }] })
+      const reactionMarks = () => [...midi.reactionMarks]
+      // Her turn, the form's reaction used: no opportunity attack, made, nothing marked.
+      fight.turn = fight.turns.findIndex(cb => cb.id === 'cbElowen')
+      midi.usedReaction.clear()
+      midi.usedReaction.add(shaped.id)
+      let reactionsFrom = reactionMarks().length
+      let bit = await bitten()
+      assert.deepEqual([bit.result.status, reactionMarks().slice(reactionsFrom)], ['done', []], `her turn: made, nothing marked (${JSON.stringify(bit.result)})`)
+      // The foe's turn, the form's reaction used: an opportunity attack, refused.
+      fight.turn = fight.turns.findIndex(cb => cb.id === 'cbFoe')
+      assert.deepEqual(refusal(await bitten()), ['failed', 'reaction', null], "the foe's turn, its reaction used: refused")
+      // The foe's turn, unused: made, and the form's reaction marked once.
+      midi.usedReaction.clear()
+      reactionsFrom = reactionMarks().length
+      bit = await bitten()
+      assert.deepEqual([bit.result.status, reactionMarks().slice(reactionsFrom)], ['done', [shaped.id]], `the foe's turn, unused: made, marked once on the form (${JSON.stringify(bit.result)})`)
+    } finally {
+      midi.usedReaction.clear()
+      port.faults.storedActorId = false
+      fight.getCombatantsByActor = byActor
+      fight.combatants.delete(cbFoe.id)
+      fight.turn = was.turn
+      Object.assign(midi.settings, { recordAOO: was.aoo, enforceReactions: was.reactions })
+    }
+    await back()
+    await campaignAs({ rolls: false, attacks: false })
+    ok("since module 0.53.0, core matching combatants by the actor they stored: the form's Bite from the app on her own turn no opportunity attack, made, nothing marked; on the foe's turn, its reaction used, refused reaction; unused, made and marked once on the form")
+  }
 
   // 13. Midi with no marker effect (enforcement turned on without a reload): done, nothing marked.
   midi.noMarker = true

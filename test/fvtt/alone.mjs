@@ -866,12 +866,40 @@ if (MIDI) {
   doneOf(await potion({ consume: true }))
   assert.equal(midi.bonusMarks.length, marks, 'out of a fight: neither checked nor marked')
   Object.defineProperty(thorin, 'inCombat', inCombat)
+
+  // 13b. Since module 0.53.0, in an encounter the Gamemaster doesn't have up, on the ridge, begun and
+  // its scene's chosen one, with none up: checked as in the encounter up, marked by the module, and the
+  // mark taken off as Thorin's next turn there begins.
+  restorePotion()
+  const viewed = game.combat
+  const ridge = combat('ridge')
+  combatant(ridge, 'cb-ridge', thorin)
+  Object.assign(ridge, { started: true, round: 1, turn: 0 })
+  game.combat = null
+  try {
+    assert.equal(thorin.inCombat, false, "Thorin in no fight the Gamemaster has up, by core's reading")
+    midi.usedBonus.add('thorin')
+    const ridgeBefore = messages.size
+    failedAs(await potion({ consume: true }), 'bonus-action')
+    assert.equal(messages.size, ridgeBefore, 'on the ridge, his Bonus Action used: nothing rolled')
+    midi.usedBonus.delete('thorin')
+    marks = midi.bonusMarks.length
+    doneOf(await potion({ consume: true }))
+    assert.deepEqual(midi.bonusMarks.slice(marks), ['thorin'], 'on the ridge, unused: marked by the module')
+    const removals = midi.bonusRemovals.length
+    ridge.round = 2
+    await Hooks.callAll('combatTurnChange', ridge, { round: 1, turn: 0, combatantId: 'cb-other' }, { round: 2, turn: 0, combatantId: 'cb-ridge' })
+    assert.deepEqual([midi.bonusRemovals.slice(removals), midi.usedBonus.has('thorin')], [['thorin'], false], 'taken off as his turn there begins')
+  } finally {
+    game.combats.delete('ridge')
+    game.combat = viewed
+  }
   midi.usedBonus.clear()
   midi.usedReaction.clear()
   midi.settings.enforceBonusActions = 'none'
   midi.settings.enforceReactions = 'none'
   restorePotion()
-  ok("Midi-QOL's economy with consume: Enforce bonus actions \"all\", Thorin's used, the potion refused \"bonus-action\", nothing rolled; without consume rolled, nothing marked; unused, marked; Enforce reactions \"all\", Wren's used, Hellish Rebuke refused \"reaction\", unused marked; out of a fight neither")
+  ok("Midi-QOL's economy with consume: Enforce bonus actions \"all\", Thorin's used, the potion refused \"bonus-action\", nothing rolled; without consume rolled, nothing marked; unused, marked; Enforce reactions \"all\", Wren's used, Hellish Rebuke refused \"reaction\", unused marked; out of a fight neither; since module 0.53.0, in an encounter begun on the ridge with none up, refused, unused marked by the module, the mark taken off as his turn there begins")
 }
 {
   // 7. Uses.

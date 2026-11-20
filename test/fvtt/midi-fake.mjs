@@ -83,6 +83,12 @@ export const midi = {
   bonusMarks: [],
   reactionMarks: [],
   noMarker: false,
+  /**
+   * Since module 0.53.0, the actors whose Bonus Action or reaction marker was taken off through
+   * `removeBonusActionUsed` and `removeReactionUsed`, by their ids, in order, forced or not.
+   */
+  bonusRemovals: [],
+  reactionRemovals: [],
   /** How many times Midi's damage roll modifiers were added to a damage configuration. */
   modifiersMade: 0,
   /** Abort the next attack without a change of state, as Midi does for a weapon with no ammunition. */
@@ -1124,6 +1130,16 @@ export function installMidi() {
       if (midi.noMarker || !['all', 'displayOnly', actor.type].includes(midi.settings.enforceBonusActions)) return
       midi.usedBonus.add(actor.id)
       midi.bonusMarks.push(actor.id)
+    },
+    // utils.ts:7293-7300, 7359-7366 (module 0.53.0): forced, the marker taken off at once; else left
+    // to DAE's special duration, which isn't modelled.
+    removeReactionUsed: async (actor, force = false) => {
+      midi.reactionRemovals.push(actor.id)
+      if (force) midi.usedReaction.delete(actor.id)
+    },
+    removeBonusActionUsed: async (actor, force = false) => {
+      midi.bonusRemovals.push(actor.id)
+      if (force) midi.usedBonus.delete(actor.id)
     },
   }
   globalThis.canvas = {

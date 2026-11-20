@@ -425,18 +425,22 @@ an attack hit only where the game shows players.
   weapon's attack mode and its ammunition, and whether Foundry spends what the use would: the spell
   slot or the item's uses, the ammunition fired, a thrown weapon. Spent, it counts as the cast:
   concentration begins, and under Midi-QOL's Enforce settings a used Bonus Action or reaction
-  refuses it, in a fight, and it marks one used. Foundry's damage card names the level, the mode and
-  the ammunition, and what was spent, or "nothing spent".
+  refuses it, in a fight (the encounter you have up, or since 0.53.0 one you don't that has begun
+  and is its scene's current one), and it marks one used. Foundry's damage card names the level, the
+  mode and the ammunition, and what was spent, or "nothing spent".
 - **Nothing asks you, where it can be helped.** An enchantment's profile and item are chosen in the
   app, so dnd5e's usage dialog never opens. Area attacks Midi targets itself around their user,
   summoning, transforming (but Wild Shape from the app where the campaign allows it) and other
   activities dnd5e asks about, Midi's Active Defence, a used
-  reaction or bonus action Midi enforces, and an activity set to always show Midi's dialogs or to
-  ask which effects to apply are refused in the app with a reason. Wild Shape follows Midi-QOL's
-  Enforce bonus actions since 0.41.0: refused once the Bonus Action is used in a fight, and marked
-  on the form, or on the character after a return. Midi may still ask you what it
-  would in Foundry, such as a target's reaction, an optional bonus or confirming ammunition or
-  damage; the player is told it took too long, then that it was made once you answer.
+  reaction or bonus action Midi enforces (in the encounter the creature fights in: the one you have
+  up, or since 0.53.0 one you don't that has begun and is its scene's current one, where the module
+  marks it itself and takes the mark off at the creature's next turn there), and an activity set to
+  always show Midi's dialogs or to ask which effects to apply are refused in the app with a reason.
+  Wild Shape follows Midi-QOL's Enforce bonus actions since 0.41.0: refused once the Bonus Action is
+  used in a fight (likewise), and marked on the form, or on the character after a return. Midi may
+  still ask you what it would in Foundry, such as a target's reaction, an optional bonus or
+  confirming ammunition or damage; the player is told it took too long, then that it was made once
+  you answer.
 - **Dice So Nice** doesn't animate a Midi attack while your tab is hidden, which would hold Midi's
   workflow until you came back.
 
@@ -1091,9 +1095,10 @@ Gamemaster-only information switched on.
     druid.
 - **Worn gear isn't modelled:** dnd5e gives a form none of the druid's gear, so a ring that should
   work on the form doesn't; you decide.
-- **Bonus Actions are counted only under Midi-QOL's Enforce bonus actions, in a fight:** elsewhere
-  Change and Return say they take one. A return or an ending made in Foundry isn't counted, as Midi
-  counts none.
+- **Bonus Actions are counted only under Midi-QOL's Enforce bonus actions, in a fight (the encounter
+  you have up, or since 0.53.0 one you don't that has begun and is its scene's current one):**
+  elsewhere Change and Return say they take one. A return or an ending made in Foundry isn't
+  counted, as Midi counts none.
 - **Beast Spells (level 18) and Archdruid (level 20)** are the table's: dnd5e drops every spell but
   the Moon's from the form, and a use regained on Initiative is yours to give.
 - **A dish served while shaped** goes on the druid's own actor: its effect waits for the return; its
@@ -1172,6 +1177,11 @@ Gamemaster-only information switched on.
 - **With Midi-QOL's *Auto Remove Summoned Creature*,** a summon's tab goes when its summoner's
   concentration ends.
 - **Midi-QOL shows less on cards of a creature no player owns,** as it does for any NPC.
+- **Midi-QOL reads only the encounter you have up.** Its own checks of a reaction or Bonus Action,
+  its opportunity attacks and its marks read the encounter you view, and its *Requires targets* "in
+  combat" your scene's. A use from the app is checked in the creature's own encounter, since 0.53.0
+  one you don't have up that has begun too; a use you make yourself in Foundry for a creature in
+  another encounter isn't: view its encounter first.
 - **Under *Right after its character* a companion rolls no initiative of its own,** so dnd5e's
   recoveries on rolling initiative don't happen for it.
 - **Only the active Gamemaster's Foundry moves companions in initiative;** with no Gamemaster
@@ -1335,7 +1345,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name; an enchant activity used, by dnd5e's card or Midi-QOL's workflow, with what `command-enchant.mjs` chose and applies |
 | `scripts/command-alone.mjs` | An action's damage or healing on its own, dnd5e's card with no targets for the Gamemaster to apply, and a spent recharge rolled, each with the player's dice, outside Midi-QOL's workflow; from 0.41.0, at the level, in the attack mode and with the ammunition chosen, spending what its use would where asked |
-| `scripts/midi-economy.mjs` | Midi-QOL's Bonus Actions and reactions, from 0.41.0: whether Midi makes uses and enforces them for an actor, whether one is used, and marking one used, for uses, damage on its own and Wild Shape |
+| `scripts/midi-economy.mjs` | Midi-QOL's Bonus Actions and reactions, from 0.41.0: whether Midi makes uses and enforces them for an actor, whether one is used, and marking one used, for uses, damage on its own and Wild Shape; from 0.53.0, which encounter a creature fights in, which a use at its user reads too, and taking off at its next turn there a mark written in an encounter you don't have up |
 | `scripts/dnd5e-generation.mjs` | Which generation of dnd5e the world runs, 5 or 6, by the first number of the system's version: for damage on its own, a plain roll, the dishes and, from 0.50.0, how hurt a creature is |
 | `scripts/command-enchant.mjs` | Enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items: the profile and item a use is made with, as the player chose them, the enchantment applied as the card's tray would, and enchantments ended; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |

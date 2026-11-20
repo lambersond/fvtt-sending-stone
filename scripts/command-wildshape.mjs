@@ -4,7 +4,7 @@ import { activeForm } from "./characters.mjs";
 import { sheetFirst } from "./command-enchant.mjs";
 import { appFlags, authorFor, checkCommand, failedResult, visibleTo } from "./command-rolls.mjs";
 import { campaignGroups } from "./groups.mjs";
-import { markMidiBonusAction, midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
+import { fightOf, markMidiBonusAction, midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
 import { finite } from "./sheet-values.mjs";
 import {
   beastsFor, eligible, endWildShape, entryOf, forgetTokenData, formName, inPool, knownProfiles, recheckCharacter,
@@ -106,16 +106,17 @@ function done(command, wildShape, { message=null, character, campaign }={}) {
 }
 
 /**
- * Are Midi-QOL's Bonus Actions counted for a Wild Shape: Midi makes uses here, it can say whether one
- * is used, and the seat, or the character's own actor, is in a fight, as a combatant made from her
- * token may still name her after dnd5e switched it to the form.
+ * The encounter Midi-QOL's Bonus Actions are counted in for a Wild Shape, where Midi makes uses here
+ * and can say whether one is used: the seat's, or the character's own, as a combatant made from her
+ * token may still name her after dnd5e switched it to the form: the one the Gamemaster has up, or
+ * since 0.53.0 one begun elsewhere (`fightOf`); null where none is, or Midi doesn't count them.
  * @param {Actor} seat        The actor she acts as now.
  * @param {Actor} character
- * @returns {boolean}
+ * @returns {{combat: Combat, combatant: Combatant|null}|null}
  */
 function midiEconomy(seat, character) {
-  return midiActivities() && (typeof globalThis.MidiQOL?.hasUsedBonusAction === "function")
-    && Boolean(seat?.inCombat || character?.inCombat);
+  return (midiActivities() && (typeof globalThis.MidiQOL?.hasUsedBonusAction === "function"))
+    ? (fightOf(seat) ?? fightOf(character)) : null;
 }
 
 /**
@@ -160,8 +161,8 @@ async function transform(command, campaign, character, rules) {
   const row = seat.items?.get?.(rules.item.id) ?? rules.item;
   if ( !((row.system?.uses?.value ?? 0) > 0) ) return failed("consume");
   // Midi-QOL's Bonus Actions, where it makes uses and the seat is in a fight (round 0.41.0 §1).
-  const economy = midiEconomy(seat, character);
-  const bonus = economy && (rules.activity?.activation?.type === "bonus");
+  const fight = midiEconomy(seat, character);
+  const bonus = Boolean(fight) && (rules.activity?.activation?.type === "bonus");
   if ( bonus && midiBonusActionUsed(seat) ) return failed("bonus-action");
   let source = null;
   try {
@@ -233,7 +234,7 @@ async function transform(command, campaign, character, rules) {
   // The Bonus Action it took, on the form, the seat for the rest of the turn, as Midi's own use marks it.
   if ( bonus ) {
     try {
-      await markMidiBonusAction(form);
+      await markMidiBonusAction(form, fight);
     } catch (err) {
       console.error(`${MODULE_ID} | Could not mark ${character.name}'s Bonus Action for Midi-QOL`, err);
     }
@@ -266,13 +267,13 @@ async function revert(command, campaign, character) {
   const record = active.getFlag(MODULE_ID, "form");
   if ( !Number.isFinite(record?.hours) ) return failed("transformed");
   // Leaving the form early is a Bonus Action too, as the 2024 rules have it (round 0.41.0 §1.5).
-  const economy = midiEconomy(active, character);
-  if ( economy && midiBonusActionUsed(active) ) return failed("bonus-action");
+  const fight = midiEconomy(active, character);
+  if ( fight && midiBonusActionUsed(active) ) return failed("bonus-action");
   await endWildShape(active, "app");
   if ( activeForm(character) ) return failed("cancelled");
-  if ( economy ) {
+  if ( fight ) {
     try {
-      await markMidiBonusAction(character);
+      await markMidiBonusAction(character, fight);
     } catch (err) {
       console.error(`${MODULE_ID} | Could not mark ${character.name}'s Bonus Action for Midi-QOL`, err);
     }

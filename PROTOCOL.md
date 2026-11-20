@@ -2685,6 +2685,20 @@ An ask:
   rolled once, with the dice settings of whoever makes it. A listener reads nothing new. A module
   before 0.53.0 leaves those checks to Midi, so under Manual Dice the Gamemaster is asked for such a
   cost twice.
+- Module 0.53.0 counts Midi-QOL's reactions and Bonus Actions in the encounter a creature fights
+  in, with no new event, field or format: the one the Gamemaster has up, or else one that has begun
+  and is its scene's current one (`started` and `active`), whichever scene the Gamemaster views, as
+  an `initiative` has been rolled into one since 0.51.0; a druid in Wild Shape by her own combatant
+  where core matches it to her and not her form. A use or damage on its own is refused
+  `"reaction"` or `"bonus-action"` there as in the encounter up, an attack out of the creature's
+  turn counting as its reaction where Midi records opportunity attacks; a Wild Shape change or
+  return is refused `"bonus-action"`. Where Midi doesn't find the creature in that fight, the module
+  marks the reaction or Bonus Action a use from the app spent, as it has marked damage on its own's
+  and Wild Shape's since 0.41.0, and takes a mark it wrote in an encounter the Gamemaster didn't
+  have up off at that creature's next turn there. A use at its user names its token in that
+  encounter where the Gamemaster's canvas draws none of it. Before an encounter elsewhere begins, it
+  counts for nothing. A listener reads refusals it knows already. A module before 0.53.0 counts
+  only the encounter the Gamemaster has up.
 
 ## Changes from protocol 1
 
@@ -3127,14 +3141,20 @@ as above (`"area"`); a spell slot the usage
 dialog doesn't offer, or with none left, as for a spell cast from an item a level the dialog
 doesn't offer for its Cast activity, or any for a cantrip (`"slot"`); ammunition that isn't the weapon's, or is used
 up (`"ammo"`); an attack mode that isn't the weapon's (`"mode"`); Midi's Active Defence; a reaction
-or bonus action Midi enforces that's been used; an activity that always opens Midi's roll, consume
-or damage dialog, or has Midi ask which effects to apply; and a target Midi can't target, or no
+or bonus action Midi enforces that's been used (since module 0.53.0 in the encounter the creature
+fights in: the one the Gamemaster has up, or else one that has begun and is its scene's current one,
+`started` and `active`, on any scene, a druid in Wild Shape by her own combatant where core matches
+it to her; in one Midi doesn't see, the module marks the reaction or Bonus Action a use spent, and
+takes a mark it wrote in an encounter the Gamemaster didn't have up off at the creature's next turn
+there); an activity that always opens Midi's roll, consume or damage dialog, or has Midi ask which
+effects to apply; and a target Midi can't target, or no
 target where Midi needs one. Midi targets only tokens the Gamemaster's canvas draws, on the level
 and scene they're viewing: any other is refused (`"scene"`), unless the Gamemaster turns on
 **Allow targets off your screen**. Then the use is made; Midi works only on the targets it can
 see, and the card names every target, for the Gamemaster to apply the rest. Its user, picked with
-[`self`](#spells-and-features), is always treated so, whatever the setting, as such a use was made
-at no one before module 0.22.0. What's left may ask
+[`self`](#spells-and-features), is always treated so, whatever the setting, named, since module
+0.53.0, by its combatant's token in an encounter begun elsewhere where the Gamemaster's canvas draws
+no token of it, as such a use was made at no one before module 0.22.0. What's left may ask
 the Gamemaster, as it would in Foundry, such as a target's reaction; an attack made after its
 `"timeout"` is reported again.
 
@@ -5096,7 +5116,10 @@ gives, else `normal` or `critical`, changed by `modifiers` as before. Before any
 spent: the slot, the mode and the ammunition as above; with `consume`, a weapon thrown, in a thrown
 mode named, or its only mode where none is, with no ammunition and not returning, needs one in hand
 (`"consume"`); and, where Midi-QOL makes uses (its activities in place of dnd5e's) and the actor, or
-for a character in [Wild Shape](#wild-shape) the character, is in a combat, a Bonus Action is refused
+for a character in [Wild Shape](#wild-shape) the character, is in a combat (since module 0.53.0 the
+encounter the Gamemaster has up, or else one that has begun and is its scene's current one, on any
+scene; a mark written in one they didn't have up is taken off at the creature's next turn there), a
+Bonus Action is refused
 `"bonus-action"` and a reaction `"reaction"` where Midi's Enforce setting applies to the actor
 (`"all"`, or its type) and one is used; then the checks of the dice as before; then, with `consume`,
 what using it would spend is worked out as dnd5e's use works it out, never the action itself, a
@@ -5438,7 +5461,10 @@ Polymorph, a 2014 Wild Shape or a form made before 0.40.0 (`"transformed"`); not
 Unconscious, Paralyzed, Petrified, Stunned, Asleep or Dead, nor at 0 hit points, as the actor the
 character is now (`"incapacitated"`); a use left, on that actor (`"consume"`); and since module
 0.41.0, where Midi-QOL makes uses (its activities in place of dnd5e's) and the character or the form
-it's in is in a combat, the Bonus Action Wild Shape takes not used yet on that actor, where Midi's
+it's in is in a combat (since module 0.53.0 the encounter the Gamemaster has up, or else one that
+has begun and is its scene's current one, on any scene; a mark written in one they didn't have up is
+taken off at the creature's next turn there), the Bonus Action Wild Shape takes not used yet on that
+actor, where Midi's
 Enforce bonus actions applies to it (`"all"`, or its type) (`"bonus-action"`). For `revert`: none
 shaped is `"done"` with `form` `null`; a form the module doesn't time, `"transformed"`; and since
 module 0.41.0, as for a change, the form's Bonus Action not used yet (`"bonus-action"`). For `learn`:
@@ -5577,7 +5603,7 @@ ran out." (at levels 2 and 3, "its hour ran out"), "{name}'s Wild Shape ends at 
 | `"full"`, `"swap"` | Every place for a known form taken; a replacement with none since the last Long Rest. |
 | `"shaped"` | A replacement of the form the character is now. |
 | `"consume"` | No use of Wild Shape left. |
-| `"bonus-action"` | Since module 0.41.0: Midi-QOL makes uses and enforces Bonus Actions for the actor the character is now, in a combat, and its Bonus Action is used. |
+| `"bonus-action"` | Since module 0.41.0: Midi-QOL makes uses and enforces Bonus Actions for the actor the character is now, in a combat (since module 0.53.0 also an encounter the Gamemaster doesn't have up that has begun and is its scene's current one), and its Bonus Action is used. |
 | `"incapacitated"` | Incapacitated, at 0 hit points or Dead. |
 | `"transformed"` | A change from, or a return of, a form the module doesn't time: it ends in Foundry. |
 | `"cancelled"` | A write a hook stopped, or the form not made, or not gone, read again. |
