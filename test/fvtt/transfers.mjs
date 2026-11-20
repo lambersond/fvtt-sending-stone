@@ -930,7 +930,20 @@ assert.deepEqual(coinWrites, [
 ], 'one update for each, of the coins moved alone, the giver first')
 made = await takeCoins({ ep: 3 })
 assert.deepEqual([made.result.status, coinsOf(thorin).ep], ['done', 3], 'a coin the receiver has no key for')
-okay(`coins: one update of each actor, of the coins moved alone, the giver's first, each from what it stores, so a coin the receiver lacks starts at none${DND5E6 ? ' and dnd5e 6\'s 10.5 gp less 10 leaves 0.5' : ''}; short where the sheet shows fewer, or fewer are stored`)
+// Module 0.53.0: a fraction stays as it's written, the giver's and the receiver's. Floating point
+// alone makes 3.6999999999999993 of 10.7 less 7, which dnd5e 6 shows as 3.69 in a world that shows
+// two decimals of a coin, and 7.5600000000000005 of 0.56 and 7.
+assert.deepEqual([10.7 - 7, 0.56 + 7], [3.6999999999999993, 7.5600000000000005], 'what floating point alone makes of them')
+stock(party, [], { gp: 10.7 })
+stock(thorin, [], { gp: 0.56 })
+at = writes.length
+made = await takeCoins({ gp: 7 })
+assert.deepEqual([made.result.status, writes.slice(at).filter(([what]) => what === 'updateActor')], ['done', [
+  ['updateActor', 'party', { 'system.currency.gp': 3.7 }],
+  ['updateActor', 'thorin', { 'system.currency.gp': 7.56 }],
+]], '10.7 gp less 7 leaves 3.7, and 0.56 gp and 7 is 7.56')
+assert.deepEqual([coinsOf(party).gp, coinsOf(thorin).gp], [3.7, 7.56])
+okay(`coins: one update of each actor, of the coins moved alone, the giver's first, each from what it stores, so a coin the receiver lacks starts at none${DND5E6 ? ' and dnd5e 6\'s 10.5 gp less 10 leaves 0.5' : ''}; short where the sheet shows fewer, or fewer are stored; a fraction${DND5E6 ? ', as dnd5e 6 stores one,' : ''} stays as it's written, 10.7 gp less 7 leaving 3.7 and 0.56 and 7 making 7.56, never what floating point alone makes`)
 
 /* -------------------------------------------- */
 /*  Failure                                     */
@@ -963,7 +976,21 @@ failing('failUpdate', target => target === party)
 made = await takeCoins({ gp: 5 })
 clearFaults()
 assert.deepEqual([refusal(made), sheetsIn(made)], [['failed', 'error', 'failUpdate of party refused'], []])
-okay("coins: where the receiver's can't be added, the giver's are put back and the move fails, `error`; where that fails too, both are said, and the coins are lost, never made twice; where the giver's can't be taken, nothing is written and no sheet sent")
+// Module 0.53.0: the put back keeps a fraction as it's written too. Floating point alone makes
+// 7.5600000000000005 of 0.56 and 7.
+stock(party, [], { gp: 7.56 })
+stock(thorin, [], { gp: 0 })
+at = writes.length
+failing('failUpdate', target => target === thorin)
+made = await takeCoins({ gp: 7 })
+clearFaults()
+assert.deepEqual(refusal(made), ['failed', 'error', 'failUpdate of thorin refused'])
+assert.deepEqual(writes.slice(at).filter(([what, id]) => (what === 'updateActor') && (id === 'party')), [
+  ['updateActor', 'party', { 'system.currency.gp': 0.56 }],
+  ['updateActor', 'party', { 'system.currency.gp': 7.56 }],
+], 'taken, then put back as it was written')
+assert.equal(coinsOf(party).gp, 7.56)
+okay("coins: where the receiver's can't be added, the giver's are put back and the move fails, `error`; where that fails too, both are said, and the coins are lost, never made twice; where the giver's can't be taken, nothing is written and no sheet sent; the put back keeps a fraction as it's written, 7.56 again")
 
 // A part's create fails: the giver's stack put back.
 stock(party, [itemData('Rope', 'loot', { quantity: 5 }, { id: 'rope000000000006' })])

@@ -2656,6 +2656,11 @@ An ask:
   `rerolls`, `enchantment` or `hitPoints`, `"invalid"`, `error` `"prepare"`, as it refuses every
   other kind's field beside it; a module before prepared the spell and ignored them. A listener's
   own checks should refuse such a request first, as the app's do, so none needs to change.
+- Module 0.53.0 writes coins moved and a party's coin distributed ([moving items and
+  coins](#moving-items-and-coins)), their put backs too, as coins taken away are written: a dnd5e 6
+  fraction stays as it's written, 10.7 gp less 7 leaving 3.7 where floating point alone left
+  3.6999999999999993, which a world showing two decimals of a coin showed as 3.69. Whole coins are
+  written as before. Nothing new is sent or taken, and no feature says it.
 
 ## Changes from protocol 1
 
@@ -3581,19 +3586,21 @@ written, as both ends now are, in this order, and each check of every part befor
 
 **What moves.** Coins first, each only the coins moved, from what each actor stores: taken from
 `from` in one update, then added to `to` in another, a coin it has no key for starting at none, so a
-dnd5e 6 fraction stays (10.5 gp less 10 leaves 0.5). Never dnd5e's Award, which caps what it moves
-without saying so and writes the giver last from what it read first. Then each item in order. Part
-of a stack, fewer than `from` holds: `from`'s stack keeps the rest under its id, taken first, then a
-copy of the part is made on `to`, at the top of its inventory, wherever it was. All of it: a copy made
-first, as dnd5e's own `createWithContents` makes it, a container with everything in it under new
-ids, each in its new container, the top at the top; then the original and everything in it deleted
-from `from` in one call. Deleting first would end what depends on it, such as a concentration or a
-favorite, which nothing could put back. Every copy arrives unequipped, unattuned, unprepared and with
-no crew, what a container holds too, as dnd5e's drop resets the item dropped; its uses, effects,
-attunement, identification and source are kept. A consumable joins `to`'s stack of the same source
-(`_stats.compendiumSource`, or the legacy `flags.core.sourceId`) and name, at the top, as dnd5e's
-drop stacks it, but never where either isn't identified, the one moved has uses spent, or either
-carries an enchantment, all of which a stack would lose.
+dnd5e 6 fraction stays (10.5 gp less 10 leaves 0.5); since module 0.53.0 it stays as it's written,
+the put back's too, as [coins taken away](#coins-added-and-taken-away) do: 10.7 gp less 7 leaves 3.7,
+never the 3.6999999999999993 floating point alone makes of it. Never dnd5e's Award, which caps what
+it moves without saying so and writes the giver last from what it read first. Then each item in
+order. Part of a stack, fewer than `from` holds: `from`'s stack keeps the rest under its id, taken
+first, then a copy of the part is made on `to`, at the top of its inventory, wherever it was. All of
+it: a copy made first, as dnd5e's own `createWithContents` makes it, a container with everything in
+it under new ids, each in its new container, the top at the top; then the original and everything in
+it deleted from `from` in one call. Deleting first would end what depends on it, such as a
+concentration or a favorite, which nothing could put back. Every copy arrives unequipped, unattuned,
+unprepared and with no crew, what a container holds too, as dnd5e's drop resets the item dropped;
+its uses, effects, attunement, identification and source are kept. A consumable joins `to`'s stack
+of the same source (`_stats.compendiumSource`, or the legacy `flags.core.sourceId`) and name, at the
+top, as dnd5e's drop stacks it, but never where either isn't identified, the one moved has uses
+spent, or either carries an enchantment, all of which a stack would lose.
 
 **What fails.** A write that fails puts back what it can, and nothing more is tried: coins added to
 `to` that fail are put back on `from`; part of a stack that can't be made on `to` is put back in
@@ -3626,7 +3633,8 @@ same, and 3 stay. Where the party's own update fails, nothing is written and the
 put back on the party in one update and the move is `"failed"`, `"error"`, its `transfer` listing
 those given theirs; where the put back fails too, `error` holds both messages joined by " / ", and
 the coins are lost, never made twice. Under dnd5e 6, of a party's 103.5 gp, 100 shared among four
-leaves it 3.5.
+leaves it 3.5. Since module 0.53.0 each write, the put back's too, keeps a fraction as it's written:
+of 103.7 gp, 3.7 stays.
 
 **A character's coins handed out.** Since module 0.49.0, where the hello says `handOut`, a
 `transfer` with `each` in place of `to` hands out a character's coins, as the app's Give does for

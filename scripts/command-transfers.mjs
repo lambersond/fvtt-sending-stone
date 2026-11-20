@@ -28,7 +28,8 @@ import { inventoryTypes, localize } from "./sheet-values.mjs";
  * stacks one, but never an unidentified one, one with uses spent, or one enchanted, which would
  * lose what it is. Coins are never moved with dnd5e's Award, which caps what it moves without
  * saying so, and writes the giver last from what it read first: only the coins moved are written,
- * each from what the actor holds, so dnd5e 6's fractions stay.
+ * each from what the actor holds, so dnd5e 6's fractions stay, as they're written since 0.53.0
+ * (`coinUpdate`).
  *
  * Everything is checked before anything is written. Then coins go first, taken from the giver
  * before they're added to the receiver; then each item, a part taken from the giver's stack before
@@ -361,7 +362,9 @@ function whoMoves(command, campaign) {
  * party's are taken; what's left over stays with the party, and the line says how much. Where a
  * share can't be given, the party is given back the shares not given, and the line says what was;
  * where that fails too, those coins are lost, never made twice, and the line says only what the
- * party still has. The party's sheet and each one's given a share go ahead of the result.
+ * party still has. The party's sheet and each one's given a share go ahead of the result. Since
+ * 0.53.0 each write is of the one coin, from what the actor stores, a fraction kept as it's written,
+ * the put back too.
  * @param {object} command
  * @param {Campaign} campaign
  * @param {{from: MoveEnd, among: Actor[], mover: Actor}} ends
@@ -372,7 +375,6 @@ async function distributeNow(command, campaign, { from, among, mover }) {
   const party = from.actor;
   const [[key, n]] = Object.entries(command.transfer.currency);
   const k = among.length;
-  const stored = actor => actor._source?.system?.currency?.[key] ?? 0;
   const held = heldCoins(party)[key] ?? 0;
   if ( n > held ) return failed("short");
   if ( n < k ) return failed("split");
@@ -381,7 +383,7 @@ async function distributeNow(command, campaign, { from, among, mover }) {
 
   // The party's own write first: refused, nothing is written, said or sent.
   try {
-    await updated(party, { [`system.currency.${key}`]: stored(party) - total });
+    await updated(party, coinUpdate(party, { [key]: -total }));
   } catch (err) {
     return failed("error", messageOf(err));
   }
@@ -390,13 +392,13 @@ async function distributeNow(command, campaign, { from, among, mover }) {
   let lost = false;
   for ( const actor of among ) {
     try {
-      await updated(actor, { [`system.currency.${key}`]: stored(actor) + share });
+      await updated(actor, coinUpdate(actor, { [key]: share }));
       credited.push(actor);
     } catch (err) {
       // The shares not given go back to the party, in one write.
       const back = share * (k - credited.length);
       try {
-        await putBack(err, () => updated(party, { [`system.currency.${key}`]: stored(party) + back }));
+        await putBack(err, () => updated(party, coinUpdate(party, { [key]: back })));
       } catch (thrown) {
         error = messageOf(thrown);
         lost = thrown !== err;
@@ -855,8 +857,9 @@ function insideOf(actor, item, ids) {
 
 /**
  * Move coins: taken from the giver, then added to the receiver, each of only the coins moved, from
- * what it holds as stored. Where the receiver's can't be added, the giver's are put back: coins are
- * never made twice, and at worst, where that fails too, lost.
+ * what it stores, a fraction kept as it's written (coin-change.mjs's `coinUpdate`), the put back
+ * too, since 0.53.0. Where the receiver's can't be added, the giver's are put back: coins are never
+ * made twice, and at worst, where that fails too, lost.
  * @param {MoveEnd} from
  * @param {MoveEnd} to
  * @param {[string, number][]} coins
@@ -865,16 +868,13 @@ function insideOf(actor, item, ids) {
  * @throws {Error}   What went wrong, with the put back's too, if that failed.
  */
 async function moveCoins(from, to, coins, written) {
-  const stored = actor => actor._source?.system?.currency ?? {};
-  const changes = (actor, sign) => Object.fromEntries(coins.map(([key, n]) => [
-    `system.currency.${key}`, (stored(actor)[key] ?? 0) + (sign * n)
-  ]));
-  await updated(from.actor, changes(from.actor, -1));
+  const by = sign => Object.fromEntries(coins.map(([key, n]) => [key, sign * n]));
+  await updated(from.actor, coinUpdate(from.actor, by(-1)));
   written();
   try {
-    await updated(to.actor, changes(to.actor, 1));
+    await updated(to.actor, coinUpdate(to.actor, by(1)));
   } catch (err) {
-    await putBack(err, () => updated(from.actor, changes(from.actor, 1)));
+    await putBack(err, () => updated(from.actor, coinUpdate(from.actor, by(1))));
   }
 }
 

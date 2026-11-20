@@ -5,7 +5,8 @@
  * (command-coins.mjs) and a character's coins handed out (command-transfers.mjs). So it stands apart
  * from both, below them, importing nothing and writing nothing: it reads dnd5e's coins and an
  * actor's, works in whole coins on plain objects, and says what update would make it so
- * (`takenCoins`, `coinUpdate`), which the commands then write.
+ * (`takenCoins`, `coinUpdate`), which the commands then write. Its `coinUpdate` writes every coin
+ * a command changes: since 0.53.0 a move's and a distribution's too.
  *
  * Not dnd5e's own deduction (`CurrencyManager.getActorCurrencyUpdates`), which divides in floating
  * point, isn't the same in dnd5e 5 and 6, and writes the whole of a character's prepared coins, so
