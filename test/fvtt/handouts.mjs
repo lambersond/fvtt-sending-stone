@@ -14,7 +14,7 @@
 // ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { settings, user, users, actors } from './stub.mjs'
+import { settings, user, users, actors, message as fakeMessage } from './stub.mjs'
 
 const MODULE = process.env.MODULE_DIR
 const DND5E6 = Boolean(process.env.DND5E6)
@@ -1013,6 +1013,58 @@ said = saidBy(made)
 assert.deepEqual(said.map(told), [['Gives 2 sp to The Iron Company', [], 'lia', 'gm']])
 assert.deepEqual([made.result.status, made.result.messages, made.result.messageId, made.result.visible, purse(lia), coinsOf(party).sp], ['done', [said[0].id], said[0].id, true, { sp: 3 }, 10])
 okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver with no one player of its own, none owning it or two with neither having it as their character, has the bridge's Gamemaster as its author, so the Gamemasters' message, whispered to both of them still, is theirs alone, the result's `visible` false, a player's own hand-out too, and the app is sent the whispers but not that; a Gamemasters' message a module's hook stops leaves the hand-out made, `messageId` null and `visible` true; Lia's to the Company alone, by the Gamemaster, posts its line for everyone as the bridge's Gamemaster, listed in the result, `visible` true")
+
+/* -------------------------------------------- */
+/*  The Gamemaster's hand-out to twenty         */
+/* -------------------------------------------- */
+
+// Module 0.53.0: a Gamemaster's hand-out to 20, characters and parties, makes 21 messages, the
+// Gamemasters' own last, and lists them all to an app that says `gmRollMessages`; to one that
+// doesn't, the first 20, as before, which an app before v0.53.0 would drop whole were it sent 21.
+const EXTRAS = Array.from({ length: 14 }, (_, i) => character(`extra${String(i + 1).padStart(2, '0')}`, `Extra ${i + 1}`, ['carol']))
+const TWENTY = ['vex', 'bram', 'ash', 'party', 'wardens', 'silent', ...EXTRAS.map(actor => actor.id)]
+campaignAs({ characters: [...CAMPAIGN.characters, ...EXTRAS.map(actor => actor.id)] })
+app.features = { ...app.features, gmRollMessages: 1 }
+await hello()
+restock()
+await settle()
+made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+said = saidBy(made)
+assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+assert.deepEqual([said.length, told(said.at(-1))], [21, ['Thorin handed out 1 gp each to Vex, Bram, Ash, The Iron Company, Wardens of the Vale, The Silent Order, Extra 1, Extra 2, Extra 3, Extra 4, Extra 5, Extra 6, Extra 7, Extra 8, Extra 9, Extra 10, Extra 11, Extra 12, Extra 13, and Extra 14: 20 gp in all', GMS, 'thorin', 'alice']])
+assert.deepEqual(made.result.messages, said.map(message => message.id), 'all 21, in order')
+// More made for it on this client, as a module posting messages of its own here: no more than 21.
+const extra = []
+const more = (message, _options, userId) => {
+  const flags = message.flags?.['sending-stone']
+  if ((userId !== game.user.id) || (flags?.by !== 'gm') || !message.whisper?.includes('gm') || extra.length) return
+  for (let i = 1; i <= 2; i++) {
+    const card = fakeMessage(`handout-extra${i}`, { author: message.author, speaker: message.speaker, flags: { 'sending-stone': { ...flags } } })
+    extra.push(card.id)
+    Hooks.callAll('createChatMessage', card, {}, game.user.id)
+  }
+}
+Hooks.on('createChatMessage', more)
+restock()
+await settle()
+made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+Hooks.off('createChatMessage', more)
+said = saidBy(made)
+assert.deepEqual([said.length, extra.length, made.result.messages], [21, 2, said.map(message => message.id)], '23 made, the first 21 listed')
+// An app that says nothing of it, as one before v0.53.0: the first 20, the Gamemasters' own not among them.
+const { gmRollMessages: _reads, ...older } = app.features
+app.features = older
+await hello()
+restock()
+await settle()
+made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+said = saidBy(made)
+assert.deepEqual([said.length, made.result.messages], [21, said.slice(0, 20).map(message => message.id)], 'the first 20')
+assert.ok(!made.result.messages.includes(said.at(-1).id), "the Gamemasters' own isn't listed")
+campaignAs()
+await hello()
+for (const actor of EXTRAS) actors.delete(actor.id)
+okay("the Gamemaster's hand-out to 20, characters and parties, makes 21 messages, all listed, the Gamemasters' last, to an app that says `gmRollMessages`; no more than 21 when more are made; to an app that doesn't, the first 20, as before 0.53.0")
 
 /* -------------------------------------------- */
 /*  A hand-out that fails                       */

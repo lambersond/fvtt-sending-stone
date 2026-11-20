@@ -180,10 +180,10 @@ saving throws, the combat tracker, Dice So Nice and Midi-QOL all behave as if th
 Foundry. Each card is marked as rolled on Sending Stone. A campaign's Gamemaster can open any of
 its characters' sheets in the app and roll as them; those rolls are marked GM on their cards, and
 are made as the character's player all the same, so the modules that read a card's author treat
-them as the player's own. Each tells the app which chat messages it made, so the app marks those
-alone as yours, never a copy a player posts from their own browser. A module that posts chat
-messages from your browser for players, as Midi-QOL does, could still let a player have one marked
-while the roll is being made.
+them as the player's own. Each tells the app which chat messages it made, up to 21 to an app from
+v0.53.0 (20 before), so the app marks those alone as yours, never a copy a player posts from their
+own browser. A module that posts chat messages from your browser for players, as Midi-QOL does,
+could still let a player have one marked while the roll is being made.
 
 - **Under D&D Fifth Edition only.** The Gamemaster's browser makes the rolls, so a Gamemaster must
   have the game open, as for everything else.
