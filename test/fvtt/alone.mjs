@@ -890,16 +890,57 @@ if (MIDI) {
     ridge.round = 2
     await Hooks.callAll('combatTurnChange', ridge, { round: 1, turn: 0, combatantId: 'cb-other' }, { round: 2, turn: 0, combatantId: 'cb-ridge' })
     assert.deepEqual([midi.bonusRemovals.slice(removals), midi.usedBonus.has('thorin')], [['thorin'], false], 'taken off as his turn there begins')
+    // Wren's Hellish Rebuke on the ridge, a reaction: refused while hers is used; unused, rolled and
+    // marked by the module; the mark taken off as her turn there begins.
+    combatant(ridge, 'cb-ridge-wren', wren)
+    assert.equal(wren.inCombat, false, "Wren in no fight the Gamemaster has up, by core's reading")
+    midi.usedReaction.add('wren')
+    failedAs(await rebuke({ slot: 'pact', consume: true, dice: [d(10, 1, 2, 3, 4)] }), 'reaction')
+    midi.usedReaction.delete('wren')
+    setSlot(wren, 'pact', 1)
+    const reactions = midi.reactionMarks.length
+    doneOf(await rebuke({ slot: 'pact', consume: true, dice: [d(10, 1, 2, 3, 4)] }))
+    setSlot(wren, 'pact', 1)
+    assert.deepEqual(midi.reactionMarks.slice(reactions), ['wren'], 'on the ridge, her reaction unused: marked by the module')
+    const reactionsOff = midi.reactionRemovals.length
+    ridge.turn = 1
+    await Hooks.callAll('combatTurnChange', ridge, { round: 2, turn: 0, combatantId: 'cb-ridge' }, { round: 2, turn: 1, combatantId: 'cb-ridge-wren' })
+    assert.deepEqual([midi.reactionRemovals.slice(reactionsOff), midi.usedReaction.has('wren')], [['wren'], false], 'taken off as her turn there begins')
+    // His potion marked again, then Thorin gone from the world: at his next turn there nothing is
+    // taken off a creature no longer there.
+    restorePotion()
+    doneOf(await potion({ consume: true }))
+    const goneOff = midi.bonusRemovals.length
+    actors.delete('thorin')
+    try {
+      ridge.round = 3
+      ridge.turn = 0
+      await Hooks.callAll('combatTurnChange', ridge, { round: 2, turn: 1, combatantId: 'cb-ridge-wren' }, { round: 3, turn: 0, combatantId: 'cb-ridge' })
+    } finally {
+      actors.set('thorin', thorin)
+    }
+    assert.deepEqual([midi.bonusRemovals.slice(goneOff), midi.usedBonus.has('thorin')], [[], true], 'gone from the world: nothing taken off')
+    // Marked again on the ridge, which is then deleted: its marks forgotten, so a turn of it heard
+    // after takes nothing off.
+    midi.usedBonus.delete('thorin')
+    restorePotion()
+    doneOf(await potion({ consume: true }))
+    game.combats.delete('ridge')
+    await Hooks.callAll('deleteCombat', ridge, {}, 'gm')
+    const forgotten = midi.bonusRemovals.length
+    await Hooks.callAll('combatTurnChange', ridge, { round: 3, turn: 1, combatantId: 'cb-ridge-wren' }, { round: 4, turn: 0, combatantId: 'cb-ridge' })
+    assert.deepEqual(midi.bonusRemovals.slice(forgotten), [], 'the ridge deleted: its marks forgotten')
   } finally {
     game.combats.delete('ridge')
     game.combat = viewed
+    setSlot(wren, 'pact', 1)
   }
   midi.usedBonus.clear()
   midi.usedReaction.clear()
   midi.settings.enforceBonusActions = 'none'
   midi.settings.enforceReactions = 'none'
   restorePotion()
-  ok("Midi-QOL's economy with consume: Enforce bonus actions \"all\", Thorin's used, the potion refused \"bonus-action\", nothing rolled; without consume rolled, nothing marked; unused, marked; Enforce reactions \"all\", Wren's used, Hellish Rebuke refused \"reaction\", unused marked; out of a fight neither; since module 0.53.0, in an encounter begun on the ridge with none up, refused, unused marked by the module, the mark taken off as his turn there begins")
+  ok("Midi-QOL's economy with consume: Enforce bonus actions \"all\", Thorin's used, the potion refused \"bonus-action\", nothing rolled; without consume rolled, nothing marked; unused, marked; Enforce reactions \"all\", Wren's used, Hellish Rebuke refused \"reaction\", unused marked; out of a fight neither; since module 0.53.0, in an encounter begun on the ridge with none up, refused, unused marked by the module, the mark taken off as his turn there begins; Wren's Hellish Rebuke there refused reaction, unused marked, taken off as her turn begins; nothing taken off Thorin gone from the world; the ridge deleted, its marks forgotten")
 }
 {
   // 7. Uses.

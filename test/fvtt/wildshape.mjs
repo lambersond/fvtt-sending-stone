@@ -3093,6 +3093,18 @@ if (MIDI) {
     used()
     await reset()
   }
+  // Since module 0.53.0: `fn` run while her combatant reads her own actor, not her token's, as core's
+  // Combatant#actor would with no token of hers to follow, so that only her own actor finds the fight.
+  const herOwn = async fn => {
+    const cb = fight.combatants.get('cbElowen')
+    const follows = Object.getOwnPropertyDescriptor(cb, 'actor')
+    Object.defineProperty(cb, 'actor', { configurable: true, enumerable: true, get: () => elowen })
+    try {
+      return await fn()
+    } finally {
+      Object.defineProperty(cb, 'actor', follows)
+    }
+  }
   // 1. Enforced for all, her Bonus Action used: refused, nothing written.
   midi.settings.enforceBonusActions = 'all'
   used('elowen')
@@ -3168,9 +3180,20 @@ if (MIDI) {
   const removals = midi.bonusRemovals.length
   await fight.setTurn(fight.round + 1, fight.turns.findIndex(cb => cb.id === 'cbElowen'))
   assert.deepEqual([midi.bonusRemovals.slice(removals), midi.usedBonus.has(away.id)], [[away.id], false], 'taken off as her next turn there begins')
+  // Her return there too, with none up: refused while the form's Bonus Action is used; unused, made and
+  // marked on her, and the module's mark on her taken off as her next turn there begins.
+  used(away.id)
+  assert.deepEqual([refusal(await made(revert())), formOf()?.id], [['failed', 'bonus-action', null], away.id], "none up, the form's Bonus Action used: its return refused")
+  used()
+  from = marks().length
+  shape = await made(revert())
+  assert.deepEqual([shape.result.status, formOf(), marks().slice(from)], ['done', undefined, ['elowen']], 'none up: returned, marked on her')
+  const herRemovals = midi.bonusRemovals.length
+  await fight.setTurn(fight.round + 1, fight.turns.findIndex(cb => cb.id === 'cbElowen'))
+  assert.deepEqual([midi.bonusRemovals.slice(herRemovals), midi.usedBonus.has('elowen')], [['elowen'], false], 'her mark taken off as her next turn there begins')
   game.combat = fight
   await back()
-  ok("since module 0.53.0, the fight begun and chosen while the Gamemaster has none up: a change refused bonus-action with her Bonus Action used, unused made and marked once on the form by the module, the mark taken off as her next turn there begins")
+  ok("since module 0.53.0, the fight begun and chosen while the Gamemaster has none up: a change refused bonus-action with her Bonus Action used, unused made and marked once on the form by the module, the mark taken off as her next turn there begins; her return there refused with the form's used, unused made and marked on her, that mark taken off as her next turn begins")
 
   // 8. A change while shaped: the Wolf's Bonus Action used, refused, the Wolf kept and no use spent;
   // at its next turn the Black Bear, one Bonus Action and one mark, on the new form.
@@ -3211,6 +3234,10 @@ if (MIDI) {
   assert.deepEqual([formOf().inCombat, elowen.inCombat], [false, true], "the form not in the fight by core's reading, she is")
   shape = await made(transform(blackBearId))
   assert.deepEqual([refusal(shape), formOf()?.name], [['failed', 'bonus-action', null], 'Elowen (Wolf)'], 'still checked, by her own actor in the fight')
+  // Since module 0.53.0, her combatant reading her own actor too, not her token's: only her own actor
+  // finds the fight, and the change while shaped is checked by it all the same.
+  shape = await herOwn(() => made(transform(blackBearId)))
+  assert.deepEqual([refusal(shape), formOf()?.name], [['failed', 'bonus-action', null], 'Elowen (Wolf)'], 'her combatant reading her own actor: still checked, by her')
   port.faults.storedActorId = false
   await back()
   // 12. Midi not making uses (ReplaceDefaultActivities off): neither checked nor marked.
@@ -3221,7 +3248,7 @@ if (MIDI) {
   assert.deepEqual([shape.result.status, marks().slice(from)], ['done', []], "Midi's activities off: neither")
   settings.delete('ReplaceDefaultActivities')
   await back()
-  ok("core matching a combatant by its stored actor: a change while shaped still checked, by her own actor in the fight; Midi-QOL not making uses: neither checked nor marked")
+  ok("core matching a combatant by its stored actor: a change while shaped still checked, by her own actor in the fight, and since module 0.53.0 so where her combatant reads her own actor too; Midi-QOL not making uses: neither checked nor marked")
 
   // 11b. Since module 0.53.0, core matching a combatant by the actor it stored (her own), and Midi
   // reading her turn by it: the form's Bite from the app is checked by her own combatant, so on her
@@ -3259,6 +3286,9 @@ if (MIDI) {
       reactionsFrom = reactionMarks().length
       bit = await bitten()
       assert.deepEqual([bit.result.status, reactionMarks().slice(reactionsFrom)], ['done', [shaped.id]], `the foe's turn, unused: made, marked once on the form (${JSON.stringify(bit.result)})`)
+      // Her combatant reading her own actor too: only her own actor finds the fight, and the Bite on
+      // the foe's turn, the form's reaction used, is still refused.
+      assert.deepEqual(refusal(await herOwn(bitten)), ['failed', 'reaction', null], "her combatant reading her own actor, the foe's turn, its reaction used: refused")
     } finally {
       midi.usedReaction.clear()
       port.faults.storedActorId = false
@@ -3269,7 +3299,7 @@ if (MIDI) {
     }
     await back()
     await campaignAs({ rolls: false, attacks: false })
-    ok("since module 0.53.0, core matching combatants by the actor they stored: the form's Bite from the app on her own turn no opportunity attack, made, nothing marked; on the foe's turn, its reaction used, refused reaction; unused, made and marked once on the form")
+    ok("since module 0.53.0, core matching combatants by the actor they stored: the form's Bite from the app on her own turn no opportunity attack, made, nothing marked; on the foe's turn, its reaction used, refused reaction; unused, made and marked once on the form; her combatant reading her own actor, refused all the same")
   }
 
   // 13. Midi with no marker effect (enforcement turned on without a reload): done, nothing marked.
@@ -3328,6 +3358,11 @@ if (MIDI) {
   from = marks().length
   shape = await made(alone())
   assert.deepEqual([shape.result.status, marks().slice(from)], ['done', [shaped.id]], "only Elowen's own used: rolled, marked once, on the form")
+  // Since module 0.53.0, her combatant reading her own actor too: only her own actor finds the fight,
+  // and the form's Bonus Action, now used, still refuses it. (The Bite's activity is made again as its
+  // item is written: a Bonus Action again.)
+  ;[...shaped.items.get(bite.id).system.activities].find(activity => activity.type === 'attack').activation = { type: 'bonus', value: 1 }
+  assert.deepEqual(refusal(await herOwn(() => made(alone()))), ['failed', 'bonus-action', null], "her combatant reading her own actor, the form's Bonus Action used: refused")
   port.faults.storedActorId = false
   await back()
   midi.settings.enforceBonusActions = 'none'
@@ -3335,7 +3370,7 @@ if (MIDI) {
   else globalThis.dnd5e.documents = documents
   await campaignAs({ rolls: false, attacks: false })
   game.combat = viewed
-  ok("damage on its own from the form, a Bonus Action with consume, under Enforce bonus actions \"all\" and core matching the form's combatant by Elowen's stored id: refused \"bonus-action\" while the form's is used; with only Elowen's own used, rolled and marked once, on the form")
+  ok("damage on its own from the form, a Bonus Action with consume, under Enforce bonus actions \"all\" and core matching the form's combatant by Elowen's stored id: refused \"bonus-action\" while the form's is used; with only Elowen's own used, rolled and marked once, on the form; since module 0.53.0, her combatant reading her own actor, refused all the same")
 } else {
   // 15. Without Midi-QOL: changed and returned in a fight as before, nothing asked of it.
   const viewed = game.combat

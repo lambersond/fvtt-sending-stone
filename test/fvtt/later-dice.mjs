@@ -563,7 +563,7 @@ assert.deepEqual(prompts.splice(0), [], "the self-tests never ask the Gamemaster
 
     // 13. Still asked: dnd5e's own spending of a configuration carrying one of Midi's workflows; a
     // configuration with a workflow that isn't Midi's; one that lists the resources it spends; and
-    // one that would spend a spell slot too.
+    // one that would spend a spell slot, or the action, too.
     charmBefore = usesOf('charm')
     const carrying = zap()._prepareUsageConfig({ workflow: Object.create(MidiQOL.Workflow.prototype) })
     await zap().consume(carrying, { data: {} })
@@ -574,8 +574,10 @@ assert.deepEqual(prompts.splice(0), [], "the self-tests never ask the Gamemaster
     assert.deepEqual(costAsked(), ['0 + 1d4'], 'a configuration that lists the resources it spends')
     await lookup(zap(), { consume: { ...SHAPE, spellSlot: true } })
     assert.deepEqual(costAsked(), ['0 + 1d4'], 'a configuration that spends a spell slot too')
+    await lookup(zap(), { consume: { ...SHAPE, action: true } })
+    assert.deepEqual(costAsked(), ['0 + 1d4'], 'a configuration that spends the action too')
     midi.settings.gmConsumeResource = 'none'
-    ok("still asked as before: dnd5e's own spending of a configuration carrying Midi's workflow, once; a check whose workflow isn't Midi's, one that lists what it spends, one that spends a spell slot too")
+    ok("still asked as before: dnd5e's own spending of a configuration carrying Midi's workflow, once; a check whose workflow isn't Midi's, one that lists what it spends, one that spends a spell slot too, one that spends the action too")
 
     // 14. An attack from the app whose player doesn't type their dice: Midi's check of Frost Brand's
     // Rime before it spends it, in that workflow, never asked; its cost asked once.
