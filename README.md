@@ -321,10 +321,11 @@ an attack hit only where the game shows players.
 - **At themselves.** A use whose range is Self that still names a creature, such as a potion or
   Wild Shape, lets the player pick themselves, Self, among its targets, first for healing and the
   like. It's then made at their token in the combat, or else at their token on the scene you're
-  viewing, or else at the character, named on the card. Midi-QOL, which can target only a token
-  your canvas draws, uses it then at the other targets or at no one, as before 0.22.0, for you
-  to apply to the character from the card; only where its Requires Targets needs a target is it
-  refused in the app.
+  viewing, or else, since 0.53.0, at their token in an encounter you don't have up that has begun
+  and is its scene's chosen one, or else at the character, named on the card. Midi-QOL, which can
+  target only a token your canvas draws, uses it then at the other targets or at no one, as before
+  0.22.0, for you to apply to the character from the card; only where its Requires Targets needs a
+  target is it refused in the app.
 - **With Midi-QOL**, the use goes through Midi's workflow, as if the player had used it in
   Foundry: Midi checks the hit, rolls the targets' saving throws and applies the damage, healing
   and effects as you have it set up. The card is yours, spoken as the character, since Midi asks
