@@ -837,6 +837,7 @@ thorin.system.bonuses.rwak.damage = '1'
 }
 if (MIDI) {
   // 13. Midi-QOL's Bonus Actions and reactions, where it enforces them, in a fight.
+  assert.equal(thorin.inCombat, true, 'Thorin in the fight the Gamemaster has up')
   const potion = fields => aloneOf({ item: 'potion', activity: 'potion-heal', dice: [d(4, 2, 3)], ...fields })
   midi.settings.enforceBonusActions = 'all'
   midi.usedBonus.add('thorin')
