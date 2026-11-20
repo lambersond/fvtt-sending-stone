@@ -1051,6 +1051,39 @@ made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
 Hooks.off('createChatMessage', more)
 said = saidBy(made)
 assert.deepEqual([said.length, extra.length, made.result.messages], [21, 2, said.map(message => message.id)], '23 made, the first 21 listed')
+/**
+ * The hand-out to twenty held at the giver's write past its minute, then let go: its results, the
+ * one that it took too long and the late one once it's made, and the messages it made.
+ */
+const tooLong = async () => {
+  restock()
+  await settle()
+  const giving = hold((target, changes) => (target === thorin) && ('system.currency.gp' in (changes ?? {})))
+  const slow = handOut('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+  app.waiting.set('camp-a', [slow])
+  app.wake?.()
+  await until(() => resultsOf(slow.id).length, 'the result that it took too long')
+  giving.release()
+  await until(() => resultsOf(slow.id).length === 2, 'the late result')
+  return [...resultsOf(slow.id), saidBy({ command: slow })]
+}
+// A late result is listed as the first: all 21 to this app, none made by the result that it took too long.
+{
+  const [early, late, lines] = await tooLong()
+  assert.deepEqual([early.status, early.reason, early.messages, late.status, lines.length, late.messages],
+    ['failed', 'timeout', [], 'done', 21, lines.map(message => message.id)], 'the late result, all 21')
+}
+// The app's answer is read only as a whole number of 1 or more, as `quiet` is: true, "1", 0 and 1.5
+// are listed the first 20; 2, a later format, all 21.
+for (const [reads, listed] of [[true, 20], ['1', 20], [0, 20], [1.5, 20], [2, 21]]) {
+  app.features = { ...app.features, gmRollMessages: reads }
+  await hello()
+  restock()
+  await settle()
+  made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+  said = saidBy(made)
+  assert.deepEqual([said.length, made.result.messages], [21, said.slice(0, listed).map(message => message.id)], `gmRollMessages ${JSON.stringify(reads)}: ${listed} listed`)
+}
 // An app that says nothing of it, as one before v0.53.0: the first 20, the Gamemasters' own not among them.
 const { gmRollMessages: _reads, ...older } = app.features
 app.features = older
@@ -1061,10 +1094,16 @@ made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
 said = saidBy(made)
 assert.deepEqual([said.length, made.result.messages], [21, said.slice(0, 20).map(message => message.id)], 'the first 20')
 assert.ok(!made.result.messages.includes(said.at(-1).id), "the Gamemasters' own isn't listed")
+// Its late result too: the first 20.
+{
+  const [early, late, lines] = await tooLong()
+  assert.deepEqual([early.status, early.reason, early.messages, late.status, lines.length, late.messages],
+    ['failed', 'timeout', [], 'done', 21, lines.slice(0, 20).map(message => message.id)], 'the late result, the first 20')
+}
 campaignAs()
 await hello()
 for (const actor of EXTRAS) actors.delete(actor.id)
-okay("the Gamemaster's hand-out to 20, characters and parties, makes 21 messages, all listed, the Gamemasters' last, to an app that says `gmRollMessages`; no more than 21 when more are made; to an app that doesn't, the first 20, as before 0.53.0")
+okay("the Gamemaster's hand-out to 20, characters and parties, makes 21 messages, all listed, the Gamemasters' last, to an app that says `gmRollMessages`, a whole number of 1 or more (2 too, never true, \"1\", 0 or 1.5); no more than 21 when more are made; to an app that doesn't, the first 20, as before 0.53.0; a late result, held past its minute, is listed as the first")
 
 /* -------------------------------------------- */
 /*  A hand-out that fails                       */
