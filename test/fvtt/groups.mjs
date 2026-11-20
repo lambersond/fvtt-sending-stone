@@ -252,16 +252,19 @@ assert.match(await textOf(summary, asCharacter.sources.get(summary)), /class="ss
 // (module 0.52.0): format 8, with the game's abilities and skills in it, gives every description a
 // new hash once, so none is 0.29.0's any more; a character's own is still hashed by 0.29.0's
 // textHash of that format and its source, nothing else, as a reference shows byte for byte.
+// Changed on purpose (module 0.53.0): format 9, with the game's tools and kinds of vehicle in it,
+// and its damage and healing types.
 const { SheetTexts: OldTexts, textHash: oldHash } = await import(`${oldModule('0.29.0')}/scripts/sheet-texts.mjs`)
 for (const [source, why] of [[{ html, relativeTo: party }, 'a description'], [{ html: '<p>Take [[/save dex dc=15]].</p>', relativeTo: thorin }, 'one with a save'], [{ reference: 'Compendium.rules.JournalEntryPage.prone' }, 'a reference']]) {
-  assert.notEqual(new SheetTexts().add(source), new OldTexts().add(source), `${why}: a character's hash new in format 8`)
+  assert.notEqual(new SheetTexts().add(source), new OldTexts().add(source), `${why}: a character's hash new in format 9`)
 }
 const rulesVersion = (() => { try { return game.settings.get('dnd5e', 'rulesVersion') ?? '' } catch { return '' } })()
 const keysOf = list => Object.keys(list ?? {}).sort().join(',')
-const format8 = `format:8\nrules:${rulesVersion}\nlang:${game.i18n?.lang ?? ''}\nabilities:${keysOf(CONFIG.DND5E.abilities)}\nskills:${keysOf(CONFIG.DND5E.skills)}`
-assert.equal(new SheetTexts().add({ reference: 'Compendium.rules.JournalEntryPage.prone' }), oldHash(`${format8}\nref:Compendium.rules.JournalEntryPage.prone`), "a reference: a character's hash, 0.29.0's of format 8 and its source")
+const format9 = `format:9\nrules:${rulesVersion}\nlang:${game.i18n?.lang ?? ''}\nabilities:${keysOf(CONFIG.DND5E.abilities)}\nskills:${keysOf(CONFIG.DND5E.skills)}`
+  + `\ntools:${keysOf({ ...CONFIG.DND5E.tools, ...CONFIG.DND5E.vehicleTypes })}\ndamage:${keysOf({ ...CONFIG.DND5E.damageTypes, ...CONFIG.DND5E.healingTypes })}`
+assert.equal(new SheetTexts().add({ reference: 'Compendium.rules.JournalEntryPage.prone' }), oldHash(`${format9}\nref:Compendium.rules.JournalEntryPage.prone`), "a reference: a character's hash, 0.29.0's of format 9 and its source")
 assert.ok(enriched.some(options => options.secrets === false), 'enriched without secrets')
-ok("a group's descriptions and its items' are sent without their secrets, and with no link to act on; the same HTML on a character keeps both, under another hash; and every character's hash is new in format 8, made as 0.29.0 made it of its format and its source alone")
+ok("a group's descriptions and its items' are sent without their secrets, and with no link to act on; the same HTML on a character keeps both, under another hash; and every character's hash is new in format 9, made as 0.29.0 made it of its format and its source alone")
 
 // ---- A private group ----
 const privateOne = updates[1]

@@ -27,10 +27,13 @@ import { sendLater } from "./transport.mjs";
  * text, since 0.21.0, so that no link is numbered as it was. 7: with damage and rolls whose dice
  * have comparisons, such as `2d6r<=2`, as links, since 0.22.0. 8: a check linked whole or not at
  * all, and since 0.52.0, to an app that reads them, on any ability the game has; with the game's
- * abilities and skills in the hash, so that no link is numbered as it was.
+ * abilities and skills in the hash, so that no link is numbered as it was. 9: with the game's tools
+ * and kinds of vehicle in the hash too, since 0.53.0, which decide whether a tool check is a link,
+ * and its damage and healing types, which decide whether plain English damage is a link, and what a
+ * damage link's types are, so that no link is numbered as it was.
  * @type {number}
  */
-const TEXT_FORMAT = 8;
+const TEXT_FORMAT = 9;
 
 /**
  * The most a character.texts payload should hold, in bytes of JSON, well within the 1 MB any
@@ -372,7 +375,10 @@ function chunk(texts) {
  * rules, which name conditions' pages and damage types, and the game's language, which labels
  * everything and decides whether plain text is read; and since 0.52.0 the game's abilities and
  * skills, which decide which checks are links, and so every later link's number, as a world that
- * turns Honor on, or adds a skill, does after its reload.
+ * turns Honor on, or adds a skill, does after its reload; and since 0.53.0 its tools and kinds of
+ * vehicle, which decide whether a tool check is one (`isTool`), as a world that adds a tool does
+ * after its reload, and its damage and healing types, which decide whether plain English damage is
+ * a link, and what a damage link's types are.
  * @returns {string}
  */
 function textFormat() {
@@ -384,7 +390,9 @@ function textFormat() {
   }
   const keys = list => Object.keys(list ?? {}).sort().join(",");
   return `format:${TEXT_FORMAT}\nrules:${rules}\nlang:${game.i18n?.lang ?? ""}`
-    + `\nabilities:${keys(CONFIG.DND5E?.abilities)}\nskills:${keys(CONFIG.DND5E?.skills)}`;
+    + `\nabilities:${keys(CONFIG.DND5E?.abilities)}\nskills:${keys(CONFIG.DND5E?.skills)}`
+    + `\ntools:${keys({ ...CONFIG.DND5E?.tools, ...CONFIG.DND5E?.vehicleTypes })}`
+    + `\ndamage:${keys({ ...CONFIG.DND5E?.damageTypes, ...CONFIG.DND5E?.healingTypes })}`;
 }
 
 /**

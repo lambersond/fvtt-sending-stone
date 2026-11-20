@@ -785,7 +785,8 @@ any tag the cut would split.
 The same hash always names the same description, its links numbered the same. Its hash is of
 everything what's sent depends on: the format descriptions are sent in, the rules the world is
 played by and the game's language, and since module 0.52.0 the game's abilities and skills and
-whether its listener answers `"anyAbility": 1`, where it comes from and its HTML, and what it shows
+whether its listener answers `"anyAbility": 1`, and since module 0.53.0 the game's tools and kinds
+of vehicle, and its damage and healing types, where it comes from and its HTML, and what it shows
 of the character's numbers. A description with rolls in it shows the character's level, proficiency,
 ability modifiers and spell save DC; one that says "spell save DC", that DC; one that names a
 saving throw, the abilities and DCs of its item's saving throws, which a saving throw without a DC
@@ -797,8 +798,8 @@ melee weapon throw extra dice, as Savage Attacks gives; and since module 0.20.0,
 damage as dnd5e resolves it, in each of the item's attack modes, so with the character's bonuses to
 damage, such as Rage's, and the scale values they name, and what a critical hit adds to it, such as
 an attack's critical damage. So it gets a new hash when any of them changes. Modules 0.17.0 to
-0.22.0, and 0.52.0, each send descriptions in a new format, so each gets a new hash, and is sent
-again once, with its next hello.
+0.22.0, 0.52.0 and 0.53.0 each send descriptions in a new format, so each gets a new hash, and is
+sent again once, with its next hello.
 
 #### Links in descriptions
 
@@ -2668,6 +2669,12 @@ An ask:
   0.53.0 never says so and is listed the first 20, as before: it would drop a longer list whole. The
   hello is unchanged. A module before 0.53.0 ignores the answer and lists at most 20, so the
   Gamemasters' own message of a hand-out to 20 isn't listed.
+- Module 0.53.0 sends descriptions in format 9 ([Descriptions](#descriptions)): their hash is also
+  of the game's tools and kinds of vehicle, which decide whether a tool check is a link, and of its
+  damage and healing types, which decide whether plain English damage is a link and what a damage
+  link's types are, so a world that adds one has new hashes after its reload. Every description
+  gets a new hash and is sent again once, with the next hello. A listener needs no change: it never
+  reads a hash's format.
 
 ## Changes from protocol 1
 
