@@ -1053,12 +1053,13 @@ export function checkWildShapeCommand(command) {
  * The fields of other kinds a spell prepared or unprepared never names, beside those a roll names:
  * a move, a removal, anything typed in, a favorite, a note, a dish, an effect, Wild Shape, a spell
  * slot, charges, Heroic Inspiration, a concentration, a turn and the End Turn a turn taken back names,
- * and since 0.49.0 coins added or taken away.
+ * and since 0.49.0 coins added or taken away; and since 0.53.0 a typed roll's rerolls, an enchantment
+ * ended and hit points set, which it let by before.
  * @type {string[]}
  */
 const OTHERS = [
-  "transfer", "remove", "typed", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter", "count",
-  "inspiration", "concentration", "turn", "undo", "coins"
+  "transfer", "remove", "typed", "rerolls", "favorite", "note", "dish", "effect", "wildShape", "spellSlot", "counter",
+  "count", "inspiration", "concentration", "enchantment", "turn", "undo", "coins", "hitPoints"
 ];
 
 /**

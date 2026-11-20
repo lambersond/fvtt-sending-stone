@@ -2652,6 +2652,10 @@ An ask:
   the mental, as Wild Shape does, and listed every ability under Appearance. `form.beast.abilities`
   already named abilities beyond dnd5e's six, as under Polymorph: a listener that knows only the
   six drops an id it doesn't know, as it did there.
+- Module 0.53.0 refuses a `prepare` ([Preparing spells](#preparing-spells)) that also names
+  `rerolls`, `enchantment` or `hitPoints`, `"invalid"`, `error` `"prepare"`, as it refuses every
+  other kind's field beside it; a module before prepared the spell and ignored them. A listener's
+  own checks should refuse such a request first, as the app's do, so none needs to change.
 
 ## Changes from protocol 1
 
@@ -3485,10 +3489,12 @@ Not a roll: `mode` `0`, `explicit` `false`, no `extras` or `dice`, none of the r
 (`enchant`, `item`, `activity`, `target`, `targets`, `self`, `slot`, `prompt`, `text`, `link`,
 `key`) and none of another kind's (`transfer`, `remove`, `typed`, `favorite`, `note`, `dish`,
 `effect`, `wildShape`, `spellSlot`, `counter`, `count`, `inspiration`, `concentration`, `turn`,
-`undo`); else `"invalid"`, `error` `"prepare"`, or `"dice"` for one that throws dice. `by` never
-(`"invalid"`, `error` `"by"`): nothing is posted, as dnd5e posts nothing, so a change the
-Gamemaster made as the character would leave no mark, and their page in the app doesn't offer it.
-`of` never (`"invalid"`, `error` `"of"`): an NPC's spells are prepared already.
+`undo`, since module 0.49.0 `coins`, and since module 0.53.0 `rerolls`, `enchantment` and
+`hitPoints`, which a module before let by); else `"invalid"`, `error` `"prepare"`, or `"dice"` for
+one that throws dice. `by` never (`"invalid"`, `error` `"by"`): nothing is posted, as dnd5e posts
+nothing, so a change the Gamemaster made as the character would leave no mark, and their page in the
+app doesn't offer it. `of` never (`"invalid"`, `error` `"of"`): an NPC's spells are prepared
+already.
 
 **Which spells.** Those the sheet sends with `prepared` `0` (to prepare) or `1` (to unprepare): a
 spell above cantrip level whose casting prepares, by dnd5e's `canPrepare` (the `spell` and `pact`
@@ -5605,9 +5611,10 @@ It's no roll: sent with `mode` `0`, `explicit` `false` and no `extras` or `dice`
 roll's fields (`item`, `activity`, `target`, `targets`, `self`, `slot`, `enchant`, `prompt`, `text`,
 `link` or `key`), no other kind's (`transfer`, `remove`, `favorite`, `note`, `dish`, `effect`,
 `wildShape`, `spellSlot`, `counter`, `count`, `inspiration`, `concentration`, `enchantment`,
-`prepare`, `turn`, `undo`), and no `typed` or `rerolls`. Nothing is posted in chat, as dnd5e posts
-nothing for its sheet's fields, so only a character's player sets them: never the Gamemaster as them,
-which would leave no mark (`by` `"gm"` is refused `"invalid"`, `error` `"by"`).
+`prepare`, `turn`, `undo`, and since module 0.49.0 `coins`), and no `typed` or `rerolls`. Nothing is
+posted in chat, as dnd5e posts nothing for its sheet's fields, so only a character's player sets
+them: never the Gamemaster as them, which would leave no mark (`by` `"gm"` is refused `"invalid"`,
+`error` `"by"`).
 
 A command refused for what it is is `"invalid"`, with `error` `"by"`, `"of"`, `"hitPoints"` (no
 `hitPoints`, or one not exactly as above; a roll's field or another kind's beside it), `"plainRoll"`
