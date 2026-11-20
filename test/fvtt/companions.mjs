@@ -2175,6 +2175,25 @@ if (MIDI) {
       await brawl.setTurn(2, 1)
       assert.deepEqual([midi.bonusRemovals.slice(removals), midi.usedBonus.has(wolfId)], [[wolfId], false], 'taken off at its turn')
       doneAs(await howlAt(), 'its turn: Howl again')
+      // 5b. The turn taken back onto the Wolf is its turn again, never its next: the Howl's mark stays.
+      // Its turn ended from the app, the goblin's next round, and taken back with Undo, under a core
+      // that tells of a turn written with its turn events off; then on to the goblin's again and back
+      // with Previous Turn, a round back. Its next turn there takes it off (8b).
+      const back = midi.bonusRemovals.length
+      const ended = await send({ id: `turn-${++ids}`, actorId: 'thorin', kind: 'endTurn', turn: { combatId: 'denbrawl', round: 2, combatantId: 'cb-db-wolf' }, ...plain, dice: [] }, 'camp-w')
+      doneAs(ended, 'its turn ended from the app')
+      assert.deepEqual([brawl.round, brawl.combatant.id], [3, 'cb-db-gob'], "the goblin's turn, the next round")
+      faults.turnEventsNotify = true
+      try {
+        doneAs(await send({ id: `undo-${++ids}`, actorId: 'thorin', kind: 'undoEndTurn', undo: ended.id, turn: { combatId: 'denbrawl', round: 3, combatantId: 'cb-db-gob' }, ...plain, dice: [] }, 'camp-w'), 'taken back')
+      } finally {
+        faults.turnEventsNotify = false
+      }
+      assert.deepEqual([brawl.round, brawl.combatant.id, midi.bonusRemovals.slice(back), midi.usedBonus.has(wolfId)], [2, 'cb-db-wolf', [], true], 'taken back with Undo: its mark stays')
+      await brawl.setTurn(3, 0)
+      await brawl.previousTurn()
+      assert.deepEqual([brawl.round, brawl.combatant.id, midi.bonusRemovals.slice(back), midi.usedBonus.has(wolfId)], [2, 'cb-db-wolf', [], true], 'Previous Turn, a round back: its mark stays')
+      failedAs(await howlAt(), 'bonus-action', 'its turn taken back: Howl again')
       // 6. Still its turn, its reaction used: its Bite is no opportunity attack, made, nothing marked.
       midi.usedReaction.add(wolfId)
       marks = midi.reactionMarks.length
@@ -2253,7 +2272,7 @@ if (MIDI) {
       midi.usedBonus.delete(wolfId)
       midi.usedReaction.delete(wolfId)
     }
-    ok("since module 0.53.0, under Midi-QOL, a Wolf fighting in the den's brawl, begun and chosen, while the Gamemaster has the arena's fight up: its Howl refused bonus-action with its Bonus Action used; unused, one stopped before its card failing midi and marking nothing, one made marked by the module; a new round's first turn, another's, leaves the mark and refuses Howl; two Howls at once, one made, one refused; at its own turn the mark taken off, forced; its Bite on its own turn no opportunity attack, on the goblin's refused reaction with its reaction used, never read from a copy of the den whose combatant has its token's id; unused, an attack Midi aborts still marked, one made marked; its Bonus Action and reaction marked in the brawl both taken off at its next turn, each once; its token gone, nothing taken off or logged; the brawl not begun, or not chosen, counts for nothing; the brawl up, Midi's own to mark")
+    ok("since module 0.53.0, under Midi-QOL, a Wolf fighting in the den's brawl, begun and chosen, while the Gamemaster has the arena's fight up: its Howl refused bonus-action with its Bonus Action used; unused, one stopped before its card failing midi and marking nothing, one made marked by the module; a new round's first turn, another's, leaves the mark and refuses Howl; two Howls at once, one made, one refused; at its own turn the mark taken off, forced; its turn ended from the app and taken back with Undo under a core that tells of it, or a round back with Previous Turn, leaves its mark on; its Bite on its own turn no opportunity attack, on the goblin's refused reaction with its reaction used, never read from a copy of the den whose combatant has its token's id; unused, an attack Midi aborts still marked, one made marked; its Bonus Action and reaction marked in the brawl both taken off at its next turn, each once; its token gone, nothing taken off or logged; the brawl not begun, or not chosen, counts for nothing; the brawl up, Midi's own to mark")
   }
   game.combats.delete(brawl.id)
   den.tokens.delete(denGoblin.id)

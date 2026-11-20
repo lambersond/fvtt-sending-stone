@@ -181,16 +181,22 @@ function stillThere(actor) {
 /**
  * As a turn begins in an encounter, since 0.53.0, take off the marks the module wrote there on the
  * creature whose turn it is, each once, forced, as Midi's own `removeBonusActionUsed` and
- * `removeReactionUsed` take one off: never as a combatant is added mid-turn, which changes no turn.
- * One whose creature is gone is forgotten.
+ * `removeReactionUsed` take one off: never as a combatant is added mid-turn, which changes no turn,
+ * nor as the turn goes back onto the creature, a round back or to an earlier turn of the same one,
+ * by Previous Turn or Previous Round or the app's Undo End Turn, which core may tell of too: that
+ * is its turn taken up again, not its next. One whose creature is gone is forgotten.
  * @param {Combat} combat
- * @param {{round: number, combatantId: string|null}} prior     The turn before, as core gives it.
- * @param {{round: number, combatantId: string|null}} current   The turn now.
+ * @param {{round: number, turn: number|null, combatantId: string|null}} prior     The turn before, as core gives it.
+ * @param {{round: number, turn: number|null, combatantId: string|null}} current   The turn now.
  * @returns {Promise<void>}
  */
 async function takeOffUnseenMarks(combat, prior, current) {
   const begun = current?.combatantId ?? null;
   if ( !begun || ((prior?.combatantId === begun) && (prior?.round === current.round)) ) return;
+  const back = (current.round === prior?.round)
+    ? (current.turn < prior?.turn)
+    : (current.round < prior?.round);
+  if ( back ) return;
   for ( const [uuid, entry] of unseenMarks ) {
     if ( (entry.combatId !== combat?.id) || (entry.combatantId !== begun) ) continue;
     unseenMarks.delete(uuid);
