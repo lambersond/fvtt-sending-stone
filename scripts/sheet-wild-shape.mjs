@@ -145,17 +145,23 @@ function flooredAc(form, record, original, campaign) {
 
 /**
  * Which of a form's numbers are the creature's: its abilities whose scores dnd5e took from it (all
- * but those its transformation kept, Wild Shape keeping the mental ones), and the saves and skills
- * whose totals on the form are above her own.
+ * but a physical or mental one of a kind its transformation kept, Wild Shape keeping the mental ones;
+ * one of neither type, as a world's own may be, always the creature's; none where it kept her whole
+ * self, as Appearance does), and the saves and skills whose totals on the form are above her own.
  * @param {Actor} form
  * @param {Actor} original
  * @returns {{abilities: string[], saves: string[], skills: string[]}}
  */
 function beastOf(form, original) {
   const keep = new Set(form.getFlag?.("dnd5e", "transformOptions")?.keep ?? []);
-  const PHYSICAL = ["str", "dex", "con"];
-  const typeOf = key => CONFIG.DND5E?.abilities?.[key]?.type ?? (PHYSICAL.includes(key) ? "physical" : "mental");
-  const abilities = Object.keys(form.system?.abilities ?? {}).filter(key => !keep.has(typeOf(key)));
+  // A score is the character's as dnd5e keeps it: a physical one where the transformation keeps the
+  // physical, a mental one where it keeps the mental, one of neither type, as a world's own may be,
+  // never. Keeping her whole self, as Appearance does, it takes no score from the creature.
+  const kept = key => {
+    const type = CONFIG.DND5E?.abilities?.[key]?.type;
+    return (keep.has("physical") && (type === "physical")) || (keep.has("mental") && (type === "mental"));
+  };
+  const abilities = keep.has("self") ? [] : Object.keys(form.system?.abilities ?? {}).filter(key => !kept(key));
   const save = (actor, key) => {
     const ability = actor.system?.abilities?.[key] ?? {};
     return finite(ability.save?.value) ?? finite(ability.save) ?? finite(ability.mod) ?? 0;

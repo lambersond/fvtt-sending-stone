@@ -23,6 +23,9 @@ import { originOf, readLink } from "./sheet-links.mjs";
  * @param {number} n
  * @param {object} [options]
  * @param {boolean} [options.secrets]   Was it sent with its secrets?
+ * @param {boolean} [options.anyAbility]   Since 0.52.0, were its checks on any ability the game has
+ *                                         links, as to a campaign's app that reads them? A command
+ *                                         is read against what its campaign was sent.
  * @returns {Promise<{source: object, origin: {name: string, item?: Item, spell?: Item}, link: object}
  *   |{refusal: "gone"|"link"}>}
  *   The description, where it comes from, and the link: a saving throw or concentration check
@@ -34,12 +37,14 @@ import { originOf, readLink } from "./sheet-links.mjs";
  *   was sent; or a roll `{kind: "roll", formula}`. Refused as "gone" when the character's sheet has
  *   no such description now, and as "link" when it has no such link. Since 0.36.0 a companion's
  *   sent without the Gamemaster's secrets, as one none of its characters' players owns, is read as
- *   it was sent, without them (`secrets: false`).
+ *   it was sent, without them (`secrets: false`). Since 0.52.0 read as its campaign's app was sent
+ *   it, with checks on any ability the game has or on the six alone (`anyAbility`), whose links are
+ *   numbered and hashed apart.
  */
-export async function findLink(actor, hash, n, { secrets=true }={}) {
+export async function findLink(actor, hash, n, { secrets=true, anyAbility=false }={}) {
   const { characterSheet } = await import("./sheet.mjs");
   const { SheetTexts, hiddenDCsOf, linkActivitiesOf, textOf } = await import("./sheet-texts.mjs");
-  const texts = new SheetTexts({ secrets });
+  const texts = new SheetTexts({ secrets, anyAbility });
   try {
     if ( !characterSheet(actor, texts, { secrets }) ) return { refusal: "gone" };
   } catch (err) {

@@ -229,6 +229,7 @@ const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)
 const { campaignCharacterId, candidateActors, activeForm } = await import(`${MODULE}/scripts/characters.mjs`)
 const { characterSheet } = await import(`${MODULE}/scripts/sheet.mjs`)
 const { eligible, wildShapeRules } = await import(`${MODULE}/scripts/wild-shape.mjs`)
+const { formBlock } = await import(`${MODULE}/scripts/sheet-wild-shape.mjs`)
 assert.equal(diceStatus.ready, true, `self-test: ${diceStatus.error}`)
 
 /** Change the campaign, as Manage Campaigns saves it, and wait for the hello that follows. */
@@ -1216,6 +1217,36 @@ async function effectsCarriedBack(formId) {
   await elowen.update({ 'system.attributes.hp.value': elowen.system.attributes.hp.max, 'system.attributes.hp.temp': 0 })
 }
 
+/**
+ * Since 0.52.0, over the live form: a world's own ability with no type, Luck, is the creature's, as
+ * dnd5e keeps only a physical or a mental one; Honor, mental, hers under Wild Shape; with her
+ * physical kept, as a transformation of the Gamemaster's may keep them, the mental ones, Honor and
+ * Luck the creature's; and with her whole self kept, as Appearance keeps it, none. dnd5e's
+ * configuration of both is put back after.
+ * Under dnd5e 6.0.5 in section 18, which ends that run; under 5.3.3 with the Wolf's sheet, case 7.
+ */
+function untypedAbilityCase() {
+  const shape = formOf()
+  const config = CONFIG.DND5E.abilities
+  const before = { luc: config.luc, hon: config.hon }
+  config.luc = { label: 'Luck', abbreviation: 'luc' }
+  config.hon = { label: 'Honor', abbreviation: 'hon', type: 'mental' }
+  try {
+    const system = { ...shape.system, abilities: { ...shape.system.abilities, luc: { value: 18, mod: 4 }, hon: { value: 8, mod: -1 } } }
+    const form = Object.create(shape, { system: { value: system } })
+    assert.deepEqual(formBlock(form, elowen, getCampaigns()[0]).beast.abilities, ['str', 'dex', 'con', 'luc'], 'Luck the form\'s, Honor hers')
+    const options = shape.getFlag('dnd5e', 'transformOptions')
+    /** The form, its flag saying its transformation kept `keep` of her. */
+    const keeping = keep => Object.create(form, { getFlag: { value: (scope, key) =>
+      ((scope === 'dnd5e') && (key === 'transformOptions')) ? { ...options, keep } : shape.getFlag(scope, key) } })
+    assert.deepEqual(formBlock(keeping(['physical']), elowen, getCampaigns()[0]).beast.abilities, ['int', 'wis', 'cha', 'luc', 'hon'], 'her physical kept: her mental ones, Luck and Honor the form\'s')
+    assert.deepEqual(formBlock(keeping(['self']), elowen, getCampaigns()[0]).beast.abilities, [], 'her whole self kept: none the form\'s')
+  } finally {
+    for (const [key, value] of Object.entries(before)) if (value === undefined) delete config[key]; else config[key] = value
+  }
+  ok("since 0.52.0, a world's own ability with no type is the form's, as dnd5e keeps only a physical or a mental one; Honor, mental, hers; her physical kept, the mental ones, Honor and Luck the form's; her whole self kept, as Appearance keeps it, none")
+}
+
 if (DND5E6) {
   /* ------------------------------------------ */
   /*  18. dnd5e 6.0.5                           */
@@ -1230,6 +1261,7 @@ if (DND5E6) {
     assert.deepEqual([changed6.result.status, wolf6?.name, elowenHall.actorId, elowenForest.actorId], ['done', 'Elowen (Wolf)', wolf6.id, wolf6.id], 'transformed, both tokens switched')
     assert.ok(port.tokenWrites.slice(tokenMark6).every(each => each.updates.every(update => update.level === 2)), "each token's level kept in the switch")
     assert.deepEqual([elowenHall.level, elowenForest.level], [2, 2])
+    untypedAbilityCase()
     await wolf6.toggleStatusEffect('prone', { active: true })
     const prone6 = wolf6.effects.find(effect => effect.statuses.has('prone'))
     assert.equal(prone6.type, 'condition', "dnd5e 6's Prone, a condition effect")
@@ -1588,6 +1620,7 @@ assert.deepEqual(shaped.sheet.form, {
   hours: 2, minutesLeft: 120, flooredAc: false, beast: shaped.sheet.form.beast,
 })
 assert.deepEqual(shaped.sheet.form.beast.abilities, ['str', 'dex', 'con'])
+untypedAbilityCase()
 assert.ok(shaped.sheet.form.beast.skills.includes('ste'), 'Stealth the Wolf\'s, above hers')
 assert.equal(shaped.sheet.wildShape.uses.value, 1, 'her Wild Shape on the form\'s sheet, one use left')
 const rows = shaped.sheet.effects.flatMap(section => section.effects)
@@ -1612,6 +1645,41 @@ await shapeItem().update({ 'flags.sending-stone.wildShape.swap': true })
 assert.deepEqual(refusal(await made(learn(uuidOf('Crocodile'), wolfId))), ['failed', 'shaped', null], "the Wolf's profile, while she's the Wolf: shaped")
 await shapeItem().update({ 'flags.sending-stone.wildShape.swap': false })
 ok('transform into the Wolf: one use spent on her own Wild Shape (2 → 1) before the form exists; transformInto with the preset, tempFormula "5", minimumAC "0", transformTokens false, renderSheet false; "Elowen (Wolf)" with its record {kind, name, hours 2, endsAt startedAt + 7200, profile, request, baseline}; her tokens switched on both scenes from dnd5e\'s partial token data with previousTokenData; the combat sent again, her combatant hers; the chat line; her sheet under her own id the form\'s (AC 12, walk 40, her hit points, 5 temporary) with form {minutesLeft 120, flooredAc false, beast} and no effect ops; done {form, temp 5, hours 2}; a sheet a world minute, not 30 s, on; a replacement of the form she\'s in "shaped"')
+
+// Since 0.52.0 (item 65): a form's check activity on Sanity is sent with its check to an app that
+// reads checks on any ability the game has, as a heartbeat's answer says, and never to one before
+// it; as is one of Rowan's own, unshaped, to an app that takes Wild Shape. This run is dnd5e 5's:
+// under dnd5e 6 the harness ends at case 18, and no check activity is offered there.
+{
+  const { Item5e } = await import('./activity5e.mjs')
+  CONFIG.DND5E.abilities.san = { label: 'Sanity', abbreviation: 'san' }
+  const witsItem = (actor, id) => new Item5e(actor, {
+    id, name: 'Keen Wits', type: 'feat', system: { properties: [] },
+    activities: [{ id: `${id.slice(0, 13)}Chk`, type: 'check', affects: '', range: 'self', check: { ability: 'san', associated: [], dc: { formula: '12' } } }],
+  })
+  wolf.items.set('wolfKeenWits0000', witsItem(wolf, 'wolfKeenWits0000'))
+  rowan.items.set('rowanKeenWits000', witsItem(rowan, 'rowanKeenWits000'))
+  const witsOf = (id, itemId) => lastSheet(id).actions?.flatMap(section => section.actions).find(action => action.id === itemId)
+  const answered = async (features, why) => {
+    const from = app.events.length
+    if (features) app.features.set('camp-a', features)
+    else app.features.delete('camp-a')
+    send('bridge.heartbeat', {}, campaign(), { sequenced: false })
+    await until(() => sheetsSince(from).length && sent('character.updated').some(e => (app.events.indexOf(e) >= from) && (e.data.character.id === 'rowan')), why)
+    await settle(80)
+  }
+  const SANITY = { checks: [{ type: 'check', ability: 'san' }], dc: 12, own: true }
+  await answered({ commands: true, wildShape: 1, anyAbility: 1 }, "her form's sheet and Rowan's again, with checks on any ability")
+  assert.deepEqual([lastSheet().form?.name, witsOf('elowen', 'wolfKeenWits0000')?.check], ['Wolf', SANITY], `the form's Sanity check: ${JSON.stringify(witsOf('elowen', 'wolfKeenWits0000'))}`)
+  assert.deepEqual([lastSheet('rowan').form, witsOf('rowan', 'rowanKeenWits000')?.check], [undefined, SANITY], "Rowan's own, unshaped")
+  await answered(null, "her form's sheet and Rowan's again, without them")
+  assert.deepEqual([lastSheet().form?.name, Boolean(witsOf('elowen', 'wolfKeenWits0000')), witsOf('elowen', 'wolfKeenWits0000')?.check], ['Wolf', true, undefined], 'to an app before 0.52.0, no check')
+  assert.deepEqual([Boolean(witsOf('rowan', 'rowanKeenWits000')), witsOf('rowan', 'rowanKeenWits000')?.check], [true, undefined], "nor Rowan's")
+  wolf.items.delete('wolfKeenWits0000')
+  rowan.items.delete('rowanKeenWits000')
+  delete CONFIG.DND5E.abilities.san
+}
+ok("since 0.52.0, a form's check activity on Sanity, and one of an unshaped character's, sent with its check once a heartbeat's answer says the app reads checks on any ability, and without it once it doesn't")
 
 /* -------------------------------------------- */
 /*  11. revert                                  */
@@ -1907,7 +1975,6 @@ await Hooks.callAll('userConnected', users.get('gm'), false)
 await setWorldTime(game.time.worldTime + 7200 + 600)
 await settle(80)
 assert.ok(game.actors.get(shape.id), 'no bridge: nothing ends')
-const { formBlock } = await import(`${MODULE}/scripts/sheet-wild-shape.mjs`)
 assert.equal(formBlock(shape, elowen, campaign()).minutesLeft, 0, 'ten minutes past its end, never below 0 minutes left')
 users.get('gm').isActiveGM = true
 await Hooks.callAll('userConnected', users.get('gm'), true)

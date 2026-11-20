@@ -16,9 +16,9 @@ for; [test/README.md](test/README.md), how the harness works. Neither is repeate
 The scripts stand in seven layers, bottom to top:
 
 1. **Ground.** What the rest reads: constants and settings, the campaigns, the dice a roll is given,
-   which dnd5e runs and which other modules (the author's own, Midi-QOL's Bonus Actions and
-   reactions), which client sends, the issue forms' links, and what the commands' checks ask in
-   common.
+   which abilities checks are sent on, which dnd5e runs and which other modules (the author's own,
+   Midi-QOL's Bonus Actions and reactions), which client sends, the issue forms' links, and what the
+   commands' checks ask in common.
 2. **The post.** The queue that posts events, and what became of each post.
 3. **The game.** Which characters and parties are a campaign's, who may type a character's dice, its
    combats as it is told them and how hurt a creature in them is, the rules of what players are

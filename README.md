@@ -369,7 +369,9 @@ an attack hit only where the game shows players.
   at the level the player picks, as in Foundry. One whose DC scales with the level it's used at,
   and every check activity under dnd5e 6 for now, are left to Foundry; with Midi-QOL, the targets'
   checks are Midi's, rolled as Midi rolls them, and one Midi would have its user make at
-  themselves, as a tool's, is refused in the app, Midi rolling it with Foundry's dice.
+  themselves, as a tool's, is refused in the app, Midi rolling it with Foundry's dice. Since 0.52.0
+  one on any ability your game has, such as Sanity, is offered to an app that reads them; to an
+  older app, one with a check on any but dnd5e's six is left to Foundry whole.
 - **Free castings.** A spell granted with uses of its own, such as Fey Touched's Misty Step, has
   dnd5e's free casting, a forward, which the app lists beneath it: cast from the app, it spends the
   use, never a slot, at the spell's own level, or a warlock's at their pact slots' level, as dnd5e
@@ -679,6 +681,11 @@ off by default, apart from players' rolls, under D&D Fifth Edition 5 and 6. A 20
 stays in Foundry, and so does any other transformation, such as Polymorph: the app shows the form,
 and you return it in Foundry.
 
+The form's sheet tells the app which of its abilities are the creature's, as dnd5e took their
+scores from it: in Wild Shape the physical ones and, since 0.52.0, any your world adds with no
+type, whose score dnd5e never keeps; and since 0.52.0 none under a transformation that keeps the
+character's whole self, as Appearance does, where before it named every one.
+
 ### Hit points
 
 Since 0.44.0 a campaign's players can set their character's hit points and temporary hit points from
@@ -915,12 +922,17 @@ description's damage or roll aren't offered yet.
   Foundry's inline rolls, links to a condition's rules, and, in a game in English, saving throws,
   ability and skill checks, and damage in plain words. Conditions are found by name in any
   language. Attack, passive check and other links are shown as text, as are rolls made for your
-  eyes or the roller's alone (`/gmr`, `/br`, `/sr`), and a check with an ability of your world's
-  own.
+  eyes or the roller's alone (`/gmr`, `/br`, `/sr`). Since 0.52.0 a check on any ability your game
+  has, dnd5e's Honor and Sanity where its settings turn them on and one of your world's own, is a
+  link to an app that reads them; to an older app, a check on any but dnd5e's six is text. A choice
+  of checks is a link whole or not at all: "Wisdom or Honor" is text to an older app, never a Wisdom
+  check alone. The module has sent saving throws on any ability as links since 0.17.0; the app shows
+  those past the six from v0.52.0.
 
-Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0 and 0.22.0 each send every description again once,
-in its new form. Since 0.20.0 a description with damage links is also sent again when the damage it
-shows changes, as with Rage.
+Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0, 0.22.0 and 0.52.0 each send every description again
+once, in its new form; since 0.52.0 so does a world that turns an ability or skill on, such as
+Honor, after its reload. Since 0.20.0 a description with damage links is also sent again when the
+damage it shows changes, as with Rage.
 
 ### The listener must allow cross-origin requests
 
@@ -1290,6 +1302,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through; the levels an item may cast its spell at, and their cost; the checks a check activity calls for, and what a forward is used through and spends; what each use spends |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, their links marked, hashed, and sent only when a campaign lacks them; a group's without secrets and without links to act on, under hashes of their own |
 | `scripts/sheet-links.mjs` | The links in a description the app can act on, marked as its own spans, and one read back from a description by its number |
+| `scripts/check-abilities.mjs` | Which abilities a check sent to a campaign's app may be made with, from 0.52.0: dnd5e's six to an app before 0.52.0, and any the game has, by a key the app takes, to one that reads them. It imports nothing: every script that sends a check, from the sheets up, asks it |
 | `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON; which counter a count is, and whether its player may spend it; whether a spell is the copy an item casts; the kinds of item the inventory lists, and its sections |
 | `scripts/groups.mjs` | A campaign's groups (party sheets): the world's Group actors to pick from, the primary party first, and which of the campaign's characters see each, by their players' ownership |
 | `scripts/sheet-group.mjs` | A group's sheet: its members' names and portraits, its description, and its inventory without what items roll or are used through |

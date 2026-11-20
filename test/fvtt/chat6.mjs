@@ -131,7 +131,19 @@ await withSettings({ gmContent: true }, () => {
   assert.deepEqual(told(requested).system.buttons.map(button => button.dc), [17, 12])
   assert.equal(told(concentrating).system.buttons[0].dc, 13)
 })
-ok("dnd5e 6's prompts, a request and a concentration check, go without each button's DC, kept on the button itself, with Gamemaster-only information off, whatever Challenge Visibility; with it on, with them")
+// Since 0.52.0, to an app that reads checks on any ability: a dnd5e 6 request on Honor is still no
+// ask, dnd5e 6's requests being none the app reads (its buttons are in `system`).
+{
+  const { noteAnyAbilityFormat } = await import(`${process.env.MODULE_DIR}/scripts/check-abilities.mjs`)
+  CONFIG.DND5E.abilities.hon = { label: 'Honor', abbreviation: 'hon' }
+  noteAnyAbilityFormat('camp-a', { anyAbility: 1 })
+  const honor = await prompt({ broadcast: true, buttons: [{ type: 'check', ability: 'hon', dc: 12, format: 'long', visibility: 'all' }] },
+    { author: 'gm', speaker: { actor: null, alias: 'Gamemaster' } })
+  assert.equal(told(honor).ask, null, 'a dnd5e 6 request on Honor asks nothing of the app')
+  noteAnyAbilityFormat('camp-a', {})
+  delete CONFIG.DND5E.abilities.hon
+}
+ok("dnd5e 6's prompts, a request and a concentration check, go without each button's DC, kept on the button itself, with Gamemaster-only information off, whatever Challenge Visibility; with it on, with them; one on Honor asks nothing, to an app that reads checks on any ability too")
 
 // ---- A legendary resistance ----
 const resisted = await save(aliceCard, 4, { resisted: true })

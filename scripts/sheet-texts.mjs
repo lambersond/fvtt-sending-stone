@@ -25,10 +25,12 @@ import { sendLater } from "./transport.mjs";
  * never a critical hit's marked, since 0.19.0. 5: with what a critical hit adds, and damage as
  * resolved, since 0.20.0. 6: with damage whose dice this world can't plan for a player left as
  * text, since 0.21.0, so that no link is numbered as it was. 7: with damage and rolls whose dice
- * have comparisons, such as `2d6r<=2`, as links, since 0.22.0.
+ * have comparisons, such as `2d6r<=2`, as links, since 0.22.0. 8: a check linked whole or not at
+ * all, and since 0.52.0, to an app that reads them, on any ability the game has; with the game's
+ * abilities and skills in the hash, so that no link is numbered as it was.
  * @type {number}
  */
-const TEXT_FORMAT = 7;
+const TEXT_FORMAT = 8;
 
 /**
  * The most a character.texts payload should hold, in bytes of JSON, well within the 1 MB any
@@ -79,6 +81,8 @@ const sent = new Map();
  * @property {boolean} [secrets]        Is it enriched with its secrets, as for its owner? Since
  *                                      0.30.0 a Group's are not: see SheetTexts.
  * @property {boolean} [actionable]     May its links be acted on from the app? A Group's may not.
+ * @property {boolean} [anyAbility]     Since 0.52.0, are its checks on any ability the game has
+ *                                      links, for an app that reads them? Else only the six's.
  */
 
 /**
@@ -114,13 +118,22 @@ export class SheetTexts {
   #actionable;
 
   /**
+   * Are checks on any ability the game has links in these descriptions, since 0.52.0?
+   * @type {boolean}
+   */
+  #anyAbility;
+
+  /**
    * @param {object} [options]
    * @param {boolean} [options.secrets]      Enrich them with their secrets, as for their owner.
    * @param {boolean} [options.actionable]   Make their links ones the app can act on.
+   * @param {boolean} [options.anyAbility]   Since 0.52.0, link checks on any ability the game has,
+   *                                         for an app that reads them; else only the six's.
    */
-  constructor({ secrets=true, actionable=true }={}) {
+  constructor({ secrets=true, actionable=true, anyAbility=false }={}) {
     this.#secrets = secrets !== false;
     this.#actionable = actionable !== false;
+    this.#anyAbility = anyAbility === true;
   }
 
   /**
@@ -131,7 +144,8 @@ export class SheetTexts {
    * since 0.30.0 whether it goes without its secrets or links to act on. A change to any of them is
    * a new description, sent anew. Those two are hashed only where they differ from a character's,
    * so that no character's description has a new hash for them, and the same HTML enriched both
-   * ways never shares one.
+   * ways never shares one; and since 0.52.0 whether its checks on any ability are links, hashed
+   * where they are, so that a link is never read by a number another app's copy gave it.
    * @param {TextSource} source
    * @returns {string|null}   Its hash, or null if there is nothing to describe.
    */
@@ -141,10 +155,11 @@ export class SheetTexts {
     this.#format ??= textFormat();
     const from = reference ? `ref:${reference}`
       : `${relativeTo?.uuid ?? ""}\n${shownSafely(html, relativeTo)}\n${html}`;
-    const options = `${this.#secrets ? "" : "\nsecrets:false"}${this.#actionable ? "" : "\nactionable:false"}`;
+    const options = `${this.#secrets ? "" : "\nsecrets:false"}${this.#actionable ? "" : "\nactionable:false"}`
+      + (this.#anyAbility ? "\nabilities:any" : "");
     const hash = textHash(`${this.#format}\n${from}${options}`);
     if ( !this.sources.has(hash) ) {
-      this.sources.set(hash, { ...source, secrets: this.#secrets, actionable: this.#actionable });
+      this.sources.set(hash, { ...source, secrets: this.#secrets, actionable: this.#actionable, anyAbility: this.#anyAbility });
     }
     return hash;
   }
@@ -276,7 +291,7 @@ async function render(sources) {
  *   The HTML sent, the DCs its authors hid, and the activities its damage is rolled by, by link
  *   number.
  */
-async function enrich({ html, relativeTo, reference, secrets, actionable }) {
+async function enrich({ html, relativeTo, reference, secrets, actionable, anyAbility }) {
   let text = html ?? "";
   let rollData;
   let result = null;
@@ -297,7 +312,8 @@ async function enrich({ html, relativeTo, reference, secrets, actionable }) {
     const hiddenDCs = new Map();
     const activities = new Map();
     const normalised = normaliseLinks(enrichedText, {
-      relativeTo, rollData, actionable: (actionable !== false) && !reference, hiddenDCs, activities
+      relativeTo, rollData, actionable: (actionable !== false) && !reference, hiddenDCs, activities,
+      anyAbility: anyAbility === true
     });
     return { html: cutShort(normalised), hiddenDCs, activities };
   } catch (err) {
@@ -354,7 +370,9 @@ function chunk(texts) {
 /**
  * The format descriptions are sent in, and what they are enriched in that every one shows: the
  * rules, which name conditions' pages and damage types, and the game's language, which labels
- * everything and decides whether plain text is read.
+ * everything and decides whether plain text is read; and since 0.52.0 the game's abilities and
+ * skills, which decide which checks are links, and so every later link's number, as a world that
+ * turns Honor on, or adds a skill, does after its reload.
  * @returns {string}
  */
 function textFormat() {
@@ -364,7 +382,9 @@ function textFormat() {
   } catch {
     rules = "";
   }
-  return `format:${TEXT_FORMAT}\nrules:${rules}\nlang:${game.i18n?.lang ?? ""}`;
+  const keys = list => Object.keys(list ?? {}).sort().join(",");
+  return `format:${TEXT_FORMAT}\nrules:${rules}\nlang:${game.i18n?.lang ?? ""}`
+    + `\nabilities:${keys(CONFIG.DND5E?.abilities)}\nskills:${keys(CONFIG.DND5E?.skills)}`;
 }
 
 /**

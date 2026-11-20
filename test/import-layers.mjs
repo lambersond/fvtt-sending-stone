@@ -85,6 +85,7 @@ const LAYERS = [
       'dnd5e-generation.mjs',
       'bridge-role.mjs',            // which client sends, asked from far below bridge.mjs
       'command-checks.mjs',         // imports only constants.mjs; journals.mjs, below the commands, asks it
+      'check-abilities.mjs',        // imports nothing: which abilities checks are sent on, read from Sheets up
     ],
   },
   {

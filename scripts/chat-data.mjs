@@ -1,4 +1,5 @@
 import { MODULE_ID } from "./constants.mjs";
+import { anyAbilityReader, CHECK_KEY, isAbilitySent } from "./check-abilities.mjs";
 import { includeGmContent } from "./config.mjs";
 import { campaignActors, charactersSeenBy, speakerCharacterId } from "./characters.mjs";
 import { messageCompanion } from "./creature-sync.mjs";
@@ -14,22 +15,10 @@ import { localize } from "./sheet-values.mjs";
  */
 
 /**
- * The abilities a check the app is told of may be made with: the six it knows.
- * @type {string[]}
- */
-const SIX_ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
-
-/**
  * The most checks an ask the app is told of offers. A card that asks for more asks nothing of it.
  * @type {number}
  */
 const MOST_CHECKS = 10;
-
-/**
- * A key dnd5e names a skill or tool by, as the app accepts one.
- * @type {RegExp}
- */
-const CHECK_KEY = /^[A-Za-z][\w-]{0,31}$/;
 
 /**
  * A content link as stored, unenriched, such as `@UUID[Actor.abc]{Thorin}`, to reduce to its label.
@@ -151,7 +140,7 @@ export function serializeMessage(message, campaign, audience=chatAudience(messag
     flavor: message.flavor ?? "",
     content,
     text: htmlToText(content, { challenge: challengeShown(message) }),
-    ask: askOf(message),
+    ask: askOf(message, campaign),
     blind: message.blind,
     audience,
     rolls: trimRolls(message, message.rolls.map(summarizeRoll), trim),
@@ -363,14 +352,17 @@ function dcHidden(button) {
 
 /**
  * The check a roll request card asks for, if it asks for one: as dnd5e's buttons for it say, each
- * an ability, skill or tool check dnd5e has, by a key the app accepts, with one of the six
- * abilities, its own or else the skill's or tool's, as dnd5e's request makes it; each check once.
- * Never a name any object answers to, which anyone posting a card could write in. Null for any
- * other card, and for one that offers more checks than the app is told of.
+ * an ability, skill or tool check dnd5e has, by a key the app accepts, with its ability, its own or
+ * else the skill's or tool's, as dnd5e's request makes it; each check once. Never a name any object
+ * answers to, which anyone posting a card could write in: such a button is passed over. Since
+ * 0.52.0 a card is read whole or not at all: one with a check on an ability the game has that the
+ * campaign's app isn't sent checks on (`isAbilitySent`) is null, rather than asking for less. Null
+ * for any other card, and for one that offers more checks than the app is told of.
  * @param {ChatMessage} message
+ * @param {boolean} [anyAbility]   Does the campaign's app read checks on any ability, since 0.52.0?
  * @returns {AskedCheck|null}
  */
-function askedCheck(message) {
+function askedCheck(message, anyAbility=false) {
   const content = message.content;
   if ( (game.system.id !== "dnd5e") || (typeof content !== "string") || !content.includes("rollRequest") ) return null;
   const parsed = new DOMParser().parseFromString(content, "text/html");
@@ -388,7 +380,8 @@ function askedCheck(message) {
     const entry = (type === "skill") ? own(config.skills, key)
       : ((type === "tool") ? (own(config.tools, key) ?? own(config.vehicleTypes, key)) : true);
     const ability = dataset.ability || entry?.ability;
-    if ( !entry || !SIX_ABILITIES.includes(ability) || !Object.hasOwn(config.abilities ?? {}, ability) ) continue;
+    if ( !entry || (typeof ability !== "string") || !Object.hasOwn(config.abilities ?? {}, ability) ) continue;
+    if ( !isAbilitySent(ability, anyAbility) ) return null;
     const id = (type === "check") ? `check:${ability}` : `${type}:${key}`;
     if ( known.has(id) ) continue;
     known.add(id);
@@ -405,13 +398,15 @@ function askedCheck(message) {
  * The save or check a roll request card asks the table for, as the app shows it: the Gamemaster's,
  * posted from a description, or a player's, posted from the app. Its DC only where players may see
  * it, as dnd5e shows it: never one the card keeps from everyone; and for a player's, what asks for
- * it, such as their item. Null for any other message.
+ * it, such as their item. Since 0.52.0 a check on any ability the game has, to a campaign's app
+ * that reads them. Null for any other message.
  * @param {ChatMessage} message
+ * @param {Campaign} campaign   The campaign it's described for.
  * @returns {{type: string, abilities?: string[], checks?: object[], dc?: number, label?: string}|null}
  */
-function askOf(message) {
+function askOf(message, campaign) {
   const save = askedSave(message);
-  const check = save ? null : askedCheck(message);
+  const check = save ? null : askedCheck(message, anyAbilityReader(campaign?.id));
   if ( (save?.source !== "request") && !check ) return null;
   const asked = save ?? check;
   const label = askLabel(message);

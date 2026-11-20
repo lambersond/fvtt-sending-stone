@@ -233,13 +233,61 @@ const checksOf = html => spans(html).map(({ class: c, n, text, ...data }) => [c,
   // A kind of vehicle is a tool, with an ability the author gave it; it has none of its own.
   assert.equal(spans(norm(request('data-type="tool" data-ability="int" data-tool="water"', 'Intelligence (Water Vehicle)')))[0].checks, 'tool:int:water')
   assert.equal(norm(request('data-type="tool" data-tool="water"', 'Water Vehicle')), 'Water Vehicle')
-  // What dnd5e doesn't have, or the app doesn't: a world's own ability, dnd5e 6's "spellcasting",
-  // unknown skills and tools, names any object answers to, and none at all, are dropped, and a link
-  // with nothing left is text; each check is offered once; and more than ten is text.
-  CONFIG.DND5E.abilities.hon = { label: 'Honor', abbreviation: 'hon' }
+  // What dnd5e doesn't have, or the app doesn't: dnd5e 6's "spellcasting", unknown skills and tools,
+  // names any object answers to, and none at all, are dropped, and a link with nothing left is text;
+  // each check is offered once; and more than ten is text. Since 0.52.0 a check on an ability the
+  // game has that the app isn't sent checks on makes its link text, whole or not at all: to an app
+  // before 0.52.0, any past the six. dnd5e's Honor and Sanity, as its settings turn them on (D5
+  // config.mjs DND5E.abilities, both mental), a world's own Luck with no type, one by a key the app
+  // can't take, and a world's own skill on Honor.
+  const added = {
+    hon: { label: 'Honor', abbreviation: 'hon', type: 'mental', fullKey: 'honor' },
+    san: { label: 'Sanity', abbreviation: 'san', type: 'mental', fullKey: 'sanity' },
+    luck: { label: 'Luck', abbreviation: 'lck' },
+    'my.luck': { label: 'Fortune', abbreviation: 'for' },
+  }
+  Object.assign(CONFIG.DND5E.abilities, added)
+  CONFIG.DND5E.skills.eti = { label: 'Etiquette', ability: 'hon' }
   assert.equal(norm(request('data-type="check" data-ability="hon" data-dc="10"', 'DC 10 Honor')), 'DC 10 Honor')
   assert.equal(norm(request('data-type="skill" data-ability="hon" data-skill="per"', 'Honor (Persuasion)')), 'Honor (Persuasion)')
-  delete CONFIG.DND5E.abilities.hon
+  assert.equal(norm(request('data-type="skill" data-ability="hon" data-skill="eti"', 'Honor (Etiquette)')), 'Honor (Etiquette)')
+  assert.equal(norm(request('data-type="check" data-ability="luck"', 'Luck')), 'Luck')
+  assert.equal(norm(request('data-type="check" data-ability="my.luck"', 'Fortune')), 'Fortune')
+  // A choice is text whole, never a Wisdom check alone, as 0.51.0 sent it.
+  assert.deepEqual(spans(norm('<p>Make a DC 12 Wisdom or Honor check.</p>')), [], 'Wisdom or Honor, to an app before 0.52.0')
+  assert.equal(norm(group('data-type="check" data-skill="ins|eti"', 'Insight or Etiquette')), 'Insight or Etiquette')
+  // Saves on any ability the game has are sent to every app, as since 0.17.0.
+  assert.deepEqual(spans(norm('<p>Make a DC 13 Sanity saving throw, then a Wisdom or Sanity saving throw.</p>')).map(({ class: c, ability, dc }) => [c, ability, dc]),
+    [['ss-save roll', 'san', '13'], ['ss-save roll', 'wis|san', undefined]])
+  // To an app that reads them, since 0.52.0: checks on any ability the game has, by a key it takes,
+  // whole: Honor, Etiquette on Honor, Luck, and Wisdom or Honor; never one by a key it can't take,
+  // nor a choice with one.
+  const any = { anyAbility: true }
+  assert.deepEqual(checksOf(norm(request('data-type="check" data-ability="hon" data-dc="10"', 'DC 10 Honor'), any)), [['ss-check roll', '0', 'DC 10 Honor', { checks: 'check:hon', dc: '10' }]])
+  assert.deepEqual(checksOf(norm(request('data-type="skill" data-ability="hon" data-skill="eti"', 'Honor (Etiquette)'), any)), [['ss-check roll', '0', 'Honor (Etiquette)', { checks: 'skill:hon:eti' }]])
+  assert.deepEqual(checksOf(norm(request('data-type="check" data-ability="luck"', 'Luck'), any)), [['ss-check roll', '0', 'Luck', { checks: 'check:luck' }]])
+  assert.deepEqual(spans(norm('<p>Make a DC 12 Wisdom or Honor check.</p>', any)).map(({ checks, dc }) => [checks, dc]), [['check:wis|check:hon', '12']], 'Wisdom or Honor, to an app that reads them')
+  assert.equal(norm(group('data-type="check" data-skill="ins|eti"', 'Insight or Etiquette'), any).includes('data-checks="skill:wis:ins|skill:hon:eti"'), true)
+  assert.equal(norm(request('data-type="check" data-ability="my.luck"', 'Fortune'), any), 'Fortune')
+  assert.equal(norm(group('data-type="check" data-ability="my.luck" data-skill="ath|acr"', 'Athletics or Acrobatics with Fortune'), any), 'Athletics or Acrobatics with Fortune')
+  // Its own copy read back for a command takes any ability the game still has, whole.
+  const readBack = checks => readLink(`<span class="ss-check roll" data-n="0" data-checks="${checks}">x</span>`, 0)
+  assert.deepEqual(readBack('check:hon')?.checks, [{ type: 'check', ability: 'hon' }])
+  assert.deepEqual(readBack('check:wis|check:hon')?.checks, [{ type: 'check', ability: 'wis' }, { type: 'check', ability: 'hon' }])
+  assert.equal(readBack('check:wis|check:my.luck'), null)
+  for (const key of Object.keys(added)) delete CONFIG.DND5E.abilities[key]
+  // Honor turned off again, as dnd5e's settings leave it (D5 deletes DND5E.abilities.hon), with
+  // Etiquette still a world's own skill on it, and its Lore on its Fortune, by a key the app can't
+  // take, gone too: a check on an ability the game hasn't is passed over, as before 0.52.0, and the
+  // rest of the choice sent, to an app before 0.52.0 and to one that reads them alike; never the
+  // whole made text, as one on an ability the game has but the app isn't sent makes it.
+  CONFIG.DND5E.skills.lor = { label: 'Lore', ability: 'my.luck' }
+  for (const [options, app] of [[undefined, 'to an app before 0.52.0'], [any, 'to an app that reads them']]) {
+    assert.deepEqual(checksOf(norm(group('data-type="check" data-skill="ins|eti|lor" data-dc="12"', 'DC 12 Insight, Etiquette or Lore'), options)),
+      [['ss-check roll', '0', 'DC 12 Insight, Etiquette or Lore', { checks: 'skill:wis:ins', dc: '12' }]], `Etiquette and Lore on abilities the game hasn't, ${app}`)
+  }
+  delete CONFIG.DND5E.skills.lor
+  delete CONFIG.DND5E.skills.eti
   assert.equal(norm(request('data-type="check" data-ability="spellcasting" data-dc="10"', 'DC 10 Spellcasting')), 'DC 10 Spellcasting')
   assert.equal(norm(request('data-type="check" data-dc="10"', 'DC 10')), 'DC 10')
   assert.equal(norm(request('data-type="skill" data-ability="str" data-skill="constructor"', 'x')), 'x')
@@ -806,15 +854,18 @@ ok('enriching: effects with their actor\'s roll data, rules pages without links,
   assert.equal(new Set(before).size, before.length)
   assert.ok(before.every(hash => /^[0-9a-f]{14}$/.test(hash)))
   // Not the hash a description had before 0.17.0, nor in 0.17.0's format, 2, 0.18.0's, 3,
-  // 0.19.0's, 4, 0.20.0's, 5, or 0.21.0's, 6, but in 0.22.0's, 7, whose links may have dice with
-  // comparisons, such as 2d6r<=2.
+  // 0.19.0's, 4, 0.20.0's, 5, 0.21.0's, 6, or 0.22.0's, 7, whose links may have dice with
+  // comparisons, such as 2d6r<=2, but in 0.52.0's, 8, whose checks are linked whole or not at all,
+  // with the game's abilities and skills.
   assert.notEqual(hashOf(stored), textHash(`${wand.uuid}\n\n${stored.html}`))
   assert.notEqual(hashOf(stored), textHash(`format:2\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
   assert.notEqual(hashOf(stored), textHash(`format:3\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
   assert.notEqual(hashOf(stored), textHash(`format:4\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
   assert.notEqual(hashOf(stored), textHash(`format:5\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
   assert.notEqual(hashOf(stored), textHash(`format:6\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
-  assert.equal(hashOf(stored), textHash(`format:7\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
+  assert.notEqual(hashOf(stored), textHash(`format:7\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
+  const keys = list => Object.keys(list).sort().join(',')
+  assert.equal(hashOf(stored), textHash(`format:8\nrules:\nlang:en\nabilities:${keys(CONFIG.DND5E.abilities)}\nskills:${keys(CONFIG.DND5E.skills)}\n${wand.uuid}\n\n${stored.html}`))
   const changes = (label, change, undo, expected) => {
     change()
     const after = all.map(hashOf)
@@ -825,6 +876,14 @@ ok('enriching: effects with their actor\'s roll data, rules pages without links,
   //                                                                      fire   stored saving spellDC effect rule
   changes('the rules', () => settings.set('rulesVersion', 'legacy'), () => settings.delete('rulesVersion'), [true, true, true, true, true, true])
   changes('the language', () => { game.i18n.lang = 'de' }, () => { game.i18n.lang = 'en' }, [true, true, true, true, true, true])
+  // Since 0.52.0, whether its checks on any ability are links: never the hash of the six's alone,
+  // and only where they are, so that a character's hashes don't change for an older app.
+  const anyHash = source => new SheetTexts({ anyAbility: true }).add(source)
+  assert.ok(all.every(source => anyHash(source) !== hashOf(source)), 'with checks on any ability, apart')
+  assert.deepEqual(all.map(source => new SheetTexts({ anyAbility: false }).add(source)), before, 'without, as before')
+  // Since 0.52.0: an ability or skill the game turns on or adds, which may make a check a link.
+  changes("the game's abilities", () => { CONFIG.DND5E.abilities.hon = { label: 'Honor' } }, () => { delete CONFIG.DND5E.abilities.hon }, [true, true, true, true, true, true])
+  changes("the game's skills", () => { CONFIG.DND5E.skills.eti = { label: 'Etiquette', ability: 'hon' } }, () => { delete CONFIG.DND5E.skills.eti }, [true, true, true, true, true, true])
   changes('the spell save DC', () => { thorin.system.attributes.spell.dc = 15 }, () => { thorin.system.attributes.spell.dc = 14 }, [true, false, false, true, true, false])
   changes('a modifier', () => { thorin.system.abilities.str.mod = 5 }, () => { thorin.system.abilities.str.mod = 4 }, [true, false, false, false, true, false])
   const wisSave = wand.system.activities.getByType('save')[0]

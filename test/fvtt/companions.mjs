@@ -1439,6 +1439,66 @@ await resetFight()
   ok("an app answering aloneChoices 1 is sent a companion's sheet again with choices and spends, Brakka's potion [uses]; its damage on its own with consume, of: thorin, spends on Brakka's actor; dropped, sent again without them")
 }
 
+// Since module 0.52.0 (item 65): an app that reads checks on any ability the game has is sent every
+// companion's sheet again with them, in answer to a heartbeat: a check activity on Sanity carries
+// its check, and a companion's descriptions are hashed for that app, so that a command reads its
+// links as they were sent. Only here does the stand-in app answer anyAbility; every case above is
+// as before.
+{
+  CONFIG.DND5E.abilities.san = { label: 'Sanity' }
+  brakka.system.abilities.san = foundry.utils.deepClone(brakka.system.abilities.wis)
+  brakka.items.set('brakka-wits', new Item5e(brakka, {
+    id: 'brakka-wits', name: 'Keen Wits', type: 'feat', system: { properties: [], description: { value: '<p>Wits.</p>' } },
+    activities: [{ id: 'bw-check', type: 'check', affects: '', range: 'self', check: { ability: 'san', associated: [], dc: { formula: '12' } } }],
+  }))
+  const witsOf = () => sheetOf('brakka')?.actions?.flatMap(section => section.actions).find(action => action.id === 'brakka-wits')
+  const spirit = arena.tokens.get('spirit1').actor
+  const { characterSheet } = await import(`${MODULE}/scripts/sheet.mjs`)
+  const { SheetTexts } = await import(`${MODULE}/scripts/sheet-texts.mjs`)
+  // The Spirit's claws as one app or the other is sent them, without the Gamemaster's secrets.
+  const clawsFor = anyAbility => {
+    const texts = new SheetTexts({ secrets: false, anyAbility })
+    characterSheet(spirit, texts, { secrets: false, ops: false })
+    return [...texts.sources].find(([, source]) => String(source.html ?? '').includes('Claws'))?.[0]
+  }
+  const sentClaws = () => (JSON.stringify(sheetOf('arena-spirit1')).match(/"text":"([0-9a-f]{14})"/g) ?? []).map(m => m.slice(8, -1))
+  const [anyClaws, sixClaws] = [clawsFor(true), clawsFor(false)]
+  assert.ok(anyClaws && sixClaws && (anyClaws !== sixClaws), 'hashed apart')
+  let from = app.events.length
+  app.features = { commands: true, companions: 1, anyAbility: 1 }
+  clock += 31_000
+  heartbeat()
+  await until(() => sheetsSent(from).some(e => e.data.companion.key === 'brakka'), "Brakka's sheet again")
+  // A sheet is sent only where it changed: the Spirit's, as its descriptions' hashes did.
+  await until(() => sentClaws().includes(anyClaws), "the Spirit's claws hashed as for an app that reads checks on any ability")
+  await settle()
+  // Under dnd5e 6, no check activity is offered at all.
+  assert.deepEqual(witsOf()?.check, DND5E6 ? undefined : { checks: [{ type: 'check', ability: 'san' }], dc: 12, own: true }, `Brakka's Sanity check: ${JSON.stringify(witsOf())}`)
+  assert.ok(!sentClaws().includes(sixClaws), "the Spirit's claws as for an older app no more")
+  const linkSave = text => send({ id: `any-${++ids}`, actorId: 'arena-spirit1', of: 'thorin', kind: 'save', key: 'dex', ...plain, dice: [{ faces: 20, results: [11] }], text, link: 0 })
+  const made = await linkSave(anyClaws)
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  const gone = await linkSave(sixClaws)
+  assert.deepEqual([gone.status, gone.reason], ['failed', 'gone'], 'as an older app is sent it: gone')
+  if (!DND5E6) {
+    const sanity = await send({ id: `any-${++ids}`, actorId: 'brakka', of: 'thorin', kind: 'ability', key: 'san', item: 'brakka-wits', activity: 'bw-check', ...plain, dice: [{ faces: 20, results: [11] }] })
+    assert.equal(sanity.status, 'done', JSON.stringify(sanity))
+  }
+  from = app.events.length
+  app.features = { commands: true, companions: 1 }
+  clock += 31_000
+  heartbeat()
+  await until(() => sheetsSent(from).some(e => e.data.companion.key === 'brakka'), "Brakka's sheet again, without them")
+  await until(() => sentClaws().includes(sixClaws), "the Spirit's claws hashed as before")
+  await settle()
+  assert.ok(witsOf() && (witsOf().check === undefined), 'no check to an app before 0.52.0')
+  assert.ok(!sentClaws().includes(anyClaws), "the Spirit's claws as for an app that reads checks on any ability no more")
+  brakka.items.delete('brakka-wits')
+  delete brakka.system.abilities.san
+  delete CONFIG.DND5E.abilities.san
+  ok(`an app answering anyAbility 1 is sent every companion's sheet again, ${DND5E6 ? '' : "Brakka's check activity on Sanity with its check and rolled, of: thorin, and "}the Spirit's descriptions hashed for it, its claws' save made by that hash and gone by the other; dropped, sent again as before`)
+}
+
 // Round 0.41.0 §2.5.3.2 and §2.6.6: under Midi-QOL's Enforce settings, in a fight, a companion's damage
 // on its own that spends is checked and marked on the companion, as Midi keeps a Bonus Action and a
 // reaction on each actor: its own used refuses it, its character's never does, and the mark is its own.

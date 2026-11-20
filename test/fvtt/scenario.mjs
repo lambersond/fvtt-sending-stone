@@ -258,16 +258,38 @@ assert.deepEqual([sent2.ask, sent2.text], [asAthAcr, 'Strength (Athletics) Dexte
 settings.set('challengeVisibility', 'player')
 ok("a check's roll request card tells the app the checks it asks for, an ability, skill or tool, a tool by dnd5e's name for it, and its DC only where players may see it")
 
-// Only what dnd5e has, by keys the app accepts, with one of the six abilities, its own or the
-// skill's or tool's; each once; and a card that asks for more than ten asks nothing of the app.
+// Only what dnd5e has, by keys the app accepts, its own ability or the skill's or tool's, each
+// passed over one by one where it isn't; each once; and a card that asks for more than ten asks
+// nothing of the app. Changed on purpose (0.52.0, item 65): c8 has no Honor button, Honor being an
+// ability the game has (below), no longer one passed over.
 CONFIG.DND5E.skills['odd.one'] = { label: 'Oddity', ability: 'str' }
 sent2 = await card('c8', { content: checkRequestHtml([{ ability: 'str', skill: 'odd.one' },
-  { ability: 'constructor', skill: 'ath' }, { ability: 'str', skill: 'constructor' }, { type: 'tool', ability: 'dex', tool: 'toString' }, { type: 'check', ability: 'hon' },
+  { ability: 'constructor', skill: 'ath' }, { ability: 'str', skill: 'constructor' }, { type: 'tool', ability: 'dex', tool: 'toString' },
   { type: 'check', ability: 'spellcasting' }, { type: 'tool', tool: 'water' }, { type: 'attack', ability: 'dex' }, { skill: 'acr' }, { ability: 'str', skill: 'ath' }, { ability: 'dex', skill: 'ath' },
 ]) })
 assert.deepEqual(sent2.ask, { type: 'check', checks: [{ type: 'skill', ability: 'dex', skill: 'acr' }, { type: 'skill', ability: 'str', skill: 'ath' }] })
 delete CONFIG.DND5E.skills['odd.one']
+// Since 0.52.0 a card is asked whole or not at all: to an app before 0.52.0, one with a check on an
+// ability the game has past the six, Honor, asks nothing of it, never the rest alone.
 assert.equal((await card('c9', { content: checkRequestHtml([{ type: 'check', ability: 'hon' }, { ability: 'str', skill: 'nope' }]) })).ask, null)
+assert.equal((await card('c13', { content: checkRequestHtml([{ ability: 'str', skill: 'ath' }, { type: 'check', ability: 'hon' }]) })).ask, null)
+// A save on any ability the game has is asked, as since 0.17.0: dnd5e's Sanity too.
+CONFIG.DND5E.abilities.san = { label: 'Sanity' }
+assert.deepEqual((await card('c14', { content: requestHtml([{ ability: 'wis', dc: 13 }, { ability: 'san', dc: 13 }]) })).ask, { type: 'save', abilities: ['wis', 'san'] })
+// To an app that says it reads checks on any ability, since 0.52.0: Honor, a world's own skill on
+// it and a world's own Luck, whole; c9's Honor, its unknown skill passed over; a save as ever.
+const { noteAnyAbilityFormat } = await import(`${MODULE}/scripts/check-abilities.mjs`)
+noteAnyAbilityFormat('camp-a', { anyAbility: 1 })
+CONFIG.DND5E.abilities.luck = { label: 'Luck' }
+CONFIG.DND5E.skills.eti = { label: 'Etiquette', ability: 'hon' }
+sent2 = await card('c15', { content: checkRequestHtml([{ type: 'check', ability: 'hon', dc: 12 }, { ability: 'hon', skill: 'eti', dc: 12 }, { type: 'check', ability: 'luck', dc: 12 }]) })
+assert.deepEqual(sent2.ask, { type: 'check', checks: [{ type: 'check', ability: 'hon' }, { type: 'skill', ability: 'hon', skill: 'eti' }, { type: 'check', ability: 'luck' }] })
+assert.deepEqual((await card('c16', { content: checkRequestHtml([{ type: 'check', ability: 'hon' }, { ability: 'str', skill: 'nope' }]) })).ask, { type: 'check', checks: [{ type: 'check', ability: 'hon' }] })
+assert.deepEqual((await card('c17', { content: requestHtml([{ ability: 'wis', dc: 13 }, { ability: 'san', dc: 13 }]) })).ask, { type: 'save', abilities: ['wis', 'san'] })
+noteAnyAbilityFormat('camp-a', {})
+delete CONFIG.DND5E.abilities.luck
+delete CONFIG.DND5E.skills.eti
+delete CONFIG.DND5E.abilities.san
 const eleven = [...['str', 'dex', 'con', 'int', 'wis', 'cha'].map(ability => ({ type: 'check', ability })),
   ...['ath', 'acr', 'slt', 'prc'].map(skill => ({ skill, ability: CONFIG.DND5E.skills[skill].ability })), { type: 'tool', ability: 'dex', tool: 'thief' }]
 assert.equal((await card('c10', { content: checkRequestHtml(eleven) })).ask, null)
@@ -277,7 +299,7 @@ sent2 = await card('c12', { content: requestHtml([{ ability: 'dex', dc: 15 }]).r
 assert.deepEqual(sent2.ask, { type: 'save', abilities: ['dex'] })
 delete CONFIG.DND5E.abilities.hon
 delete globalThis.dnd5e
-ok("a check's request offers only dnd5e's skills, tools and abilities, each once, and no more than ten; a save's request with it is a save's")
+ok("a check's request offers only dnd5e's skills, tools and abilities, each once, and no more than ten, whole or not at all; a save's request with it is a save's, on any ability the game has")
 
 sent2 = await card('a1', { flavor: '', content: activityHtml('Burning Hands', [saveButton, damageButton]) })
 assert.deepEqual([sent2.ask, sent2.text], [null, 'Burning Hands A thin sheet of flames. Dexterity Saving Throw Damage'])
