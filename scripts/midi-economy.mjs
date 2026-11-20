@@ -104,8 +104,9 @@ export function midiReactionUsed(actor) {
 export async function markMidiBonusAction(actor, fight = null) {
   const MidiQOL = globalThis.MidiQOL;
   if ( (typeof MidiQOL?.setBonusActionUsed !== "function") || (MidiQOL.hasUsedBonusAction?.(actor) === true) ) return;
+  const before = midiUsedCount(actor, "bonus");
   await MidiQOL.setBonusActionUsed(actor);
-  noteUnseenMark(actor, fight, "bonus");
+  noteUnseenMark(actor, fight, "bonus", before);
 }
 
 /**
@@ -117,25 +118,42 @@ export async function markMidiBonusAction(actor, fight = null) {
 export async function markMidiReaction(actor, fight = null) {
   const MidiQOL = globalThis.MidiQOL;
   if ( (typeof MidiQOL?.setReactionUsed !== "function") || (MidiQOL.hasUsedReaction?.(actor) === true) ) return;
+  const before = midiUsedCount(actor, "reaction");
   await MidiQOL.setReactionUsed(actor);
-  noteUnseenMark(actor, fight, "reaction");
+  noteUnseenMark(actor, fight, "reaction", before);
+}
+
+/**
+ * How many Bonus Actions or reactions Midi-QOL counts this actor as having used, since 0.53.0: the
+ * count its marker writes (`flags.midi-qol.actions`), which its own `hasUsedBonusAction` and
+ * `hasUsedReaction` read against the most it allows the actor a round; 0 where it writes none.
+ * @param {Actor} actor
+ * @param {"bonus"|"reaction"} kind
+ * @returns {number}
+ */
+function midiUsedCount(actor, kind) {
+  const actions = actor?.flags?.["midi-qol"]?.actions;
+  const count = Number((kind === "bonus") ? actions?.bonusActionsUsed : actions?.reactionsUsed);
+  return Number.isFinite(count) ? count : 0;
 }
 
 /**
  * Note, since 0.53.0, a mark just written on a creature fighting in an encounter the Gamemaster
  * doesn't have up, for its take-off at the creature's next turn there: only where it has a combatant
- * there and Midi now reads the mark, as it doesn't under a setting it never marks under. The latest
- * encounter wins; a second mark in the same one joins the first.
+ * there and Midi wrote the mark, as it doesn't under a setting it never marks under: Midi now reads
+ * the action used, or counts one more used than before, as for a creature it allows more than one a
+ * round. The latest encounter wins; a second mark in the same one joins the first.
  * @param {Actor} actor
  * @param {{combat: Combat, combatant: Combatant|null}|null} fight
  * @param {"bonus"|"reaction"} kind
+ * @param {number} before   Midi's count of that kind used before the mark (`midiUsedCount`).
  * @returns {void}
  */
-function noteUnseenMark(actor, fight, kind) {
+function noteUnseenMark(actor, fight, kind, before) {
   if ( !fight?.combatant || (fight.combat === game.combat) ) return;
   const MidiQOL = globalThis.MidiQOL;
-  const marked = (kind === "bonus") ? MidiQOL?.hasUsedBonusAction?.(actor) : MidiQOL?.hasUsedReaction?.(actor);
-  if ( marked !== true ) return;
+  const used = (kind === "bonus") ? MidiQOL?.hasUsedBonusAction?.(actor) : MidiQOL?.hasUsedReaction?.(actor);
+  if ( (used !== true) && !(midiUsedCount(actor, kind) > before) ) return;
   const entry = unseenMarks.get(actor.uuid);
   const same = (entry?.combatId === fight.combat.id) && (entry?.combatantId === fight.combatant.id);
   unseenMarks.set(actor.uuid, {
