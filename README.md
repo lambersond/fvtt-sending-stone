@@ -941,10 +941,11 @@ description's damage or roll aren't offered yet.
   check alone. The module has sent saving throws on any ability as links since 0.17.0; the app shows
   those past the six from v0.52.0.
 
-Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0, 0.22.0 and 0.52.0 each send every description again
-once, in its new form; since 0.52.0 so does a world that turns an ability or skill on, such as
-Honor, after its reload. Since 0.20.0 a description with damage links is also sent again when the
-damage it shows changes, as with Rage.
+Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0, 0.22.0, 0.52.0 and 0.53.0 each send every
+description again once, in its new form; since 0.52.0 so does a world that turns an ability or skill
+on, such as Honor, and since 0.53.0 one that gains or loses a tool, a kind of vehicle, or a damage
+or healing type, each after its reload. Since 0.20.0 a description with damage links is also sent
+again when the damage it shows changes, as with Rage.
 
 ### The listener must allow cross-origin requests
 

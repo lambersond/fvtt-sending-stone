@@ -797,9 +797,12 @@ and for an item with an attack, since module 0.19.0, whether the character's cri
 melee weapon throw extra dice, as Savage Attacks gives; and since module 0.20.0, its activities'
 damage as dnd5e resolves it, in each of the item's attack modes, so with the character's bonuses to
 damage, such as Rage's, and the scale values they name, and what a critical hit adds to it, such as
-an attack's critical damage. So it gets a new hash when any of them changes. Modules 0.17.0 to
-0.22.0, 0.52.0 and 0.53.0 each send descriptions in a new format, so each gets a new hash, and is
-sent again once, with its next hello.
+an attack's critical damage. So it gets a new hash when any of them changes, with one known limit:
+of the game's abilities, skills, tools, kinds of vehicle, and damage and healing types, the hash
+holds which the game has, never what each is called, so a module that renames an ability, skill or
+damage type in place can change which plain English text is a link, and the numbers of the links
+after it, under the same hash. Modules 0.17.0 to 0.22.0, 0.52.0 and 0.53.0 each send descriptions in
+a new format, so each gets a new hash, and is sent again once, with its next hello.
 
 #### Links in descriptions
 
