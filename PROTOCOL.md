@@ -782,27 +782,28 @@ it are relative to the game's address, like `img`. It is not sanitised: treat it
 sanitise it before showing it. A description longer than 100,000 characters is cut short, short of
 any tag the cut would split.
 
-The same hash always names the same description, its links numbered the same. Its hash is of
-everything what's sent depends on: the format descriptions are sent in, the rules the world is
-played by and the game's language, and since module 0.52.0 the game's abilities and skills and
-whether its listener answers `"anyAbility": 1`, and since module 0.53.0 the game's tools and kinds
-of vehicle, and its damage and healing types, where it comes from and its HTML, and what it shows
-of the character's numbers. A description with rolls in it shows the character's level, proficiency,
-ability modifiers and spell save DC; one that says "spell save DC", that DC; one that names a
-saving throw, the abilities and DCs of its item's saving throws, which a saving throw without a DC
-of its own takes; one that names a check, or has dnd5e's skill or tool links, the abilities, skills,
-tools and DCs of its item's checks, which dnd5e's `[[/check]]` shows and a check without a DC of its
-own takes (since module 0.18.0); and one with dnd5e's damage or healing links, its item's damage,
-and for an item with an attack, since module 0.19.0, whether the character's critical hits with a
-melee weapon throw extra dice, as Savage Attacks gives; and since module 0.20.0, its activities'
-damage as dnd5e resolves it, in each of the item's attack modes, so with the character's bonuses to
-damage, such as Rage's, and the scale values they name, and what a critical hit adds to it, such as
-an attack's critical damage. So it gets a new hash when any of them changes, with one known limit:
-of the game's abilities, skills, tools, kinds of vehicle, and damage and healing types, the hash
-holds which the game has, never what each is called, so a module that renames an ability, skill or
-damage type in place can change which plain English text is a link, and the numbers of the links
-after it, under the same hash. Modules 0.17.0 to 0.22.0, 0.52.0 and 0.53.0 each send descriptions in
-a new format, so each gets a new hash, and is sent again once, with its next hello.
+But for one known limit, below, the same hash always names the same description, its links numbered
+the same. Its hash is of everything what's sent depends on: the format descriptions are sent in, the
+rules the world is played by and the game's language, and since module 0.52.0 the game's abilities
+and skills and whether its listener answers `"anyAbility": 1`, and since module 0.53.0 the game's
+tools and kinds of vehicle, and its damage and healing types, where it comes from and its HTML, and
+what it shows of the character's numbers. A description with rolls in it shows the character's
+level, proficiency, ability modifiers and spell save DC; one that says "spell save DC", that DC; one
+that names a saving throw, the abilities and DCs of its item's saving throws, which a saving throw
+without a DC of its own takes; one that names a check, or has dnd5e's skill or tool links, the
+abilities, skills, tools and DCs of its item's checks, which dnd5e's `[[/check]]` shows and a check
+without a DC of its own takes (since module 0.18.0); and one with dnd5e's damage or healing links,
+its item's damage, and for an item with an attack, since module 0.19.0, whether the character's
+critical hits with a melee weapon throw extra dice, as Savage Attacks gives; and since module
+0.20.0, its activities' damage as dnd5e resolves it, in each of the item's attack modes, so with the
+character's bonuses to damage, such as Rage's, and the scale values they name, and what a critical
+hit adds to it, such as an attack's critical damage. So it gets a new hash when any of them changes,
+with one known limit: of the game's abilities, skills, tools, kinds of vehicle, and damage and
+healing types, the hash holds which the game has, never what each is called, so a module that
+renames an ability, skill or damage type in place can change which plain English text is a link, and
+the numbers of the links after it, under the same hash. Modules 0.17.0 to 0.22.0, 0.52.0 and 0.53.0
+each send descriptions in a new format, so each gets a new hash, and is sent again once, with its
+next hello.
 
 #### Links in descriptions
 
