@@ -2654,9 +2654,11 @@ An ask:
   already named abilities beyond dnd5e's six, as under Polymorph: a listener that knows only the
   six drops an id it doesn't know, as it did there.
 - Module 0.53.0 refuses a `prepare` ([Preparing spells](#preparing-spells)) that also names
-  `rerolls`, `enchantment` or `hitPoints`, `"invalid"`, `error` `"prepare"`, as it refuses every
-  other kind's field beside it; a module before prepared the spell and ignored them. A listener's
-  own checks should refuse such a request first, as the app's do, so none needs to change.
+  `rerolls`, `enchantment` or `hitPoints`, `"invalid"`, `error` `"prepare"`, as it refuses the other
+  fields that section lists; a module before prepared the spell and ignored them. A field that
+  section doesn't list, such as a roll's `use` or a dice answer's `diceAsk`, is still let by and
+  ignored. A listener's own checks should refuse such a request first, as the app's do, so none
+  needs to change.
 - Module 0.53.0 writes coins moved and a party's coin distributed ([moving items and
   coins](#moving-items-and-coins)), their put backs too, as coins taken away are written: a dnd5e 6
   fraction stays as it's written, 10.7 gp less 7 leaving 3.7 where floating point alone left
@@ -3631,9 +3633,9 @@ written, as both ends now are, in this order, and each check of every part befor
 **What moves.** Coins first, each only the coins moved, from what each actor stores: taken from
 `from` in one update, then added to `to` in another, a coin it has no key for starting at none, so a
 dnd5e 6 fraction stays (10.5 gp less 10 leaves 0.5); since module 0.53.0 it stays as it's written,
-the put back's too, as [coins taken away](#coins-added-and-taken-away) do: 10.7 gp less 7 leaves 3.7,
-never the 3.6999999999999993 floating point alone makes of it. Never dnd5e's Award, which caps what
-it moves without saying so and writes the giver last from what it read first. Then each item in
+the put back's too, as [coins taken away](#coins-added-and-taken-away) do: 10.7 gp less 7 leaves
+3.7, never the 3.6999999999999993 floating point alone makes of it. Never dnd5e's Award, which caps
+what it moves without saying so and writes the giver last from what it read first. Then each item in
 order. Part of a stack, fewer than `from` holds: `from`'s stack keeps the rest under its id, taken
 first, then a copy of the part is made on `to`, at the top of its inventory, wherever it was. All of
 it: a copy made first, as dnd5e's own `createWithContents` makes it, a container with everything in
@@ -5120,17 +5122,16 @@ mode named, or its only mode where none is, with no ammunition and not returning
 for a character in [Wild Shape](#wild-shape) the character, is in a combat (since module 0.53.0 the
 encounter the Gamemaster has up, or else one that has begun and is its scene's chosen one, on any
 scene; a mark written in one they didn't have up is taken off at the creature's next turn there), a
-Bonus Action is refused
-`"bonus-action"` and a reaction `"reaction"` where Midi's Enforce setting applies to the actor
-(`"all"`, or its type) and one is used; then the checks of the dice as before; then, with `consume`,
-what using it would spend is worked out as dnd5e's use works it out, never the action itself, a
-spell slot where casting it spends one, a target spent only in a fight left out of one, and refused
-`"consume"`, with dnd5e's own message in `error`, where something isn't there to spend; since module
-0.44.0, a dice cost thrown for that, and for its working out again as it's spent, is Foundry's
-computer dice, never the Gamemaster's Manual Dice nor a player's ask. Under Midi-QOL, with a mode
-named, the damage is rolled on a copy whose damage configuration is dnd5e's own followed by Midi's
-damage roll modifiers, as Midi adds them, so that the mode holds and Midi's modifiers still apply;
-the activity itself is never changed.
+Bonus Action is refused `"bonus-action"` and a reaction `"reaction"` where Midi's Enforce setting
+applies to the actor (`"all"`, or its type) and one is used; then the checks of the dice as before;
+then, with `consume`, what using it would spend is worked out as dnd5e's use works it out, never the
+action itself, a spell slot where casting it spends one, a target spent only in a fight left out of
+one, and refused `"consume"`, with dnd5e's own message in `error`, where something isn't there to
+spend; since module 0.44.0, a dice cost thrown for that, and for its working out again as it's
+spent, is Foundry's computer dice, never the Gamemaster's Manual Dice nor a player's ask. Under
+Midi-QOL, with a mode named, the damage is rolled on a copy whose damage configuration is dnd5e's
+own followed by Midi's damage roll modifiers, as Midi adds them, so that the mode holds and Midi's
+modifiers still apply; the activity itself is never changed.
 
 The card's flavor is dnd5e's own, `{item} - {damage flavor}`, followed by ` · ` and the slot's level
 as dnd5e names it (`"2nd Level"`), where a slot is named; the mode as dnd5e names it (`"Two-Handed"`,
@@ -5465,15 +5466,14 @@ character is now (`"incapacitated"`); a use left, on that actor (`"consume"`); a
 it's in is in a combat (since module 0.53.0 the encounter the Gamemaster has up, or else one that
 has begun and is its scene's chosen one, on any scene; a mark written in one they didn't have up is
 taken off at the creature's next turn there), the Bonus Action Wild Shape takes not used yet on that
-actor, where Midi's
-Enforce bonus actions applies to it (`"all"`, or its type) (`"bonus-action"`). For `revert`: none
-shaped is `"done"` with `form` `null`; a form the module doesn't time, `"transformed"`; and since
-module 0.41.0, as for a change, the form's Bonus Action not used yet (`"bonus-action"`). For `learn`:
-from the campaign's compendiums, else `"form"`; its entry there, else `"gone"`; fitting the druid
-now, else `"form"`; known already is `"done"` with nothing written; then for an empty place none left
-(`"full"`), and for a replacement a known form (`"form"`), not the one the character is now
-(`"shaped"`), and the replacement after a Long Rest not spent (`"swap"`). `forms` reads only the
-compendiums' indexes and writes nothing.
+actor, where Midi's Enforce bonus actions applies to it (`"all"`, or its type) (`"bonus-action"`).
+For `revert`: none shaped is `"done"` with `form` `null`; a form the module doesn't time,
+`"transformed"`; and since module 0.41.0, as for a change, the form's Bonus Action not used yet
+(`"bonus-action"`). For `learn`: from the campaign's compendiums, else `"form"`; its entry there,
+else `"gone"`; fitting the druid now, else `"form"`; known already is `"done"` with nothing written;
+then for an empty place none left (`"full"`), and for a replacement a known form (`"form"`), not the
+one the character is now (`"shaped"`), and the replacement after a Long Rest not spent (`"swap"`).
+`forms` reads only the compendiums' indexes and writes nothing.
 
 **A change.** Shaped already, the character's current form is returned first, as one command. One
 use of Wild Shape is spent on the character's own feature, never through its activity, whose
