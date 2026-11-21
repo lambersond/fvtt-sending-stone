@@ -518,6 +518,87 @@ assert.deepEqual(prompts.splice(0), [], "the self-tests never ask the Gamemaster
     }
     assert.deepEqual([await rolled(), await rolled({ config: {} }), costAsked()], [4, 4, ['0 + 1d4', '0 + 1d4']], 'a cost rolled with no configuration, or one that says nothing of creating')
     ok("a reaction's cost rolled with no configuration, or with one that doesn't say it creates nothing: asked as before")
+
+    // Since module 0.53.0, Midi-QOL's check of what a use would spend, worked out and thrown away
+    // before it spends, wherever Midi makes it: Foundry's computer dice, the cost itself asked of
+    // the Gamemaster once. The charm's Zap spends 1d4 of its charges, an action's: no reaction looked
+    // for, and no run's check. What the charm and Frost Brand spend here is put back after case 14,
+    // since what follows reads their totals.
+    const SHAPE = { resources: true, spellSlot: false, action: false }
+    const zap = () => thorin.items.get('charm').system.activities.get('charm-zap')
+    const gmUse = { midiOptions: { workflowOptions: { autoRollAttack: true, fastForwardAttack: true, autoRollDamage: 'always', fastForwardDamage: true, forceCompletion: true } } }
+    const was = { charm: usesOf('charm'), brand: usesOf('frost-brand'), targets: [...(game.user.targets ?? [])].map(token => token.id) }
+
+    // 10. A Gamemaster's use in Foundry, where Midi spends what it uses without its dialog: its check
+    // of the use, from the use's own configuration, which carries its workflow, never asked.
+    midi.settings.gmConsumeResource = 'both'
+    canvas.tokens.setTargets([])
+    prompts.splice(0)
+    let charmBefore = usesOf('charm')
+    let made = midi.made.length
+    await zap().use(gmUse, { configure: false }, { create: true })
+    const zapped = midi.made[made]
+    await until(() => zapped.aborted || (zapped.currentAction === zapped.WorkflowState_Completed), "the Gamemaster's Zap workflow")
+    assert.deepEqual([midi.consumeChecks.at(-1), costAsked(), usesOf('charm') - charmBefore], ['charm-zap', ['0 + 1d4'], 4], "the Gamemaster's own use, Midi spending without its dialog")
+    ok("Midi-QOL's check of a Gamemaster's own use in Foundry, where it spends without its dialog: Foundry's computer dice; the cost itself asked of them once, and spent")
+
+    // 11. A reaction taken, Midi spending without its dialog: its check never asked, its cost once.
+    midi.reactions.set('tok-goblin', 'hide-spikes')
+    spent = [spentOf('hide'), spentOf('wand')]
+    await gmAttack()
+    assert.deepEqual([costAsked(), spentOf('hide') - spent[0], spentOf('wand') - spent[1]], [['0 + 1d4'], 4, 0], 'a reaction taken, Midi spending without its dialog')
+    ok("a reaction taken where Midi spends without its dialog: Midi's check of it Foundry's computer dice, its own cost asked of the Gamemaster once, and spent")
+
+    // 12. The other activity Midi pairs with an attack, as Midi checks it before spending it: worked
+    // out with a configuration that spends resources alone, never asked; then spent, asked once, and
+    // no mark left on the configuration.
+    canvas.tokens.setTargets([])
+    const paired = zap()._prepareUsageConfig({ consume: SHAPE })
+    await zap()._prepareUsageUpdates(paired, { returnErrors: true })
+    assert.deepEqual(costAsked(), [], "Midi's check of another activity")
+    charmBefore = usesOf('charm')
+    await zap().consume(paired, { data: {} })
+    assert.deepEqual([costAsked(), usesOf('charm') - charmBefore, 'sendingStoneBegun' in paired], [['0 + 1d4'], 4, false], 'the other activity spent')
+    ok("Midi-QOL's check of another activity, with a configuration that spends resources alone: Foundry's computer dice; the spending of it asked once, spent, no mark left")
+
+    // 13. Still asked: dnd5e's own spending of a configuration carrying one of Midi's workflows; a
+    // configuration with a workflow that isn't Midi's; one that lists the resources it spends; and
+    // one that would spend a spell slot, or the action, too.
+    charmBefore = usesOf('charm')
+    const carrying = zap()._prepareUsageConfig({ workflow: Object.create(MidiQOL.Workflow.prototype) })
+    await zap().consume(carrying, { data: {} })
+    assert.deepEqual([costAsked(), usesOf('charm') - charmBefore], [['0 + 1d4'], 4], "dnd5e's own spending of a configuration carrying Midi's workflow")
+    await lookup(zap(), { workflow: {} })
+    assert.deepEqual(costAsked(), ['0 + 1d4'], "a configuration whose workflow isn't Midi's")
+    await lookup(zap(), { consume: { resources: [0], spellSlot: false, action: false } })
+    assert.deepEqual(costAsked(), ['0 + 1d4'], 'a configuration that lists the resources it spends')
+    await lookup(zap(), { consume: { ...SHAPE, spellSlot: true } })
+    assert.deepEqual(costAsked(), ['0 + 1d4'], 'a configuration that spends a spell slot too')
+    await lookup(zap(), { consume: { ...SHAPE, action: true } })
+    assert.deepEqual(costAsked(), ['0 + 1d4'], 'a configuration that spends the action too')
+    midi.settings.gmConsumeResource = 'none'
+    ok("still asked as before: dnd5e's own spending of a configuration carrying Midi's workflow, once; a check whose workflow isn't Midi's, one that lists what it spends, one that spends a spell slot too, one that spends the action too")
+
+    // 14. An attack from the app whose player doesn't type their dice: Midi's check of Frost Brand's
+    // Rime before it spends it, in that workflow, never asked; its cost asked once.
+    const consumed = midi.otherConsumed.filter(id => id === 'frost-burst').length
+    const consumedAll = midi.otherConsumed.length
+    const untyped = await make({ actorId: 'thorin', mode: 0, explicit: false, extras: [], typed: false, id: 'atk-untyped-brand', kind: 'attack', item: 'frost-brand', activity: 'frost-attack', target: { combatId: 'fight', combatantId: 'cb-gob' }, dice: [{ faces: 20, results: [17] }] })
+    assert.equal(untyped.status, 'done', JSON.stringify(untyped))
+    const untypedDealt = await make({ actorId: 'thorin', mode: 0, explicit: false, extras: [], typed: false, id: 'dmg-untyped-brand', kind: 'damage', use: untyped.id, dice: [{ faces: 8, results: [5] }] })
+    assert.equal(untypedDealt.status, 'done', JSON.stringify(untypedDealt))
+    await until(() => midi.otherConsumed.filter(id => id === 'frost-burst').length > consumed, "Rime spent in the untyped attack's workflow")
+    await until(() => workflowOf(untyped.id)?.otherDamageRolls?.length, "the untyped attack's deferred damage")
+    assert.deepEqual(costAsked(), ['0 + 1d4'], "an untyped attack from the app: Rime's cost")
+    ok("an attack from the app whose player doesn't type their dice: Midi's check of the other activity it pairs with it Foundry's computer dice; its cost asked of the Gamemaster once")
+
+    // Put back what the run section reads whole: the charm's and Frost Brand's charges, and the list
+    // of other activities Midi spent.
+    await thorin.updateEmbeddedDocuments('Item', [{ _id: 'charm', 'system.uses.spent': was.charm }, { _id: 'frost-brand', 'system.uses.spent': was.brand }])
+    assert.deepEqual([usesOf('charm'), usesOf('frost-brand')], [was.charm, was.brand], 'the charm and Frost Brand put back')
+    midi.otherConsumed.splice(consumedAll)
+    canvas.tokens.setTargets(was.targets)
+    prompts.splice(0)
     midi.settings.gmDoReactions = 'none'
   } else {
     // 7. Without Midi-QOL nothing looks for reactions so: the same check is rolled as it was.
@@ -531,6 +612,19 @@ assert.deepEqual(prompts.splice(0), [], "the self-tests never ask the Gamemaster
     game.modules.delete('midi-qol')
     assert.deepEqual(costAsked(), ['0 + 1d4'], 'with Midi-QOL installed but not active')
     ok("with Midi-QOL installed but not active, the same check: asked as before")
+
+    // 7c. Since module 0.53.0: without Midi-QOL, a check with a configuration that spends resources
+    // alone, as Midi words its check of another activity, is no check of Midi's: asked as before;
+    // and so it is with Midi-QOL installed but not active. (A look spends nothing.)
+    const zap = thorin.items.get('charm').system.activities.get('charm-zap')
+    const shape = { resources: true, spellSlot: false, action: false }
+    await lookup(zap, { consume: shape })
+    assert.deepEqual(costAsked(), ['0 + 1d4'], "without Midi-QOL, Midi's words for another activity")
+    game.modules.set('midi-qol', { id: 'midi-qol', title: 'Midi-QOL', active: false })
+    await lookup(zap, { consume: shape })
+    game.modules.delete('midi-qol')
+    assert.deepEqual(costAsked(), ['0 + 1d4'], "with Midi-QOL installed but not active, Midi's words for another activity")
+    ok("without Midi-QOL, or with it installed but not active, a check that spends resources alone: asked as before")
   }
 }
 
@@ -1659,7 +1753,7 @@ await until(() => gmBrand?.aborted || (gmBrand?.currentAction === gmBrand?.Workf
 await pass(3000)
 assert.deepEqual([asked().length - count, midi.otherConsumed.filter(id => id === 'frost-burst').length], [0, 2],
   "the Gamemaster's own Frost Brand: its deferred Rime spent in their own workflow, never asked")
-assert.deepEqual(checks().filter(formula => formula === '0 + 1d4'), ['0 + 1d4', '0 + 1d4'], "Midi's check of the cost and the cost itself, both the Gamemaster's manual dice")
+assert.deepEqual(checks().filter(formula => formula === '0 + 1d4'), ['0 + 1d4'], "Midi's check of the cost on the computer's dice, the cost itself the Gamemaster's manual dice")
 spentBefore = usesOf('frost-brand')
 dealt = await damage(held.id, [{ faces: 8, results: [5] }])
 const heldCost = await nextAsk(count)

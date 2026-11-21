@@ -855,8 +855,9 @@ ok('enriching: effects with their actor\'s roll data, rules pages without links,
   assert.ok(before.every(hash => /^[0-9a-f]{14}$/.test(hash)))
   // Not the hash a description had before 0.17.0, nor in 0.17.0's format, 2, 0.18.0's, 3,
   // 0.19.0's, 4, 0.20.0's, 5, 0.21.0's, 6, or 0.22.0's, 7, whose links may have dice with
-  // comparisons, such as 2d6r<=2, but in 0.52.0's, 8, whose checks are linked whole or not at all,
-  // with the game's abilities and skills.
+  // comparisons, such as 2d6r<=2, or in 0.52.0's, 8, whose checks are linked whole or not at all,
+  // with the game's abilities and skills, but in 0.53.0's, 9, with the game's tools and kinds of
+  // vehicle too, and its damage and healing types.
   assert.notEqual(hashOf(stored), textHash(`${wand.uuid}\n\n${stored.html}`))
   assert.notEqual(hashOf(stored), textHash(`format:2\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
   assert.notEqual(hashOf(stored), textHash(`format:3\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
@@ -865,7 +866,11 @@ ok('enriching: effects with their actor\'s roll data, rules pages without links,
   assert.notEqual(hashOf(stored), textHash(`format:6\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
   assert.notEqual(hashOf(stored), textHash(`format:7\nrules:\nlang:en\n${wand.uuid}\n\n${stored.html}`))
   const keys = list => Object.keys(list).sort().join(',')
-  assert.equal(hashOf(stored), textHash(`format:8\nrules:\nlang:en\nabilities:${keys(CONFIG.DND5E.abilities)}\nskills:${keys(CONFIG.DND5E.skills)}\n${wand.uuid}\n\n${stored.html}`))
+  const format8 = `format:8\nrules:\nlang:en\nabilities:${keys(CONFIG.DND5E.abilities)}\nskills:${keys(CONFIG.DND5E.skills)}`
+  assert.notEqual(hashOf(stored), textHash(`${format8}\n${wand.uuid}\n\n${stored.html}`))
+  const tools = keys({ ...CONFIG.DND5E.tools, ...CONFIG.DND5E.vehicleTypes })
+  const damage = keys({ ...CONFIG.DND5E.damageTypes, ...CONFIG.DND5E.healingTypes })
+  assert.equal(hashOf(stored), textHash(`format:9\nrules:\nlang:en\nabilities:${keys(CONFIG.DND5E.abilities)}\nskills:${keys(CONFIG.DND5E.skills)}\ntools:${tools}\ndamage:${damage}\n${wand.uuid}\n\n${stored.html}`))
   const changes = (label, change, undo, expected) => {
     change()
     const after = all.map(hashOf)
@@ -884,6 +889,13 @@ ok('enriching: effects with their actor\'s roll data, rules pages without links,
   // Since 0.52.0: an ability or skill the game turns on or adds, which may make a check a link.
   changes("the game's abilities", () => { CONFIG.DND5E.abilities.hon = { label: 'Honor' } }, () => { delete CONFIG.DND5E.abilities.hon }, [true, true, true, true, true, true])
   changes("the game's skills", () => { CONFIG.DND5E.skills.eti = { label: 'Etiquette', ability: 'hon' } }, () => { delete CONFIG.DND5E.skills.eti }, [true, true, true, true, true, true])
+  // Since 0.53.0: a tool or a kind of vehicle the game adds, which may make a tool check a link; and
+  // a damage or healing type, which may make plain English damage a link, or change a damage link's
+  // types.
+  changes("the game's tools", () => { CONFIG.DND5E.tools.lute = { ability: 'cha' } }, () => { delete CONFIG.DND5E.tools.lute }, [true, true, true, true, true, true])
+  changes("the game's kinds of vehicle", () => { CONFIG.DND5E.vehicleTypes.air = 'Airship' }, () => { delete CONFIG.DND5E.vehicleTypes.air }, [true, true, true, true, true, true])
+  changes("the game's damage types", () => { CONFIG.DND5E.damageTypes.psionic = { label: 'Psionic' } }, () => { delete CONFIG.DND5E.damageTypes.psionic }, [true, true, true, true, true, true])
+  changes("the game's healing types", () => { CONFIG.DND5E.healingTypes.vigor = { label: 'Vigor' } }, () => { delete CONFIG.DND5E.healingTypes.vigor }, [true, true, true, true, true, true])
   changes('the spell save DC', () => { thorin.system.attributes.spell.dc = 15 }, () => { thorin.system.attributes.spell.dc = 14 }, [true, false, false, true, true, false])
   changes('a modifier', () => { thorin.system.abilities.str.mod = 5 }, () => { thorin.system.abilities.str.mod = 4 }, [true, false, false, false, true, false])
   const wisSave = wand.system.activities.getByType('save')[0]
@@ -976,7 +988,7 @@ ok('enriching: effects with their actor\'s roll data, rules pages without links,
   assert.notEqual(hashOf(onItem), onItemHash)
   thorin.system.details.level = 5
 }
-ok('the hash changes with the format, rules, language, spell save DC, modifiers and save and check activities a text shows, and only those; effects find their actor')
+ok("the hash changes with the format, rules, language, the game's abilities, skills, tools, kinds of vehicle, damage and healing types, spell save DC, modifiers and save and check activities a text shows, and only those; effects find their actor")
 
 // ---- finding a link, as a command does ----
 {

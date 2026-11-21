@@ -2120,6 +2120,160 @@ if (MIDI) {
     midi.settings.requiresTargets = required
     await game.settings.set('sending-stone', 'offCanvasTargets', false)
   }
+
+  // 14b. Since module 0.53.0, Midi-QOL's Bonus Actions and reactions in an encounter the Gamemaster
+  // doesn't have up: the den's brawl, begun and its scene's chosen one, while they view the arena's
+  // fight, which the Wolf isn't in. Its Howl (a Bonus Action) and its Bite at the goblin (out of its
+  // turn, an opportunity attack where Midi records them) are checked there as in the encounter up,
+  // marked by the module, and the mark taken off at the Wolf's next turn there, never before.
+  {
+    const wolfId = denWolf.actor.id
+    const cbWolf = brawl.combatants.get('cb-db-wolf')
+    const cbGob = brawl.combatants.get('cb-db-gob')
+    const was = {
+      settings: { ...midi.settings }, initiatives: [cbWolf.initiative, cbGob.initiative], round: brawl.round, turn: brawl.turn, active: brawl.active,
+    }
+    const failedAs = (made, reason, what) => assert.deepEqual([made.status, made.reason], ['failed', reason], `${what}: ${JSON.stringify(made)}`)
+    const doneAs = (made, what) => assert.equal(made.status, 'done', `${what}: ${JSON.stringify(made)}`)
+    game.combat = fight
+    cbGob.initiative = 20
+    cbWolf.initiative = 10
+    brawl.round = 1
+    brawl.turn = 0
+    Object.assign(midi.settings, { requiresTargets: 'none', enforceBonusActions: 'all', enforceReactions: 'all', recordAOO: 'all' })
+    await game.settings.set('sending-stone', 'offCanvasTargets', true)
+    try {
+      assert.equal(denWolf.actor.inCombat, false, "the Wolf not in the fight the Gamemaster has up, by core's reading")
+      // 1. Its Bonus Action used: Howl refused, no workflow made.
+      midi.usedBonus.add(wolfId)
+      let made = midi.made.length
+      failedAs(await howlAt(), 'bonus-action', 'its Bonus Action used')
+      assert.equal(midi.made.length, made, 'no workflow')
+      // 2. Unused: a Howl that never has its card, as one a module's dnd5e.preUseActivity stops, fails
+      // "midi" and marks nothing; one made is marked by the module, as Midi would mark it in the
+      // encounter up.
+      midi.usedBonus.delete(wolfId)
+      let marks = midi.bonusMarks.length
+      Hooks.once('dnd5e.preUseActivity', () => false)
+      failedAs(await howlAt(), 'midi', 'stopped before its card')
+      assert.deepEqual([midi.bonusMarks.slice(marks), midi.usedBonus.has(wolfId)], [[], false], 'no card: nothing marked')
+      doneAs(await howlAt(), 'its Bonus Action unused')
+      assert.deepEqual(midi.bonusMarks.slice(marks), [wolfId], 'marked once')
+      // 3. A new round, the goblin's turn: the mark stays, and Howl again is refused.
+      const removals = midi.bonusRemovals.length
+      await brawl.setTurn(2, 0)
+      assert.deepEqual(midi.bonusRemovals.slice(removals), [], "the goblin's turn takes nothing off")
+      failedAs(await howlAt(), 'bonus-action', 'marked: Howl again')
+      // 4. Two Howls sent together: the first made and marked, the second refused, one after the other.
+      midi.usedBonus.delete(wolfId)
+      const both = await sendAll([
+        use({ actorId: 'den-wolf9', of: 'thorin', item: 'howl', activity: 'howl-use', self: true }),
+        use({ actorId: 'den-wolf9', of: 'thorin', item: 'howl', activity: 'howl-use', self: true }),
+      ], 'camp-w')
+      assert.deepEqual(both.map(each => [each.status, each.reason]), [['done', null], ['failed', 'bonus-action']], JSON.stringify(both))
+      // 5. The Wolf's turn begins: the mark taken off, forced, and Howl made again.
+      await brawl.setTurn(2, 1)
+      assert.deepEqual([midi.bonusRemovals.slice(removals), midi.usedBonus.has(wolfId)], [[wolfId], false], 'taken off at its turn')
+      doneAs(await howlAt(), 'its turn: Howl again')
+      // 5b. The turn taken back onto the Wolf is its turn again, never its next: the Howl's mark stays.
+      // Its turn ended from the app, the goblin's next round, and taken back with Undo, under a core
+      // that tells of a turn written with its turn events off; then on to the goblin's again and back
+      // with Previous Turn, a round back. Its next turn there takes it off (8b).
+      const back = midi.bonusRemovals.length
+      const ended = await send({ id: `turn-${++ids}`, actorId: 'thorin', kind: 'endTurn', turn: { combatId: 'denbrawl', round: 2, combatantId: 'cb-db-wolf' }, ...plain, dice: [] }, 'camp-w')
+      doneAs(ended, 'its turn ended from the app')
+      assert.deepEqual([brawl.round, brawl.combatant.id], [3, 'cb-db-gob'], "the goblin's turn, the next round")
+      faults.turnEventsNotify = true
+      try {
+        doneAs(await send({ id: `undo-${++ids}`, actorId: 'thorin', kind: 'undoEndTurn', undo: ended.id, turn: { combatId: 'denbrawl', round: 3, combatantId: 'cb-db-gob' }, ...plain, dice: [] }, 'camp-w'), 'taken back')
+      } finally {
+        faults.turnEventsNotify = false
+      }
+      assert.deepEqual([brawl.round, brawl.combatant.id, midi.bonusRemovals.slice(back), midi.usedBonus.has(wolfId)], [2, 'cb-db-wolf', [], true], 'taken back with Undo: its mark stays')
+      await brawl.setTurn(3, 0)
+      await brawl.previousTurn()
+      assert.deepEqual([brawl.round, brawl.combatant.id, midi.bonusRemovals.slice(back), midi.usedBonus.has(wolfId)], [2, 'cb-db-wolf', [], true], 'Previous Turn, a round back: its mark stays')
+      failedAs(await howlAt(), 'bonus-action', 'its turn taken back: Howl again')
+      // 6. Still its turn, its reaction used: its Bite is no opportunity attack, made, nothing marked.
+      midi.usedReaction.add(wolfId)
+      marks = midi.reactionMarks.length
+      doneAs(await bite(), 'its own turn: the Bite')
+      assert.deepEqual(midi.reactionMarks.slice(marks), [], 'no reaction marked')
+      // 7. Not its turn, its reaction used: the Bite, an opportunity attack, refused. A begun encounter
+      // on a copy of the den, listed before the brawl, whose combatant has the Wolf's token's id and
+      // whose turn it is, isn't the Wolf's: a token's creature is matched by its token and its scene.
+      brawl.turn = 0
+      const copy = combatOf('dencopy', [{ id: 'cb-copy-wolf', actor: wolf, fields: { tokenId: denWolf.id, sceneId: 'den-copy' } }])
+      Object.assign(copy, { round: 1, turn: 0 })
+      game.combats.delete(brawl.id)
+      game.combats.set(brawl.id, brawl)
+      try {
+        failedAs(await bite(), 'reaction', "the goblin's turn, its reaction used: the Bite")
+      } finally {
+        game.combats.delete(copy.id)
+      }
+      // 8. Not its turn, its reaction unused: an attack Midi aborts once it has its card (no ammunition)
+      // has its reaction marked all the same, as Midi marks one once its use has its card.
+      midi.usedReaction.delete(wolfId)
+      midi.abortNext = true
+      failedAs(await bite(), 'midi', "the goblin's turn, its reaction unused: the Bite aborted")
+      assert.deepEqual(midi.reactionMarks.slice(marks), [wolfId], 'its reaction marked, the attack aborted')
+      // Made, and its reaction marked.
+      midi.usedReaction.delete(wolfId)
+      marks = midi.reactionMarks.length
+      doneAs(await bite(), "the goblin's turn, its reaction unused: the Bite")
+      assert.deepEqual(midi.reactionMarks.slice(marks), [wolfId], 'its reaction marked once')
+      // 8b. Its Bonus Action (step 5's Howl, on its own turn) and its reaction (the Bite) both marked in
+      // the brawl: at its next turn there both are taken off, each once.
+      const offs = [midi.bonusRemovals.length, midi.reactionRemovals.length]
+      assert.deepEqual([midi.usedBonus.has(wolfId), midi.usedReaction.has(wolfId)], [true, true], 'both marked')
+      await brawl.setTurn(3, 1)
+      assert.deepEqual([midi.bonusRemovals.slice(offs[0]), midi.reactionRemovals.slice(offs[1]), midi.usedBonus.has(wolfId), midi.usedReaction.has(wolfId)],
+        [[wolfId], [wolfId], false, false], 'both taken off at its next turn there, each once')
+      // 8c. Its Howl marked again on that turn, then its token gone from the den: at its next turn
+      // nothing is taken off a creature no longer there, and nothing is logged.
+      doneAs(await howlAt(), 'its turn: Howl')
+      den.tokens.delete(denWolf.id)
+      const gone = [midi.bonusRemovals.length, midi.reactionRemovals.length]
+      const errors = []
+      const logged = console.error
+      console.error = (...args) => errors.push(args.map(String).join(' '))
+      try {
+        await brawl.setTurn(4, 1)
+      } finally {
+        console.error = logged
+        den.tokens.set(denWolf.id, denWolf)
+      }
+      assert.deepEqual([midi.bonusRemovals.length, midi.reactionRemovals.length, errors], [...gone, []], 'its token gone: nothing taken off, nothing logged')
+      midi.usedBonus.delete(wolfId)
+      midi.usedReaction.delete(wolfId)
+      // 9. The brawl not begun, or not its scene's chosen one: it counts for nothing.
+      midi.usedBonus.add(wolfId)
+      marks = midi.bonusMarks.length
+      brawl.round = 0
+      doneAs(await howlAt(), 'not begun')
+      brawl.round = 1
+      brawl.active = false
+      doneAs(await howlAt(), 'not its scene\'s chosen one')
+      assert.deepEqual(midi.bonusMarks.slice(marks), [], 'neither marked')
+      // 10. The Gamemaster views the brawl: Midi finds the Wolf in it, so the module marks nothing.
+      brawl.active = true
+      game.combat = brawl
+      assert.equal(denWolf.actor.inCombat, true, 'in the fight the Gamemaster has up')
+      midi.usedBonus.delete(wolfId)
+      doneAs(await howlAt(), 'the encounter up')
+      assert.deepEqual(midi.bonusMarks.slice(marks), [], "Midi's own to mark there")
+    } finally {
+      game.combat = fight
+      Object.assign(midi.settings, was.settings)
+      await game.settings.set('sending-stone', 'offCanvasTargets', false)
+      ;[cbWolf.initiative, cbGob.initiative] = was.initiatives
+      Object.assign(brawl, { round: was.round, turn: was.turn, active: was.active })
+      midi.usedBonus.delete(wolfId)
+      midi.usedReaction.delete(wolfId)
+    }
+    ok("since module 0.53.0, under Midi-QOL, a Wolf fighting in the den's brawl, begun and chosen, while the Gamemaster has the arena's fight up: its Howl refused bonus-action with its Bonus Action used; unused, one stopped before its card failing midi and marking nothing, one made marked by the module; a new round's first turn, another's, leaves the mark and refuses Howl; two Howls at once, one made, one refused; at its own turn the mark taken off, forced; its turn ended from the app and taken back with Undo under a core that tells of it, or a round back with Previous Turn, leaves its mark on; its Bite on its own turn no opportunity attack, on the goblin's refused reaction with its reaction used, never read from a copy of the den whose combatant has its token's id; unused, an attack Midi aborts still marked, one made marked; its Bonus Action and reaction marked in the brawl both taken off at its next turn, each once; its token gone, nothing taken off or logged; the brawl not begun, or not chosen, counts for nothing; the brawl up, Midi's own to mark")
+  }
   game.combats.delete(brawl.id)
   den.tokens.delete(denGoblin.id)
   await denWolf.delete()

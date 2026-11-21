@@ -43,9 +43,11 @@ export const screen = { notifications: [], subsequent: [], templates: 0, summons
 /**
  * What a harness turns on of dnd5e that the port leaves out by default, so that every other
  * harness's cards stay as they were (module 0.36.0): `targets`, a use's and a roll's card naming the
- * Gamemaster's targets, as mixin.mjs:136-142's getTargetDescriptors does.
+ * Gamemaster's targets, as mixin.mjs:136-142's getTargetDescriptors does. And of core, since module
+ * 0.53.0, `storedActorId`: an actor's `inCombat` by the actor id its combatant stored when it was
+ * made, core's other reading, as transform5e.mjs's `port.faults.storedActorId` [core, unverified].
  */
-export const port = { targets: false }
+export const port = { targets: false, storedActorId: false }
 
 /**
  * mixin.mjs (getTargetDescriptors): the Gamemaster's targets, as a card names them.
@@ -424,7 +426,17 @@ export function equip(actor, { items = [], spells = {}, ac = 15, concentrationLi
   if (!Object.getOwnPropertyDescriptor(actor, 'inCombat')) {
     Object.defineProperty(actor, 'inCombat', {
       configurable: true,
-      get() { return [...game.combats.values()].some(c => c.combatants.some?.(cb => cb.actorId === actor.id)) },
+      // Foundry v14's Actor#inCombat (module 0.53.0): "at least one Combatant in the active Combat
+      // that represents it", the one the Gamemaster views (`game.combat`), never another: a token's
+      // creature by its token and scene; any other by its combatant's actor now, as transform5e.mjs's
+      // actors are matched, or under `port.storedActorId` by the actor id the combatant stored
+      // [core, unverified].
+      get() {
+        const token = actor.isToken ? actor.token : null
+        return Array.from(game.combat?.combatants?.values?.() ?? []).some(cb => (token
+          ? (cb.tokenId === token.id) && (cb.sceneId === token.parent?.id)
+          : ((port.storedActorId ? cb.actorId : cb.actor?.id) === actor.id)))
+      },
     })
   }
   return actor

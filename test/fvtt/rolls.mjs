@@ -1072,7 +1072,7 @@ ok("a character's roll after hit dice spent at once waits for all of them")
   assert.deepEqual(lateGm.messages, cardsOf(slowGm.id).map(m => m.id))
   rested()
   // One that made more than 20 messages, as a module posting cards of its own for it here: the
-  // first 20, in order.
+  // first 20, in order, to an app that says nothing of `gmRollMessages`.
   const extra = []
   const more = (message, _options, userId) => {
     const flags = flagsOf(message)

@@ -180,10 +180,10 @@ saving throws, the combat tracker, Dice So Nice and Midi-QOL all behave as if th
 Foundry. Each card is marked as rolled on Sending Stone. A campaign's Gamemaster can open any of
 its characters' sheets in the app and roll as them; those rolls are marked GM on their cards, and
 are made as the character's player all the same, so the modules that read a card's author treat
-them as the player's own. Each tells the app which chat messages it made, so the app marks those
-alone as yours, never a copy a player posts from their own browser. A module that posts chat
-messages from your browser for players, as Midi-QOL does, could still let a player have one marked
-while the roll is being made.
+them as the player's own. Each tells the app which chat messages it made, up to 21 to an app from
+v0.53.0 (20 before), so the app marks those alone as yours, never a copy a player posts from their
+own browser. A module that posts chat messages from your browser for players, as Midi-QOL does,
+could still let a player have one marked while the roll is being made.
 
 - **Under D&D Fifth Edition only.** The Gamemaster's browser makes the rolls, so a Gamemaster must
   have the game open, as for everything else.
@@ -243,7 +243,14 @@ while the roll is being made.
   line for it looks for reactions as its line for dnd5e 5 does; where it doesn't, those checks are
   rolled as Midi rolls them. The cost the use spends is rolled as ever: your own dice settings, or
   a typing player's dice. A reaction that's taken still rolls its cost with the dice settings of
-  whoever takes it. Midi's check of a use you make in Foundry yourself is rolled as Midi rolls it.
+  whoever takes it. Since 0.53.0 Midi's check of a use you make in Foundry yourself is Foundry's
+  computer dice too, where Midi spends what it uses without its dialog (its setting for what your
+  uses consume, or the item's own, says so), a reaction you take among them; and so is its check of
+  the activity it pairs with an attack, as Frost Brand's Rime, in your own attacks, from Midi's card
+  button for it, which always checks first, and in an attack from the app whose player doesn't type
+  their dice, or any attack from the app under dnd5e 6. The cost itself is asked once, of your dice
+  settings. Where Midi shows its dialog first, as by default, it makes no check. A player's use in
+  their own Foundry is rolled as Midi rolls it.
 - **What the player is told.** The app shows each roll's total in the game, unless the roll was
   made blind, as Midi-QOL can make a player's check: then only that it was made.
 - **Hit dice** heal the character as dnd5e's rest dialog does: the die and their Constitution
@@ -314,10 +321,11 @@ an attack hit only where the game shows players.
 - **At themselves.** A use whose range is Self that still names a creature, such as a potion or
   Wild Shape, lets the player pick themselves, Self, among its targets, first for healing and the
   like. It's then made at their token in the combat, or else at their token on the scene you're
-  viewing, or else at the character, named on the card. Midi-QOL, which can target only a token
-  your canvas draws, uses it then at the other targets or at no one, as before 0.22.0, for you
-  to apply to the character from the card; only where its Requires Targets needs a target is it
-  refused in the app.
+  viewing, or else, since 0.53.0, at their token in an encounter you don't have up that has begun
+  and is its scene's chosen one, or else at the character, named on the card. Midi-QOL, which can
+  target only a token your canvas draws, uses it then at the other targets or at no one, as before
+  0.22.0, for you to apply to the character from the card; only where its Requires Targets needs a
+  target is it refused in the app.
 - **With Midi-QOL**, the use goes through Midi's workflow, as if the player had used it in
   Foundry: Midi checks the hit, rolls the targets' saving throws and applies the damage, healing
   and effects as you have it set up. The card is yours, spoken as the character, since Midi asks
@@ -419,18 +427,22 @@ an attack hit only where the game shows players.
   weapon's attack mode and its ammunition, and whether Foundry spends what the use would: the spell
   slot or the item's uses, the ammunition fired, a thrown weapon. Spent, it counts as the cast:
   concentration begins, and under Midi-QOL's Enforce settings a used Bonus Action or reaction
-  refuses it, in a fight, and it marks one used. Foundry's damage card names the level, the mode and
-  the ammunition, and what was spent, or "nothing spent".
+  refuses it, in a fight (the encounter you have up, or since 0.53.0 one you don't that has begun
+  and is its scene's chosen one), and it marks one used. Foundry's damage card names the level, the
+  mode and the ammunition, and what was spent, or "nothing spent".
 - **Nothing asks you, where it can be helped.** An enchantment's profile and item are chosen in the
   app, so dnd5e's usage dialog never opens. Area attacks Midi targets itself around their user,
   summoning, transforming (but Wild Shape from the app where the campaign allows it) and other
   activities dnd5e asks about, Midi's Active Defence, a used
-  reaction or bonus action Midi enforces, and an activity set to always show Midi's dialogs or to
-  ask which effects to apply are refused in the app with a reason. Wild Shape follows Midi-QOL's
-  Enforce bonus actions since 0.41.0: refused once the Bonus Action is used in a fight, and marked
-  on the form, or on the character after a return. Midi may still ask you what it
-  would in Foundry, such as a target's reaction, an optional bonus or confirming ammunition or
-  damage; the player is told it took too long, then that it was made once you answer.
+  reaction or bonus action Midi enforces (in the encounter the creature fights in: the one you have
+  up, or since 0.53.0 one you don't that has begun and is its scene's chosen one, where the module
+  marks it itself and takes the mark off at the creature's next turn there), and an activity set to
+  always show Midi's dialogs or to ask which effects to apply are refused in the app with a reason.
+  Wild Shape follows Midi-QOL's Enforce bonus actions since 0.41.0: refused once the Bonus Action is
+  used in a fight (likewise), and marked on the form, or on the character after a return. Midi may
+  still ask you what it would in Foundry, such as a target's reaction, an optional bonus or
+  confirming ammunition or damage; the player is told it took too long, then that it was made once
+  you answer.
 - **Dice So Nice** doesn't animate a Midi attack while your tab is hidden, which would hold Midi's
   workflow until you came back.
 
@@ -514,9 +526,9 @@ either is missing.
   drop moves it. Each item arrives unequipped and unattuned, what a container held too, with its
   uses, effects and identification. A potion joins a stack of the same potion, but never an
   unidentified one, one with uses spent or one enchanted. Coins are moved exactly: never more than
-  there are, and dnd5e 6's fractions stay; coins handed out, as above, to characters and since
-  0.51.0 parties, are taken from the giver as coins taken away are. An item in a container that
-  hides what it holds, or deeper than five containers, isn't offered.
+  there are, and dnd5e 6's fractions stay as they're written; coins handed out, as above, to
+  characters and since 0.51.0 parties, are taken from the giver as coins taken away are. An item in
+  a container that hides what it holds, or deeper than five containers, isn't offered.
 - **A line in chat** for each move, as the character who moved it, for everyone, such as "Takes 50
   gp from The Iron Company" or "Gives 2 Potion of Healing to Vex"; yours marked "GM". Coins given to
   characters, as above, are whispered instead; a party's is for everyone.
@@ -929,10 +941,11 @@ description's damage or roll aren't offered yet.
   check alone. The module has sent saving throws on any ability as links since 0.17.0; the app shows
   those past the six from v0.52.0.
 
-Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0, 0.22.0 and 0.52.0 each send every description again
-once, in its new form; since 0.52.0 so does a world that turns an ability or skill on, such as
-Honor, after its reload. Since 0.20.0 a description with damage links is also sent again when the
-damage it shows changes, as with Rage.
+Modules 0.17.0, 0.18.0, 0.19.0, 0.20.0, 0.21.0, 0.22.0, 0.52.0 and 0.53.0 each send every
+description again once, in its new form; since 0.52.0 so does a world that turns an ability or skill
+on, such as Honor, and since 0.53.0 one that gains or loses a tool, a kind of vehicle, or a damage
+or healing type, each after its reload. Since 0.20.0 a description with damage links is also sent
+again when the damage it shows changes, as with Rage.
 
 ### The listener must allow cross-origin requests
 
@@ -1085,9 +1098,10 @@ Gamemaster-only information switched on.
     druid.
 - **Worn gear isn't modelled:** dnd5e gives a form none of the druid's gear, so a ring that should
   work on the form doesn't; you decide.
-- **Bonus Actions are counted only under Midi-QOL's Enforce bonus actions, in a fight:** elsewhere
-  Change and Return say they take one. A return or an ending made in Foundry isn't counted, as Midi
-  counts none.
+- **Bonus Actions are counted only under Midi-QOL's Enforce bonus actions, in a fight (the encounter
+  you have up, or since 0.53.0 one you don't that has begun and is its scene's chosen one):**
+  elsewhere Change and Return say they take one. A return or an ending made in Foundry isn't
+  counted, as Midi counts none.
 - **Beast Spells (level 18) and Archdruid (level 20)** are the table's: dnd5e drops every spell but
   the Moon's from the form, and a use regained on Initiative is yours to give.
 - **A dish served while shaped** goes on the druid's own actor: its effect waits for the return; its
@@ -1166,6 +1180,11 @@ Gamemaster-only information switched on.
 - **With Midi-QOL's *Auto Remove Summoned Creature*,** a summon's tab goes when its summoner's
   concentration ends.
 - **Midi-QOL shows less on cards of a creature no player owns,** as it does for any NPC.
+- **Midi-QOL reads only the encounter you have up.** Its own checks of a reaction or Bonus Action,
+  its opportunity attacks and its marks read the encounter you view, and its *Requires targets* "in
+  combat" your scene's. A use from the app is checked in the creature's own encounter, since 0.53.0
+  one you don't have up that has begun too; a use you make yourself in Foundry for a creature in
+  another encounter isn't: view its encounter first.
 - **Under *Right after its character* a companion rolls no initiative of its own,** so dnd5e's
   recoveries on rolling initiative don't happen for it.
 - **Only the active Gamemaster's Foundry moves companions in initiative;** with no Gamemaster
@@ -1329,7 +1348,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
 | `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name; an enchant activity used, by dnd5e's card or Midi-QOL's workflow, with what `command-enchant.mjs` chose and applies |
 | `scripts/command-alone.mjs` | An action's damage or healing on its own, dnd5e's card with no targets for the Gamemaster to apply, and a spent recharge rolled, each with the player's dice, outside Midi-QOL's workflow; from 0.41.0, at the level, in the attack mode and with the ammunition chosen, spending what its use would where asked |
-| `scripts/midi-economy.mjs` | Midi-QOL's Bonus Actions and reactions, from 0.41.0: whether Midi makes uses and enforces them for an actor, whether one is used, and marking one used, for uses, damage on its own and Wild Shape |
+| `scripts/midi-economy.mjs` | Midi-QOL's Bonus Actions and reactions, from 0.41.0: whether Midi makes uses and enforces them for an actor, whether one is used, and marking one used, for uses, damage on its own and Wild Shape; from 0.53.0, which encounter a creature fights in, which a use at its user reads too, and taking off at its next turn there a mark written in an encounter you don't have up |
 | `scripts/dnd5e-generation.mjs` | Which generation of dnd5e the world runs, 5 or 6, by the first number of the system's version: for damage on its own, a plain roll, the dishes and, from 0.50.0, how hurt a creature is |
 | `scripts/command-enchant.mjs` | Enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items: the profile and item a use is made with, as the player chose them, the enchantment applied as the card's tray would, and enchantments ended; sending a character's sheet ahead of what a command changed |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
@@ -1339,7 +1358,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/tidy-journal.mjs` | From 0.44.0, Tidy 5e Sheets' journal on a campaign's characters, read only: its current sheet's entries and its Classic sheet's boxes, read straight off the character's flags whether Tidy is active or not, in Tidy's order, without secrets where no player owns the character; what the hello says of it; sending each character's in `journal.tidy` after a hello's books and 500 ms after its Tidy flags or ownership change, never twice the same, withheld when too large |
 | `scripts/command-notes.mjs` | A note or chapter added, changed or deleted, or a group's notes put in order, from the app: checked whole, the page's revision against what the change was made from, and the rights, before anything is written; made once in effect, one at a time, in Foundry's order, new and moved notes last, its Markdown converted and cleaned; the journal sent before the result |
 | `scripts/command-transfers.mjs` | Moving items and coins from the app between a character and a party, or to another character, as the campaign's switch and Foundry's ownership let its players; checked whole before anything is written, one move at a time, each with its line in chat, and from 0.32.0 a party's things sent elsewhere by its Owner, party to party, and a party's coin distributed among its characters, and from 0.33.0 an item removed from a character, with no switch, and from 0.49.0 a character's coins handed out to the characters picked, each whispered what they received and the Gamemasters all of it, and from 0.51.0 to the parties picked too, each party's line for everyone; and the one line that moves, removals and coins added or taken away stand in |
-| `scripts/coin-change.mjs` | The rule of paying in coins, from 0.49.0, which the coins' commands read: dnd5e's coins that have a rate, and the whole coins an actor holds; a coin paid from its own, then a larger coin broken and its change given back, then smaller coins; which of the coins held went beyond those asked for; and the update that changes an actor's coins from what it stores. It imports nothing and writes nothing |
+| `scripts/coin-change.mjs` | The rule of paying in coins, from 0.49.0, which the coins' commands read: dnd5e's coins that have a rate, and the whole coins an actor holds; a coin paid from its own, then a larger coin broken and its change given back, then smaller coins; which of the coins held went beyond those asked for; and the update that changes an actor's coins from what it stores, which since 0.53.0 a move of coins and a party's distribution write by too. It imports nothing and writes nothing |
 | `scripts/command-coins.mjs` | A character's coins added and taken away from the app, from 0.49.0, by the campaign's switch, on by default, under dnd5e: fetching them from an app that takes them; its player's, or the Gamemaster's at its page; other coins paying where it's short of one, by the campaign's setting; one update of the coins that change, made in the line of moves, with its line in chat |
 | `scripts/command-favorites.mjs` | Adding to and removing from a character's favorites from the app, by dnd5e's own methods, under dnd5e with no switch, and from 0.47.0 putting them in order, writing dnd5e's own sorts; nothing posted |
 | `scripts/command-prepare.mjs` | Preparing and unpreparing a character's spells from the app, as dnd5e's menu does; nothing posted |
@@ -1354,7 +1373,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-dishes.mjs` | Dishes from the Magical Recipe Book, from 0.38.0: whether a campaign takes them, by its own switch under dnd5e 5, and what its hello says of them; each dish command posted once as its card, answered again from its card or its tombstone |
 | `scripts/dish-card.mjs` | A dish's card, whispered to the Gamemasters and the campaign's players: its words, its buttons for Gamemasters, what became of it for anyone, the dialog of who ate it, serving it and setting it aside; which apps take dishes, and telling them what was decided, again after a drop and after every hello; deleted cards' tombstones; one dish effect per character |
 | `scripts/dish-effects.mjs` | A dish's Active Effect: its changes on dnd5e 5.3.3's paths, its one-offs, its duration and flags; whether the system is one dishes are taken under, dnd5e 5; cookbook strings made inert for enrichers; dish effects ended once their time has passed; the long rest's top-up |
-| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.44.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one, and Midi-QOL's of a use from the app, Foundry's computer dice; from 0.49.0, so is Midi-QOL's check of a reaction it looks for; and what lists a campaign's open dice asks for its hello, once `later-dice.mjs` registers it |
+| `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.44.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one, and Midi-QOL's of a use from the app, Foundry's computer dice; from 0.49.0, so is Midi-QOL's check of a reaction it looks for; from 0.53.0, so is its check of a use where it spends without its dialog, and of the activity it pairs with an attack; and what lists a campaign's open dice asks for its hello, once `later-dice.mjs` registers it |
 | `scripts/later-dice.mjs` | From 0.44.0, under dnd5e 5, the dice the game rolls later asked of a player typing theirs: a typed roll's run, bound to its Midi-QOL workflow; which rolls are its, by their subject, workflow, a use's own spending (its consumption hooks, and Midi's check of a workflow's other activity's consumption) and Midi's bonus damage; one ask per step, or per die thrown again, a minute's wait, the Gamemaster's window with Roll it now, the answers and their refusals, what the watchdog doesn't count, the hello's list, and its self-test |
 | `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster; and from 0.39.0 the links to the module's issue forms at the end of its side |
 | `scripts/apps/help-window.mjs` | From 0.39.0, Configure Settings' Report a bug or request a feature, which any user may open: the links to the module's issue forms |

@@ -138,6 +138,14 @@ const offered = new Set();
 const quietReaders = new Set();
 
 /**
+ * Since 0.53.0, the campaigns whose app said, in its last answer to their hello or heartbeat, that
+ * it reads every message a Gamemaster's command makes, up to MOST_MESSAGES_KEPT: `gmRollMessages`
+ * of 1 or more.
+ * @type {Set<string>}
+ */
+const messageReaders = new Set();
+
+/**
  * Campaigns whose fetch the app refused, as for a wrong secret, until the settings change.
  * @type {Set<string>}
  */
@@ -169,10 +177,20 @@ const taken = [];
 const queues = new Map();
 
 /**
- * The most chat messages a Gamemaster's roll's result lists.
+ * The most chat messages a Gamemaster's roll's result lists to an app that doesn't say it reads
+ * more, as one before v0.53.0, which drops a longer list whole.
  * @type {number}
  */
 const MOST_MESSAGES = 20;
+
+/**
+ * The most chat messages kept and listed for one of the Gamemaster's commands, since 0.53.0, to an
+ * app that reads them (`gmRollMessages` 1): a hand-out to MOST_AMONG (20) characters and parties,
+ * one each, and the Gamemasters' own; any made after are left out. It is the protocol's number, so
+ * it doesn't follow MOST_AMONG: a longer hand-out needs a new format.
+ * @type {number}
+ */
+const MOST_MESSAGES_KEPT = 21;
 
 /**
  * The chat messages each of the Gamemaster's rolls being made has made, by the roll's id, in the
@@ -346,9 +364,10 @@ export function registerCommandHooks() {
  * says so (health-sync.mjs), and whether it answers fetches quietly while nobody is in it, `quiet`;
  * and since 0.52.0, whether it reads checks on any ability the game has, `anyAbility`, to which the
  * campaign's sheets, its companions' too, are sent again where it starts or stops in a heartbeat's
- * answer (character-sync.mjs). A hello's answer wakes the campaign's fetching, which may be waiting
- * as an answer given before the hello was taken asked; since 0.50.0 it fetches in full at its usual
- * pace again, for two minutes at least.
+ * answer (character-sync.mjs); and since 0.53.0 whether it reads every message a Gamemaster's
+ * command makes, `gmRollMessages`. A hello's answer wakes the campaign's fetching, which may be
+ * waiting as an answer given before the hello was taken asked; since 0.50.0 it fetches in full at
+ * its usual pace again, for two minutes at least.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -379,6 +398,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteHealthReader(campaignId, features);
   if ( !healthWas && healthReader(campaignId) ) healthWanted(campaignId);
   noteQuietReader(campaignId, features);
+  noteGmRollMessageReader(campaignId, features);
   syncPollers();
   if ( type === EVENTS.HELLO ) pollers.get(campaignId)?.rouse();
 }
@@ -467,6 +487,29 @@ function noteQuietReader(campaignId, features) {
   const format = features?.quiet;
   if ( Number.isInteger(format) && (format >= 1) ) quietReaders.add(campaignId);
   else quietReaders.delete(campaignId);
+}
+
+/**
+ * Note whether a campaign's app reads every message a Gamemaster's command makes, up to
+ * MOST_MESSAGES_KEPT, since 0.53.0: `features.gmRollMessages`, 1 or later. One that says nothing of
+ * it, as an older or rolled back app, is listed the first MOST_MESSAGES alone.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @returns {void}
+ */
+function noteGmRollMessageReader(campaignId, features) {
+  const format = features?.gmRollMessages;
+  if ( Number.isInteger(format) && (format >= 1) ) messageReaders.add(campaignId);
+  else messageReaders.delete(campaignId);
+}
+
+/**
+ * Does a campaign's app read every message a Gamemaster's command makes, up to MOST_MESSAGES_KEPT?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+function gmRollMessageReader(campaignId) {
+  return messageReaders.has(campaignId);
 }
 
 /**
@@ -890,11 +933,11 @@ async function make(command, campaign) {
   void running.finally(() => endRun(run));
   try {
     const result = await Promise.race([running, timeout]);
-    send(EVENTS.COMMAND_RESULT, withMessages(command, result), campaign, { sequenced: false });
+    send(EVENTS.COMMAND_RESULT, withMessages(command, result, campaign.id), campaign, { sequenced: false });
     if ( watchdog.signal.aborted ) {
       void running.then(late => {
         if ( (late.status === "done") || (late.spent?.made > 0) ) {
-          send(EVENTS.COMMAND_RESULT, withMessages(command, late), campaign, { sequenced: false });
+          send(EVENTS.COMMAND_RESULT, withMessages(command, late, campaign.id), campaign, { sequenced: false });
         }
       });
     }
@@ -907,14 +950,17 @@ async function make(command, campaign) {
 
 /**
  * A result as the app is told it: a Gamemaster's roll's with the ids of the chat messages it has
- * made, in the order made, none if it made none; a player's as it is.
+ * made, in the order made, at most MOST_MESSAGES_KEPT; the first MOST_MESSAGES to an app that
+ * doesn't say it reads more; none if it made none; a player's as it is.
  * @param {object} command
  * @param {CommandResult} result
+ * @param {string} campaignId
  * @returns {CommandResult}
  */
-function withMessages(command, result) {
+function withMessages(command, result, campaignId) {
   if ( command.by !== "gm" ) return result;
-  return { ...result, messages: [...(made.get(command.id) ?? [])] };
+  const list = made.get(command.id) ?? [];
+  return { ...result, messages: gmRollMessageReader(campaignId) ? [...list] : list.slice(0, MOST_MESSAGES) };
 }
 
 /**
@@ -931,7 +977,7 @@ function withMessages(command, result) {
 function noteMessageMade(message, userId) {
   if ( userId !== game.user?.id ) return;
   const list = made.get(gmRollOf(message).gmRoll);
-  if ( list && !list.includes(message.id) && (list.length < MOST_MESSAGES) ) list.push(message.id);
+  if ( list && !list.includes(message.id) && (list.length < MOST_MESSAGES_KEPT) ) list.push(message.id);
 }
 
 /**

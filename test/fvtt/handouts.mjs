@@ -14,7 +14,7 @@
 // ./unref-timers.mjs --import ./dnd5e-register.mjs.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { settings, user, users, actors } from './stub.mjs'
+import { settings, user, users, actors, message as fakeMessage } from './stub.mjs'
 
 const MODULE = process.env.MODULE_DIR
 const DND5E6 = Boolean(process.env.DND5E6)
@@ -376,14 +376,15 @@ users.get('carol').character = bram
 /*  The app                                     */
 /* -------------------------------------------- */
 
-const app = { events: [], polls: [], waiting: new Map(), wake: null, features: { commands: true, transfers: 1, groups: 1, coins: 1 } }
+// `answers`, by campaign, is what that campaign's app answers in place of `features`.
+const app = { events: [], polls: [], waiting: new Map(), wake: null, features: { commands: true, transfers: 1, groups: 1, coins: 1 }, answers: {} }
 const json = body => ({ ok: true, status: 200, statusText: 'OK', headers: new Headers({ 'content-type': 'application/json' }), json: async () => body })
 globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body)
   if (String(url).endsWith('/api/events')) {
     app.events.push(body)
     const announcing = ['bridge.hello', 'bridge.heartbeat'].includes(body.type)
-    return announcing ? json({ features: app.features }) : { ok: true, status: 204, statusText: 'No Content', headers: new Headers() }
+    return announcing ? json({ features: app.answers[body.campaign?.id] ?? app.features }) : { ok: true, status: 204, statusText: 'No Content', headers: new Headers() }
   }
   if (String(url).endsWith('/api/bridge/commands')) {
     app.polls.push({ at: performance.now(), body })
@@ -1013,6 +1014,124 @@ said = saidBy(made)
 assert.deepEqual(said.map(told), [['Gives 2 sp to The Iron Company', [], 'lia', 'gm']])
 assert.deepEqual([made.result.status, made.result.messages, made.result.messageId, made.result.visible, purse(lia), coinsOf(party).sp], ['done', [said[0].id], said[0].id, true, { sp: 3 }, 10])
 okay("each whisper goes to exactly the character's own players: both of a character two players own, never a player she's only shared with through All Players; the Gamemaster's hand-out, at the giver's page, flags each message `by: \"gm\"` and lists them in the result; a giver with no one player of its own, none owning it or two with neither having it as their character, has the bridge's Gamemaster as its author, so the Gamemasters' message, whispered to both of them still, is theirs alone, the result's `visible` false, a player's own hand-out too, and the app is sent the whispers but not that; a Gamemasters' message a module's hook stops leaves the hand-out made, `messageId` null and `visible` true; Lia's to the Company alone, by the Gamemaster, posts its line for everyone as the bridge's Gamemaster, listed in the result, `visible` true")
+
+/* -------------------------------------------- */
+/*  The Gamemaster's hand-out to twenty         */
+/* -------------------------------------------- */
+
+// Module 0.53.0: a Gamemaster's hand-out to 20, characters and parties, makes 21 messages, the
+// Gamemasters' own last, and lists them all to an app that says `gmRollMessages`; to one that
+// doesn't, the first 20, as before, which an app before v0.53.0 would drop whole were it sent 21.
+const EXTRAS = Array.from({ length: 14 }, (_, i) => character(`extra${String(i + 1).padStart(2, '0')}`, `Extra ${i + 1}`, ['carol']))
+const TWENTY = ['vex', 'bram', 'ash', 'party', 'wardens', 'silent', ...EXTRAS.map(actor => actor.id)]
+campaignAs({ characters: [...CAMPAIGN.characters, ...EXTRAS.map(actor => actor.id)] })
+app.features = { ...app.features, gmRollMessages: 1 }
+await hello()
+restock()
+await settle()
+made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+said = saidBy(made)
+assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+assert.deepEqual([said.length, told(said.at(-1))], [21, ['Thorin handed out 1 gp each to Vex, Bram, Ash, The Iron Company, Wardens of the Vale, The Silent Order, Extra 1, Extra 2, Extra 3, Extra 4, Extra 5, Extra 6, Extra 7, Extra 8, Extra 9, Extra 10, Extra 11, Extra 12, Extra 13, and Extra 14: 20 gp in all', GMS, 'thorin', 'alice']])
+assert.deepEqual(made.result.messages, said.map(message => message.id), 'all 21, in order')
+// More made for it on this client, as a module posting messages of its own here: no more than 21.
+const extra = []
+const more = (message, _options, userId) => {
+  const flags = message.flags?.['sending-stone']
+  if ((userId !== game.user.id) || (flags?.by !== 'gm') || !message.whisper?.includes('gm') || extra.length) return
+  for (let i = 1; i <= 2; i++) {
+    const card = fakeMessage(`handout-extra${i}`, { author: message.author, speaker: message.speaker, flags: { 'sending-stone': { ...flags } } })
+    extra.push(card.id)
+    Hooks.callAll('createChatMessage', card, {}, game.user.id)
+  }
+}
+Hooks.on('createChatMessage', more)
+restock()
+await settle()
+made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+Hooks.off('createChatMessage', more)
+said = saidBy(made)
+assert.deepEqual([said.length, extra.length, made.result.messages], [21, 2, said.map(message => message.id)], '23 made, the first 21 listed')
+/**
+ * The hand-out to twenty held at the giver's write past its minute, then let go: its results, the
+ * one that it took too long and the late one once it's made, and the messages it made.
+ */
+const tooLong = async () => {
+  restock()
+  await settle()
+  const giving = hold((target, changes) => (target === thorin) && ('system.currency.gp' in (changes ?? {})))
+  const slow = handOut('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+  app.waiting.set('camp-a', [slow])
+  app.wake?.()
+  await until(() => resultsOf(slow.id).length, 'the result that it took too long')
+  giving.release()
+  await until(() => resultsOf(slow.id).length === 2, 'the late result')
+  return [...resultsOf(slow.id), saidBy({ command: slow })]
+}
+// A late result is listed as the first: all 21 to this app, none made by the result that it took too long.
+{
+  const [early, late, lines] = await tooLong()
+  assert.deepEqual([early.status, early.reason, early.messages, late.status, lines.length, late.messages],
+    ['failed', 'timeout', [], 'done', 21, lines.map(message => message.id)], 'the late result, all 21')
+}
+// The app's answer is read only as a whole number of 1 or more, as `quiet` is: true, "1", 0 and 1.5
+// are listed the first 20; 2, a later format, all 21.
+for (const [reads, listed] of [[true, 20], ['1', 20], [0, 20], [1.5, 20], [2, 21]]) {
+  app.features = { ...app.features, gmRollMessages: reads }
+  await hello()
+  restock()
+  await settle()
+  made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+  said = saidBy(made)
+  assert.deepEqual([said.length, made.result.messages], [21, said.slice(0, listed).map(message => message.id)], `gmRollMessages ${JSON.stringify(reads)}: ${listed} listed`)
+}
+// An app that says nothing of it, as one before v0.53.0: the first 20, the Gamemasters' own not among them.
+const { gmRollMessages: _reads, ...older } = app.features
+app.features = older
+await hello()
+restock()
+await settle()
+made = await handed('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+said = saidBy(made)
+assert.deepEqual([said.length, made.result.messages], [21, said.slice(0, 20).map(message => message.id)], 'the first 20')
+assert.ok(!made.result.messages.includes(said.at(-1).id), "the Gamemasters' own isn't listed")
+// Its late result too: the first 20.
+{
+  const [early, late, lines] = await tooLong()
+  assert.deepEqual([early.status, early.reason, early.messages, late.status, lines.length, late.messages],
+    ['failed', 'timeout', [], 'done', 21, lines.slice(0, 20).map(message => message.id)], 'the late result, the first 20')
+}
+// Two campaigns, each with its own app, one of them at v0.53.0 and the other older: each app's
+// answer is read for its own campaign alone, so the same hand-out lists all 21 in the first and the
+// first 20 in the second, which would drop a list of 21 whole.
+const MIRKWOOD = { ...CAMPAIGN, id: 'camp-b', title: 'Mirkwood', characters: [...CAMPAIGN.characters, ...EXTRAS.map(actor => actor.id)] }
+settings.set('campaignSecrets', { 'camp-a': 'ashlands-secret', 'camp-b': 'mirkwood-secret' })
+settings.set('campaigns', [{ ...CAMPAIGN, characters: MIRKWOOD.characters }, MIRKWOOD])
+app.answers = { 'camp-a': { ...older, gmRollMessages: 1 } }
+const pollsBefore = app.polls.length
+await hello()
+await until(() => app.polls.slice(pollsBefore).some(poll => poll.body.campaign.id === 'camp-b'), "Mirkwood's fetch, its app's answer read")
+for (const [campaignId, listed] of [['camp-a', 21], ['camp-b', 20]]) {
+  restock()
+  await settle()
+  const giving = handOut('thorin', TWENTY, { gp: 1 }, { by: 'gm' })
+  app.waiting.set(campaignId, [giving])
+  app.wake?.()
+  await until(() => resultIndex(giving.id) >= 0, `the hand-out in ${campaignId}`)
+  const { campaign: { id: to }, data: result } = app.events[resultIndex(giving.id)]
+  const lines = saidBy({ command: giving })
+  assert.deepEqual([to, result.status, lines.length, result.messages], [campaignId, 'done', 21, lines.slice(0, listed).map(message => message.id)],
+    `two campaigns: ${listed} listed in ${campaignId}`)
+}
+// Everyone as the world began, and told so in Ashlands' hello, before Mirkwood goes.
+restock()
+await settle()
+app.answers = {}
+settings.set('campaignSecrets', { 'camp-a': 'ashlands-secret' })
+campaignAs()
+await hello()
+for (const actor of EXTRAS) actors.delete(actor.id)
+okay("the Gamemaster's hand-out to 20, characters and parties, makes 21 messages, all listed, the Gamemasters' last, to an app that says `gmRollMessages`, a whole number of 1 or more (2 too, never true, \"1\", 0 or 1.5); no more than 21 when more are made; to an app that doesn't, the first 20, as before 0.53.0; a late result, held past its minute, is listed as the first; in a world of two campaigns, each app's answer is read for its own alone: 21 to the one that says it, the first 20 to the other")
 
 /* -------------------------------------------- */
 /*  A hand-out that fails                       */

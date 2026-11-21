@@ -10,7 +10,9 @@ import { applyChosen, enchantChoice, enchantedOf, enchantResult, endAll, notAppl
 import { midiIntegration, resultsAlways } from "./config.mjs";
 import { commandActor } from "./creatures.mjs";
 import { bindWorkflow } from "./later-dice.mjs";
-import { midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
+import {
+  fightOf, markMidiBonusAction, markMidiReaction, midiActivities, midiBonusActionUsed, midiReactionUsed
+} from "./midi-economy.mjs";
 import { midiPromptWaits } from "./midi-prompts.mjs";
 import { outcomeOf } from "./results.mjs";
 import { DND5E_ACTIVITIES, eligibleSlots, ownDamageConfig, previewDamage, slotChoice } from "./sheet-links.mjs";
@@ -124,7 +126,7 @@ function isMidiActivity(activity) {
  * takes them and the character can make it now: use the item, then, for an attack, attack, and for
  * an enchantment, apply it. Since 0.36.0 one of a companion of theirs, named by `of`, on its live
  * actor, as their character's player, what it found carried in the use as `character` and
- * `companion`.
+ * `companion`, and since 0.53.0 a druid's Wild Shape form as `form`.
  * @param {object} command      The player's attack or use, as fetched from the app.
  * @param {Campaign} campaign   The campaign it was fetched for.
  * @param {object} [options]
@@ -142,6 +144,7 @@ export async function runUseCommand(command, campaign, { signal }={}) {
   if ( use.refusal ) return failedResult(command, use.refusal, use.error ?? null);
   use.character = found.character;
   use.companion = found.companion;
+  use.form = found.form;
   if ( !isMidiActivity(use.activity) ) {
     if ( use.enchanting ) return dnd5eEnchant(command, campaign, actor, use);
     return use.attack ? dnd5eAttack(command, campaign, actor, use) : dnd5eUse(command, campaign, actor, use);
@@ -521,10 +524,12 @@ export function targetOf({ combatId, combatantId }) {
 
 /**
  * The character as a target of their own use: by their token, their combatant's in the combat the
- * Gamemaster has up, else their own on the scene the Gamemaster views; else by no token, the actor
- * alone, which the card names all the same, but Midi-QOL can't target. Since 0.36.0 a token's
- * creature, as a companion's, is its own token, and its own combatant, by its token and scene,
- * wherever the Gamemaster's canvas is.
+ * Gamemaster has up, else their own on the scene the Gamemaster views; else, since 0.53.0, its
+ * combatant's token in an encounter begun elsewhere (`fightOf`), named on the card, which Midi can't
+ * target; else by no token, the actor alone, which the card names all the same, but Midi-QOL can't
+ * target. A token the Gamemaster's canvas has is never passed over for one it hasn't. Since 0.36.0 a
+ * token's creature, as a companion's, is its own token, and its own combatant, by its token and
+ * scene, wherever the Gamemaster's canvas is.
  * @param {Actor} actor
  * @returns {{combatant: Combatant|null, token: TokenDocument|null, actor: Actor}}
  */
@@ -536,8 +541,9 @@ function selfTarget(actor) {
     return { combatant, token, actor };
   }
   const combatant = game.combat?.combatants?.find?.(each => (each.actor?.id ?? each.actorId) === actor.id) ?? null;
-  const token = combatant?.token ?? actor.getActiveTokens?.(true, true)?.[0] ?? null;
-  return { combatant, token, actor: token?.actor ?? actor };
+  const elsewhere = (combatant || actor.getActiveTokens?.(true, true)?.length) ? null : fightOf(actor);
+  const token = combatant?.token ?? actor.getActiveTokens?.(true, true)?.[0] ?? elsewhere?.combatant?.token ?? null;
+  return { combatant: combatant ?? elsewhere?.combatant ?? null, token, actor: token?.actor ?? actor };
 }
 
 /**
@@ -861,12 +867,14 @@ export function midiSettled() {
  * Midi picks itself; an activity that always opens Midi's dialogs, asks which of its effects to
  * apply, or prompts for its roll; a target that can't be targeted; a target the Gamemaster's canvas
  * doesn't draw, unless they allow it, though never its user; none Midi can target where one is
- * needed; or a reaction or bonus action already used this round, where they're enforced.
- * @param {object} use   What `prepareUse` found.
+ * needed; or a reaction or bonus action already used this round, where they're enforced, in the
+ * encounter the creature fights in (`midiEconomyOf`).
+ * @param {object} use   What `prepareUse` found, with its character and form.
  * @param {Actor} actor
  * @returns {string|null}
  */
-function midiRefusal({ activity, targets, attack, area }, actor) {
+function midiRefusal(use, actor) {
+  const { activity, targets, attack, area } = use;
   const MidiQOL = globalThis.MidiQOL;
   if ( !MidiQOL?.Workflow ) return "midi";
   const settings = MidiQOL.configSettings?.() ?? {};
@@ -890,17 +898,60 @@ function midiRefusal({ activity, targets, attack, area }, actor) {
   }
   if ( !drawn.length && midiNeedsTargets(activity, actor, settings) ) return targets.length ? "scene" : "target";
 
-  if ( actor.inCombat ) {
-    const enforced = setting => (settings[setting] === "all") || (settings[setting] === actor.type);
-    const type = activity.effectiveActivationType ?? activity.activation?.type ?? "";
-    const combat = game.combat;
-    const ownTurn = combat?.combatant === combat?.getCombatantsByActor?.(actor)?.[0];
-    const opportunity = attack && !ownTurn && enforced("recordAOO") && (type !== "special");
-    const reaction = (REACTIONS.has(type) && ((activity.activation?.cost ?? 1) > 0)) || opportunity;
-    if ( reaction && enforced("enforceReactions") && MidiQOL.hasUsedReaction?.(actor) ) return "reaction";
-    if ( (type === "bonus") && midiBonusActionUsed(actor) ) return "bonus-action";
-  }
+  const economy = midiEconomyOf(use, actor, settings);
+  if ( economy?.reaction && midiReactionUsed(actor) ) return "reaction";
+  if ( economy?.bonus && midiBonusActionUsed(actor) ) return "bonus-action";
   return null;
+}
+
+/**
+ * A use's reaction or Bonus Action as Midi-QOL counts it, since 0.41.0, in the encounter the
+ * creature fights in (since 0.53.0 `fightOf`, one begun elsewhere too; a druid's form by her own
+ * combatant where core matches it to her): a reaction by its activation, or an attack out of the
+ * creature's turn where Midi records opportunity attacks; a Bonus Action by its own. `seen` where
+ * Midi finds the creature in the fight itself (`Actor#inCombat`), so that Midi checks and marks it;
+ * else the module marks it. Null out of every fight.
+ * @param {object} use   What `prepareUse` found, with its character and form.
+ * @param {Actor} actor
+ * @param {object} settings   Midi's settings.
+ * @returns {{reaction: boolean, bonus: boolean, seen: boolean, fight: object}|null}
+ */
+function midiEconomyOf({ activity, attack, character, form }, actor, settings) {
+  const fight = fightOf(actor) ?? (form ? fightOf(character) : null);
+  if ( !fight ) return null;
+  const enforced = setting => (settings[setting] === "all") || (settings[setting] === actor.type);
+  const type = activity.effectiveActivationType ?? activity.activation?.type ?? "";
+  const ownTurn = Boolean(fight.combatant) && (fight.combat.combatant?.id === fight.combatant.id);
+  const opportunity = Boolean(attack) && !ownTurn && enforced("recordAOO") && (type !== "special");
+  const reaction = (REACTIONS.has(type) && ((activity.activation?.cost ?? 1) > 0)) || opportunity;
+  return { reaction, bonus: type === "bonus", seen: actor.inCombat === true, fight };
+}
+
+/**
+ * Mark, since 0.53.0, the reaction or Bonus Action a use from the app spent where Midi-QOL doesn't
+ * find the creature in its fight, as Midi marks one once its use has its card; where it does,
+ * Midi's own mark stands. One in an encounter the Gamemaster doesn't have up is taken off at the
+ * creature's next turn there (midi-economy.mjs).
+ * @param {{reaction: boolean, bonus: boolean, seen: boolean, fight: object}|null} economy
+ * @param {Actor} actor
+ * @returns {Promise<void>}
+ */
+async function markUnseenEconomy(economy, actor) {
+  if ( !economy || economy.seen ) return;
+  if ( economy.reaction ) {
+    try {
+      await markMidiReaction(actor, economy.fight);
+    } catch (err) {
+      console.error(`${MODULE_ID} | Could not mark ${actor.name}'s reaction for Midi-QOL`, err);
+    }
+  }
+  if ( economy.bonus ) {
+    try {
+      await markMidiBonusAction(actor, economy.fight);
+    } catch (err) {
+      console.error(`${MODULE_ID} | Could not mark ${actor.name}'s Bonus Action for Midi-QOL`, err);
+    }
+  }
 }
 
 /**
@@ -960,6 +1011,9 @@ function rollsDamage(activity) {
  */
 async function midiUseNow(command, campaign, actor, use) {
   const { activity, usage, prepared, attackMode, ammunition, attack } = use;
+  // Since 0.53.0 its reaction or Bonus Action, read as Midi reads it, inside the queue: marked once
+  // the use has its card, where Midi doesn't find the creature in its fight.
+  const economy = midiEconomyOf(use, actor, globalThis.MidiQOL?.configSettings?.() ?? {});
   // Where Midi averages this creature's damage, it rolls it itself, as a utility's roll: nothing of
   // its damage waits for the player's dice, so its target never takes it twice.
   const averaged = midiAverages(actor);
@@ -1046,6 +1100,7 @@ async function midiUseNow(command, campaign, actor, use) {
       return workflowSettled(workflow);
     });
 
+    if ( card ) await markUnseenEconomy(economy, actor);
     if ( (state === "aborted") || !card || !workflow ) return failedResult(command, "midi");
     if ( attack && !workflow.attackRoll ) return failedResult(command, (state === "late") ? "timeout" : "no-attack");
 
@@ -1103,6 +1158,8 @@ async function midiUseNow(command, campaign, actor, use) {
  */
 export async function midiEnchantNow(command, campaign, actor, use) {
   const { activity, usage, prepared, enchanting } = use;
+  // Since 0.53.0 its Bonus Action or reaction, as a use's, marked once it has its card.
+  const economy = midiEconomyOf(use, actor, globalThis.MidiQOL?.configSettings?.() ?? {});
   const saved = currentTargets();
   setTargets([]);
   try {
@@ -1137,6 +1194,7 @@ export async function midiEnchantNow(command, campaign, actor, use) {
     if ( !results ) return failedResult(command, "midi");
     const card = results.message?.id ? results.message : null;
     if ( !card ) return notApplied(command, null, actor, campaign, "midi", use);
+    await markUnseenEconomy(economy, actor);
     const workflow = midiUsage.workflow ?? globalThis.MidiQOL?.Workflow?.getWorkflow(card.uuid);
     if ( !workflow ) return notApplied(command, card, actor, campaign, "midi", use);
     const state = await workflowSettled(workflow);

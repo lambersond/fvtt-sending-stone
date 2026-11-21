@@ -633,6 +633,34 @@ assert.equal(lineOf(made), 'Distributes 8 sp among Bram, Lia, Thorin, and Vex (2
 assert.deepEqual([coinsOf(party).sp, ...FOUR.map(id => coinsOf(actors.get(id)).sp)], [0, 2, 2, 2, 2])
 okay('8 sp among four: 2 each, "…; none stays with The Iron Company"')
 
+// Module 0.53.0: a distribution keeps a fraction as it's written, the party's and each one's given a
+// share. Floating point alone makes 3.700000000000003 of 103.7 less 100, and 7.5600000000000005 of
+// 0.56 and 7.
+assert.deepEqual([103.7 - 100, 0.56 + 7], [3.700000000000003, 7.5600000000000005], 'what floating point alone makes of them')
+restock()
+stock(party, companyStock(), { ...COMPANY_COINS, gp: 103.7 })
+await settle()
+at = writes.length
+made = await sent('thorin', share({ gp: 103 }))
+assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+assert.deepEqual(writes.slice(at).map(([what, id, changes]) => [what, id, changes]), [
+  ['updateActor', 'party', { 'system.currency.gp': 3.7 }],
+  ['updateActor', 'bram', { 'system.currency.gp': 25 }], ['updateActor', 'lia', { 'system.currency.gp': 25 }],
+  ['updateActor', 'thorin', { 'system.currency.gp': 65 }], ['updateActor', 'vex', { 'system.currency.gp': 37 }],
+], '103.7 gp less 100 leaves 3.7')
+restock()
+stock(party, companyStock(), { ...COMPANY_COINS, sp: 28 })
+stock(vex, [], { gp: 12, sp: 0.56 })
+await settle()
+at = writes.length
+made = await sent('thorin', share({ sp: 28 }))
+assert.equal(made.result.status, 'done', JSON.stringify(made.result))
+assert.deepEqual(writes.slice(at).filter(([what, id]) => (what === 'updateActor') && (id === 'vex')).map(([, , changes]) => changes), [
+  { 'system.currency.sp': 7.56 },
+], "Vex's 0.56 sp and her 7 sp share make 7.56")
+assert.deepEqual([coinsOf(party).sp, coinsOf(vex).sp], [0, 7.56])
+okay(`a distribution keeps a fraction${DND5E6 ? ', as dnd5e 6 stores one,' : ''} as it's written: of 103.7 gp, 3.7 stays with the Company; Vex's 0.56 sp and her 7 sp share make 7.56`)
+
 // Refused: nothing written, posted, or sent.
 restock()
 await settle()
@@ -690,6 +718,21 @@ assert.deepEqual(made.result.transfer, { from: 'party', to: null, items: [], cur
 assert.deepEqual([coinsOf(party).gp, coinsOf(bram).gp, coinsOf(lia).gp, coinsOf(thorin).gp], [DND5E6 ? 78.5 : 78, 25, 0, 40], '3 + 75 back')
 assert.equal(lineOf(made), 'Distributes 25 gp among Bram (25 gp each); 78 gp stays with The Iron Company')
 assert.deepEqual(sheetsIn(made), [['group.updated', 'party'], ['character.updated', 'bram']])
+// Module 0.53.0: the shares put back keep a fraction as it's written. Of the Company's 7.56 gp, 7 among
+// the four, Bram's refused: 3.56 left, then 4 put back, 7.56 again (floating point alone,
+// 7.5600000000000005).
+restock()
+stock(party, companyStock(), { ...COMPANY_COINS, gp: 7.56 })
+await settle()
+at = writes.length
+refusing((what, target) => (what === 'update') && (target === bram))
+made = await sent('thorin', share({ gp: 7 }))
+clearFaults()
+assert.deepEqual(refusal(made), ['failed', 'error', 'An update was refused'])
+assert.deepEqual(writes.slice(at).filter(([what, id]) => (what === 'updateActor') && (id === 'party')).map(([, , changes]) => changes), [
+  { 'system.currency.gp': 3.56 }, { 'system.currency.gp': 7.56 },
+], 'taken, then the four not given put back')
+assert.equal(coinsOf(party).gp, 7.56)
 // The putting back refused too: the shares not given lost, never made twice; the line says what stays.
 restock()
 await settle()
@@ -721,7 +764,7 @@ clearFaults()
 assert.deepEqual([refusal(made), 'transfer' in made.result, messages.size, coinsOf(party).gp], [['failed', 'error', 'An update was refused'], false, lines, COMPANY_GP])
 // The party's sheet is looked at again, its coins having been written, but is as it was told: none posted.
 assert.deepEqual(sheetsIn(made), [])
-okay('where Lia\'s share is refused, the three shares not given go back to the party in one write (3 + 75 = 78 gp): `error`, `transfer` naming Bram\'s alone, "Distributes 25 gp among Bram (25 gp each); 78 gp stays with The Iron Company", the party\'s and Bram\'s sheets; where that\'s refused too, both said, the party left at 3 and the line says 3 stays; where the party\'s own write is refused, nothing is written, said or sent; where the first share is, all goes back: no line, and the party\'s sheet, as it was, isn\'t posted')
+okay('where Lia\'s share is refused, the three shares not given go back to the party in one write (3 + 75 = 78 gp): `error`, `transfer` naming Bram\'s alone, "Distributes 25 gp among Bram (25 gp each); 78 gp stays with The Iron Company", the party\'s and Bram\'s sheets; where that\'s refused too, both said, the party left at 3 and the line says 3 stays; where the party\'s own write is refused, nothing is written, said or sent; where the first share is, all goes back: no line, and the party\'s sheet, as it was, isn\'t posted; the shares put back keep the Company\'s 7.56 gp as it was')
 
 /* -------------------------------------------- */
 /*  Two at once                                 */

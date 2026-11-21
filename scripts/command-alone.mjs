@@ -10,7 +10,7 @@ import {
 } from "./dice-plan.mjs";
 import { dnd5eGeneration } from "./dnd5e-generation.mjs";
 import {
-  markMidiBonusAction, markMidiReaction, midiActivities, midiBonusActionUsed, midiReactionUsed
+  fightOf, markMidiBonusAction, markMidiReaction, midiActivities, midiBonusActionUsed, midiReactionUsed
 } from "./midi-economy.mjs";
 import {
   aloneSubject, criticalAdditions, DND5E_ACTIVITIES, eligibleSlots, ownDamageConfig, previewDamage, slotChoice
@@ -100,8 +100,10 @@ export async function runItemDamageCommand(command, campaign) {
   if ( weapon.refusal ) return failed(weapon.refusal);
   const { attackMode, ammunition, thrown } = weapon;
 
-  // Midi-QOL's Bonus Actions and reactions, where it asks to spend, as a use's are (round 0.41.0 §2.5).
-  const economy = consume && midiActivities() && Boolean(actor.inCombat || (form && character.inCombat));
+  // Midi-QOL's Bonus Actions and reactions, where it asks to spend, as a use's are (round 0.41.0 §2.5),
+  // in the encounter it fights in: since 0.53.0 one begun elsewhere too.
+  const fight = (consume && midiActivities()) ? (fightOf(actor) ?? (form ? fightOf(character) : null)) : null;
+  const economy = Boolean(fight);
   const type = activity.effectiveActivationType ?? activity.activation?.type ?? "";
   const bonus = economy && (type === "bonus");
   const reaction = economy && REACTIONS.has(type) && ((activity.activation?.cost ?? 1) > 0);
@@ -193,14 +195,14 @@ export async function runItemDamageCommand(command, campaign) {
   }
   if ( bonus ) {
     try {
-      await markMidiBonusAction(actor);
+      await markMidiBonusAction(actor, fight);
     } catch (err) {
       console.error(`${MODULE_ID} | Could not mark ${character.name}'s Bonus Action for Midi-QOL`, err);
     }
   }
   if ( reaction ) {
     try {
-      await markMidiReaction(actor);
+      await markMidiReaction(actor, fight);
     } catch (err) {
       console.error(`${MODULE_ID} | Could not mark ${character.name}'s reaction for Midi-QOL`, err);
     }

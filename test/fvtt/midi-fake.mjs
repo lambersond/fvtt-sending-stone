@@ -83,6 +83,12 @@ export const midi = {
   bonusMarks: [],
   reactionMarks: [],
   noMarker: false,
+  /**
+   * Since module 0.53.0, the actors whose Bonus Action or reaction marker was taken off through
+   * `removeBonusActionUsed` and `removeReactionUsed`, by their ids, in order, forced or not.
+   */
+  bonusRemovals: [],
+  reactionRemovals: [],
   /** How many times Midi's damage roll modifiers were added to a damage configuration. */
   modifiersMade: 0,
   /** Abort the next attack without a change of state, as Midi does for a weapon with no ammunition. */
@@ -446,7 +452,9 @@ class Workflow {
   /**
    * Workflow.ts:2494-2575 (module 0.44.0): an other activity that spends something, its damage put
    * off, has its consumption checked first, which rolls its dice cost and throws the roll away, then
-   * spent; then its damage is rolled (2592-2610).
+   * spent; then its damage is rolled (2592-2610). The branch where Midi spends without its dialog
+   * (`shouldAutoConsume`); with its dialog shown it makes no check (Workflow.ts:2505-2511), which no
+   * harness here takes.
    */
   async checkOtherActivityConsumption() {
     const other = this.otherActivity
@@ -1097,6 +1105,20 @@ export class MidiForwardActivity extends ForwardActivity {
   async setupTargets() { return true }
 }
 
+/**
+ * Since module 0.53.0, Midi's own count of an actor's reactions or Bonus Actions used, where a harness
+ * gives the actor Midi's most a round (`flags.midi-qol.actions.reactionsMax`, `bonusActionsMax`):
+ * its marker writes the count to `reactionsUsed` and `bonusActionsUsed` there (utils.ts:7193-7208),
+ * which the module reads. Null for an actor without, which `usedReaction` and `usedBonus` stand for.
+ * @param {Actor} actor
+ * @param {"reactionsMax"|"bonusActionsMax"} most
+ * @returns {object|null}
+ */
+function counted(actor, most) {
+  const actions = actor?.flags?.['midi-qol']?.actions
+  return Number.isFinite(actions?.[most]) ? actions : null
+}
+
 /** Put Midi in the world: its activities in place of dnd5e's, and its API. */
 export function installMidi() {
   Object.assign(activityTypes, {
@@ -1109,19 +1131,48 @@ export function installMidi() {
     configSettings: () => midi.settings,
     checkRule: rule => (rule === 'activeDefence') && midi.activeDefence,
     isTargetable: token => !token.document.hidden,
-    hasUsedReaction: actor => midi.usedReaction.has(actor.id),
-    hasUsedBonusAction: actor => midi.usedBonus.has(actor.id),
+    // utils.ts:7307-7308, 7351-7355: used once the count reaches the actor's most, where a harness
+    // gives it one (`counted`); else by `usedReaction` and `usedBonus`, as before module 0.53.0.
+    hasUsedReaction: actor => {
+      const actions = counted(actor, 'reactionsMax')
+      return actions ? (actions.reactionsUsed ?? 0) >= actions.reactionsMax : midi.usedReaction.has(actor.id)
+    },
+    hasUsedBonusAction: actor => {
+      const actions = counted(actor, 'bonusActionsMax')
+      return actions ? (actions.bonusActionsUsed ?? 0) >= actions.bonusActionsMax : midi.usedBonus.has(actor.id)
+    },
     // utils.ts:7029-7061, 7063-7098 (module 0.41.0): marked only under "all", "displayOnly" or the
-    // actor's type, and only where Midi registered its marker effect.
+    // actor's type, and only where Midi registered its marker effect; since module 0.53.0 counted one
+    // more where the actor has its most (utils.ts:7223-7285).
     setReactionUsed: async actor => {
       if (midi.noMarker || !['all', 'displayOnly', actor.type].includes(midi.settings.enforceReactions)) return
-      midi.usedReaction.add(actor.id)
+      const actions = counted(actor, 'reactionsMax')
+      if (actions) actions.reactionsUsed = (actions.reactionsUsed ?? 0) + 1
+      else midi.usedReaction.add(actor.id)
       midi.reactionMarks.push(actor.id)
     },
     setBonusActionUsed: async actor => {
       if (midi.noMarker || !['all', 'displayOnly', actor.type].includes(midi.settings.enforceBonusActions)) return
-      midi.usedBonus.add(actor.id)
+      const actions = counted(actor, 'bonusActionsMax')
+      if (actions) actions.bonusActionsUsed = (actions.bonusActionsUsed ?? 0) + 1
+      else midi.usedBonus.add(actor.id)
       midi.bonusMarks.push(actor.id)
+    },
+    // utils.ts:7293-7300, 7359-7366 (module 0.53.0): forced, the marker taken off at once, its count
+    // with it; else left to DAE's special duration, which isn't modelled.
+    removeReactionUsed: async (actor, force = false) => {
+      midi.reactionRemovals.push(actor.id)
+      if (!force) return
+      midi.usedReaction.delete(actor.id)
+      const actions = counted(actor, 'reactionsMax')
+      if (actions) actions.reactionsUsed = 0
+    },
+    removeBonusActionUsed: async (actor, force = false) => {
+      midi.bonusRemovals.push(actor.id)
+      if (!force) return
+      midi.usedBonus.delete(actor.id)
+      const actions = counted(actor, 'bonusActionsMax')
+      if (actions) actions.bonusActionsUsed = 0
     },
   }
   globalThis.canvas = {

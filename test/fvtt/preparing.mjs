@@ -634,8 +634,9 @@ const shaped = field => ({ ...prepare('witch'), prepare: field })
 // Each field another kind names (§P.2.1), alone beside it, refused whatever its value, 0 too: only a
 // field undefined or null isn't given.
 // Module 0.49.0: and `coins`, added or taken away.
+// Module 0.53.0: and `rerolls`, `enchantment` and `hitPoints`, let by before.
 const OTHER_FIELDS = ['transfer', 'remove', 'typed', 'favorite', 'note', 'dish', 'effect', 'wildShape', 'spellSlot', 'counter', 'count',
-  'inspiration', 'concentration', 'turn', 'undo', 'coins']
+  'inspiration', 'concentration', 'turn', 'undo', 'coins', 'rerolls', 'enchantment', 'hitPoints']
 for (const [command, error, why] of [
   [{ ...prepare('witch'), prepare: undefined }, 'prepare', 'no prepare'],
   [shaped(null), 'prepare', 'prepare null'],
@@ -671,7 +672,7 @@ for (const [command, error, why] of [
   assert.deepEqual(sheetsIn(it), [], `${why}: no sheet`)
 }
 assert.deepEqual([updates.length, messages.size, stored()], [count, lines, before], 'nothing written or posted')
-okay("refuses as `invalid`, nothing written, posted or sent: `prepare` missing, null, a string, an array, without id or op, with an extra key, an op but prepare or unprepare, an id empty, dotted, of 65 letters or not a string, or a roll's field, an effect, a spell slot, a favorite, a move, a counter or `typed` beside it, or any of the 15 fields other kinds name, each given as 1 and as 0 (`prepare`); advantage, a die or anything added (`dice`); the Gamemaster's or a `by` but theirs (`by`); a companion's, or an `of` that is no id (`of`)")
+okay("refuses as `invalid`, nothing written, posted or sent: `prepare` missing, null, a string, an array, without id or op, with an extra key, an op but prepare or unprepare, an id empty, dotted, of 65 letters or not a string, or a roll's field, an effect, a spell slot, a favorite, a move, a counter or `typed` beside it, or any of the 19 fields other kinds name, each given as 1 and as 0 (`prepare`); advantage, a die or anything added (`dice`); the Gamemaster's or a `by` but theirs (`by`); a companion's, or an `of` that is no id (`of`)")
 
 /* -------------------------------------------- */
 /*  8. Refused: unknown, attacks-off, off       */

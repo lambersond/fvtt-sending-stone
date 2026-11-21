@@ -36,9 +36,11 @@ import { COST_BEGUN, COST_CHECK, CRITICAL_AS_DND5E, DAMAGE_FACES, DIE_FACES, MOD
  * Foundry's computer dice, never asked of anyone (`costCheck`), under dnd5e 5 or 6, as are those of
  * Midi-QOL's own check of a use the module hands it (`checkedUntilSpent`), and, since 0.49.0, of
  * its check of a reaction it looks for, where it looks as its line for dnd5e 5 does
- * (`isReactionLookup`), and, under dnd5e 5, of Midi's check of a typed roll's run's other activity:
- * told by dnd5e's consumption targets' `resolveCost`, which is passed the use's configuration, and
- * which tells later-dice.mjs of each dice cost a run spends.
+ * (`isReactionLookup`), and, under dnd5e 5, of Midi's check of a typed roll's run's other activity,
+ * and, since 0.53.0, of Midi's check of any use where it spends without its dialog and of any other
+ * activity it pairs with an attack (`isMidiSpendingCheck`): told by dnd5e's consumption targets'
+ * `resolveCost`, which is passed the use's configuration, and which tells later-dice.mjs of each dice
+ * cost a run spends.
  */
 
 /**
@@ -419,7 +421,8 @@ export function checkedUntilSpent(usage) {
  * dnd5e begins spending what a use spends, since 0.44.0: its configuration is no longer a check
  * (`checkedUntilSpent`), so that a dice cost dnd5e rolls for it is rolled as ever; and, since
  * 0.49.0, it says its spending has begun (`COST_BEGUN`), so that no cost of it is taken for
- * Midi-QOL's check of a reaction it looks for (`isReactionLookup`).
+ * Midi-QOL's check of a reaction it looks for (`isReactionLookup`), and, since 0.53.0, no cost of it
+ * is taken for Midi's check of a use or of another activity (`isMidiSpendingCheck`).
  * @param {Activity} activity
  * @param {object} usageConfig
  * @returns {void}
@@ -464,6 +467,29 @@ function isReactionLookup(activity, config) {
   if ( game.modules.get("midi-qol")?.active !== true ) return false;
   const activation = activity?.effectiveActivationType ?? activity?.activation?.type;
   return (typeof activation === "string") && activation.includes("reaction");
+}
+
+/**
+ * Is a dice cost Midi-QOL's check of what a use would spend, since 0.53.0? Before its use spends
+ * without its dialog, Midi works the cost out from the use's own configuration, which carries its
+ * workflow, and throws that away (its `checkAutoConsume`); before it spends the other activity it
+ * pairs with an attack, in its workflow or from its card's button, it works that out with a
+ * configuration that spends resources alone (`checkOtherActivityConsumption`,
+ * `#consumeOtherActivity`), and throws that away too. Told by exactly that, with Midi-QOL active, of
+ * a configuration dnd5e hasn't begun spending (`spendingBegins`): dnd5e's own lists the targets it
+ * spends, never `true`. So the use itself, a reaction taken among them, spends as ever, its cost
+ * rolled once with the dice settings of whoever makes it. A Midi-QOL that builds its checks
+ * otherwise leaves them to roll as Midi rolls them.
+ * @param {object} [config]   The configuration dnd5e's roll of the cost was given.
+ * @returns {boolean}
+ */
+function isMidiSpendingCheck(config) {
+  if ( !config || (typeof config !== "object") || (config[COST_BEGUN] === true) ) return false;
+  if ( game.modules.get("midi-qol")?.active !== true ) return false;
+  const Workflow = globalThis.MidiQOL?.Workflow;
+  if ( (typeof Workflow === "function") && (config.workflow instanceof Workflow) ) return true;
+  const consume = config.consume;
+  return (consume?.resources === true) && (consume.spellSlot === false) && (consume.action === false);
 }
 
 /* -------------------------------------------- */
@@ -587,10 +613,11 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
  * Around dnd5e's roll of a dice cost, since 0.44.0, `ConsumptionTargetData#resolveCost`, which is
  * passed the use's configuration: for the module's own check of what a use would spend
  * (`costCheck`), Midi-QOL's of a use the module hands it (`checkedUntilSpent`), Midi's of a typed
- * roll's run's other activity, or, since 0.49.0, its check of a reaction it looks for
- * (`isReactionLookup`), each thrown away, or a run's own spending (later-dice.mjs), the roll is
- * built unevaluated, noted, then evaluated, as dnd5e would have evaluated it; any other, as dnd5e
- * has it.
+ * roll's run's other activity, since 0.49.0 its check of a reaction it looks for
+ * (`isReactionLookup`), or, since 0.53.0, its check of a use or of the other activity it pairs with
+ * an attack (`isMidiSpendingCheck`), each thrown away, or a run's own spending (later-dice.mjs), the
+ * roll is built unevaluated, noted, then evaluated, as dnd5e would have evaluated it; any other, as
+ * dnd5e has it.
  * @this {object}              The consumption target.
  * @param {Function} wrapped   dnd5e's own.
  * @param {object} [options]   `{config, evaluate, ...}`, as dnd5e's.
@@ -600,7 +627,7 @@ function taggedEvaluate(wrapped, options={}, ...rest) {
 function resolveCost(wrapped, options, ...rest) {
   const config = options?.config;
   const check = (config?.[COST_CHECK] === true) || (laterDice?.checking?.(this.activity) === true)
-    || isReactionLookup(this.activity, config);
+    || isReactionLookup(this.activity, config) || isMidiSpendingCheck(config);
   const later = (!check && config && laterDice?.costOf) ? laterDice.costOf(config) : null;
   if ( !check && !later ) return wrapped(options, ...rest);
   const roll = wrapped({ ...options, evaluate: false }, ...rest);

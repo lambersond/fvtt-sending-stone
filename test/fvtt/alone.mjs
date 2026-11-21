@@ -837,6 +837,7 @@ thorin.system.bonuses.rwak.damage = '1'
 }
 if (MIDI) {
   // 13. Midi-QOL's Bonus Actions and reactions, where it enforces them, in a fight.
+  assert.equal(thorin.inCombat, true, 'Thorin in the fight the Gamemaster has up')
   const potion = fields => aloneOf({ item: 'potion', activity: 'potion-heal', dice: [d(4, 2, 3)], ...fields })
   midi.settings.enforceBonusActions = 'all'
   midi.usedBonus.add('thorin')
@@ -865,12 +866,136 @@ if (MIDI) {
   doneOf(await potion({ consume: true }))
   assert.equal(midi.bonusMarks.length, marks, 'out of a fight: neither checked nor marked')
   Object.defineProperty(thorin, 'inCombat', inCombat)
+
+  // 13b. Since module 0.53.0, in an encounter the Gamemaster doesn't have up, on the ridge, begun and
+  // its scene's chosen one, with none up: checked as in the encounter up, marked by the module, and the
+  // mark taken off as Thorin's next turn there begins.
+  restorePotion()
+  const viewed = game.combat
+  const ridge = combat('ridge')
+  combatant(ridge, 'cb-ridge', thorin)
+  Object.assign(ridge, { started: true, round: 1, turn: 0 })
+  game.combat = null
+  try {
+    assert.equal(thorin.inCombat, false, "Thorin in no fight the Gamemaster has up, by core's reading")
+    midi.usedBonus.add('thorin')
+    const ridgeBefore = messages.size
+    failedAs(await potion({ consume: true }), 'bonus-action')
+    assert.equal(messages.size, ridgeBefore, 'on the ridge, his Bonus Action used: nothing rolled')
+    midi.usedBonus.delete('thorin')
+    marks = midi.bonusMarks.length
+    doneOf(await potion({ consume: true }))
+    assert.deepEqual(midi.bonusMarks.slice(marks), ['thorin'], 'on the ridge, unused: marked by the module')
+    const removals = midi.bonusRemovals.length
+    ridge.round = 2
+    await Hooks.callAll('combatTurnChange', ridge, { round: 1, turn: 0, combatantId: 'cb-other' }, { round: 2, turn: 0, combatantId: 'cb-ridge' })
+    assert.deepEqual([midi.bonusRemovals.slice(removals), midi.usedBonus.has('thorin')], [['thorin'], false], 'taken off as his turn there begins')
+    // Wren's Hellish Rebuke on the ridge, a reaction: refused while hers is used; unused, rolled and
+    // marked by the module; the mark taken off as her turn there begins.
+    combatant(ridge, 'cb-ridge-wren', wren)
+    assert.equal(wren.inCombat, false, "Wren in no fight the Gamemaster has up, by core's reading")
+    midi.usedReaction.add('wren')
+    failedAs(await rebuke({ slot: 'pact', consume: true, dice: [d(10, 1, 2, 3, 4)] }), 'reaction')
+    midi.usedReaction.delete('wren')
+    setSlot(wren, 'pact', 1)
+    const reactions = midi.reactionMarks.length
+    doneOf(await rebuke({ slot: 'pact', consume: true, dice: [d(10, 1, 2, 3, 4)] }))
+    setSlot(wren, 'pact', 1)
+    assert.deepEqual(midi.reactionMarks.slice(reactions), ['wren'], 'on the ridge, her reaction unused: marked by the module')
+    const reactionsOff = midi.reactionRemovals.length
+    ridge.turn = 1
+    await Hooks.callAll('combatTurnChange', ridge, { round: 2, turn: 0, combatantId: 'cb-ridge' }, { round: 2, turn: 1, combatantId: 'cb-ridge-wren' })
+    assert.deepEqual([midi.reactionRemovals.slice(reactionsOff), midi.usedReaction.has('wren')], [['wren'], false], 'taken off as her turn there begins')
+    // Midi allowing Thorin two Bonus Actions a round and Wren two reactions (its bonusActionsMax and
+    // reactionsMax): one used on the ridge is marked, though not used up, and taken off all the same
+    // as the creature's next turn there begins, so that its next round has both.
+    thorin.flags['midi-qol'] = { actions: { bonusActionsMax: 2 } }
+    wren.flags['midi-qol'] = { actions: { reactionsMax: 2 } }
+    try {
+      const counts = () => [thorin.flags['midi-qol'].actions.bonusActionsUsed ?? 0, wren.flags['midi-qol'].actions.reactionsUsed ?? 0]
+      restorePotion()
+      doneOf(await potion({ consume: true }))
+      doneOf(await rebuke({ slot: 'pact', consume: true, dice: [d(10, 1, 2, 3, 4)] }))
+      setSlot(wren, 'pact', 1)
+      assert.deepEqual([counts(), MidiQOL.hasUsedBonusAction(thorin), MidiQOL.hasUsedReaction(wren)], [[1, 1], false, false], 'one of two used each, neither used up')
+      const offs = [midi.bonusRemovals.length, midi.reactionRemovals.length]
+      ridge.round = 3
+      ridge.turn = 0
+      await Hooks.callAll('combatTurnChange', ridge, { round: 2, turn: 1, combatantId: 'cb-ridge-wren' }, { round: 3, turn: 0, combatantId: 'cb-ridge' })
+      ridge.turn = 1
+      await Hooks.callAll('combatTurnChange', ridge, { round: 3, turn: 0, combatantId: 'cb-ridge' }, { round: 3, turn: 1, combatantId: 'cb-ridge-wren' })
+      assert.deepEqual([midi.bonusRemovals.slice(offs[0]), midi.reactionRemovals.slice(offs[1]), counts()], [['thorin'], ['wren'], [0, 0]], 'one of two, taken off at the next turn there all the same')
+      restorePotion()
+      doneOf(await potion({ consume: true }))
+      restorePotion()
+      doneOf(await potion({ consume: true }))
+      restorePotion()
+      failedAs(await potion({ consume: true }), 'bonus-action')
+    } finally {
+      delete thorin.flags['midi-qol']
+      delete wren.flags['midi-qol']
+      setSlot(wren, 'pact', 1)
+    }
+    // His potion marked again, then Thorin gone from the world: at his next turn there nothing is
+    // taken off a creature no longer there.
+    midi.usedBonus.delete('thorin')
+    restorePotion()
+    doneOf(await potion({ consume: true }))
+    const goneOff = midi.bonusRemovals.length
+    actors.delete('thorin')
+    try {
+      ridge.round = 4
+      ridge.turn = 0
+      await Hooks.callAll('combatTurnChange', ridge, { round: 3, turn: 1, combatantId: 'cb-ridge-wren' }, { round: 4, turn: 0, combatantId: 'cb-ridge' })
+    } finally {
+      actors.set('thorin', thorin)
+    }
+    assert.deepEqual([midi.bonusRemovals.slice(goneOff), midi.usedBonus.has('thorin')], [[], true], 'gone from the world: nothing taken off')
+    // Wren's next turn there, nothing marked on her since hers was taken off: nothing taken off, a
+    // mark taken off once.
+    const laterOff = midi.reactionRemovals.length
+    ridge.turn = 1
+    await Hooks.callAll('combatTurnChange', ridge, { round: 4, turn: 0, combatantId: 'cb-ridge' }, { round: 4, turn: 1, combatantId: 'cb-ridge-wren' })
+    assert.deepEqual(midi.reactionRemovals.slice(laterOff), [], 'her next turn there, nothing marked since: nothing taken off')
+    // His potion on her turn, then Previous Turn back onto his in the same round: his turn taken up
+    // again, never his next, so his mark stays; on to hers, then the next round's first, his next
+    // turn there, takes it off.
+    midi.usedBonus.delete('thorin')
+    restorePotion()
+    doneOf(await potion({ consume: true }))
+    const backOff = midi.bonusRemovals.length
+    ridge.turn = 0
+    await Hooks.callAll('combatTurnChange', ridge, { round: 4, turn: 1, combatantId: 'cb-ridge-wren' }, { round: 4, turn: 0, combatantId: 'cb-ridge' })
+    assert.deepEqual([midi.bonusRemovals.slice(backOff), midi.usedBonus.has('thorin')], [[], true], 'Previous Turn back onto his, the same round: his mark stays')
+    restorePotion()
+    failedAs(await potion({ consume: true }), 'bonus-action')
+    ridge.turn = 1
+    await Hooks.callAll('combatTurnChange', ridge, { round: 4, turn: 0, combatantId: 'cb-ridge' }, { round: 4, turn: 1, combatantId: 'cb-ridge-wren' })
+    ridge.round = 5
+    ridge.turn = 0
+    await Hooks.callAll('combatTurnChange', ridge, { round: 4, turn: 1, combatantId: 'cb-ridge-wren' }, { round: 5, turn: 0, combatantId: 'cb-ridge' })
+    assert.deepEqual([midi.bonusRemovals.slice(backOff), midi.usedBonus.has('thorin')], [['thorin'], false], 'his next turn there: taken off')
+    // Marked again on the ridge, which is then deleted: its marks forgotten, so a turn of it heard
+    // after takes nothing off.
+    midi.usedBonus.delete('thorin')
+    restorePotion()
+    doneOf(await potion({ consume: true }))
+    game.combats.delete('ridge')
+    await Hooks.callAll('deleteCombat', ridge, {}, 'gm')
+    const forgotten = midi.bonusRemovals.length
+    await Hooks.callAll('combatTurnChange', ridge, { round: 5, turn: 1, combatantId: 'cb-ridge-wren' }, { round: 6, turn: 0, combatantId: 'cb-ridge' })
+    assert.deepEqual(midi.bonusRemovals.slice(forgotten), [], 'the ridge deleted: its marks forgotten')
+  } finally {
+    game.combats.delete('ridge')
+    game.combat = viewed
+    setSlot(wren, 'pact', 1)
+  }
   midi.usedBonus.clear()
   midi.usedReaction.clear()
   midi.settings.enforceBonusActions = 'none'
   midi.settings.enforceReactions = 'none'
   restorePotion()
-  ok("Midi-QOL's economy with consume: Enforce bonus actions \"all\", Thorin's used, the potion refused \"bonus-action\", nothing rolled; without consume rolled, nothing marked; unused, marked; Enforce reactions \"all\", Wren's used, Hellish Rebuke refused \"reaction\", unused marked; out of a fight neither")
+  ok("Midi-QOL's economy with consume: Enforce bonus actions \"all\", Thorin's used, the potion refused \"bonus-action\", nothing rolled; without consume rolled, nothing marked; unused, marked; Enforce reactions \"all\", Wren's used, Hellish Rebuke refused \"reaction\", unused marked; out of a fight neither; since module 0.53.0, in an encounter begun on the ridge with none up, refused, unused marked by the module, the mark taken off as his turn there begins; Wren's Hellish Rebuke there refused reaction, unused marked, taken off as her turn begins; allowed two a round, one used is taken off at the next turn there all the same; nothing taken off Thorin gone from the world; Wren's next turn there, nothing marked since, takes nothing off; Previous Turn back onto Thorin's in the same round leaves his mark on, his next turn there takes it off; the ridge deleted, its marks forgotten")
 }
 {
   // 7. Uses.

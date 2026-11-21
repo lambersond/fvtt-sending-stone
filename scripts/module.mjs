@@ -26,6 +26,7 @@ import { registerGroupsWanted } from "./groups.mjs";
 import { startHeartbeat } from "./heartbeat.mjs";
 import { registerJournalHooks } from "./journals.mjs";
 import { installLaterDice } from "./later-dice.mjs";
+import { registerMidiMarkHooks } from "./midi-economy.mjs";
 import { installMidiPrompts, registerMidiPromptHooks } from "./midi-prompts.mjs";
 import { registerPromptHooks } from "./prompts.mjs";
 import { registerSettings } from "./settings.mjs";
@@ -53,6 +54,7 @@ Hooks.once("init", () => {
   registerPromptHooks();
   registerMidiPromptHooks();
   registerCommandHooks();
+  registerMidiMarkHooks();
   registerSettingsWatch();
   registerDishHooks();
   registerEffectHooks();
