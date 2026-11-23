@@ -208,8 +208,9 @@ function statusEffects() {
  * staticID; dnd5e's transformation config and TransformationSetting, sizes, creature types, movement
  * and senses, status effects (a list under dnd5e 5, an object under 6) and the abilities' types;
  * dnd5e's default units and `utils.defaultUnits`, its metric settings off;
- * Actor.implementation; a canvas showing token-core's viewed scene; `game.packs`; fromUuid and
- * fromUuidSync for compendium documents; escapeHTML.
+ * Actor.implementation; a canvas showing token-core's viewed scene; `game.packs`; since module 0.54.0
+ * `game.folders`, where no world has made it; fromUuid and fromUuidSync for compendium documents;
+ * escapeHTML.
  * @returns {void}
  */
 export function installTransformCore() {
@@ -263,6 +264,9 @@ export function installTransformCore() {
   globalThis.canvas = canvas
 
   game.packs = packs
+  // The world's folders (journal-core.mjs's, where a world has them), which a world actor's `folder`
+  // reads since module 0.54.0.
+  game.folders ??= new Collection()
   const before = globalThis.fromUuidSync
   const beforeAsync = globalThis.fromUuid
   globalThis.fromUuidSync = (uuid, options = {}) => {
@@ -438,9 +442,11 @@ export class TActor extends Character {
   get isOwner() { return Boolean(game.user?.isGM) || ((this.ownership?.[game.user?.id] ?? this.ownership?.default ?? 0) >= 3) }
   get hasPlayerOwner() { return game.users.some(user => !user.isGM && this.testUserPermission(user, 'OWNER')) }
   set hasPlayerOwner(_) {}
+  // As core's: a compendium's folder from its compendium, a world actor's from the world's (since
+  // module 0.54.0).
   get folder() {
     const id = this._source.folder ?? null
-    return (this.compendium ? this.compendium.folders.get(id) : null) ?? null
+    return (this.compendium ? this.compendium.folders.get(id) : game.folders?.get?.(id)) ?? null
   }
   get statuses() {
     return new Set(this.effects.filter(effect => effect.active !== false).flatMap(effect => [...(effect.statuses ?? [])]))
