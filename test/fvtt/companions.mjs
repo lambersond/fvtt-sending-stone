@@ -2805,6 +2805,7 @@ await saveKeep({ constantCompanions: [] })
   assert.equal(rowOf('steelDef').querySelector('.hint').textContent.trim(), `${C}.Already {"character":"Thorin"}`)
   assert.equal(rowOf('steelCopy').querySelector('.hint').textContent.trim(), `${C}.SummonCopy`, "dnd5e's copy hinted")
   assert.ok(find(win, '[data-action="addPickedCompanions"]').disabled, 'nothing to add yet')
+  assert.equal(find(win, '[data-pick-companion-count]').textContent, 'SENDINGSTONE.Config.Picker.NoneSelected', 'and it says so')
   const hawkBox = find(win, '[data-pick-companion="hawk"]')
   hawkBox.checked = true
   hawkBox.dispatchEvent(new Event('change', { bubbles: true }))
