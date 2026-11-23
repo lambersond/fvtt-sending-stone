@@ -1576,6 +1576,18 @@ async function formsFromAnywhere() {
   assert.equal(knownAt('anyGreyWolf00000').why, 'permission', 'H9: unshared: "permission"')
   await posts(() => greyWolf.update({ 'ownership.alice': CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER }), 'her sheet, the Grey Wolf shared again')
   assert.deepEqual(reads(), USABLE_READS)
+  // The campaign's switch off: her sheet sent again all the same as the Grey Wolf changes, and as
+  // Allow Transformation does, as her Wild Shape is on it whatever the switch.
+  await campaignAs({ wildShape: false })
+  assert.deepEqual([getCampaigns()[0].wildShape, helloOf().features.wildShape, reads()], [false, OFF, USABLE_READS], 'H9: the switch off, the hello saying so, her known forms as before')
+  await posts(() => greyWolf.update({ name: 'Dire Pup' }), 'her sheet, the switch off, the Grey Wolf renamed')
+  assert.equal(knownAt('anyGreyWolf00000').name, 'Dire Pup', 'H9: the switch off: renamed in Foundry, renamed here')
+  await transformation(false, 'updateSetting')
+  assert.equal(knownAt('anyGreyWolf00000').why, 'transformation', 'H9: the switch off: Allow Transformation off, "transformation"')
+  await transformation(true, 'updateSetting')
+  await posts(() => greyWolf.update({ name: 'Grey Wolf' }), 'her sheet, the switch off, the Grey Wolf named again')
+  await campaignAs({ wildShape: true })
+  assert.deepEqual(reads(), USABLE_READS, 'H9: the switch on again: as before')
   fromAnywhere.add('H9')
 
   // H10, a world actor deleted, and one made: "gone", and usable; an entry gone refused "gone" on
@@ -1668,7 +1680,7 @@ async function formsFromAnywhere() {
   await freshUses(rowan)
   await settle(80)
   assert.deepEqual([formOf(), formOf(rowan), lastSheet().wildShape.known.length, game.permissions.ACTOR_CREATE], [undefined, undefined, before.length, undefined], 'R: put back')
-  ok(`known forms from anywhere (0.54.0; ${[...fromAnywhere].join(', ')}): to an app that says wildShape 1, by name alone with no why and refused "form"; at 2, sent again with no hello, and nothing sent for the same answer again; at 3 as at 2; each with why not, the form's own reasons first ("source" a token's actor, an item, or an item of a world actor or of a compendium's or in one, "gone" a world actor or compendium not there or a compendium of Items, "owner" no player or one not her Owner, an assigned player with no level on her or only her Observer, or beside another assigned her who is Owner through her default, "permission" one may not observe it, Limited or a hidden compendium, never telling an entry missing from it, "transformation", then "create", one player without Create New Actors of his own beside one with it), each usable listed with its numbers, a world actor's read as it stands and never through fromUuid, a compendium's loaded once, an entry gone found false; Allow Transformation and the compendiums' configuration watched by createSetting and updateSetting, a world actor's creation, change and deletion, for a druid who knows only forms from anywhere else too; a permission that can't be read not held, her Wild Shape kept; a change into the world's Grey Wolf as into a Beast of the compendiums, its record, use, line and tokens, a return never refused once unusable; a deleted one "gone", an entry gone refused "gone", the rules' "form" (CR, a world folder named Summons); the Moon's floor from a world beast's own armor class, at 2 or 3 where his players may observe it, never at 1 or with no player; back at 1 as before`)
+  ok(`known forms from anywhere (0.54.0; ${[...fromAnywhere].join(', ')}): to an app that says wildShape 1, by name alone with no why and refused "form"; at 2, sent again with no hello, and nothing sent for the same answer again; at 3 as at 2; each with why not, the form's own reasons first ("source" a token's actor, an item, or an item of a world actor or of a compendium's or in one, "gone" a world actor or compendium not there or a compendium of Items, "owner" no player or one not her Owner, an assigned player with no level on her or only her Observer, or beside another assigned her who is Owner through her default, "permission" one may not observe it, Limited or a hidden compendium, never telling an entry missing from it, "transformation", then "create", one player without Create New Actors of his own beside one with it), each usable listed with its numbers, a world actor's read as it stands and never through fromUuid, a compendium's loaded once, an entry gone found false; Allow Transformation and the compendiums' configuration watched by createSetting and updateSetting, a world actor's creation, change and deletion, for a druid who knows only forms from anywhere else too, and whatever the campaign's switch; a permission that can't be read not held, her Wild Shape kept; a change into the world's Grey Wolf as into a Beast of the compendiums, its record, use, line and tokens, a return never refused once unusable; a deleted one "gone", an entry gone refused "gone", the rules' "form" (CR, a world folder named Summons); the Moon's floor from a world beast's own armor class, at 2 or 3 where his players may observe it, never at 1 or with no player; back at 1 as before`)
 }
 
 if (DND5E6) {
