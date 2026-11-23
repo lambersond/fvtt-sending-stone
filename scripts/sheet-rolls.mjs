@@ -26,9 +26,10 @@ import { castCopy, countedUses, finite, limitedUses, localize, RESOURCES } from 
 
 /**
  * The kinds of activity a player can use from the app other than an attack: a saving throw, damage,
- * healing, a check, an enchantment, or anything else, such as an effect.
+ * healing, a check, an enchantment, or anything else, such as an effect; and since 0.54.0 a
+ * summoning, cast as dnd5e casts it, its creature placed by the Gamemaster from its card.
  */
-export const USES = new Set(["save", "damage", "heal", "utility", "check", "enchant"]);
+export const USES = new Set(["save", "damage", "heal", "utility", "check", "enchant", "summon"]);
 
 /**
  * The kinds of activity a forward may be used through from the app: an attack, and those used

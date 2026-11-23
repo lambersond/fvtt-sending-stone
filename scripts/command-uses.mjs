@@ -1,12 +1,13 @@
 import { MODULE_ID, ROLL_TAG, SETTINGS } from "./constants.mjs";
 import { cardTargetAcs } from "./chat-data.mjs";
 import {
-  appFlags, authorFor, commandRefusal, describeResult, failedResult, findMessage, PUBLIC
+  appFlags, authorFor, commandRefusal, describeResult, failedResult, findMessage, given, PUBLIC
 } from "./command-rolls.mjs";
 import {
   checkedUntilSpent, costCheck, matchesDice, modifiedDice, readModifiers, takesAway, unmaximizable, withPlan
 } from "./dice-plan.mjs";
 import { applyChosen, enchantChoice, enchantedOf, enchantResult, endAll, notApplied } from "./command-enchant.mjs";
+import { summonChoice, summonFlag } from "./command-summon.mjs";
 import { midiIntegration, resultsAlways } from "./config.mjs";
 import { commandActor } from "./creatures.mjs";
 import { bindWorkflow } from "./later-dice.mjs";
@@ -17,6 +18,7 @@ import { midiPromptWaits } from "./midi-prompts.mjs";
 import { outcomeOf } from "./results.mjs";
 import { DND5E_ACTIVITIES, eligibleSlots, ownDamageConfig, previewDamage, slotChoice } from "./sheet-links.mjs";
 import { effectsOf, enchantInPlay, originOf } from "./sheet-enchant.mjs";
+import { summonInPlay } from "./sheet-summon.mjs";
 import {
   castSpellOf, checkUsable, followUpCheck, forwardTarget, FORWARDED, freeCheck, offeredLevels, USES
 } from "./sheet-rolls.mjs";
@@ -160,7 +162,9 @@ export async function runUseCommand(command, campaign, { signal }={}) {
  * consumes. A forward is used through the activity it names, spending what the forward spends
  * rather than that activity's own, and never a slot: at the level dnd5e casts it at by default,
  * whatever slot the player chose. An enchant activity is used with the profile and item the player
- * chose, as `enchantChoice` has them.
+ * chose, as `enchantChoice` has them. Since 0.54.0 a summon activity is cast with nothing placed,
+ * the creature, type and size the player chose noted where dnd5e would ask, as `summonChoice` has
+ * them.
  * @param {object} command
  * @param {Actor} actor
  * @returns {Promise<object>}   `{refusal, error}`, or what the use is made with.
@@ -189,6 +193,8 @@ async function prepareUse(command, actor) {
   // An enchant activity the sheet leaves to Foundry, as a magic item's template or a choice made
   // once, is used there alone, as only one the sheet offers is ended from here.
   if ( (activity.type === "enchant") && !enchantInPlay(activity) ) return { refusal: "activity" };
+  // Since 0.54.0 a summon activity with a creature to summon, as the sheet offers it.
+  if ( (activity.type === "summon") && !summonInPlay(activity) ) return { refusal: "activity" };
   // A spell an item casts is cast at a level its Cast activity offers, whether through the Cast
   // activity or through the spell's copy, as the spellbook casts it.
   const castBy = linked ? cast : ((castCopy(item) && !forward) ? (item.system.linkedActivity ?? null) : null);
@@ -228,6 +234,12 @@ async function prepareUse(command, actor) {
   const enchanting = enchants ? enchantChoice(command, actor, activity, scaledActivity(activity, slot)) : null;
   if ( enchanting?.refusal ) return enchanting;
   if ( enchanting ) usage.enchantmentProfile = enchanting.profile;
+  // A summoning is cast at no one with nothing placed, the player's choice noted for its card at the
+  // level it's cast at; nothing else is used with one (since 0.54.0).
+  const summons = activity.type === "summon";
+  if ( !summons && given(command.summon) ) return { refusal: "invalid", error: "summon" };
+  const summoning = summons ? summonChoice(command, activity, scaledActivity(activity, slot)) : null;
+  if ( summoning?.refusal ) return summoning;
 
   const targets = self ? [{ ...selfTarget(actor), picked: { self: true } }] : [];
   for ( const picked of ((attack && !command.targets) ? [command.target] : (command.targets ?? [])) ) {
@@ -243,7 +255,7 @@ async function prepareUse(command, actor) {
   }
 
   Object.assign(usage, {
-    create: { ...usage.create, measuredTemplate: false },
+    create: { ...usage.create, measuredTemplate: false, ...(summons && { summons: false }) },
     subsequentActions: false,
     ...((slot && !forward) ? { spell: { ...usage.spell, slot } } : {}),
     ...(unslotted ? { consume: { ...usage.consume, spellSlot: false } } : {}),
@@ -268,16 +280,17 @@ async function prepareUse(command, actor) {
 
   return {
     attack, area, item, activity, targets, usage, prepared, attackMode: weapon.attackMode, ammunition: weapon.ammunition,
-    cast: linked ? cast : null, forward, enchanting
+    cast: linked ? cast : null, forward, enchanting, summoning
   };
 }
 
 /**
- * Can a forward be used from the app, through the activity it names: one the app uses, not a Cast,
- * a summoning, a transformation or an enchantment, nor a spell's check called for once it's cast,
- * as `followUpCheck` has it, which a free casting would spend its use on for nothing; both of them
- * usable, as dnd5e requires of each as it uses it; and not one that lets the level be chosen, which
- * is left to Foundry. One the sheet leaves out as a repeat of another is used as any other.
+ * Can a forward be used from the app, through the activity it names: one the app uses, since 0.54.0
+ * a summoning among them, not a Cast, a transformation or an enchantment, nor a spell's check called
+ * for once it's cast, as `followUpCheck` has it, which a free casting would spend its use on for
+ * nothing; both of them usable, as dnd5e requires of each as it uses it; and not one that lets the
+ * level be chosen, which is left to Foundry. One the sheet leaves out as a repeat of another is used
+ * as any other.
  * @param {Item} item
  * @param {Activity} forward
  * @param {Activity|null} target   The activity it's used through, as `forwardTarget` finds it.
@@ -671,9 +684,10 @@ async function dnd5eUse(command, campaign, actor, use) {
   const author = authorFor(actor, use.character);
   const targets = cardTargets(use, actor);
   // A forward has the activity it names used, as dnd5e's forward does: the card is that activity's.
+  // Since 0.54.0 a summoning's carries the player's choice, where dnd5e's would ask.
   const results = await (use.forward ?? activity).use(usage, { configure: false }, {
     rollMode: PUBLIC,
-    data: { author: author.id, flags: { dnd5e: { targets }, [MODULE_ID]: appFlags(command, "use") } }
+    data: { author: author.id, flags: { dnd5e: { targets }, [MODULE_ID]: { ...appFlags(command, "use"), ...summonFlag(use) } } }
   });
   castFromItem(use, results);
   const card = results?.message;
@@ -1074,7 +1088,7 @@ async function midiUseNow(command, campaign, actor, use) {
     const state = await withPlan(command, async () => {
       const using = activity.use(midiCall, { configure: false }, {
         rollMode: PUBLIC,
-        data: { flags: { [MODULE_ID]: appFlags(command, "use") } }
+        data: { flags: { [MODULE_ID]: { ...appFlags(command, "use"), ...summonFlag(use) } } }
       }).finally(() => Hooks.off("dnd5e.preCreateUsageMessage", nameAll));
       // Since 0.44.0 its rolls are its run's: the dice they throw later are asked of a typing player.
       bindWorkflow(command.id, midiCall.workflow);

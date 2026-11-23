@@ -165,8 +165,10 @@ const MONSTER = name => Object.keys(CREATURES).find(uuid => CREATURES[uuid].name
 const add = actor => { actors.set(actor.id, actor); return actor }
 const spells = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => [`spell${level}`, { value: 2, max: 2, level }]))
 const profile = (_id, fields = {}) => ({ _id, count: '', cr: '', name: '', uuid: '', level: { min: null, max: null }, types: [], ...fields })
+// A spell whose summon activity's duration is the spell's, its concentration too (base-activity.mjs).
 const summonSpell = (id, name, level, activity, system = {}) => ({
-  id, name, type: 'spell', system: { level, method: 'spell', properties: [], ...system }, activities: [{ type: 'summon', affects: '', ...activity }],
+  id, name, type: 'spell', system: { level, method: 'spell', properties: [], ...system },
+  activities: [{ type: 'summon', affects: '', duration: { override: false }, ...activity }],
 })
 // Find Familiar, 1st: a Bat, a Cat or an Owl, from dnd5e's Monsters, Celestial, Fey or Fiend (dnd5e's
 // spells/1st-level/find-familiar.yml, shortened to three).
@@ -464,6 +466,230 @@ const activityOf = (sheet, id) => rowOf(sheet, id)?.activity ?? null
   const swarm = summonOf('batSwarm').profiles
   assert.deepEqual([swarm.length, swarm[0].name, swarm.at(-1).name], [20, 'Bat 1', 'Bat 20'], 'twenty of twenty-one')
   ok("Summon Beast's limits, Air from the 3rd; Conjure Animals by Challenge Rating with dnd5e's labels, ½ and ¼, its counts 1, 2, 4 and 8 and each higher level's where it changes; Conjure Fey's Challenge Rating at each level; types and sizes only where there's a choice; twenty profiles at most")
+}
+
+/* -------------------------------------------- */
+/*  The cast                                     */
+/* -------------------------------------------- */
+
+let ids = 0
+const queue = (campaign, ...commands) => {
+  app.waiting.set(campaign, [...(app.waiting.get(campaign) ?? []), ...commands])
+  app.wake?.()
+}
+const results = id => app.events.filter(e => (e.type === 'command.result') && (e.data.id === id)).map(e => e.data)
+async function send(command, campaign = 'camp-a') {
+  queue(campaign, command)
+  await until(() => results(command.id).length, `the result of ${command.id}`)
+  return results(command.id)[0]
+}
+const use = (item, activity, fields = {}) => send({ id: `use-${++ids}`, actorId: 'thorin', kind: 'use', item, activity, targets: [], slot: null, ...fields })
+const useCard = id => [...messages.values()].find(m => m.flags?.['sending-stone']?.use === id) ?? null
+const slots = actor => Object.fromEntries(Object.entries(actor.system.spells).map(([key, pool]) => [key, pool.value]))
+const usesOf = (actor, item) => actor.items.get(item).system.uses.spent
+const concentratingOn = (actor, item) => [...actor.concentration.effects.values()].filter(e => e.flags.dnd5e.item.id === item)
+const refusalOf = made => [made.status, made.reason, made.error ?? null]
+const cardsMade = () => messages.size
+/** The Summon button on a card's content, as the card draws it under each release. */
+const summonButton = card => /data-action="placeSummons"/.test(String(card?.content ?? ''))
+const nothingPlaced = () => { assert.equal(screen.summons, 0, 'dnd5e placed nothing as it was used'); assert.deepEqual(screen.placed, [], 'nothing placed') }
+
+/* -------------------------------------------- */
+/*  U4: the cast, nothing placed                   */
+/* -------------------------------------------- */
+
+let owlCard = null
+{
+  // What dnd5e would do by default: the Gamemaster may summon, and a scene is up.
+  const familiar = thorin.items.get('findFamiliar').system.activities.get('ffSummon')
+  assert.equal(game.user.isGM, true)
+  assert.equal(familiar.canSummon, true, "dnd5e's default would place")
+  assert.ok(canvas.scene, 'a scene is up')
+  const before = slots(thorin)
+  const made = await use('findFamiliar', 'ffSummon', { summon: { profile: P.owl, type: 'fey' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual([made.use, made.damage], [{ type: 'summon' }, null])
+  assert.equal(slots(thorin).spell1, before.spell1 - 1, 'a 1st-level slot spent')
+  owlCard = useCard(made.id)
+  assert.ok(owlCard, 'its card')
+  assert.equal(made.messageId, owlCard.id)
+  if (!MIDI) assert.equal(owlCard.author?.id ?? owlCard.author, 'alice', "authored by Thorin's player")
+  assert.deepEqual(owlCard.flags['sending-stone'].summon, { item: 'findFamiliar', activity: 'ffSummon', profile: P.owl, label: 'Owl', type: 'fey' })
+  assert.ok(summonButton(owlCard), "dnd5e's Summon button on it")
+  nothingPlaced()
+  ok("Find Familiar cast from the app as Owl, Fey, the Gamemaster able to summon and a scene up: a 1st-level slot spent, its card Alice's with dnd5e's Summon button, flagged with the Owl and Fey labelled \"Owl\", nothing placed; done, a summon's use, no damage")
+}
+
+/* -------------------------------------------- */
+/*  U5: the level it's cast at                      */
+/* -------------------------------------------- */
+
+{
+  const before = slots(thorin)
+  const cards = cardsMade()
+  let made = await use('summonBeast', 'sbSummon', { slot: 'spell2', summon: { profile: 'airProfile000000' } })
+  assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'no Air at the 2nd')
+  assert.deepEqual([slots(thorin), cardsMade()], [before, cards], 'nothing spent or posted')
+  made = await use('summonBeast', 'sbSummon', { slot: 'spell3', summon: { profile: 'airProfile000000' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.equal(slots(thorin).spell3, before.spell3 - 1, 'a 3rd-level slot spent')
+  assert.equal(concentratingOn(thorin, 'summonBeast').length, 1, 'concentration begun')
+  assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'summonBeast', activity: 'sbSummon', profile: 'airProfile000000', label: 'Air' })
+  // Summon Air Spirit at the 2nd summons nothing: refused, chosen or not.
+  const now = slots(thorin)
+  made = await use('summonAir', 'saSummon', { slot: 'spell2' })
+  assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'nothing at the 2nd')
+  assert.deepEqual([slots(thorin), cardsMade()], [now, cards + 1], 'nothing spent or posted')
+  nothingPlaced()
+  ok("Summon Beast's Air refused at the 2nd, nothing spent, and cast at the 3rd, concentration begun; Summon Air Spirit refused at the 2nd with nothing chosen, as it summons nothing there")
+}
+
+/* -------------------------------------------- */
+/*  U6: what's refused                               */
+/* -------------------------------------------- */
+
+{
+  const before = slots(thorin)
+  const cards = cardsMade()
+  for (const [summon, why] of [[{ profile: P.owl, colour: 1 }, 'another field'], [{ profile: 7 }, 'a profile not an id'], [{ profile: P.owl, type: 'a b' }, 'a type not a key']]) {
+    const made = await use('findFamiliar', 'ffSummon', { summon })
+    assert.deepEqual(refusalOf(made), ['failed', 'invalid', 'summon'], why)
+  }
+  // On a save activity, an attack, damage on its own and an end of concentration.
+  let made = await send({ id: `use-${++ids}`, actorId: 'vex', kind: 'use', item: 'sacredFlame', activity: 'sfSave', targets: [], slot: null, summon: { profile: P.owl } })
+  assert.deepEqual(refusalOf(made), ['failed', 'invalid', 'summon'], 'on a save')
+  made = await send({ id: `atk-${++ids}`, actorId: 'thorin', kind: 'attack', item: 'findFamiliar', activity: 'ffSummon', mode: 0, explicit: false, extras: [], dice: [{ faces: 20, results: [12] }], summon: { profile: P.owl } })
+  assert.deepEqual(refusalOf(made), ['failed', 'invalid', 'summon'], 'on an attack')
+  made = await send({ id: `alone-${++ids}`, actorId: 'thorin', kind: 'itemDamage', item: 'findFamiliar', activity: 'ffSummon', mode: 0, explicit: false, extras: [], dice: [{ faces: 8, results: [5] }], summon: { profile: P.owl } })
+  assert.deepEqual(refusalOf(made), ['failed', 'invalid', 'summon'], 'on damage on its own')
+  // Its checks name it among what damage on its own and a recharge never name, behind the test of
+  // its kind, as an enchantment is.
+  const { checkItemDamageCommand, checkRechargeCommand } = await import(`${MODULE}/scripts/command-rolls.mjs`)
+  const plainly = { mode: 0, explicit: false, extras: [] }
+  const alone = { kind: 'itemDamage', item: 'findFamiliar', activity: 'ffSummon', ...plainly, dice: [{ faces: 8, results: [5] }] }
+  const recharge = { kind: 'recharge', item: 'packOfWolves', ...plainly, dice: [{ faces: 6, results: [5] }] }
+  assert.deepEqual([checkItemDamageCommand(alone), checkItemDamageCommand({ ...alone, summon: { profile: P.owl } })], [null, 'item'], 'damage on its own')
+  assert.deepEqual([checkRechargeCommand(recharge), checkRechargeCommand({ ...recharge, summon: { profile: P.owl } })], [null, 'item'], 'a recharge')
+  made = await send({ id: `end-${++ids}`, actorId: 'thorin', kind: 'endConcentration', concentration: { effect: 'conc' }, mode: 0, explicit: false, extras: [], dice: [], summon: { profile: P.owl } })
+  assert.deepEqual([made.status, made.reason], ['failed', 'invalid'], 'on an end of concentration')
+  // At a target, or its user; a type or size it doesn't offer.
+  made = await use('findFamiliar', 'ffSummon', { targets: [{ combatId: 'fight', combatantId: 'cb-1' }], summon: { profile: P.owl } })
+  assert.deepEqual(refusalOf(made), ['failed', 'target', null], 'at a target')
+  made = await use('findFamiliar', 'ffSummon', { self: true })
+  assert.deepEqual(refusalOf(made), ['failed', 'target', null], 'at its user')
+  made = await use('packOfWolves', 'pwSummon', { summon: { profile: 'wolvesProfile000', type: 'beast' } })
+  assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'a type the wolves offer no choice of')
+  made = await use('findFamiliar', 'ffSummon', { summon: { profile: P.owl, size: 'huge' } })
+  assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'a size Find Familiar offers none of')
+  made = await use('summonAir', 'saSummon', { slot: 'spell3', summon: { profile: 'airSpiritProfile', type: 'elemental' } })
+  assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'the one type Summon Air Spirit gives, no choice')
+  made = await use('findFamiliar', 'ffSummon', { summon: { profile: 'catProfile00000x' } })
+  assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'a profile it has not')
+  assert.deepEqual([slots(thorin), usesOf(thorin, 'packOfWolves'), cardsMade()], [before, 0, cards], 'nothing spent or posted')
+  ok("refused, nothing spent: a summon with another field, a profile not an id or a type not a key, invalid; one named on a save, an attack, damage on its own or an end of concentration; at a target or its user; a type the wolves offer no choice of, nor Summon Air Spirit with its one, a size Find Familiar offers none of, or a profile it hasn't")
+}
+
+/* -------------------------------------------- */
+/*  U7: nothing to write                             */
+/* -------------------------------------------- */
+
+{
+  let made = await use('findFamiliar', 'ffSummon')
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.equal(useCard(made.id).flags['sending-stone'].summon, undefined, 'nothing chosen, nothing noted')
+  made = await use('packOfWolves', 'pwSummon', { summon: { profile: 'wolvesProfile000' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual([useCard(made.id).flags['sending-stone'].summon, usesOf(thorin, 'packOfWolves')], [undefined, 1], 'the one profile: nothing noted, its use spent')
+  made = await use('steelDefender', 'sdSummon', { summon: { profile: 'defenderProfile0' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.equal(useCard(made.id).flags['sending-stone'].summon, undefined)
+  nothingPlaced()
+  ok("Find Familiar with nothing chosen, the Pack of Wolves and the Steel Defender with their one creature named: done, nothing noted on their cards, where dnd5e asks nothing")
+}
+
+/* -------------------------------------------- */
+/*  U10: through Midi-QOL's workflow                 */
+/* -------------------------------------------- */
+
+if (MIDI) {
+  midi.settings.autoRemoveSummonedCreature = true
+  const made = await use('summonBeast', 'sbSummon', { slot: 'spell3', summon: { profile: 'seaProfile000000' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  const card = useCard(made.id)
+  assert.deepEqual(card.flags['sending-stone'].summon, { item: 'summonBeast', activity: 'sbSummon', profile: 'seaProfile000000', label: 'Sea' })
+  assert.ok(summonButton(card), "Midi's card keeps dnd5e's Summon button")
+  nothingPlaced()
+  const [concentration] = concentratingOn(thorin, 'summonBeast').slice(-1)
+  assert.ok(concentration, 'concentration begun')
+  assert.equal(concentration.flags.dnd5e.dependents, undefined, 'nothing tied to it, as nothing was placed')
+  delete midi.settings.autoRemoveSummonedCreature
+  ok("through Midi-QOL's workflow: Summon Beast as Sea, nothing placed, the card flagged with dnd5e's Summon button on it, concentration begun with nothing tied to it")
+}
+
+/* -------------------------------------------- */
+/*  U11-U14: a staff, a forward, a companion, a form  */
+/* -------------------------------------------- */
+
+{
+  const before = slots(thorin)
+  let made = await use('staffFamiliar', 'sfCast', { summon: { profile: P.owl } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'staffCopy', activity: 'scSummon', profile: P.owl, label: 'Owl' }, "the spell's copy's")
+  assert.deepEqual([usesOf(thorin, 'staffFamiliar'), slots(thorin)], [1, before], "the staff's charge spent, no slot")
+  made = await use('feyFamiliar', 'fyFree', { summon: { profile: P.cat } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'feyFamiliar', activity: 'fyCall', profile: P.cat, label: 'Cat' }, "the summon's, not the forward's")
+  assert.deepEqual([thorin.items.get('feyFamiliar').system.activities.get('fyFree').uses.spent, slots(thorin)], [1, before], "the free casting's use spent, no slot")
+  ok("the staff's Find Familiar as Owl, its card the spell's copy's, flagged with it, a charge spent; Fey Touched's free casting as Cat, flagged with the summon activity, its use spent and no slot")
+}
+{
+  let made = await send({ id: `use-${++ids}`, actorId: 'brakka', of: 'thorin', kind: 'use', item: 'brakkaCall', activity: 'bcSummon', targets: [], slot: null })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  if (!MIDI) assert.equal(useCard(made.id).author?.id ?? useCard(made.id).author, 'alice', "Brakka's player's")
+  const hers = slots(elowen)
+  const form = slots(elowenWolf)
+  made = await send({ id: `use-${++ids}`, actorId: 'elowen', kind: 'use', item: 'elowenFamiliar', activity: 'efSummon', targets: [], slot: null, summon: { profile: P.bat, type: 'celestial' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'elowenFamiliar', activity: 'efSummon', profile: P.bat, label: 'Bat', type: 'celestial' })
+  assert.deepEqual([slots(elowen), slots(elowenWolf).spell1], [hers, form.spell1 - 1], "the form's slot, hers untouched")
+  nothingPlaced()
+  ok("Brakka's Call the Pack cast from the app, its card Alice's; Elowen's Find Familiar as her Wolf, from the form's slots, hers untouched")
+}
+
+/* -------------------------------------------- */
+/*  U15: whoever asks, and whatever may summon          */
+/* -------------------------------------------- */
+
+{
+  settings.set('allowSummoning', false)
+  alice.permissions = { TOKEN_CREATE: false, ACTOR_CREATE: false }
+  assert.equal(alice.can('TOKEN_CREATE'), false)
+  for (const by of ['gm', undefined]) {
+    const made = await use('findFamiliar', 'ffSummon', { ...(by && { by }), summon: { profile: P.cat, type: 'fiend' } })
+    assert.equal(made.status, 'done', JSON.stringify(made))
+    const card = useCard(made.id)
+    if (!MIDI) assert.equal(card.author?.id ?? card.author, 'alice')
+    assert.deepEqual([card.flags['sending-stone'].by ?? null, card.flags['sending-stone'].summon.label], [by ?? null, 'Cat'])
+  }
+  alice.permissions = {}
+  settings.delete('allowSummoning')
+  nothingPlaced()
+  ok("Allow Summoning off and Alice's role unable to create tokens or actors: the Gamemaster's command and Alice's own both cast, the card Alice's, the Gamemaster's marked by: gm")
+}
+
+/* -------------------------------------------- */
+/*  U18: summoning again                              */
+/* -------------------------------------------- */
+
+{
+  const owl = companionActor('placedOwl', 'Owl', { linked: false, flags: { dnd5e: { summon: { origin: 'Actor.thorin.Item.findFamiliar' } } } })
+  placeToken(arena, owl, { id: 'placedOwlToken00', name: 'Owl', delta: { flags: { dnd5e: { summon: { origin: 'Actor.thorin.Item.findFamiliar' } } } } })
+  const made = await use('findFamiliar', 'ffSummon', { summon: { profile: P.owl, type: 'fey' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.ok(arena.tokens.get('placedOwlToken00'), 'the Owl placed before stays')
+  const flagged = [...messages.values()].filter(m => m.flags?.['sending-stone']?.summon?.profile === P.owl)
+  assert.ok(flagged.length >= 2 && flagged.includes(owlCard) && flagged.includes(useCard(made.id)), 'two cards, each with its choice')
+  ok("Find Familiar cast again while an Owl it placed is on the arena: the Owl stays, and both cards carry their choice, as dnd5e has it")
 }
 
 console.log(`summons${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

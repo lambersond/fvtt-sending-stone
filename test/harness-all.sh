@@ -127,6 +127,7 @@ for v in X=1 "X=1 DND5E6=1"; do run handouts $v SLIM_CHECK=1; done
 for v in X=1 "X=1 DND5E6=1"; do run health $v; done
 # Module 0.54.0: summon activities on the sheets of an app that reads them, and none to an older app:
 # the creatures, types and sizes each offers at each level, labelled as dnd5e's usage dialog labels
-# them (dnd5e 5.3.3 and 6.0.5 stand-ins, with and without Midi-QOL's).
+# them; cast from the app, nothing placed, the player's choice noted on the card (dnd5e 5.3.3 and
+# 6.0.5 stand-ins, with and without Midi-QOL's).
 for v in "X=1 SLIM_CHECK=1" "MIDI=1 SLIM_CHECK=1" "X=1 DND5E6=1 SLIM_CHECK=1" "MIDI=1 DND5E6=1"; do run summons $v; done
 exit $fail

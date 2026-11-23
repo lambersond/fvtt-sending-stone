@@ -28,7 +28,7 @@ import { HIT_POINT_OPS, MOST_HIT_POINTS } from "./constants.mjs";
  * @type {string[]}
  */
 const ROLL_FIELDS = [
-  "enchant", "item", "activity", "target", "targets", "self", "slot", "prompt", "text", "link", "key"
+  "enchant", "summon", "item", "activity", "target", "targets", "self", "slot", "prompt", "text", "link", "key"
 ];
 
 /**

@@ -162,6 +162,7 @@ const LAYERS = [
       'foundry-settings.mjs',       // it tells why attacks can't be made here, which it asks command-rolls.mjs
       'command-dishes.mjs',
       'command-enchant.mjs',
+      'command-summon.mjs',
       'command-notes.mjs',
       'command-plain.mjs',
       'command-texts.mjs',
