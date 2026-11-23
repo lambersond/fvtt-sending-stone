@@ -452,8 +452,9 @@ export const WILD_SHAPE_PACKS = Object.freeze(["dnd5e.actors24"]);
 export const ENDING_STATUSES = Object.freeze(["incapacitated", "unconscious", "paralyzed", "petrified", "stunned", "sleeping"]);
 
 /**
- * The pack folders whose creatures are no Wild Shape form, since 0.40.0, wherever they are within a
- * pack: a spell's or an item's creatures, as the Phantom Steed and the Goat of Traveling, and summons.
+ * The folders, within a pack or since 0.54.0 the world's, whose creatures are no Wild Shape form,
+ * since 0.40.0, wherever they are within it: a spell's or an item's creatures, as the Phantom Steed
+ * and the Goat of Traveling, and summons.
  * @type {readonly string[]}
  */
 export const NOT_FORM_FOLDERS = Object.freeze(["Conjurations", "Magic Items", "Summons"]);

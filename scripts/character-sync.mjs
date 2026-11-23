@@ -521,8 +521,9 @@ function seatSheet(campaign, actor, texts) {
 }
 
 /**
- * Send a campaign whose app has started or stopped taking Wild Shape, in answer to a heartbeat,
- * every character again, as it's now sent them: with or without their forms.
+ * Send a campaign whose app has started or stopped taking Wild Shape, or since 0.54.0 changed the
+ * format it takes, in answer to a heartbeat, every character again, as it's now sent them: with or
+ * without their forms, and with or without known forms from anywhere.
  * @param {string} campaignId
  * @returns {void}
  */

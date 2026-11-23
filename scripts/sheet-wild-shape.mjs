@@ -1,14 +1,18 @@
 import { MODULE_ID } from "./constants.mjs";
 import { finite } from "./sheet-values.mjs";
 import {
-  fitsNow, formName, formSummary, inPool, knownProfiles, sizeLabel, wildShapeOn, wildShapeRules
+  anywhereReader, canPlayersSee, fitsNow, formName, formSummary, foundryOnlyWhy, inPool, knownProfiles, sizeLabel,
+  wildShapeOn, wildShapeRules
 } from "./wild-shape.mjs";
 
 /**
  * What a character's sheet says of Wild Shape, since module 0.40.0, to an app that takes it (see
  * wild-shape.mjs, command-wildshape.mjs): on a 2024 druid's sheet, `wildShape`, what a change gives
  * her now, her known forms and her last ending; and on a transformed character's, which is its form's,
- * `form`, what she is now. Each is left out, never the sheet, should building it fail.
+ * `form`, what she is now. Each is left out, never the sheet, should building it fail. Since 0.54.0,
+ * to an app that says `wildShape` 2, a known form from anywhere else is listed as one from the
+ * campaign's compendiums is where each of her players could use it in Foundry, and with why not
+ * where not.
  */
 
 /**
@@ -53,7 +57,9 @@ export function wildShapeBlock(original, sheetActor, campaign) {
  * Her known forms, in her Wild Shape's order: one from the campaign's compendiums summarised as it
  * was loaded, with whether it fits her now, and whether it can't be found; one from anywhere else
  * by its profile's name alone, never loaded here, so nothing a player put on their own feature in
- * Foundry is read as a Gamemaster or shown in the app. A profile with no name, as dnd5e's own sheet
+ * Foundry is read as a Gamemaster or shown in the app, unless, since 0.54.0 and for an app that
+ * takes it, each of her players could use it in Foundry (`foundryOnlyWhy`): then as one from the
+ * campaign's compendiums, and otherwise with why not. A profile with no name, as dnd5e's own sheet
  * adds a dropped creature, is named as `formName` finds, never blank.
  * @param {Actor} original
  * @param {object} rules
@@ -61,10 +67,15 @@ export function wildShapeBlock(original, sheetActor, campaign) {
  * @returns {object[]}
  */
 function knownForms(original, rules, campaign) {
+  const anywhere = anywhereReader(campaign.id);
   return knownProfiles(rules.activity).map(profile => {
     const id = profile._id;
     const named = () => formName(profile, original, campaign);
-    if ( !inPool(profile.uuid, campaign) ) return { id, name: named(), pool: false };
+    if ( !inPool(profile.uuid, campaign) ) {
+      if ( !anywhere ) return { id, name: named(), pool: false };
+      const why = foundryOnlyWhy(profile.uuid, original);
+      if ( why ) return { id, name: named(), pool: false, why };
+    }
     const summary = formSummary(profile.uuid, original);
     const fits = fitsNow(profile.uuid, summary, rules);
     const uuid = profile.uuid;
@@ -125,10 +136,11 @@ function unrecordedName(form, original) {
 
 /**
  * Is the form's armor class Circle of the Moon's floor, not the creature's: the floor as dnd5e sets
- * it, a natural armor class of exactly it, where the creature's own, as loaded, is lower. Only a
- * creature from the campaign's compendiums is loaded for it: one from anywhere else, as a world
- * actor or another pack a form was taken from in Foundry, is never loaded on the bridge, and its own
- * armor class, unknown, is taken to be lower, as for a pool form not loaded yet.
+ * it, a natural armor class of exactly it, where the creature's own, as loaded, is lower. A creature
+ * from the campaign's compendiums is loaded for it; one from anywhere else, as a world actor or
+ * another pack a form was taken from in Foundry, is loaded too since 0.54.0, for an app that takes
+ * such forms, where each of her players may observe it, whatever Foundry's other permissions; else
+ * its own armor class, unknown, is taken to be lower, as for a pool form not loaded yet.
  * @param {Actor} form
  * @param {object|null} record
  * @param {Actor} original
@@ -139,7 +151,8 @@ function flooredAc(form, record, original, campaign) {
   const floor = wildShapeRules(original)?.acFloor ?? null;
   const ac = form.system?.attributes?.ac ?? {};
   if ( (record?.kind !== "wildShape") || (floor === null) || (ac.calc !== "natural") || (finite(ac.value) !== floor) ) return false;
-  const own = inPool(record.uuid, campaign) ? formSummary(record.uuid, original)?.ac : undefined;
+  const loaded = inPool(record.uuid, campaign) || (anywhereReader(campaign.id) && canPlayersSee(record.uuid, original));
+  const own = loaded ? formSummary(record.uuid, original)?.ac : undefined;
   return !Number.isFinite(own) || (own < floor);
 }
 

@@ -4,7 +4,8 @@ import { activeForm, noteFormDeleted, originalOf, transformed } from "./characte
 import { queueBusy, registerQueueSettled } from "./commands.mjs";
 import { postEnding } from "./command-wildshape.mjs";
 import {
-  dueWhy, ending, endWildShape, formDeleted, leftover, record, rested, returned, switchedOnCharacters
+  dueWhy, ending, endWildShape, formDeleted, formSettingChanged, formSourceChanged, leftover, record, rested, returned,
+  switchedOnCharacters
 } from "./wild-shape.mjs";
 
 /**
@@ -12,10 +13,11 @@ import {
  *
  * wild-shape.mjs says how a Wild Shape is kept and ended, and holds what the hooks here hand each
  * event to: the record of a transformation, what comes back on a return, the replacement after a
- * Long Rest, a form deleted, and a player's leftover form. The watch is here whole: on the bridge,
- * it ends each form that's due and posts the ending's line in chat, looking as world time moves, as
- * a form or its effects change, when a character's queue of commands settles, and when a client
- * becomes the bridge (bridge.mjs).
+ * Long Rest, a form deleted, and a player's leftover form; and since 0.54.0 a known form's source and
+ * the settings that decide whether one from anywhere is used from the app. The watch is here whole:
+ * on the bridge, it ends each form that's due and posts the ending's line in chat, looking as world
+ * time moves, as a form or its effects change, when a character's queue of commands settles, and
+ * when a client becomes the bridge (bridge.mjs).
  *
  * They're in a file of their own, above wild-shape.mjs, because the watch waits on the command
  * queue (commands.mjs) and posts each ending's line (command-wildshape.mjs), and both of those
@@ -26,7 +28,10 @@ import {
 /**
  * Register Wild Shape's hooks: on every client, the record of a transformation, what comes back on a
  * return, the replacement after a Long Rest, and the forms deleted; on the bridge, the endings, the
- * deletion safety net, and a player's leftover forms.
+ * deletion safety net, and a player's leftover forms; and since 0.54.0, on the bridge, a known form's
+ * source (a world actor made, changed or deleted) and the settings that decide whether one from
+ * anywhere is used from the app (dnd5e's Allow Transformation, the world's compendium
+ * configuration), stored the first time one changes from its default and updated after.
  * @returns {void}
  */
 export function registerWildShapeHooks() {
@@ -37,9 +42,11 @@ export function registerWildShapeHooks() {
     if ( canSend() ) setTimeout(() => endDueForms(), 0);
   });
   Hooks.on("updateActor", actor => {
+    formSourceChanged(actor);
     if ( transformed(actor) ) checkSoon(originalOf(actor));
     else leftover(actor);
   });
+  Hooks.on("createActor", actor => formSourceChanged(actor));
   for ( const hook of ["createActiveEffect", "updateActiveEffect"] ) {
     Hooks.on(hook, effect => {
       const actor = effect?.parent;
@@ -49,7 +56,9 @@ export function registerWildShapeHooks() {
   Hooks.on("deleteActor", actor => {
     noteFormDeleted(actor);
     formDeleted(actor);
+    formSourceChanged(actor);
   });
+  for ( const hook of ["createSetting", "updateSetting"] ) Hooks.on(hook, setting => formSettingChanged(setting));
   registerQueueSettled(key => {
     const character = game.actors.get(key);
     if ( character ) endDueForms(character);

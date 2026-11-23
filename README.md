@@ -671,14 +671,18 @@ in chat; the change shows on the character's sheet, in Foundry and in the app.
 
 Turn **Allow Players to use Wild Shape from the app** on for a campaign, under **Wild Shape** on its
 Player actions tab, and a 2024 druid's player can, from the app, choose the Beasts their druid knows
-and change into one and back, a use of Wild Shape each time, by the 2024 rules: 4, 6 or 8 known forms
-by level, the Challenge Rating the druid's level (or the Circle of the Moon) allows, no Fly Speed
-before level 8, one known form replaced after each Long Rest. **Beasts come from** lists the world's
-Actor compendiums; the players see the names and statistics of the Beasts in those you tick, dnd5e's
-2024 Actors by default. Known forms are kept on the druid's own Wild Shape feature, as dnd5e's
-linked forms ("By Direct Link"), so dnd5e's sheet and Tidy 5e offer the same ones in Foundry in place
-of their Challenge Rating browser. A form put there in Foundry from anywhere else, or outside the
-rules, is shown by name and used only in Foundry.
+and change into one and back, a use of Wild Shape each time, by the 2024 rules: 4, 6 or 8 known
+forms by level, the Challenge Rating the druid's level (or the Circle of the Moon) allows, no Fly
+Speed before level 8, one known form replaced after each Long Rest. **Beasts come from** lists the
+world's Actor compendiums; the players see the names and statistics of the Beasts in those you tick,
+dnd5e's 2024 Actors by default. Known forms are kept on the druid's own Wild Shape feature, as
+dnd5e's linked forms ("By Direct Link"), so dnd5e's sheet and Tidy 5e offer the same ones in Foundry
+in place of their Challenge Rating browser. Since 0.54.0 a form put there in Foundry from anywhere
+else, another Actor compendium or one of the world's actors, is used from the app too, with its
+statistics, where each of the druid's players could use it in Foundry: the druid theirs, the form
+shared with them as Observer, dnd5e's **Allow Transformation** on, and their **Create New Actors**
+permission. Any other is shown by name with why, and used only in Foundry. One outside the rules,
+from anywhere, is used only in Foundry.
 
 A change is dnd5e's own, with its Wild Shape preset, on your Foundry, with no dialog on your screen:
 the druid's linked tokens become the form on every scene, not only the one you're viewing, and a
@@ -1120,9 +1124,11 @@ Gamemaster-only information switched on.
   return its summon names a deleted actor.
 - **Enchantments on the druid's weapons** can't be ended from the app while shaped: the form's sheet
   lists none of them.
-- **A known form put on a druid's Wild Shape in Foundry** from outside the campaign's compendiums, or
-  outside the rules, is listed by name and used only in Foundry, where dnd5e's own Allow Polymorphing
-  and the source's permissions apply.
+- **A known form put on a druid's Wild Shape in Foundry from outside the campaign's compendiums** is
+  used from the app only where each of the druid's players could use it in Foundry: the druid
+  theirs, the form shared with them, Allow Transformation on, and the Create New Actors permission. A
+  form from another compendium is read once a session, as the campaign's are; a world actor's as it
+  stands. One outside the rules, from anywhere, is used only in Foundry.
 - **Dead on a form** (the wolf's combatant marked defeated) ends Wild Shape as at 0 hit points and
   isn't carried to the druid, who is at 0 hit points: mark the druid as you see fit.
 - **A druid's known forms are dnd5e's linked forms:** once a player has learned one from the app, the
