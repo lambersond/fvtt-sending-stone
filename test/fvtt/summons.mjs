@@ -158,6 +158,7 @@ const CREATURES = {
   'Compendium.dnd5e.monsters.Actor.wolfCreature0000': { name: 'Wolf' },
   'Compendium.dnd5e.actors24.Actor.bestialSpirit000': { name: 'Bestial Spirit' },
   'Compendium.dnd5e.actors24.Actor.airSpirit0000000': { name: 'Air Elemental Spirit' },
+  'Compendium.dnd5e.actors24.Actor.steedSpirit00000': { name: 'Otherworldly Steed' },
 }
 const MONSTER = name => Object.keys(CREATURES).find(uuid => CREATURES[uuid].name === name)
 
@@ -212,6 +213,20 @@ equip(thorin, {
     // Conjure Fey, 6th, by Challenge Rating: one fey of the spell's level or lower.
     summonSpell('conjureFey', 'Conjure Fey', 6, { id: 'cfSummon', summon: { mode: 'cr', prompt: true }, profiles: [profile('cfProfile0000000', { cr: '@item.level', types: ['fey'] })] },
       { properties: ['concentration'] }),
+    // Find Steed, 2nd: its one steed, Celestial, Fey or Fiend (dnd5e's 2024 spells/2nd-level/find-steed.yml).
+    summonSpell('findSteed', 'Find Steed', 2, {
+      id: 'fsSummon', profiles: [profile('steedProfile0000', { uuid: MONSTER('Otherworldly Steed') })], creatureTypes: ['celestial', 'fey', 'fiend'],
+    }),
+    // Call the Hunt, 2nd: as many wolves as the level it's cast at, to the 4th; and a creature whose
+    // compendium is gone, left out.
+    summonSpell('callHunt', 'Call the Hunt', 2, {
+      id: 'chSummon', profiles: [profile('huntWolves000000', { count: '@item.level', uuid: MONSTER('Wolf'), level: { min: null, max: 4 } }),
+        profile('huntLost00000000', { uuid: 'Compendium.gone.monsters.Actor.lostCreature0000' })],
+    }),
+    // Beast Bond, a feature: one wolf or one owl, each counted "1", which dnd5e's dialog then leaves out.
+    { id: 'beastBond', name: 'Beast Bond', type: 'feat', system: {},
+      activities: [{ id: 'bbSummon', type: 'summon', affects: '',
+        profiles: [profile('bondWolf00000000', { count: '1', uuid: MONSTER('Wolf') }), profile('bondOwl000000000', { count: '1', uuid: MONSTER('Owl') })] }] },
     // Pack of Wolves, a feature: two wolves, once a day, its count a sum dnd5e makes a whole number.
     { id: 'packOfWolves', name: 'Pack of Wolves', type: 'feat', system: { uses: { max: 1, spent: 0, recovery: [{ period: 'lr' }] } },
       activities: [{ id: 'pwSummon', type: 'summon', affects: '', consumption: [{ type: 'itemUses', value: '1' }],
@@ -246,10 +261,14 @@ equip(thorin, {
           consumption: [{ type: 'activityUses', value: '1' }], uses: { max: 1, spent: 0, recovery: [{ period: 'lr' }] } }] },
   ],
 })
-// Vex, Bob's, with a saving throw to use.
+// Vex, Bob's, with a saving throw to use; and two features that summon Thorin's familiars: his Pact
+// of the Chain's, whose activity has the id of Thorin's Find Familiar's, as dnd5e's compendium copies
+// keep it, and his own Find Familiar, a character's copy with Thorin's item's id, its activity its own.
 const vex = add(new Actor5e({ id: 'vex', name: 'Vex', owners: ['bob'], mods: { dex: 3 } }))
 equip(vex, { items: [{ id: 'sacredFlame', name: 'Sacred Flame', type: 'spell', system: { level: 0, method: 'spell', properties: [] },
-  activities: [{ id: 'sfSave', type: 'save', save: ['dex'], dc: 13, affects: 'creature', count: 1, damage: [{ number: 1, denomination: 8, types: ['radiant'] }] }] }] })
+  activities: [{ id: 'sfSave', type: 'save', save: ['dex'], dc: 13, affects: 'creature', count: 1, damage: [{ number: 1, denomination: 8, types: ['radiant'] }] }] },
+{ id: 'pactFamiliar', name: 'Pact of the Chain', type: 'feat', system: {}, activities: [{ id: 'ffSummon', type: 'summon', affects: '', ...FAMILIAR }] },
+{ id: 'findFamiliar', name: 'Find Familiar', type: 'feat', system: {}, activities: [{ id: 'vfSummon', type: 'summon', affects: '', ...FAMILIAR }] }] })
 bob.character = vex
 // Elowen, Alice's druid, in the arena as a Wolf, dnd5e's form keeping her Find Familiar (transformInto's
 // keepSpells): the form a world actor of its own, dnd5e's flags naming her.
@@ -392,18 +411,27 @@ const activityOf = (sheet, id) => rowOf(sheet, id)?.activity ?? null
 }
 {
   // A heartbeat's answer that starts summons sends Mirkwood Thorin's sheet and Brakka's again, with
-  // them; one that stops them, again without. Nothing else in the answer changes.
-  for (const [answer, reads] of [[{ ...OLDER, summons: 1 }, true], [OLDER, false]]) {
+  // them; one that stops them, again without. Nothing else in the answer changes. The app's answer is
+  // read only as a whole number of 1 or more, as `quiet` and `gmRollMessages` are: 2, a later format,
+  // starts them; true, "1", 0 and 1.5, each after 1, stop them; and one that says nothing, as before.
+  const { summonReader } = await import(`${MODULE}/scripts/sheet-summon.mjs`)
+  const said = [[2, true], [true, false], [1, true], ['1', false], [1, true], [0, false], [1, true], [1.5, false], [1, true], [undefined, false]]
+  for (const [summons, reads] of said) {
     const from = app.events.length
-    app.answers['camp-b'] = answer
+    app.answers['camp-b'] = (summons === undefined) ? OLDER : { ...OLDER, summons }
     clock += 31_000
     heartbeat()
-    await until(() => sheetOf('thorin', 'camp-b', from) && companionSheet('brakka', 'camp-b', from), `the sheets again, summons ${reads}`)
+    const why = `summons ${JSON.stringify(summons)}`
+    await until(() => ofType(since(from), 'bridge.heartbeat', 'camp-b').length, `the heartbeat, ${why}`)
     await settle()
-    assert.equal(activityOf(sheetOf('thorin', 'camp-b', from), 'findFamiliar')?.type ?? null, reads ? 'summon' : null, `Thorin's, summons ${reads}`)
-    assert.equal(activityOf(companionSheet('brakka', 'camp-b', from), 'brakkaCall')?.type ?? null, reads ? 'summon' : null, `Brakka's, summons ${reads}`)
+    assert.equal(summonReader('camp-b'), reads, `${why} read as ${reads}`)
+    await until(() => sheetOf('thorin', 'camp-b', from) && companionSheet('brakka', 'camp-b', from), `the sheets again, ${why}`)
+    await settle()
+    assert.equal(activityOf(sheetOf('thorin', 'camp-b', from), 'findFamiliar')?.type ?? null, reads ? 'summon' : null, `Thorin's, ${why}`)
+    assert.equal(activityOf(companionSheet('brakka', 'camp-b', from), 'brakkaCall')?.type ?? null, reads ? 'summon' : null, `Brakka's, ${why}`)
   }
-  ok("a heartbeat's answer that starts summons sends Thorin's sheet and Brakka's again with their summons; one that stops them, again without")
+  app.answers['camp-b'] = OLDER
+  ok("a heartbeat's answer that starts summons, a whole number of 1 or more, 2 among them, sends Thorin's sheet and Brakka's again with their summons; one that stops them, saying true, \"1\", 0, 1.5 or nothing, again without")
 }
 
 /* -------------------------------------------- */
@@ -463,10 +491,16 @@ const activityOf = (sheet, id) => rowOf(sheet, id)?.activity ?? null
   assert.deepEqual([summonOf('summonAir').types, summonOf('summonAir').sizes], [[], [{ key: 'med', label: 'Medium' }, { key: 'lg', label: 'Large' }]],
     "Summon Air Spirit's one type, two sizes")
   assert.deepEqual([summonOf('conjureAnimals').types, summonOf('conjureAnimals').sizes], [[], []], 'none')
+  // A count by the level, offered to the 4th: higher only within it; the creature that's gone left out.
+  assert.deepEqual(summonOf('callHunt').profiles, [{ id: 'huntWolves000000', name: 'Wolf', count: '2', min: null, max: 4,
+    higher: [{ level: 3, name: 'Wolf', count: '3' }, { level: 4, name: 'Wolf', count: '4' }] }], "Call the Hunt's wolves to the 4th, its lost creature left out")
+  // One steed, its three types.
+  assert.deepEqual(summonOf('findSteed'), { profiles: [{ id: 'steedProfile0000', name: 'Otherworldly Steed', count: null, min: null, max: null, higher: [] }],
+    types: [{ key: 'celestial', label: 'Celestial' }, { key: 'fey', label: 'Fey' }, { key: 'fiend', label: 'Fiend' }], sizes: [] }, 'Find Steed')
   // At most twenty.
   const swarm = summonOf('batSwarm').profiles
   assert.deepEqual([swarm.length, swarm[0].name, swarm.at(-1).name], [20, 'Bat 1', 'Bat 20'], 'twenty of twenty-one')
-  ok("Summon Beast's limits, Air from the 3rd; Conjure Animals by Challenge Rating with dnd5e's labels, ½ and ¼, its counts 1, 2, 4 and 8 and each higher level's where it changes; Conjure Fey's Challenge Rating at each level; types and sizes only where there's a choice; twenty profiles at most")
+  ok("Summon Beast's limits, Air from the 3rd; Conjure Animals by Challenge Rating with dnd5e's labels, ½ and ¼, its counts 1, 2, 4 and 8 and each higher level's where it changes; Conjure Fey's Challenge Rating at each level; a count by the level higher only to its last level, a creature that's gone left out; types and sizes only where there's a choice, Find Steed's three types for its one steed; twenty profiles at most")
 }
 
 /* -------------------------------------------- */
@@ -506,6 +540,12 @@ async function dialogOf(start) {
 }
 const fieldOf = (dialog, name) => [...dialog.form.elements].find(element => element.name === name) ?? null
 const choiceIn = dialog => ({ profile: fieldOf(dialog, 'summons.profile')?.value ?? null, type: fieldOf(dialog, 'summons.creatureType')?.value ?? null })
+const sizeIn = dialog => fieldOf(dialog, 'summons.creatureSize')?.value ?? null
+/** The words dnd5e's dialog writes for the creature chosen in it. */
+const chosenWords = dialog => {
+  const select = fieldOf(dialog, 'summons.profile')
+  return select?.options?.[select.selectedIndex]?.textContent ?? null
+}
 /**
  * The Gamemaster clicks a card's Summon button, drawn for them: its dialog, with its configuration
  * as first drawn (`first`), Summon pressed in it.
@@ -620,8 +660,15 @@ let airCard = null
   assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'the one type Summon Air Spirit gives, no choice')
   made = await use('findFamiliar', 'ffSummon', { summon: { profile: 'catProfile00000x' } })
   assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'a profile it has not')
+  // A type or size it has a choice of, but not that one; and the creature that can't be found.
+  made = await use('findFamiliar', 'ffSummon', { summon: { profile: P.owl, type: 'beast' } })
+  assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'a type not among its three')
+  made = await use('summonAir', 'saSummon', { slot: 'spell3', summon: { profile: 'airSpiritProfile', size: 'huge' } })
+  assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'a size not among its two')
+  made = await use('callHunt', 'chSummon', { summon: { profile: 'huntLost00000000' } })
+  assert.deepEqual(refusalOf(made), ['failed', 'creature', null], 'the creature that can\'t be found')
   assert.deepEqual([slots(thorin), usesOf(thorin, 'packOfWolves'), cardsMade()], [before, 0, cards], 'nothing spent or posted')
-  ok("refused, nothing spent: a summon with another field, a profile not an id or a type not a key, invalid; one named on a save, an attack, damage on its own or an end of concentration; at a target or its user; a type the wolves offer no choice of, nor Summon Air Spirit with its one, a size Find Familiar offers none of, or a profile it hasn't")
+  ok("refused, nothing spent: a summon with another field, a profile not an id or a type not a key, invalid; one named on a save, an attack, damage on its own or an end of concentration; at a target or its user; a type the wolves offer no choice of, nor Summon Air Spirit with its one, a size Find Familiar offers none of, a type or size not among those offered, a profile it hasn't, or one whose creature can't be found")
 }
 
 /* -------------------------------------------- */
@@ -667,8 +714,62 @@ let airCard = null
   made = await use('conjureAnimals', 'caSummon', { slot: 'spell5', summon: { profile: 'caCr100000000000' } })
   const animals = useCard(made.id)
   assert.deepEqual(linesOf(await renderCard(animals)).map(line => line.textContent), ['Chosen on Sending Stone: 4 × Challenge Rating of 1 or lower'])
-  await summonThrough(animals, { profile: 'caCr100000000000', type: null }, 'Conjure Animals at the 5th')
-  ok("the Gamemaster clicks the Owl's Summon button: dnd5e's dialog drawn once with the Owl and Fey chosen, and placed so; Summon Beast at the 3rd offers its Air and has it chosen; an Air named at the 2nd is never set; Conjure Animals at the 5th says \"4 × Challenge Rating of 1 or lower\" and has it chosen")
+  let chosen = await summonThrough(animals, { profile: 'caCr100000000000', type: null }, 'Conjure Animals at the 5th')
+  assert.equal(chosenWords(chosen), '4 × Challenge Rating of 1 or lower', "as dnd5e's dialog writes it")
+  // Conjure Animals at the 3rd as its Challenge Rating 2: "1 × " kept, as the others' counts aren't 1;
+  // Beast Bond's wolf and owl, each "1": "1 × " left out, as dnd5e's dialog leaves it out of all.
+  made = await use('conjureAnimals', 'caSummon', { slot: 'spell3', summon: { profile: 'caCr200000000000' } })
+  const one = useCard(made.id)
+  assert.deepEqual(linesOf(await renderCard(one)).map(line => line.textContent), ['Chosen on Sending Stone: 1 × Challenge Rating of 2 or lower'])
+  chosen = await summonThrough(one, { profile: 'caCr200000000000', type: null }, 'Conjure Animals at the 3rd')
+  assert.equal(chosenWords(chosen), '1 × Challenge Rating of 2 or lower', "as dnd5e's dialog writes it")
+  made = await use('beastBond', 'bbSummon', { summon: { profile: 'bondOwl000000000' } })
+  const bond = useCard(made.id)
+  assert.equal(bond.flags['sending-stone'].summon.label, 'Owl')
+  assert.deepEqual(linesOf(await renderCard(bond)).map(line => line.textContent), ['Chosen on Sending Stone: Owl'])
+  chosen = await summonThrough(bond, { profile: 'bondOwl000000000', type: null }, 'Beast Bond')
+  assert.deepEqual([[...fieldOf(chosen, 'summons.profile').options].map(option => option.textContent), chosenWords(chosen)], [['Wolf', 'Owl'], 'Owl'],
+    "as dnd5e's dialog writes them")
+  // Summon Air Spirit at the 3rd, Large: its one spirit and the size, written and chosen.
+  made = await use('summonAir', 'saSummon', { slot: 'spell3', summon: { profile: 'airSpiritProfile', size: 'lg' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  const large = useCard(made.id)
+  assert.deepEqual(large.flags['sending-stone'].summon, { item: 'summonAir', activity: 'saSummon', profile: 'airSpiritProfile', label: 'Air Spirit', size: 'lg' })
+  assert.deepEqual(linesOf(await renderCard(large)).map(line => line.textContent), ['Chosen on Sending Stone: Air Spirit (Large)'])
+  chosen = await summonThrough(large, { profile: 'airSpiritProfile', type: null }, 'Summon Air Spirit')
+  assert.deepEqual([sizeIn(chosen), chosen.first.creatureSize, chosen.config.summons.creatureSize], ['lg', 'lg', 'lg'], 'Large, in its first form')
+  assert.deepEqual([screen.placed.at(-1).profile, screen.placed.at(-1).creatureSize, screen.placed.at(-1).scaling], ['airSpiritProfile', 'lg', 1], 'placed Large')
+  // Find Steed, its one steed a Fiend: the type alone, written and chosen.
+  made = await use('findSteed', 'fsSummon', { summon: { profile: 'steedProfile0000', type: 'fiend' } })
+  const steed = useCard(made.id)
+  assert.deepEqual(steed.flags['sending-stone'].summon, { item: 'findSteed', activity: 'fsSummon', profile: 'steedProfile0000', label: 'Otherworldly Steed', type: 'fiend' })
+  assert.deepEqual(linesOf(await renderCard(steed)).map(line => line.textContent), ['Chosen on Sending Stone: Otherworldly Steed (Fiend)'])
+  chosen = await summonThrough(steed, { profile: 'steedProfile0000', type: 'fiend' }, 'Find Steed')
+  assert.equal(chosen.config.summons.creatureType, 'fiend')
+  // A card whose flag names a type or a size its dialog doesn't offer, as only a card out of date
+  // carries (written by the case): dnd5e's default kept, never that one.
+  made = await use('findFamiliar', 'ffSummon', { summon: { profile: P.owl, type: 'fey' } })
+  const beastly = useCard(made.id)
+  beastly.flags['sending-stone'].summon.type = 'beast'
+  chosen = await summonThrough(beastly, { profile: P.owl, type: '' }, 'a Beast named on Find Familiar')
+  assert.deepEqual([chosen.first.creatureType ?? null, chosen.config.summons.creatureType], [null, ''], 'no Beast set')
+  made = await use('summonAir', 'saSummon', { slot: 'spell3', summon: { profile: 'airSpiritProfile', size: 'lg' } })
+  const huge = useCard(made.id)
+  huge.flags['sending-stone'].summon.size = 'huge'
+  chosen = await summonThrough(huge, { profile: 'airSpiritProfile', type: null }, 'a Huge size named on Summon Air Spirit')
+  assert.deepEqual([chosen.first.creatureSize ?? null, chosen.config.summons.creatureSize, sizeIn(chosen)], [null, '', ''], 'no Huge set')
+  // A card whose choice can't be read: no line.
+  made = await use('findFamiliar', 'ffSummon', { summon: { profile: P.owl, type: 'fey' } })
+  const odd = useCard(made.id)
+  const good = structuredClone(odd.flags['sending-stone'].summon)
+  for (const [bad, why] of [[{ type: 'a b' }, 'a type not a key'], [{ size: 'x y' }, 'a size not a key'], [{ label: '' }, 'no label'], [{ label: 7 }, 'a label not words'],
+    [{ profile: 7 }, 'a profile not an id'], [{ item: '' }, 'no item'], [{ activity: null }, 'no activity']]) {
+    odd.flags['sending-stone'].summon = { ...good, ...bad }
+    assert.deepEqual(linesOf(await renderCard(odd)), [], `${why}: no line`)
+  }
+  odd.flags['sending-stone'].summon = good
+  assert.equal(linesOf(await renderCard(odd)).length, 1, 'and the line once it can be read')
+  ok("the Gamemaster clicks the Owl's Summon button: dnd5e's dialog drawn once with the Owl and Fey chosen, and placed so; Summon Beast at the 3rd offers its Air and has it chosen; an Air named at the 2nd is never set; Conjure Animals at the 5th says \"4 × Challenge Rating of 1 or lower\" and at the 3rd \"1 × Challenge Rating of 2 or lower\", Beast Bond's owl \"Owl\", each as dnd5e's dialog writes it, and has it chosen; Summon Air Spirit Large, its size written and chosen, and placed so; Find Steed's Fiend; a type or size its dialog doesn't offer never set; a choice that can't be read, a type or size not a key, no label, profile, item or activity, draws no line")
 }
 
 /* -------------------------------------------- */
@@ -713,7 +814,43 @@ let airCard = null
   opened = await dialogOf(() => summonFromCard(owlCard))
   assert.deepEqual(choiceIn(opened.dialog), defaults, '(d) forgotten as it\'s used by hand')
   await opened.dialog.use(); await opened.done; placedSeen = screen.placed.length
-  ok("the note of a click: a card cast in Foundry clicked gets dnd5e's defaults; spent as dnd5e places a summoning; kept through another activity's use, from the app or by hand, and the same one's from the app; forgotten as that activity is used by hand")
+  // Vex's two: his Pact of the Chain, another item whose activity has the id of Thorin's Find
+  // Familiar's, as dnd5e's compendium copies keep it; and his own Find Familiar, an item with Thorin's
+  // item's id, its activity another. Their cards are Foundry's own.
+  const pact = vex.items.get('pactFamiliar').system.activities.get('ffSummon')
+  const copy = vex.items.get('findFamiliar').system.activities.get('vfSummon')
+  const cardOf = async activity => (await activity.use({ create: { summons: false } }, { configure: false }, {})).message
+  const vexCards = [[await cardOf(pact), "(e) another item's, its activity's id the same"], [await cardOf(copy), "(f) an item's of the same id, another activity's"]]
+  for (const [card, why] of vexCards) {
+    // Its dialog drawn first: it takes the note and sets nothing, its activity not the one noted.
+    await plainClick(owlCard)
+    opened = await dialogOf(() => summonFromCard(card))
+    assert.deepEqual(choiceIn(opened.dialog), defaults, `${why}: nothing set`)
+    await opened.dialog.close(); await opened.done
+    opened = await dialogOf(() => summonFromCard(owlCard))
+    assert.deepEqual(choiceIn(opened.dialog), defaults, `${why}: the note taken all the same`)
+    await opened.dialog.close(); await opened.done
+  }
+  for (const [activity, why] of [[pact, "(g) another item's, its activity's id the same"], [copy, "(h) an item's of the same id, another activity's"]]) {
+    // Used by hand: the note kept, as it isn't the activity noted.
+    await plainClick(owlCard)
+    Hooks.call('dnd5e.preUseActivity', activity, {}, { configure: true }, {})
+    opened = await dialogOf(() => summonFromCard(owlCard))
+    assert.deepEqual(choiceIn(opened.dialog), { profile: P.owl, type: 'fey' }, `${why}, used by hand: kept`)
+    await opened.dialog.use(); await opened.done; placedSeen = screen.placed.length
+  }
+  // (i) A dialog already open, drawn again as the Gamemaster changes it, after a click: it takes
+  // nothing, their change kept, and the note left for the dialog the click opens.
+  opened = await dialogOf(() => summonFromCard(foundryCard))
+  assert.deepEqual(choiceIn(opened.dialog), defaults, '(i) the open dialog')
+  await plainClick(owlCard)
+  await opened.dialog.choose('summons.profile', P.cat)
+  assert.deepEqual([opened.dialog.renders, choiceIn(opened.dialog), opened.dialog.config.summons.profile], [2, { profile: P.cat, type: '' }, P.cat], '(i) the Cat kept')
+  await opened.dialog.close(); await opened.done
+  opened = await dialogOf(() => summonFromCard(owlCard))
+  assert.deepEqual(choiceIn(opened.dialog), { profile: P.owl, type: 'fey' }, '(i) the note left for the next')
+  await opened.dialog.use(); await opened.done; placedSeen = screen.placed.length
+  ok("the note of a click: a card cast in Foundry clicked gets dnd5e's defaults; spent as dnd5e places a summoning; kept through another activity's use, from the app or by hand, and the same one's from the app; forgotten as that activity is used by hand; taken, with nothing set, by another item's dialog whose activity's id is the same, or another activity's of an item whose id is; kept through either's use by hand; never taken as an open dialog is drawn again, the Gamemaster's change kept")
 }
 
 /* -------------------------------------------- */
