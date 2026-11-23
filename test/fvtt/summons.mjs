@@ -244,6 +244,15 @@ equip(thorin, {
       activities: [{ id: 'sfCast', type: 'cast', spell: { level: 1 }, consumption: [{ type: 'itemUses', value: '1' }] }] },
     { id: 'staffCopy', name: 'Find Familiar', type: 'spell', flags: { dnd5e: { cachedFor: '.Item.staffFamiliar.Activity.sfCast' } },
       system: { level: 1, method: 'spell', properties: [] }, activities: [{ id: 'scSummon', type: 'summon', affects: '', ...FAMILIAR }] },
+    // A wand that casts Summon Beast at the 3rd, a level above its own, from its charges, through the
+    // copy dnd5e keeps, which dnd5e casts with the 3rd's slot as the Cast activity's level.
+    { id: 'wandBeast', name: 'Wand of the Beast', type: 'consumable', system: { properties: [], quantity: 1, uses: { max: 3, spent: 0 } },
+      activities: [{ id: 'wbCast', type: 'cast', spell: { level: 3 }, consumption: [{ type: 'itemUses', value: '1' }] }] },
+    { id: 'wandCopy', name: 'Summon Beast', type: 'spell', flags: { dnd5e: { cachedFor: '.Item.wandBeast.Activity.wbCast' } },
+      system: { level: 2, method: 'spell', properties: ['concentration'] },
+      activities: [{ id: 'wcSummon', type: 'summon', affects: '', profiles: [profile('landProfile00000', { name: 'Land', uuid: MONSTER('Bestial Spirit') }),
+        profile('seaProfile000000', { name: 'Sea', uuid: MONSTER('Bestial Spirit') }),
+        profile('airProfile000000', { name: 'Air', uuid: MONSTER('Bestial Spirit'), level: { min: 3, max: null } })] }] },
     // Summon Beast as a feat's spell, cast free once a day through its forward at its own level.
     { id: 'beastTouched', name: 'Summon Beast (Wild Touched)', type: 'spell', system: { level: 2, method: 'innate', properties: ['concentration'] },
       activities: [{ id: 'btCall', type: 'summon', affects: '', profiles: [profile('landProfile00000', { name: 'Land', uuid: MONSTER('Bestial Spirit') }),
@@ -276,6 +285,25 @@ const elowen = add(new Actor5e({ id: 'elowen', name: 'Elowen', owners: ['alice']
 equip(elowen, { spells, items: [summonSpell('elowenFamiliar', 'Find Familiar', 1, { id: 'efSummon', ...FAMILIAR })] })
 const elowenWolf = add(new Actor5e({ id: 'elowenWolf', name: 'Elowen (Wolf)', owners: ['alice'], mods: { str: 2 }, flags: { isPolymorphed: true, originalActor: 'elowen' } }))
 equip(elowenWolf, { spells, items: [summonSpell('elowenFamiliar', 'Find Familiar', 1, { id: 'efSummon', ...FAMILIAR })] })
+
+// Wren, Bob's warlock, her pact slots at the 3rd: Summon Beast and Call the Hunt, each a 2nd-level
+// spell granted as a Pact Magic spell with a free casting a day, which dnd5e casts at her pact
+// slots' level (spellcasting-model.mjs:254-257), a level above the spell's own, spending no slot.
+const freeCasting = (id, target) => ({ id, type: 'forward', name: 'Cast (free casting)', activity: { id: target },
+  consumption: [{ type: 'activityUses', value: '1' }], uses: { max: 1, spent: 0, recovery: [{ period: 'lr' }] } })
+const wren = add(new Actor5e({ id: 'wren', name: 'Wren', owners: ['bob'], mods: { cha: 4 } }))
+equip(wren, {
+  spells: { pact: { value: 2, max: 2, level: 3 } },
+  items: [
+    { id: 'pactBeast', name: 'Summon Beast', type: 'spell', system: { level: 2, method: 'pact', properties: ['concentration'] },
+      activities: [{ id: 'pbCall', type: 'summon', affects: '', profiles: [profile('landProfile00000', { name: 'Land', uuid: MONSTER('Bestial Spirit') }),
+        profile('seaProfile000000', { name: 'Sea', uuid: MONSTER('Bestial Spirit') }),
+        profile('airProfile000000', { name: 'Air', uuid: MONSTER('Bestial Spirit'), level: { min: 3, max: null } })] }, freeCasting('pbFree', 'pbCall')] },
+    { id: 'pactHunt', name: 'Call the Hunt', type: 'spell', system: { level: 2, method: 'pact', properties: [] },
+      activities: [{ id: 'phCall', type: 'summon', affects: '',
+        profiles: [profile('pactWolves000000', { count: '@item.level', uuid: MONSTER('Wolf'), level: { min: null, max: 4 } })] }, freeCasting('phFree', 'phCall')] },
+  ],
+})
 
 // The world NPC the Steel Defender summons, unlinked, no player's.
 const steelDef = companionActor('steelDef', 'Steel Defender', { linked: false, spec: { mods: { str: 2 }, hp: { value: 20, max: 20, temp: 0 } } })
@@ -350,7 +378,7 @@ await Hooks.callAll('init')
 settings.set('listenerUrl', 'https://stone.example')
 settings.set('campaignSecrets', { 'camp-a': 'a-secret', 'camp-b': 'b-secret' })
 settings.set('campaigns', [
-  { id: 'camp-a', title: 'Ashlands', characters: ['thorin', 'vex', 'elowen'], rolls: true, attacks: true },
+  { id: 'camp-a', title: 'Ashlands', characters: ['thorin', 'vex', 'elowen', 'wren'], rolls: true, attacks: true },
   { id: 'camp-b', title: 'Mirkwood', characters: ['thorin'], rolls: true, attacks: true },
 ])
 await Hooks.callAll('ready')
@@ -358,7 +386,7 @@ const { diceStatus } = await import(`${MODULE}/scripts/dice-plan.mjs`)
 const { heartbeat } = await import(`${MODULE}/scripts/heartbeat.mjs`)
 const { characterSheet } = await import(`${MODULE}/scripts/sheet.mjs`)
 await until(() => app.polls.length > 0, 'the first fetch')
-await until(() => sheetOf('thorin') && sheetOf('thorin', 'camp-b') && sheetOf('elowen'), "Thorin's and Elowen's sheets")
+await until(() => sheetOf('thorin') && sheetOf('thorin', 'camp-b') && sheetOf('elowen') && sheetOf('wren'), "Thorin's, Elowen's and Wren's sheets")
 await until(() => companionSheet('brakka'), "Brakka's sheet")
 await settle()
 assert.equal(diceStatus.ready, true, `self-test: ${diceStatus.error}`)
@@ -433,6 +461,39 @@ const activityOf = (sheet, id) => rowOf(sheet, id)?.activity ?? null
   app.answers['camp-b'] = OLDER
   ok("a heartbeat's answer that starts summons, a whole number of 1 or more, 2 among them, sends Thorin's sheet and Brakka's again with their summons; one that stops them, saying true, \"1\", 0, 1.5 or nothing, again without")
 }
+{
+  // A hello's answer that starts summons sends nothing again of its own: the hello's sheets follow
+  // it anyway, with them, each once. Then a heartbeat's that stops them, as before.
+  const { HELLO_WANTED_HOOK } = await import(`${MODULE}/scripts/constants.mjs`)
+  const { summonReader } = await import(`${MODULE}/scripts/sheet-summon.mjs`)
+  let from = app.events.length
+  app.answers['camp-b'] = { ...OLDER, summons: 1 }
+  await Hooks.callAll(HELLO_WANTED_HOOK, 'camp-b')
+  await until(() => ofType(since(from), 'bridge.hello', 'camp-b').length, "Mirkwood's hello")
+  await until(() => sheetOf('thorin', 'camp-b', from) && companionSheet('brakka', 'camp-b', from), "the hello's sheets")
+  await settle()
+  const posted = type => ofType(since(from), type, 'camp-b')
+  assert.equal(summonReader('camp-b'), true, 'read from the hello')
+  assert.equal(posted('character.updated').filter(e => e.data.character.id === 'thorin').length, 1, "Thorin's sheet once")
+  assert.equal(posted('companion.updated').filter(e => e.data.companion.key === 'brakka').length, 1, "Brakka's once")
+  assert.deepEqual([activityOf(sheetOf('thorin', 'camp-b', from), 'findFamiliar')?.type, activityOf(companionSheet('brakka', 'camp-b', from), 'brakkaCall')?.type],
+    ['summon', 'summon'], 'with their summons')
+  // A heartbeat's answer that says it again changes nothing, and sends nothing again.
+  from = app.events.length
+  clock += 31_000
+  heartbeat()
+  await until(() => ofType(since(from), 'bridge.heartbeat', 'camp-b').length, "Mirkwood's heartbeat")
+  await settle()
+  assert.deepEqual([posted('character.updated').length, posted('companion.updated').length], [0, 0], 'nothing sent again for the same answer')
+  from = app.events.length
+  app.answers['camp-b'] = OLDER
+  clock += 31_000
+  heartbeat()
+  await until(() => sheetOf('thorin', 'camp-b', from) && companionSheet('brakka', 'camp-b', from), 'the sheets again, without')
+  await settle()
+  assert.equal(summonReader('camp-b'), false)
+  ok("a hello's answer that starts summons: Thorin's sheet and Brakka's each posted once after the hello, with their summons, nothing sent again for the answer; a heartbeat's that says it again, nothing; one that stops them, again without")
+}
 
 /* -------------------------------------------- */
 /*  U2: what may be cast, and from where          */
@@ -453,6 +514,11 @@ const activityOf = (sheet, id) => rowOf(sheet, id)?.activity ?? null
   // The staff's Cast row: its Find Familiar's, by the Cast's id.
   const staff = activityOf(reader, 'staffFamiliar')
   assert.deepEqual([staff?.type, staff?.id, staff?.summon?.profiles.map(each => each.name)], ['summon', 'sfCast', ['Bat', 'Cat', 'Owl']], 'the staff casts it')
+  // The wand's, cast at the 3rd: the spell's own description, Air from the 3rd, with the level the
+  // Cast activity casts it at, at which the app offers its Air.
+  const wand = rowOf(reader, 'wandBeast')
+  assert.deepEqual([wand?.activity?.id, wand?.cast?.level, wand?.activity?.summon?.profiles.map(({ name, min }) => [name, min])],
+    ['wbCast', 3, [['Land', null], ['Sea', null], ['Air', 3]]], 'the wand casts it at the 3rd')
   // Brakka's own, and Elowen's as her Wolf, her form's.
   assert.deepEqual(activityOf(companionSheet('brakka'), 'brakkaCall')?.summon?.profiles.map(({ name, count }) => [name, count]), [['Wolf', '2']], "Brakka's")
   assert.deepEqual([activityOf(sheetOf('elowen'), 'elowenFamiliar')?.type, sheetOf('elowen')?.form?.name], ['summon', 'Wolf'], "Elowen's form's")
@@ -466,7 +532,19 @@ const activityOf = (sheet, id) => rowOf(sheet, id)?.activity ?? null
   ]], 'the forward at the 2nd')
   assert.deepEqual(touched.find(entry => entry.id === 'btCall')?.activity?.summon?.profiles.map(({ name, min }) => [name, min]),
     [['Land', null], ['Sea', null], ['Air', 3]], 'the summon itself at any level')
-  ok("no summon with no creature, or none to be found, nor the Steel Defender below the artificer's 3rd level; the staff's Cast row, Brakka's sheet and Elowen's form's each have theirs; a forward's what it summons at the level it casts at, no limits, nothing higher")
+  // Wren's free castings, which dnd5e casts at her pact slots' 3rd, a level above the spells' own:
+  // what each summons there, Summon Beast's Air among them and Call the Hunt's wolves counted at the
+  // 3rd, as the module casts them.
+  const pact = sheetOf('wren')
+  const freeOf = (id, forward) => (rowOf(pact, id)?.activities ?? []).find(entry => entry.id === forward)?.activity
+  assert.deepEqual([freeOf('pactBeast', 'pbFree')?.id, freeOf('pactBeast', 'pbFree')?.summon?.profiles], ['pbFree', [
+    { id: 'landProfile00000', name: 'Land', count: null, min: null, max: null, higher: [] },
+    { id: 'seaProfile000000', name: 'Sea', count: null, min: null, max: null, higher: [] },
+    { id: 'airProfile000000', name: 'Air', count: null, min: null, max: null, higher: [] },
+  ]], "Wren's free casting at her pact slots' 3rd, its Air too")
+  assert.deepEqual(freeOf('pactHunt', 'phFree')?.summon?.profiles, [{ id: 'pactWolves000000', name: 'Wolf', count: '3', min: null, max: null, higher: [] }],
+    "Wren's Call the Hunt, three wolves at the 3rd")
+  ok("no summon with no creature, or none to be found, nor the Steel Defender below the artificer's 3rd level; the staff's Cast row, the wand's at the 3rd, Brakka's sheet and Elowen's form's each have theirs; a forward's what it summons at the level it casts at, no limits, nothing higher: at the spell's own 2nd, Land and Sea, and at a warlock's pact slots' 3rd, Air too and three wolves")
 }
 
 /* -------------------------------------------- */
@@ -885,12 +963,36 @@ if (MIDI) {
   assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'staffCopy', activity: 'scSummon', profile: P.owl, label: 'Owl' }, "the spell's copy's")
   assert.deepEqual([usesOf(thorin, 'staffFamiliar'), slots(thorin)], [1, before], "the staff's charge spent, no slot")
   await summonThrough(useCard(made.id), { profile: P.owl, type: '' }, "the staff's")
+  // The wand's Summon Beast, cast at the 3rd as Air: checked there, a charge spent and no slot; its
+  // Summon button's dialog at the 3rd.
+  made = await use('wandBeast', 'wbCast', { summon: { profile: 'airProfile000000' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'wandCopy', activity: 'wcSummon', profile: 'airProfile000000', label: 'Air' }, "the wand's copy's")
+  assert.deepEqual([usesOf(thorin, 'wandBeast'), slots(thorin)], [1, before], "the wand's charge spent, no slot")
+  const wand = await summonThrough(useCard(made.id), { profile: 'airProfile000000', type: null }, "the wand's")
+  assert.deepEqual([[...fieldOf(wand, 'summons.profile').options].map(option => option.textContent), screen.placed.at(-1).scaling], [['Land', 'Sea', 'Air'], 1],
+    'offered at the 3rd')
   made = await use('feyFamiliar', 'fyFree', { summon: { profile: P.cat } })
   assert.equal(made.status, 'done', JSON.stringify(made))
   assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'feyFamiliar', activity: 'fyCall', profile: P.cat, label: 'Cat' }, "the summon's, not the forward's")
   assert.deepEqual([thorin.items.get('feyFamiliar').system.activities.get('fyFree').uses.spent, slots(thorin)], [1, before], "the free casting's use spent, no slot")
   await summonThrough(useCard(made.id), { profile: P.cat, type: '' }, 'the free casting\'s')
-  ok("the staff's Find Familiar as Owl, its card the spell's copy's, flagged with it, a charge spent; Fey Touched's free casting as Cat, flagged with the summon activity, its use spent and no slot; each card's Summon button has its choice chosen")
+  ok("the staff's Find Familiar as Owl, its card the spell's copy's, flagged with it, a charge spent; the wand's Summon Beast as Air at the 3rd, a level above its own, a charge spent; Fey Touched's free casting as Cat, flagged with the summon activity, its use spent and no slot; each card's Summon button has its choice chosen, the wand's at the 3rd")
+}
+{
+  // Wren's free casting of Summon Beast, cast at her pact slots' 3rd: Air, offered only from the 3rd,
+  // checked and written there, her use spent and no pact slot; its Summon button's dialog at the 3rd.
+  const pact = slots(wren)
+  const made = await send({ id: `use-${++ids}`, actorId: 'wren', kind: 'use', item: 'pactBeast', activity: 'pbFree', targets: [], slot: null, summon: { profile: 'airProfile000000' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  const card = useCard(made.id)
+  assert.deepEqual(card.flags['sending-stone'].summon, { item: 'pactBeast', activity: 'pbCall', profile: 'airProfile000000', label: 'Air' }, 'Air, at the 3rd')
+  assert.deepEqual([wren.items.get('pactBeast').system.activities.get('pbFree').uses.spent, slots(wren)], [1, pact], "the free casting's use spent, no pact slot")
+  const air = await summonThrough(card, { profile: 'airProfile000000', type: null }, "Wren's free casting")
+  assert.deepEqual([...fieldOf(air, 'summons.profile').options].map(option => option.textContent), ['Land', 'Sea', 'Air'], 'offered at the 3rd')
+  assert.equal(screen.placed.at(-1).scaling, 1, 'a level above its own')
+  nothingPlaced()
+  ok("Wren's free casting of Summon Beast as Air, cast at her pact slots' 3rd: done, flagged with the Air, her use spent and no pact slot; its Summon button's dialog offers Land, Sea and Air and has the Air chosen")
 }
 {
   let made = await send({ id: `use-${++ids}`, actorId: 'brakka', of: 'thorin', kind: 'use', item: 'brakkaCall', activity: 'bcSummon', targets: [], slot: null })
