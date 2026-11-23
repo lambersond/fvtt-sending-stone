@@ -128,8 +128,8 @@ let characterChanged = () => {};
 /**
  * What sends a campaign whose app has started or stopped taking Wild Shape, or since 0.54.0 changed
  * the format it takes, every character again: character-sync.mjs's `wildShapeTermsChanged`, handed
- * over with `characterChanged`, for the same reason. It does nothing until then, as `wildShapeTermsChanged` itself does while this client
- * can't send.
+ * over with `characterChanged`, for the same reason. It does nothing until then, as
+ * `wildShapeTermsChanged` itself does while this client can't send.
  * @type {(campaignId: string) => void}
  */
 let wildShapeTermsChanged = () => {};

@@ -138,9 +138,9 @@ function incapacitated(actor) {
  * since 0.54.0, for an app that takes them, a form from anywhere else each of her players could use
  * in Foundry; fitting her now; not while she's another kind of form, Incapacitated, or out of uses,
  * nor since 0.41.0 with Midi-QOL's Bonus Action used in a fight, where it enforces them. Shaped
- * already, the form she is is returned first, as one command. The use is spent on her own feature before dnd5e
- * changes her, refunded where the change doesn't happen; once the form exists it never is, and the
- * Bonus Action is marked on it.
+ * already, the form she is is returned first, as one command. The use is spent on her own feature
+ * before dnd5e changes her, refunded where the change doesn't happen; once the form exists it never
+ * is, and the Bonus Action is marked on it.
  * @param {object} command
  * @param {Campaign} campaign
  * @param {Actor} character
