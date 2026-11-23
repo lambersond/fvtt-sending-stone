@@ -119,6 +119,10 @@ export const user = (id, name, isGM = false, role = isGM ? 4 : 1) => {
     hasPermission(p) {
       return this.isGM || ((p in this.permissions) ? (this.permissions[p] === true) : (game.permissions?.[p] ?? []).includes(this.role))
     },
+    // Since module 0.54.0, core's User#can, as hasPermission [core, unverified]: a Gamemaster may do
+    // anything; anyone else what their permissions or role give them. No script of the module reads
+    // it; dnd5e's summon activity does (activity5e.mjs).
+    can(p) { return this.hasPermission(p) },
   }
   users.set(id, u)
   return u

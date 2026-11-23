@@ -37,8 +37,23 @@ export class Collection extends Map {
 /** How many concentration effects have been made, for their ids. */
 let concentrations = 0
 
-/** What happened on the Gamemaster's screen that shouldn't: dialogs, warnings, placements. */
-export const screen = { notifications: [], subsequent: [], templates: 0, summons: 0 }
+/**
+ * What happened on the Gamemaster's screen that shouldn't: dialogs, warnings, placements. Since
+ * module 0.54.0 also what dnd5e's summon activity would place (`placed`, from `placeSummons`) and
+ * each of its usage dialogs opened by a card's Summon button (`summonDialogs`).
+ */
+export const screen = { notifications: [], subsequent: [], templates: 0, summons: 0, placed: [], summonDialogs: [] }
+
+/**
+ * A button's dataset as dnd5e's `dnd5e-dataset` helper writes it: `data-` and each key in kebab case.
+ * @param {object} [data]
+ * @returns {string}
+ */
+const datasetOf = (data = {}) => Object.entries(data)
+  .map(([key, value]) => `data-${key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`)}="${value}"`).join(' ')
+
+/** Is dnd5e 6 the system, as a harness's `DND5E6=1` makes it? */
+const sixth = () => String(game.system?.version ?? '').startsWith('6')
 
 /**
  * What a harness turns on of dnd5e that the port leaves out by default, so that every other
@@ -809,17 +824,25 @@ export class Activity {
   /** mixin.mjs:732-758, without the buttons to place a template or spend what wasn't spent. */
   _usageChatButtons(message) { return [] }
 
+  /**
+   * activity-card.hbs:18-25: the card's buttons, as the port has drawn every card. Since module
+   * 0.54.0 a method of its own, so that the summon activity's card can be drawn as its own is.
+   * @param {object[]} buttons
+   * @returns {string}
+   */
+  _usageCardContent(buttons) {
+    return buttons.length
+      ? `<div class="activity-card"><div class="card-buttons">${buttons.map(button =>
+        `<button type="button" ${datasetOf(button.dataset)}>${button.icon}<span>${button.label}</span></button>`).join('')}</div></div>`
+      : '<div class="activity-card"></div>'
+  }
+
   /** mixin.mjs:787-824, the card's buttons rendered as activity-card.hbs:18-25 renders them. */
   async _createUsageMessage(message) {
     const buttons = this._usageChatButtons(message)
-    const dataset = data => Object.entries(data)
-      .map(([key, value]) => `data-${key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`)}="${value}"`).join(' ')
     const messageConfig = mergeObject({
       data: {
-        content: buttons.length
-          ? `<div class="activity-card"><div class="card-buttons">${buttons.map(button =>
-            `<button type="button" ${dataset(button.dataset)}>${button.icon}<span>${button.label}</span></button>`).join('')}</div></div>`
-          : '<div class="activity-card"></div>',
+        content: this._usageCardContent(buttons),
         flags: { core: { canPopout: true } },
         speaker: ChatMessage.getSpeaker({ actor: this.item.actor }),
         title: `${this.item.name} - ${this.name}`,
@@ -1260,13 +1283,492 @@ export class UtilityActivity extends Activity {
   }
 }
 
-/** summon.mjs: summoning places tokens, which dnd5e asks the Gamemaster about. */
+/* -------------------------------------------- */
+/*  Summons                                     */
+/* -------------------------------------------- */
+
+/**
+ * The first of a set, as core's Set#first gives it, or null.
+ * @param {Set} set
+ * @returns {*}
+ */
+const firstOf = set => (set?.size ? set.values().next().value : null)
+
+/**
+ * dnd5e's own helpers a label is worked out with, where a harness gives them (utils.mjs's formatCR
+ * and simplifyBonus, dice/simplify-roll-formula.mjs), else the formula as it's written.
+ */
+const crOf = (formula, rollData) => {
+  const { formatCR, simplifyBonus } = globalThis.dnd5e?.utils ?? {}
+  return (formatCR && simplifyBonus) ? formatCR(simplifyBonus(formula, rollData)) : String(formula ?? '')
+}
+const countOf5e = (formula, rollData) => {
+  const simplify = globalThis.dnd5e?.dice?.simplifyRollFormula
+  if (!simplify) return String(formula ?? '')
+  const count = simplify(Roll.replaceFormulaData(formula, rollData))
+  return /^-?\d+(\.\d+)?$/.test(count) ? parseInt(count) : count
+}
+
+/**
+ * A document of the run's own to draw a dialog's form in: the run's, where it has one, as dish-core.mjs
+ * draws cards.
+ * @returns {Promise<Document>}
+ */
+let ownDocument = null
+async function drawingDocument() {
+  if (typeof globalThis.document?.createElement === 'function') return globalThis.document
+  if (!ownDocument) {
+    const { JSDOM } = await import('jsdom')
+    ownDocument = new JSDOM('').window.document
+  }
+  return ownDocument
+}
+
+/**
+ * Since module 0.54.0, summon.mjs and summon-data.mjs: an activity that summons creatures, ported
+ * where the module meets it. Its data (summon-data.mjs:30-55), each with a default, so that a bare
+ * `{ type: 'summon' }` is one with nothing to summon, as the e2e's are: `profiles`, `creatureSizes`
+ * and `creatureTypes` (Sets), `summon.mode` and `summon.prompt`, and the class whose levels decide
+ * what a feature offers (`visibility.identifier`, or a fixture's `classIdentifier`); and
+ * `availableProfiles` (86-89) by `relevantLevel` (base-activity.mjs:209-213). Its use: `canSummon`
+ * (53-55, by core's User#can), `_prepareUsageConfig` (62-74, the scene `globalThis.canvas?.scene`),
+ * `_finalizeMessageConfig` (79-82), `_usageChatButtons` (87-96; under dnd5e 6, 6.0.5's 80-87 shape),
+ * `shouldHideChatButton` (101-104) and `_finalizeUsage` (109-119), which counts `screen.summons`; and
+ * `placeSummons` (130-147) to `dnd5e.preSummon`, where what it would place is kept in `screen.placed`
+ * with the item's scaling: nothing is fetched, placed or put on a canvas. Its card is drawn as 5.3.3's
+ * activity-card.hbs draws it, or under dnd5e 6 as 6.0.5's card-face.hbs and card-buttons.hbs do,
+ * for the Gamemaster (`summonCardHtml` draws it for another viewer); the card's Summon button's
+ * action is 563-600's, with `SummonUsageDialog` below. Line references are to 5.3.3.
+ */
 export class SummonActivity extends Activity {
   static type = 'summon'
-  async use(...args) {
-    screen.summons++
-    return super.use(...args)
+
+  constructor(item, data) {
+    super(item, data)
+    this.profiles = (data.profiles ?? []).map(profile => ({
+      _id: profile._id, count: profile.count ?? '', cr: profile.cr ?? '', name: profile.name ?? '',
+      level: { min: profile.level?.min ?? null, max: profile.level?.max ?? null },
+      types: new Set(profile.types ?? []), uuid: profile.uuid ?? '',
+    }))
+    this.creatureSizes = new Set(data.creatureSizes ?? [])
+    this.creatureTypes = new Set(data.creatureTypes ?? [])
+    this.summon = { mode: data.summon?.mode ?? '', prompt: data.summon?.prompt ?? true }
+    this.visibility = { identifier: data.visibility?.identifier ?? data.classIdentifier ?? '' }
+    // summon.mjs:29-43
+    this.metadata = {
+      usage: { dialog: SummonUsageDialog, chatCard: 'activity-card.hbs', actions: { placeSummons: SummonActivity.#placeSummons } },
+    }
   }
+
+  /** base-activity.mjs:209-213: a leveled spell's level as cast, else its class's or character's. */
+  get relevantLevel() {
+    const keyPath = ((this.item.type === 'spell') && (this.item.system.level > 0)) ? 'item.level'
+      : this.visibility.identifier ? `classes.${this.visibility.identifier}.levels` : 'details.level'
+    return getProperty(this.getRollData(), keyPath) ?? 0
+  }
+
+  /** summon-data.mjs:86-89 */
+  get availableProfiles() {
+    const level = this.relevantLevel
+    return this.profiles.filter(e => ((e.level.min ?? -Infinity) <= level) && (level <= (e.level.max ?? Infinity)))
+  }
+
+  /** summon.mjs:53-55 */
+  get canSummon() {
+    return (game.user?.can?.('TOKEN_CREATE') === true) && (game.user.isGM || (game.settings.get('dnd5e', 'allowSummoning') === true))
+  }
+
+  /** summon.mjs:62-74 */
+  _prepareUsageConfig(config) {
+    config = super._prepareUsageConfig(config)
+    const summons = this.availableProfiles
+    if (config.create !== false) {
+      config.create ??= {}
+      config.create.summons ??= this.canSummon && globalThis.canvas?.scene && summons.length && this.summon.prompt
+    }
+    config.summons ??= {}
+    config.summons.profile ??= summons[0]?._id ?? null
+    config.summons.creatureSize ??= firstOf(this.creatureSizes)
+    config.summons.creatureType ??= firstOf(this.creatureTypes)
+    return config
+  }
+
+  /** summon.mjs:79-82, gone under dnd5e 6 */
+  _finalizeMessageConfig(usageConfig, messageConfig, results) {
+    super._finalizeMessageConfig(usageConfig, messageConfig, results)
+    if (!sixth()) delete messageConfig.data.system?.effects
+  }
+
+  /** summon.mjs:87-96 [6.0.5 80-87] */
+  _usageChatButtons(message) {
+    if (!this.availableProfiles.length) return super._usageChatButtons(message)
+    const button = sixth()
+      ? { action: 'placeSummons', icon: 'fa-solid fa-spaghetti-monster-flying', label: { value: 'DND5E.SUMMON.Action.Summon' } }
+      : { label: game.i18n.localize('DND5E.SUMMON.Action.Summon'), icon: '<i class="fa-solid fa-spaghetti-monster-flying" inert></i>', dataset: { action: 'placeSummons' } }
+    return [button].concat(super._usageChatButtons(message))
+  }
+
+  /** summon.mjs:101-104 [92-95] */
+  shouldHideChatButton(button) {
+    return ((button.action ?? button.dataset?.action) === 'placeSummons') ? !this.canSummon : false
+  }
+
+  /**
+   * The card as 5.3.3's activity-card.hbs draws it, `.chat-card.activation-card` with its
+   * `.card-buttons`; or under dnd5e 6 as 6.0.5's card-face.hbs, its buttons as card-buttons.hbs
+   * draws them, `section.icon-row > ul.unlist > li > button[data-action][data-index]`. Every button
+   * is drawn: `summonCardHtml` draws the card for a viewer who may not see one.
+   */
+  _usageCardContent(buttons) {
+    const title = `<span class="title">${this.item.name}</span>`
+    if (sixth()) {
+      const row = buttons.length ? `<section class="icon-row"><i class="fa-solid fa-fw fa-circle-play"></i><ul class="unlist">${buttons.map((button, index) =>
+        `<li><button type="button" class="icon" aria-label="${game.i18n.localize(button.label.value)}" data-action="${button.action}" data-index="${index}"><i class="${button.icon}"></i></button></li>`).join('')}</ul></section>` : ''
+      return `<div class="chat-card"><section class="card-header"><div class="name-stacked">${title}</div></section>${row}</div>`
+    }
+    const row = buttons.length ? `<div class="card-buttons">${buttons.map(button =>
+      `<button type="button" ${datasetOf(button.dataset)}>${button.icon} <span>${button.label}</span></button>`).join('')}</div>` : ''
+    return `<div class="chat-card activation-card"><section class="card-header description"><header class="summary"><div class="name-stacked">${title}</div></header></section>${row}</div>`
+  }
+
+  /** summon.mjs:109-119 */
+  async _finalizeUsage(config, results) {
+    await super._finalizeUsage(config, results)
+    if (config.create?.summons) {
+      screen.summons++
+      try {
+        results.summoned = await this.placeSummons(config.summons)
+      } catch (err) {
+        results.summoned = []
+        screen.notifications.push(`SummonActivity#use ${err.message}`)
+      }
+    }
+  }
+
+  /**
+   * summon.mjs:130-147: refused without `canSummon` or a scene; the profile found, or an error;
+   * `dnd5e.preSummon`. dnd5e then fetches the creature (for a summoning by Challenge Rating, from its
+   * compendium browser), asks where to place it, and makes its tokens, none of which is ported: what
+   * it would place is kept, with the item's scaling, the level it's cast at.
+   */
+  async placeSummons(options) {
+    if (!this.canSummon || !globalThis.canvas?.scene) return
+    const profile = this.profiles.find(p => p._id === options?.profile)
+    if (!profile) throw new Error(`DND5E.SUMMON.Warning.NoProfile ${options?.profile} ${this.item.name}`)
+    if (Hooks.call('dnd5e.preSummon', this, profile, options) === false) return
+    screen.placed.push({ ...options, scaling: this.item.flags.dnd5e?.scaling ?? 0, item: this.item.id, activity: this.id })
+    return []
+  }
+
+  /** summon.mjs:563-600: the card's Summon button, on the activity as it was cast. */
+  static async #placeSummons(event, target, message) {
+    const config = { create: { summons: true }, summons: {} }
+    let needsConfiguration = false
+    const profiles = this.availableProfiles
+    if (profiles.length === 1) config.summons.profile = profiles[0]._id
+    else needsConfiguration = true
+    if ((this.creatureSizes.size > 1) || (this.creatureTypes.size > 1)) needsConfiguration = true
+    if (needsConfiguration) {
+      try {
+        await SummonUsageDialog.create(this, config, {
+          button: { icon: 'fa-solid fa-spaghetti-monster-flying', label: 'DND5E.SUMMON.Action.Summon' },
+          display: { all: false, create: { summons: true } },
+        })
+      } catch {
+        return
+      }
+    }
+    try {
+      await this.placeSummons(config.summons)
+    } catch (err) {
+      screen.notifications.push(`SummonsActivity#placeSummons ${err.message}`)
+    }
+  }
+}
+
+/**
+ * Since module 0.54.0, summon-usage-dialog.mjs (both releases alike) over activity-usage-dialog.mjs's
+ * ActivityUsageDialog, as far as a card's Summon button opens it: its activity, item and `config`, the
+ * very object it's given (14-19, 82-118); a render in core's order [core, V12/V13; the V14 pages say
+ * only that preRender fires before the render and is awaited]: `isFirstRender` set, the base context
+ * (159-168), the `preRenderSummonUsageDialog`, `preRenderActivityUsageDialog` and
+ * `preRenderApplicationV2` hooks with `(app, context, options)`, then the creation part's context
+ * (173-181; summon-usage-dialog.mjs 29-85), its fields drawn as a form of selects, then the `render…`
+ * hooks, each render counted (`renders`); `use()` as #onUse (493-499), the form merged into the
+ * config; `choose()` as a change made in it (534-537), merged and drawn again; `close()`; `create`
+ * (551-563). A select of a field that isn't required has core's blank option first [core,
+ * unverified]. Each is listed in `screen.summonDialogs`.
+ */
+export class SummonUsageDialog {
+  #activityId
+  #item
+  #config
+  #used = false
+  #rendered = false
+  #closers = []
+
+  constructor(options = {}) {
+    this.options = { display: { all: true }, ...options }
+    this.#activityId = options.activity.id
+    this.#item = options.activity.item
+    this.#config = options.config
+    this.renders = 0
+    this.closed = false
+    this.form = null
+    screen.summonDialogs.push(this)
+  }
+
+  get activity() { return this.item.system.activities.get(this.#activityId) }
+  get item() { return this.#item }
+  get config() { return this.#config }
+  get used() { return this.#used }
+  get rendered() { return this.#rendered }
+
+  /** As an application's, for `create`'s one listener. */
+  addEventListener(type, listener) { if (type === 'close') this.#closers.push(listener) }
+
+  /** activity-usage-dialog.mjs:461-467 */
+  _shouldDisplay(section) {
+    const display = this.options.display
+    if (getProperty(display, section) !== undefined) return getProperty(display, section)
+    const [group] = section.split('.')
+    if ((group !== section) && (group in display)) return display[group]
+    return display.all ?? true
+  }
+
+  /** summon-usage-dialog.mjs:95-117 */
+  getProfileLabel(profile, rollData) {
+    let label
+    if (profile.name) label = profile.name
+    else if (this.activity.summon.mode === 'cr') {
+      label = game.i18n.format('DND5E.SUMMON.Profile.ChallengeRatingLabel', { cr: crOf(profile.cr, rollData) })
+    } else label = globalThis.fromUuidSync?.(profile.uuid)?.name
+    label ??= '—'
+    const count = countOf5e(profile.count ?? '1', rollData)
+    if (count) label = `${count} × ${label}`
+    return label
+  }
+
+  /** summon-usage-dialog.mjs:29-85 */
+  async _prepareCreationContext(context) {
+    const profiles = this.activity.availableProfiles
+    if (this._shouldDisplay('create.summons') && (profiles.length || (this.activity.creatureSizes.size > 1) || (this.activity.creatureTypes.size > 1))) {
+      context.hasCreation = true
+      context.summonsFields = []
+      if (getProperty(this.options.display, 'create.summons') === undefined) {
+        context.summonsFields.push({ name: 'create.summons', value: this.config.create?.summons, checkbox: true })
+      }
+      if (this.config.create?.summons) {
+        const rollData = this.activity.getRollData()
+        if (profiles.length > 1) {
+          let options = profiles.map(profile => ({ value: profile._id, label: this.getProfileLabel(profile, rollData) }))
+          if (options.every(o => o.label.startsWith('1 × '))) options = options.map(({ value, label }) => ({ value, label: label.replace('1 × ', '') }))
+          context.summonsFields.push({ name: 'summons.profile', value: this.config.summons?.profile, options, blank: false })
+        } else context.summonsProfile = profiles[0]?._id
+        if (this.activity.creatureSizes.size > 1) context.summonsFields.push({
+          name: 'summons.creatureSize', value: this.config.summons?.creatureSize, blank: true,
+          options: Array.from(this.activity.creatureSizes).map(value => ({ value, label: CONFIG.DND5E?.actorSizes?.[value]?.label })),
+        })
+        if (this.activity.creatureTypes.size > 1) context.summonsFields.push({
+          name: 'summons.creatureType', value: this.config.summons?.creatureType, blank: true,
+          options: Array.from(this.activity.creatureTypes).map(value => ({ value, label: CONFIG.DND5E?.creatureTypes?.[value]?.label })),
+        })
+      }
+    } else if (profiles.length === 1) context.summonsProfile = profiles[0]._id
+    return context
+  }
+
+  /** The creation part's form, as summon-usage-creation.hbs and core's formField draw it. */
+  async #drawForm(context) {
+    const doc = await drawingDocument()
+    const form = doc.createElement('form')
+    for (const field of context.summonsFields ?? []) {
+      if (field.checkbox) {
+        const input = doc.createElement('input')
+        Object.assign(input, { type: 'checkbox', name: field.name, checked: field.value === true })
+        form.append(input)
+        continue
+      }
+      const select = doc.createElement('select')
+      select.name = field.name
+      const options = field.blank ? [{ value: '', label: '' }, ...field.options] : field.options
+      for (const { value, label } of options) {
+        const option = doc.createElement('option')
+        option.value = value
+        option.textContent = label ?? ''
+        if (value === field.value) option.selected = true
+        select.append(option)
+      }
+      form.append(select)
+    }
+    if (context.summonsProfile) {
+      const input = doc.createElement('input')
+      Object.assign(input, { type: 'hidden', name: 'summons.profile', value: context.summonsProfile })
+      form.append(input)
+    }
+    return form
+  }
+
+  /** What the form holds, as FormDataExtended reads it, expanded. */
+  #formData() {
+    const flat = {}
+    for (const element of this.form?.elements ?? []) {
+      if (!element.name) continue
+      flat[element.name] = (element.type === 'checkbox') ? element.checked : element.value
+    }
+    return foundry.utils.expandObject(flat)
+  }
+
+  /** ApplicationV2#render, in core's order [core, V12/V13], with activity-usage-dialog.mjs's parts. */
+  async render(options = {}) {
+    options = { ...options, isFirstRender: !this.#rendered, window: { ...(options.window ?? {}) } }
+    // activity-usage-dialog.mjs:159-168
+    if ('scaling' in this.config) this.#item = this.#item.clone({ 'flags.dnd5e.scaling': this.config.scaling }, { keepId: true })
+    const context = { activity: this.activity, linkedActivity: null }
+    for (const name of ['SummonUsageDialog', 'ActivityUsageDialog', 'ApplicationV2']) await Hooks.callAll(`preRender${name}`, this, context, options)
+    this.form = await this.#drawForm(await this._prepareCreationContext({ ...context }))
+    this.renders++
+    this.#rendered = true
+    for (const name of ['SummonUsageDialog', 'ActivityUsageDialog', 'ApplicationV2']) await Hooks.callAll(`render${name}`, this, this.form, context, options)
+    return this
+  }
+
+  /** activity-usage-dialog.mjs:534-537: a field changed in the form, merged and drawn again. */
+  async choose(name, value) {
+    const element = [...this.form.elements].find(each => each.name === name)
+    if (!element) throw new Error(`no ${name} in the dialog`)
+    element.value = value
+    mergeObject(this.#config, this.#formData())
+    return this.render()
+  }
+
+  /** activity-usage-dialog.mjs:493-499 */
+  async use() {
+    mergeObject(this.#config, this.#formData())
+    this.#used = true
+    return this.close()
+  }
+
+  async close() {
+    this.closed = true
+    for (const closer of this.#closers.splice(0)) closer()
+  }
+
+  /** activity-usage-dialog.mjs:551-563 */
+  static async create(activity, config, { sheet, ...options } = {}) {
+    if (!activity.item.actor) throw new Error('Cannot activate an activity that is not owned.')
+    return new Promise((resolve, reject) => {
+      const dialog = new this({ activity, config, ...options })
+      dialog.addEventListener('close', () => {
+        if (dialog.used) resolve(dialog.config)
+        else reject(new Error('closed'))
+      })
+      dialog.render({ force: true })
+    })
+  }
+}
+
+/**
+ * Since module 0.54.0, dnd5e's handling of a click on a card's button (5.3.3 mixin.mjs:1009-1031;
+ * 6.0.5 1012-1033): the item cloned at the level the card was cast at (`message.system.scaling`,
+ * `keepId`), the action's handler called on that clone's activity, the button disabled while it runs.
+ * @param {Activity} activity
+ * @param {Event|null} event
+ * @param {{dataset: object, disabled?: boolean}} target
+ * @param {object} message
+ * @returns {Promise<void>}
+ */
+async function onChatAction(activity, event, target, message) {
+  const scaling = message.system?.scaling ?? 0
+  const item = scaling ? activity.item.clone({ 'flags.dnd5e': { scaling } }, { keepId: true }) : activity.item
+  const scaled = item.system.activities.get(activity.id)
+  const handler = activity.metadata.usage?.actions?.[target.dataset.action]
+  target.disabled = true
+  try {
+    if (handler) await handler.call(scaled, event, target, message)
+  } catch (err) {
+    screen.notifications.push(`Activity#onChatAction ${err.message}`)
+  } finally {
+    target.disabled = false
+  }
+}
+
+/** The cards' elements dnd5e listens to already, and what each click last started. */
+const listened = new WeakMap()
+
+/**
+ * Since module 0.54.0, the Gamemaster clicks a card's Summon button, drawn in `html`: dnd5e's
+ * listener, a bubbling one on the message's element (5.3.3 mixin.mjs:940-945, attached as the card
+ * is drawn, before `dnd5e.renderChatMessage`; under dnd5e 6 chat-message-data-model.mjs:87, 162-179
+ * and usage-message-data.mjs:318-321, the left button only), attached once, then the button clicked,
+ * so that a listener on the button itself runs first. Resolves once dnd5e's action has run, its
+ * dialog used or closed.
+ * @param {object} message
+ * @param {HTMLElement} html
+ * @returns {Promise<void>}
+ */
+export function clickSummon(message, html) {
+  if (!listened.has(html)) {
+    const state = { running: null }
+    listened.set(html, state)
+    html.addEventListener('click', event => {
+      if (sixth() && (event.button !== 0)) return
+      const target = event.target.closest('[data-action]')
+      const activity = message.getAssociatedActivity?.()
+      if (target && activity) state.running = onChatAction(activity, event, target, message)
+    })
+  }
+  const button = html.querySelector('[data-action="placeSummons"]')
+  if (!button) throw new Error('the card has no Summon button')
+  const state = listened.get(html)
+  state.running = null
+  button.click()
+  return state.running ?? Promise.resolve()
+}
+
+/**
+ * Since module 0.54.0, the card's Summon action run as dnd5e runs it, with no click on any drawn
+ * button: for the cases that set the module's note of a click apart from the action.
+ * @param {object} message
+ * @returns {Promise<void>}
+ */
+export function summonFromCard(message) {
+  return onChatAction(message.getAssociatedActivity(), null, { dataset: { action: 'placeSummons' } }, message)
+}
+
+/**
+ * Since module 0.54.0, a summon activity's card as a viewer's client draws it: as the Gamemaster's,
+ * or a player's, who may not see the Summon button without `canSummon`. Under 5.3.3 the button is
+ * kept, `hidden` (usage-message-data.mjs:109-118); under dnd5e 6 it's left out, and the button row
+ * with it where none is left (usage-message-data.mjs:255-298, card-buttons.hbs).
+ * @param {object} card
+ * @param {object} [options]
+ * @param {boolean} [options.asGm]
+ * @returns {Promise<string>}
+ */
+export async function summonCardHtml(card, { asGm = true } = {}) {
+  const doc = await drawingDocument()
+  const holder = doc.createElement('div')
+  holder.innerHTML = card.content ?? ''
+  const activity = card.getAssociatedActivity?.()
+  const viewer = game.users.find(user => user.isGM === asGm)
+  const was = Object.getOwnPropertyDescriptor(game, 'user')
+  Object.defineProperty(game, 'user', { configurable: true, get: () => viewer })
+  try {
+    for (const button of holder.querySelectorAll('[data-action="placeSummons"]')) {
+      if (!activity?.shouldHideChatButton({ action: 'placeSummons' })) continue
+      if (!sixth()) {
+        button.hidden = true
+        continue
+      }
+      const row = button.closest('section.icon-row')
+      button.closest('li')?.remove()
+      if (row && !row.querySelector('li')) row.remove()
+    }
+  } finally {
+    Object.defineProperty(game, 'user', was)
+  }
+  return holder.innerHTML
 }
 
 /**
