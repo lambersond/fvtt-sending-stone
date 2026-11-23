@@ -156,12 +156,14 @@ a summoned or unlinked one shows only while its token is on the active scene.
 Its player is a player you gave Owner on the character by name; since 0.45.0 a character shared with
 All Players as Owner isn't everyone's for this, so another campaign's sidekicks never show beside it,
 and where no player owns it by name, its player is the one it's assigned to in User Configuration.
-Players roll for them, attack and cast with them from the app, as for their character; summoning,
-dismissing and changing them stay in Foundry. A creature its player doesn't own in Foundry goes
-without its secrets, with its public biography. To take one from a player in the app, take their
-Owner away, or hide or delete its token. Since 0.41.0 the saves the game asks of a companion are
-asked in the app, on its own sheet, as a character's are, and the character's sheet says so; a
-Gamemaster's request in chat asks the characters only ([Saves the game asks for](#saves-the-game-asks-for)).
+Players roll for them, attack and cast with them from the app, as for their character; placing a
+creature summoned, dismissing and changing them stay in Foundry (since 0.54.0 a summon activity is
+cast from the app, and you place its creature from its card). A creature its player doesn't own in
+Foundry goes without its secrets, with its public biography. To take one from a player in the app,
+take their Owner away, or hide or delete its token. Since 0.41.0 the saves the game asks of a
+companion are asked in the app, on its own sheet, as a character's are, and the character's sheet
+says so; a Gamemaster's request in chat asks the characters only
+([Saves the game asks for](#saves-the-game-asks-for)).
 On the campaign's **Player actions** tab, **Companions' initiative** chooses how they enter
 combat: **Its own roll**, each rolled from its tab in the app or here; or **Right after its
 character**: whenever a character's initiative is rolled, changed or cleared, here or in the app,
@@ -404,7 +406,7 @@ an attack hit only where the game shows players.
   use, never a slot, at the spell's own level, or a warlock's at their pact slots' level, as dnd5e
   casts it, and its card is the spell's. Repeats of the same free casting, as dnd5e gives a spell
   granted more than once, are listed once; forwards that each spend uses of their own are each
-  listed. A forward to a summoning, a transformation, an enchantment or a Cast activity, or one
+  listed. A forward to a transformation, an enchantment or a Cast activity, or one
   whose level may be chosen, is left to Foundry (or Wild Shape from the app, where the campaign
   allows it), and so is a free casting of a check that isn't the
   spell cast, as the 2014 Silent Image's.
@@ -427,8 +429,18 @@ an attack hit only where the game shows players.
   game won't apply it once it's used, as when the item can no longer take it, it's left on the card
   for you; one whose concentration has ended by then isn't applied at all, as dnd5e's card no longer
   offers it. Choices made once, such as Eldritch Spear or Spell Mastery, and a magic item's
-  templates, such as a Shield's +1, are left to Foundry; summoning and transforming are yours to do,
-  or Wild Shape from the app where the campaign allows it.
+  templates, such as a Shield's +1, are left to Foundry; placing a summoned creature and
+  transforming are yours to do, or Wild Shape from the app where the campaign allows it.
+- **Summoning.** Since 0.54.0 a summon activity, such as Find Familiar, Summon Beast, Conjure
+  Animals or a Steel Defender, is cast from the app as dnd5e casts it, its slot or use spent and its
+  concentration begun, and nothing placed. Where dnd5e's dialog would ask which creature, type or
+  size, its card says what the player chose, "Chosen on Sending Stone: Owl (Fey)", and when its
+  Summon button is clicked, on any browser, dnd5e's dialog opens with that chosen, for you to change
+  or keep; then you place it as always. Allow Summoning and your players' roles don't matter, as
+  when a player casts it in Foundry; a player Allow Summoning lets summon sees the button too, and
+  may place it. One by Challenge Rating has its creature picked in dnd5e's compendium browser. A
+  staff's, a free casting's, a companion's and a druid's form's are cast alike. With no scene up,
+  Summon does nothing, as in Foundry; each click places the creature again.
 - **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
   Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
@@ -451,8 +463,8 @@ an attack hit only where the game shows players.
   mode and the ammunition, and what was spent, or "nothing spent".
 - **Nothing asks you, where it can be helped.** An enchantment's profile and item are chosen in the
   app, so dnd5e's usage dialog never opens. Area attacks Midi targets itself around their user,
-  summoning, transforming (but Wild Shape from the app where the campaign allows it) and other
-  activities dnd5e asks about, Midi's Active Defence, a used
+  placing a summoned creature, transforming (but Wild Shape from the app where the campaign allows
+  it) and other activities dnd5e asks about, Midi's Active Defence, a used
   reaction or bonus action Midi enforces (in the encounter the creature fights in: the one you have
   up, or since 0.53.0 one you don't that has begun and is its scene's chosen one, where the module
   marks it itself and takes the mark off at the creature's next turn there), and an activity set to
@@ -1195,15 +1207,19 @@ Gamemaster-only information switched on.
   Edition, Foundry's `Roll#evaluate` and `DiceTerm#_roll` are wrapped, through libWrapper when it's
   active, so that a roll made for a player from the app takes their dice. Every other roll is left alone. No core
   or system class is otherwise overridden.
-- **Summons are placed on the scene the summoner is viewing:** one summoned while you view a prep
-  scene shows once its token is on the active scene; it shows at once, marked on another scene, to
-  an app from v0.51.0.
+- **A card's Summon button is listened to,** since 0.54.0, on every browser: the dialog it opens has
+  the player's choice set on its own configuration before it is drawn, as dnd5e sets it on any
+  change. Nothing of dnd5e's is replaced.
+- **Summons are placed on the scene whoever places them is viewing,** for one cast from the app the
+  Gamemaster who clicks the card's Summon button: one placed on a prep scene shows once its token is
+  on the active scene; it shows at once, marked on another scene, to an app from v0.51.0.
 - **View the active scene while companions act:** Foundry, and Midi-QOL, find a creature's token on
   your canvas.
 - **With dnd5e's *Automatic Recharge* on,** Foundry rolls a companion's recharge at the start of its
   turn.
 - **With Midi-QOL's *Auto Remove Summoned Creature*,** a summon's tab goes when its summoner's
-  concentration ends.
+  concentration ends, for one placed in the cast's own workflow; one placed later from the card's
+  Summon button, as every one cast from the app, stays.
 - **Midi-QOL shows less on cards of a creature no player owns,** as it does for any NPC.
 - **Midi-QOL reads only the encounter you have up.** Its own checks of a reaction or Bonus Action,
   its opportunity attacks and its marks read the encounter you view, and its *Requires targets* "in
