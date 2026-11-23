@@ -1304,6 +1304,16 @@ async function formsFromAnywhere() {
   const bob = users.get('bob')
   const { NONE, OBSERVER, OWNER } = CONST.DOCUMENT_OWNERSHIP_LEVELS
   const knownAt = (id, who = 'elowen') => lastSheet(who).wildShape.known.find(each => each.id === id)
+  /**
+   * A change into a known form from anywhere else, Elowen herself with a use left: refused for this
+   * reason, no use spent, dnd5e's change never asked, and she still herself.
+   */
+  async function refusedInto(id, reason, what) {
+    const [spent, asked] = [shapeItem().system.uses.spent, port.transforms.length]
+    assert.ok((shapeItem().system.uses.value > 0) && !formOf(), `${what}: herself, with a use left`)
+    assert.deepEqual([refusal(await made(transform(id))), shapeItem().system.uses.spent, port.transforms.length, formOf()],
+      [['failed', reason, null], spent, asked, undefined], what)
+  }
   // The world: a folder named Summons, and three world actors copied from the 2024 Actors, each one
   // Alice may observe.
   const actors24Source = name => structuredClone(packs.get('dnd5e.actors24').sources.get(uuidOf(name).split('.').at(-1)))
@@ -1344,7 +1354,7 @@ async function formsFromAnywhere() {
   // H0, at format 1: each by its profile's name alone, with no why, never loaded, and a change refused "form".
   await posts(() => shapeItem().update({ [`system.activities.${ACTIVITY}.profiles`]: [...before, ...ANYWHERE] }), 'her sheet with the forms from anywhere')
   assert.deepEqual(ANYWHERE.map(({ _id }) => knownAt(_id)), ANYWHERE.map(({ _id, name }) => ({ id: _id, name, pool: false })), 'H0: an app that says wildShape 1: by name alone, no why')
-  assert.deepEqual(refusal(await made(transform('anyGreyWolf00000'))), ['failed', 'form', null], 'H0: a change into one refused "form"')
+  await refusedInto('anyGreyWolf00000', 'form', 'H0: a change into one refused "form"')
   assert.deepEqual(loadedSince(ANYWHERE.map(profile => profile.uuid)), [], 'H0: none loaded')
   fromAnywhere.add('H0')
 
@@ -1360,6 +1370,10 @@ async function formsFromAnywhere() {
   send('bridge.heartbeat', {}, getCampaigns()[0], { sequenced: false })
   await settle(500)
   assert.deepEqual(sent('character.updated').filter(e => app.events.indexOf(e) >= sameMark), [], 'H1: wildShape 2 again: no sheet sent')
+  // A change into one her players couldn't use in Foundry refused "form" by its gate alone, as each
+  // fits her and is there: the Gamemaster's own Moon Hare, and the Grey Wolf, Allow Transformation off.
+  await refusedInto('anyHare000000000', 'form', 'H1: into the Moon Hare, "permission": "form"')
+  await refusedInto('anyGreyWolf00000', 'form', 'H1: into the Grey Wolf, "transformation": "form"')
   fromAnywhere.add('H1')
 
   // H2, the druid's players: none; then Alice hers by assignment alone, with no level on her, then
@@ -1378,6 +1392,7 @@ async function formsFromAnywhere() {
   assert.deepEqual(reads(), asH1(), 'H2: assigned to Alice, her Owner: H1\'s')
   await posts(() => elowen.update({ 'ownership.alice': OBSERVER }), 'her sheet, Alice her Observer alone')
   assert.deepEqual(reads(), asH1(OWNER_READS), 'H2: assigned to Alice, her Observer, not her Owner: "owner"')
+  await refusedInto('anyGreyWolf00000', 'form', 'H2: into the Grey Wolf, Alice her Observer alone, "owner": "form"')
   bob.character = elowen
   await Hooks.callAll('updateUser', bob, { character: 'elowen' }, {}, 'gm')
   await elowen.update({ 'ownership.default': OWNER })
@@ -1395,6 +1410,7 @@ async function formsFromAnywhere() {
   // H3, Allow Transformation: stored the first time by createSetting, then updated.
   await transformation(true, 'createSetting')
   assert.deepEqual(reads(), asH1(each(USABLE, 'create')), 'H3: on: "create", none of her players having Create New Actors')
+  await refusedInto('anyGreyWolf00000', 'form', 'H3: into the Grey Wolf, "create": "form"')
   await transformation(false, 'updateSetting')
   assert.deepEqual(reads(), asH1(), 'H3: off again: "transformation"')
   await transformation(true, 'updateSetting')
@@ -1417,6 +1433,21 @@ async function formsFromAnywhere() {
   assert.deepEqual([knownAt('anyPackWolf00000').pool, knownAt('anyPackWolf00000').fits], [true, false], 'H4: the Pack Wolf, in a world folder named Summons: fits false')
   assert.deepEqual(reads(), asH1(each(USABLE, 'pool')), 'H4: Thorin, the hare and the hare gone still "permission"')
   assert.deepEqual(loadedSince(NEVER_LOADED), [], 'H4: no world actor, nor what she can\'t see, loaded')
+  // Each of Foundry's gates closed while the app still holds the Grey Wolf usable, unseen by any hook,
+  // as between a change in Foundry and the sheet it sends: a change into it refused "form" all the
+  // same, each command checked against her and the world as they are when it's made.
+  const granted = game.permissions
+  for (const [what, close, open] of [
+    ['Alice her Observer alone', () => { elowen.ownership.alice = OBSERVER }, () => { elowen.ownership.alice = OWNER }],
+    ['the Grey Wolf unshared', () => { greyWolf.ownership.alice = NONE }, () => { greyWolf.ownership.alice = OBSERVER }],
+    ['Allow Transformation off', () => settings.set('allowPolymorphing', false), () => settings.set('allowPolymorphing', true)],
+    ['Create New Actors taken away', () => { game.permissions = { ...granted, ACTOR_CREATE: [] } }, () => { game.permissions = granted }],
+  ]) {
+    close()
+    assert.deepEqual([knownAt('anyGreyWolf00000').pool, knownAt('anyGreyWolf00000').fits], [true, true], `H4: ${what}, the app still holding the Grey Wolf usable`)
+    await refusedInto('anyGreyWolf00000', 'form', `H4: into the Grey Wolf, ${what} and the app not told: "form"`)
+    open()
+  }
   fromAnywhere.add('H4')
 
   // H5, a second player, and Limited: each of her players must observe the form.
@@ -1510,16 +1541,15 @@ async function formsFromAnywhere() {
   // H10, a world actor deleted, and one made: "gone", and usable; an entry gone refused "gone" on its change.
   await posts(() => Actor.implementation.deleteDocuments(['greyWolf00000000']), 'her sheet, the Grey Wolf deleted')
   assert.equal(knownAt('anyGreyWolf00000').why, 'gone', 'H10: deleted: "gone"')
-  assert.deepEqual(refusal(await made(transform('anyGreyWolf00000'))), ['failed', 'gone', null], 'H10: a change into it "gone"')
+  await refusedInto('anyGreyWolf00000', 'gone', 'H10: a change into it "gone"')
   await posts(() => worldBeast('Wolf', { _id: 'lateWolf00000000', name: 'Late Wolf' }), 'her sheet, the Late Wolf made')
   assert.deepEqual([knownAt('anyLateWolf00000').pool, knownAt('anyLateWolf00000').fits, knownAt('anyLateWolf00000').cr], [true, true, 0.25], 'H10: made: usable')
-  assert.deepEqual(refusal(await made(transform('anyMonGone000000'))), ['failed', 'gone', null], 'H10: an entry gone from the Monsters: "gone"')
-  assert.equal(formOf(), undefined)
+  await refusedInto('anyMonGone000000', 'gone', 'H10: an entry gone from the Monsters: "gone"')
   fromAnywhere.add('H10')
 
   // H11, the rules, as for any known form.
   for (const [id, why] of [['anyApe0000000000', 'the Giant Ape, above her CR'], ['anyPackWolf00000', 'the Pack Wolf, in a world folder named Summons']]) {
-    assert.deepEqual(refusal(await made(transform(id))), ['failed', 'form', null], `H11: ${why}: "form"`)
+    await refusedInto(id, 'form', `H11: ${why}: "form"`)
   }
   fromAnywhere.add('H11')
 
@@ -1577,7 +1607,7 @@ async function formsFromAnywhere() {
   // Hz, back to wildShape 1, every check passing: each by name alone again, a change refused "form".
   await answerAs(1)
   assert.deepEqual(ANYWHERE.map(({ _id }) => knownAt(_id)), ANYWHERE.map(({ _id, name }) => ({ id: _id, name, pool: false })), 'Hz: wildShape 1 again: by name alone, no why')
-  assert.deepEqual(refusal(await made(transform('anyLateWolf00000'))), ['failed', 'form', null], 'Hz: a change into a world actor she could use "form"')
+  await refusedInto('anyLateWolf00000', 'form', 'Hz: a change into a world actor she could use "form"')
   fromAnywhere.add('Hz')
 
   // R, the world put back as 15b found it.
