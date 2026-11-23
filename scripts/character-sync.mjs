@@ -1,6 +1,7 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
 import { anyAbilityReader, noteAnyAbilityFormat } from "./check-abilities.mjs";
+import { noteSummonFormat, summonReader } from "./sheet-summon.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { activeForm, campaignActors, noteFormDeleted, originalOf, rosterEntry, transformed } from "./characters.mjs";
 import {
@@ -213,6 +214,21 @@ export function aloneReader(campaignId) {
 export function noteAnyAbilityReader(campaignId, features, type) {
   const was = noteAnyAbilityFormat(campaignId, features);
   if ( (was !== anyAbilityReader(campaignId)) && (type !== EVENTS.HELLO) ) sendSheetsAgain(campaignId);
+}
+
+/**
+ * Note whether a campaign's app reads summon activities, since 0.54.0: `features.summons`, 1 or
+ * later, kept by sheet-summon.mjs, whose sheets then carry the summon activities it may cast. One
+ * that says nothing of it, as an older app, is sent none. An answer to a heartbeat that changes it
+ * sends the campaign's sheets and its companions' again; a hello's are sent after it anyway.
+ * @param {string} campaignId
+ * @param {object|null} features
+ * @param {string} [type]   The event answered.
+ * @returns {void}
+ */
+export function noteSummonReader(campaignId, features, type) {
+  const was = noteSummonFormat(campaignId, features);
+  if ( (was !== summonReader(campaignId)) && (type !== EVENTS.HELLO) ) sendSheetsAgain(campaignId);
 }
 
 /* -------------------------------------------- */
@@ -498,8 +514,9 @@ function sendSheet(campaign, actor) {
 /**
  * A character's sheet as a campaign's app is sent it: to one that takes Wild Shape, its active form's
  * while it has one, with `form`, and her `wildShape` where she's a 2024 druid; else her own, as before.
- * Since 0.41.0, to one that reads damage on its own's choices, with them; and since 0.52.0, to one
- * that reads checks on any ability the game has, with its check activities on any.
+ * Since 0.41.0, to one that reads damage on its own's choices, with them; since 0.52.0, to one
+ * that reads checks on any ability the game has, with its check activities on any; and since
+ * 0.54.0, to one that reads summon activities, with those it may cast, her form's too.
  * @param {Campaign} campaign
  * @param {Actor} actor
  * @param {SheetTexts} texts
@@ -508,10 +525,11 @@ function sendSheet(campaign, actor) {
 function seatSheet(campaign, actor, texts) {
   const aloneChoices = aloneReader(campaign.id);
   const anyAbility = anyAbilityReader(campaign.id);
-  if ( !wildShapeReader(campaign.id) ) return characterSheet(actor, texts, { aloneChoices, anyAbility });
+  const summons = summonReader(campaign.id);
+  if ( !wildShapeReader(campaign.id) ) return characterSheet(actor, texts, { aloneChoices, anyAbility, summons });
   const form = activeForm(actor);
-  const sheet = form ? characterSheet(form, texts, { ops: false, aloneChoices, anyAbility })
-    : characterSheet(actor, texts, { aloneChoices, anyAbility });
+  const sheet = form ? characterSheet(form, texts, { ops: false, aloneChoices, anyAbility, summons })
+    : characterSheet(actor, texts, { aloneChoices, anyAbility, summons });
   if ( !sheet ) return sheet;
   const shape = form ? formBlock(form, actor, campaign) : undefined;
   const block = wildShapeBlock(actor, form ?? actor, campaign);
@@ -552,7 +570,8 @@ export function aloneTermsChanged(campaignId) {
 /**
  * Send a campaign whose app has changed how it reads its sheets, in answer to a heartbeat, every
  * character and companion again, as it's now sent them: since 0.41.0 with or without damage on its
- * own's choices, and since 0.52.0 with or without checks on any ability.
+ * own's choices, since 0.52.0 with or without checks on any ability, and since 0.54.0 with or
+ * without summon activities.
  * @param {string} campaignId
  * @returns {void}
  */

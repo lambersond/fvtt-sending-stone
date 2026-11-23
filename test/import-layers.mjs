@@ -118,6 +118,7 @@ const LAYERS = [
       'sheet-effects.mjs',
       'sheet-effect-dice.mjs',
       'sheet-enchant.mjs',
+      'sheet-summon.mjs',
       'sheet-links.mjs',
       'sheet-rolls.mjs',
       'sheet-features.mjs',

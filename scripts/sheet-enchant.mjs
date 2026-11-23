@@ -1,5 +1,5 @@
 import { durationOf, hiddenFromPlayer } from "./sheet-effects.mjs";
-import { castCopy, finite, inventoryTypes } from "./sheet-values.mjs";
+import { castCopy, finite, inventoryTypes, leveled } from "./sheet-values.mjs";
 
 /**
  * What a character's sheet says of enchantments: which of their enchant activities can be used
@@ -418,15 +418,6 @@ export function availableProfiles(activity) {
 export function effectsOf(document) {
   const effects = document?.effects;
   return (typeof effects?.[Symbol.iterator] === "function") ? Array.from(effects) : [];
-}
-
-/**
- * Is an item a leveled spell, whose enchantments are offered by the level it's cast at?
- * @param {Item} item
- * @returns {boolean}
- */
-function leveled(item) {
-  return (item?.type === "spell") && ((finite(item.system?.level) ?? 0) > 0);
 }
 
 /**

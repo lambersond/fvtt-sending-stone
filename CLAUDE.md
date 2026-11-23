@@ -24,7 +24,8 @@ The scripts stand in seven layers, bottom to top:
    combats as it is told them and how hurt a creature in them is, the rules of what players are
    shown of results, a dish's effects, and the rule of paying in coins.
 4. **Sheets.** A character's or a party's sheet as plain data, with its descriptions and their
-   links; a druid's Wild Shape and its forms; and which creatures are a character's companions.
+   links, and the creatures its summonings offer; a druid's Wild Shape and its forms; and which
+   creatures are a character's companions.
 5. **What each app was told.** Keeping every campaign's copy current: characters and parties,
    companions, journals, dishes' cards, chat, combat and its creatures' health, the saves the game
    asks, and heartbeats; and, posting nothing itself, companions set right after their characters in
@@ -126,7 +127,7 @@ those too. The module's only two, `findLink`'s in `command-links.mjs`, point dow
   `test/fvtt/<area>.mjs`, under both releases where they differ. A change that only moves code
   changes no assertion: only the import lines that name what moved. The app's e2e imports
   `test/fvtt/`'s stand-ins too: a change to one can break it.
-- **test/README.md's counts stay true:** "52 harnesses, 122 runs" changes with `harness-all.sh`.
+- **test/README.md's counts stay true:** "53 harnesses, 126 runs" changes with `harness-all.sh`.
 - **The dnd5e checkouts are read-only:** `test:setup` fetches them at pinned SHAs into
   `.cache/dnd5e/` (or set `DND5E5_DIR` and `DND5E6_DIR`). Never edit or commit them; a pin moves in
   `test/pins.env` alone.

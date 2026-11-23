@@ -1,6 +1,7 @@
 import { EVENTS, MODULE_ID } from "./constants.mjs";
 import { canSend } from "./bridge-role.mjs";
 import { anyAbilityReader } from "./check-abilities.mjs";
+import { summonReader } from "./sheet-summon.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { combatEnabled } from "./config.mjs";
@@ -326,11 +327,13 @@ export function sendCompanion(campaign, entry, actor) {
       // A companion's effects take no commands, so its sheet offers none. Since 0.41.0 its damage on
       // its own carries its choices, to an app that reads them.
       const aloneChoices = aloneReader(campaign.id);
+      // Since 0.54.0 the summon activities it may cast, to an app that reads them.
+      const summons = summonReader(campaign.id);
       return {
         texts,
         data: {
           companion: { ...entry },
-          sheet: sheet ? characterSheet(actor, texts, { secrets, ops: false, aloneChoices, anyAbility }) : null
+          sheet: sheet ? characterSheet(actor, texts, { secrets, ops: false, aloneChoices, anyAbility, summons }) : null
         }
       };
     }

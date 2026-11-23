@@ -28,7 +28,7 @@ import { runDamageCommand, runUseCommand } from "./command-uses.mjs";
 import { isId } from "./command-checks.mjs";
 import { attacksUnavailable, failedResult, HIT_DICE_KINDS, runRollCommand } from "./command-rolls.mjs";
 import { runAskCommand, runTextDamageCommand, runTextRollCommand, textKinds } from "./command-texts.mjs";
-import { noteAloneReader, noteAnyAbilityReader } from "./character-sync.mjs";
+import { noteAloneReader, noteAnyAbilityReader, noteSummonReader } from "./character-sync.mjs";
 import { gmRollOf } from "./chat-data.mjs";
 import { healthReader, noteHealthReader } from "./creature-health.mjs";
 import { noteCompanionReader } from "./creature-sync.mjs";
@@ -243,15 +243,18 @@ const made = new Map();
  * whether its players typing in their dice are asked for the dice the game rolls later
  * (`diceAsks`), under dnd5e 5 wherever they type them and the self-test passed, and if not, why not
  * (`diceAsksReason`); with it, the answer to such an ask, `"dice"`, last among the kinds. And
- * since 0.52.0, last, `anyAbility`, true whatever the rolls, as descriptions and request cards
- * carry checks whatever they are: checks on any ability the game has are sent to an app that
- * answers `anyAbility` 1 or later.
+ * since 0.52.0 `anyAbility`, true whatever the rolls, as descriptions and request cards carry
+ * checks whatever they are: checks on any ability the game has are sent to an app that answers
+ * `anyAbility` 1 or later. And since 0.54.0, last, `summons`, true whatever the rolls: a summon
+ * activity is cast from the app, its creature placed by the Gamemaster from its card, by an app
+ * that answers `summons` 1 or later, whose sheets carry them.
  * @param {Campaign} campaign
  * @returns {{enabled: boolean, kinds: string[], reason: string|null, modifiers: boolean,
  *   areaAttacks: boolean, prompts: boolean, activityChecks: boolean, signedDice: boolean,
  *   selfTargets: boolean, gmRolls: boolean, gmRollMessages: boolean, manualDice: boolean,
  *   midiPrompts: boolean, aloneChoices: boolean, companionPrompts: boolean, effectDice: boolean,
- *   keptRerolls: boolean, diceAsks: boolean, diceAsksReason: string|null, anyAbility: boolean}}
+ *   keptRerolls: boolean, diceAsks: boolean, diceAsksReason: string|null, anyAbility: boolean,
+ *   summons: boolean}}
  */
 export function rollFeatures(campaign) {
   const asks = diceAskFeatures(campaign);
@@ -259,7 +262,7 @@ export function rollFeatures(campaign) {
     enabled: false, kinds: [], modifiers: false, areaAttacks: false, prompts: false, activityChecks: false,
     signedDice: false, selfTargets: false, gmRolls: false, gmRollMessages: false, manualDice: false,
     midiPrompts: false, aloneChoices: false, companionPrompts: false, effectDice: false, keptRerolls: false,
-    diceAsks: false, diceAsksReason: asks.diceAsksReason, anyAbility: true
+    diceAsks: false, diceAsksReason: asks.diceAsksReason, anyAbility: true, summons: true
   };
   if ( !campaign.rolls ) return { ...off, reason: "off" };
   if ( !diceStatus.ready ) return { ...off, reason: diceStatus.reason };
@@ -295,7 +298,8 @@ export function rollFeatures(campaign) {
     keptRerolls: manualDiceOn(campaign) && diceStatus.keptRerolls,
     diceAsks: asks.diceAsks,
     diceAsksReason: asks.diceAsksReason,
-    anyAbility: true
+    anyAbility: true,
+    summons: true
   };
 }
 
@@ -366,10 +370,12 @@ export function registerCommandHooks() {
  * says so (health-sync.mjs), and whether it answers fetches quietly while nobody is in it, `quiet`;
  * and since 0.52.0, whether it reads checks on any ability the game has, `anyAbility`, to which the
  * campaign's sheets, its companions' too, are sent again where it starts or stops in a heartbeat's
- * answer (character-sync.mjs); and since 0.53.0 whether it reads every message a Gamemaster's
- * command makes, `gmRollMessages`. A hello's answer wakes the campaign's fetching, which may be
- * waiting as an answer given before the hello was taken asked; since 0.50.0 it fetches in full at
- * its usual pace again, for two minutes at least.
+ * answer (character-sync.mjs); since 0.53.0 whether it reads every message a Gamemaster's
+ * command makes, `gmRollMessages`; and since 0.54.0 whether it reads summon activities, `summons`,
+ * to which the campaign's sheets, its companions' too, are sent again where it starts or stops in a
+ * heartbeat's answer (character-sync.mjs). A hello's answer wakes the campaign's fetching, which may
+ * be waiting as an answer given before the hello was taken asked; since 0.50.0 it fetches in full
+ * at its usual pace again, for two minutes at least.
  * @param {string} campaignId
  * @param {object|null} features   Such as `{commands: true}`; null when it said nothing.
  * @param {string} [type]          The event answered, a hello or a heartbeat.
@@ -391,6 +397,7 @@ export function noteListenerFeatures(campaignId, features, type) {
   noteCoinReader(campaignId, features);
   noteAloneReader(campaignId, features, type);
   noteAnyAbilityReader(campaignId, features, type);
+  noteSummonReader(campaignId, features, type);
   noteNotesReader(campaignId, features, type);
   noteTidyReader(campaignId, features, type);
   noteCompanionReader(campaignId, features, type);

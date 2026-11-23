@@ -127,6 +127,15 @@ export function castCopy(spell) {
 }
 
 /**
+ * Is an item a leveled spell, whose enchantments and summons are offered by the level it's cast at?
+ * @param {Item} item
+ * @returns {boolean}
+ */
+export function leveled(item) {
+  return (item?.type === "spell") && ((finite(item.system?.level) ?? 0) > 0);
+}
+
+/**
  * Join words as a list in the game's language, such as "Short Rest, Long Rest".
  * @param {string[]} words
  * @returns {string}

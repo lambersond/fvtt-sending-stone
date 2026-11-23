@@ -125,4 +125,8 @@ for v in X=1 "X=1 DND5E6=1"; do run handouts $v SLIM_CHECK=1; done
 # Module 0.50.0: other creatures' health in the app: who is shown, dnd5e's bands under 5.3.3 and
 # 6.0.5, the watch that follows hit points between combat events, and older apps sent nothing new.
 for v in X=1 "X=1 DND5E6=1"; do run health $v; done
+# Module 0.54.0: summon activities on the sheets of an app that reads them, and none to an older app:
+# the creatures, types and sizes each offers at each level, labelled as dnd5e's usage dialog labels
+# them (dnd5e 5.3.3 and 6.0.5 stand-ins, with and without Midi-QOL's).
+for v in "X=1 SLIM_CHECK=1" "MIDI=1 SLIM_CHECK=1" "X=1 DND5E6=1 SLIM_CHECK=1" "MIDI=1 DND5E6=1"; do run summons $v; done
 exit $fail
