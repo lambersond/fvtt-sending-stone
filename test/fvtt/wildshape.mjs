@@ -1291,16 +1291,18 @@ async function formsFromAnywhere() {
     await until(() => sent('character.updated').some(e => (app.events.indexOf(e) >= mark) && (e.data.character.id === id)), what)
     await settle(80)
   }
-  /** The campaign's app answers a heartbeat with this format of Wild Shape. */
-  const answerAs = format => posts(() => {
+  /** The campaign's app answers a heartbeat with this format of Wild Shape: the character's sheet after it. */
+  const answerAs = (format, id = 'elowen') => posts(() => {
     app.features.set('camp-a', { commands: true, wildShape: format })
     send('bridge.heartbeat', {}, getCampaigns()[0], { sequenced: false })
-  }, `Elowen's sheet after an answer of wildShape ${format}`)
-  /** Allow Transformation turned on or off, as its setting is stored. */
-  const transformation = (on, hook) => posts(async () => {
+  }, `${id}'s sheet after an answer of wildShape ${format}`, id)
+  /** Allow Transformation turned on or off, as its setting is stored: the character's sheet after it. */
+  const transformation = (on, hook, id = 'elowen') => posts(async () => {
     settings.set('allowPolymorphing', on)
     await setting('dnd5e.allowPolymorphing', hook)
-  }, `Allow Transformation ${on ? 'on' : 'off'} by ${hook}`)
+  }, `${id}'s sheet, Allow Transformation ${on ? 'on' : 'off'} by ${hook}`, id)
+  const bob = users.get('bob')
+  const { NONE, OBSERVER, OWNER } = CONST.DOCUMENT_OWNERSHIP_LEVELS
   const knownAt = (id, who = 'elowen') => lastSheet(who).wildShape.known.find(each => each.id === id)
   // The world: a folder named Summons, and three world actors copied from the 2024 Actors, each one
   // Alice may observe.
@@ -1353,21 +1355,41 @@ async function formsFromAnywhere() {
   assert.deepEqual(reads(), asH1(), 'H1: Thorin, the Gamemaster\'s hare and a hare gone from that pack "permission"; those she could see "transformation"; a world actor and a compendium that aren\'t there "gone"; a token\'s actor and an item "source"')
   assert.deepEqual(knownAt('anyThorin0000000'), { id: 'anyThorin0000000', name: 'Thorin', pool: false, why: 'permission' }, 'H1: by name, with why')
   assert.deepEqual(loadedSince(ANYWHERE.map(profile => profile.uuid)), [], 'H1: none loaded')
+  // The same answer again sends nothing: only a change of the format sends every character again.
+  const sameMark = app.events.length
+  send('bridge.heartbeat', {}, getCampaigns()[0], { sequenced: false })
+  await settle(500)
+  assert.deepEqual(sent('character.updated').filter(e => app.events.indexOf(e) >= sameMark), [], 'H1: wildShape 2 again: no sheet sent')
   fromAnywhere.add('H1')
 
-  // H2, the druid's players: none, then Alice hers by assignment alone, not Owner: "owner".
+  // H2, the druid's players: none; then Alice hers by assignment alone, with no level on her, then
+  // her Owner, then only her Observer; then Bob assigned her too, her Owner through her default, while
+  // Alice is still only her Observer. Each of her players must be her Owner, as Foundry lets only an
+  // Owner use her sheet: "owner" wherever one isn't.
+  const OWNER_READS = each(['anyGreyWolf00000', 'anyMonWolf000000', 'anyThorin0000000', 'anyHare000000000', 'anySecretGone000', 'anyMonGone000000', 'anyApe0000000000',
+    'anyPackWolf00000'], 'owner')
   await posts(() => elowen.update({ 'ownership.-=alice': null }), 'her sheet, no player')
-  assert.deepEqual(reads(), asH1({ anyGreyWolf00000: 'owner', anyMonWolf000000: 'owner', anyThorin0000000: 'owner', anyHare000000000: 'owner', anySecretGone000: 'owner',
-    anyMonGone000000: 'owner', anyApe0000000000: 'owner', anyPackWolf00000: 'owner' }), 'H2: a druid with no player: "owner", after the form\'s own reasons')
+  assert.deepEqual(reads(), asH1(OWNER_READS), 'H2: a druid with no player: "owner", after the form\'s own reasons')
   alice.character = elowen
   await Hooks.callAll('updateUser', alice, { character: 'elowen' }, {}, 'gm')
   await settle(500)
-  assert.equal(knownAt('anyGreyWolf00000').why, 'owner', 'H2: assigned to Alice, who isn\'t her Owner: "owner"')
-  await posts(() => elowen.update({ 'ownership.alice': CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER }), 'her sheet, Alice her Owner again')
+  assert.deepEqual(reads(), asH1(OWNER_READS), 'H2: assigned to Alice, who has no level on her: "owner"')
+  await posts(() => elowen.update({ 'ownership.alice': OWNER }), 'her sheet, Alice her Owner again')
+  assert.deepEqual(reads(), asH1(), 'H2: assigned to Alice, her Owner: H1\'s')
+  await posts(() => elowen.update({ 'ownership.alice': OBSERVER }), 'her sheet, Alice her Observer alone')
+  assert.deepEqual(reads(), asH1(OWNER_READS), 'H2: assigned to Alice, her Observer, not her Owner: "owner"')
+  bob.character = elowen
+  await Hooks.callAll('updateUser', bob, { character: 'elowen' }, {}, 'gm')
+  await elowen.update({ 'ownership.default': OWNER })
+  await settle(500)
+  assert.deepEqual(reads(), asH1(OWNER_READS), 'H2: Bob assigned her too and her Owner through her default, Alice still her Observer alone: "owner"')
+  await posts(() => elowen.update({ 'ownership.default': NONE, 'ownership.alice': OWNER }), 'her sheet, Alice her Owner again, and no default')
   alice.character = null
+  bob.character = null
   await Hooks.callAll('updateUser', alice, { character: null }, {}, 'gm')
+  await Hooks.callAll('updateUser', bob, { character: null }, {}, 'gm')
   await settle(80)
-  assert.deepEqual(reads(), asH1(), 'H2: back to H1\'s')
+  assert.deepEqual([reads(), elowen.ownership.default, elowen.ownership.alice], [asH1(), NONE, OWNER], 'H2: back to H1\'s')
   fromAnywhere.add('H2')
 
   // H3, Allow Transformation: stored the first time by createSetting, then updated.
@@ -1406,6 +1428,19 @@ async function formsFromAnywhere() {
   assert.equal(knownAt('anyGreyWolf00000').why, 'permission', 'H5: Bob Limited on the Grey Wolf: "permission"')
   await posts(() => greyWolf.update({ 'ownership.bob': CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER }), "her sheet, the Grey Wolf's change")
   assert.deepEqual([knownAt('anyGreyWolf00000').pool, knownAt('anyGreyWolf00000').fits], [true, true], 'H5: Bob an Observer: usable')
+  // Bob's own Create New Actors taken away, as a user's own permissions are, Alice's still hers: each
+  // of her players must have it.
+  const BOB_SEES = { ...USABLE_READS, anyApe0000000000: 'permission', anyPackWolf00000: 'permission' }
+  await posts(async () => {
+    bob.permissions = { ...bob.permissions, ACTOR_CREATE: false }
+    await Hooks.callAll('updateUser', bob, { permissions: { ACTOR_CREATE: false } }, {}, 'gm')
+  }, 'her sheet, Bob without Create New Actors')
+  assert.deepEqual(reads(), { ...BOB_SEES, anyGreyWolf00000: 'create', anyMonWolf000000: 'create', anyMonGone000000: 'create' }, 'H5: Bob without Create New Actors, Alice with it: "create"')
+  await posts(async () => {
+    delete bob.permissions.ACTOR_CREATE
+    await Hooks.callAll('updateUser', bob, { permissions: { '-=ACTOR_CREATE': null } }, {}, 'gm')
+  }, "her sheet, Bob's Create New Actors his role's again")
+  assert.deepEqual(reads(), BOB_SEES, 'H5: Bob with it again: usable')
   await posts(() => elowen.update({ 'ownership.-=bob': null }), 'her sheet, Bob gone')
   await greyWolf.update({ 'ownership.-=bob': null })
   await settle(80)
@@ -1491,16 +1526,50 @@ async function formsFromAnywhere() {
   // H12, the Moon's floor: a world beast's own armor class known wherever his players may observe it.
   const ironSource = actors24Source('Brown Bear')
   ironSource.system.attributes.ac = { calc: 'natural', flat: 16 }
-  await Actor.implementation.create({ ...ironSource, _id: 'ironBear00000000', name: 'Iron Bear', folder: null, ownership: { default: 0, bob: 2 } }, { keepId: true })
+  const ironBear = await Actor.implementation.create({ ...ironSource, _id: 'ironBear00000000', name: 'Iron Bear', folder: null, ownership: { default: 0, bob: 2 } }, { keepId: true })
+  const IRON_BEAR = { _id: 'anyIronBear00000', name: 'Iron Bear', uuid: 'Actor.ironBear00000000' }
   // Rowan's Wild Shape links forms once he has learned one (as dnd5e 6's run hasn't made him yet).
   assert.equal((await made(learn(uuidOf('Brown Bear'), null, { actorId: 'rowan' }))).result.status, 'done')
   const rowanBefore = profilesOf(rowan).map(profile => ({ ...profile, movement: [], sizes: [], types: [] }))
-  await shapeItem(rowan).update({ [`system.activities.${ACTIVITY}.profiles`]: [...rowanBefore, { _id: 'anyIronBear00000', name: 'Iron Bear', uuid: 'Actor.ironBear00000000' }] })
+  // Rowan knowing the Iron Bear alone, a form from anywhere else and none of the campaign's: sent again
+  // as it changes, and as Allow Transformation does, as Elowen is.
+  await posts(() => shapeItem(rowan).update({ [`system.activities.${ACTIVITY}.profiles`]: [IRON_BEAR] }), "Rowan's sheet, the Iron Bear his one known form", 'rowan')
+  assert.deepEqual(lastSheet('rowan').wildShape.known.map(each => [each.id, each.pool, each.fits]), [['anyIronBear00000', true, true]], 'H12: Rowan knowing the Iron Bear alone: usable')
+  await posts(() => ironBear.update({ name: 'Iron Sow' }), "Rowan's sheet, the Iron Bear renamed", 'rowan')
+  assert.equal(knownAt('anyIronBear00000', 'rowan').name, 'Iron Sow', 'H12: renamed in Foundry, renamed on the sheet of a druid who knows it alone')
+  await posts(() => ironBear.update({ name: 'Iron Bear' }), "Rowan's sheet, the Iron Bear named again", 'rowan')
+  await transformation(false, 'updateSetting', 'rowan')
+  assert.equal(knownAt('anyIronBear00000', 'rowan').why, 'transformation', 'H12: Allow Transformation off: Rowan, who knows none of the campaign\'s, sent again')
+  await transformation(true, 'updateSetting', 'rowan')
+  assert.equal(knownAt('anyIronBear00000', 'rowan').pool, true, 'H12: on again: usable')
+  await posts(() => shapeItem(rowan).update({ [`system.activities.${ACTIVITY}.profiles`]: [...rowanBefore, IRON_BEAR] }), "Rowan's sheet, the Brown Bear and the Iron Bear", 'rowan')
   await freshUses(rowan)
   it = await made(transform('anyIronBear00000', { actorId: 'rowan' }))
   assert.deepEqual([it.result.status, formOf(rowan).system.attributes.ac.value, lastSheet('rowan').form?.flooredAc], ['done', 16, false], "H12: AC 16, the Iron Bear's own, not the Moon's floor")
-  await transformation(false, 'updateSetting')
+  await transformation(false, 'updateSetting', 'rowan')
   assert.deepEqual([knownAt('anyIronBear00000', 'rowan').why, lastSheet('rowan').form?.flooredAc], ['transformation', false], 'H12: Allow Transformation off: still its own')
+  // While he is the Iron Bear: an app that says wildShape 1 is sent the floor as for any form from
+  // anywhere else, its own armor class never read; one that says 3 as one that says 2.
+  await answerAs(1, 'rowan')
+  assert.deepEqual([knownAt('anyIronBear00000', 'rowan'), lastSheet('rowan').form?.flooredAc], [{ id: 'anyIronBear00000', name: 'Iron Bear', pool: false }, true], 'H12: at wildShape 1, by name alone, and his armor class taken for the Moon\'s floor')
+  await answerAs(3, 'rowan')
+  await until(() => knownAt('anyThorin0000000')?.why, "Elowen's sheet at wildShape 3")
+  assert.deepEqual([knownAt('anyIronBear00000', 'rowan').why, lastSheet('rowan').form?.flooredAc], ['transformation', false], 'H12: at wildShape 3, as at 2')
+  assert.deepEqual(reads(), { ...USABLE_READS, anyGreyWolf00000: 'gone', anyMonWolf000000: 'transformation', anyMonGone000000: 'transformation', anyApe0000000000: 'transformation',
+    anyPackWolf00000: 'transformation', anyLateWolf00000: 'transformation' }, 'H12: Elowen\'s at wildShape 3, as at 2, Allow Transformation off')
+  // With no player, Bob no longer his Owner nor his form's, none may observe the Iron Bear: his armor
+  // class is taken for the Moon's floor.
+  const ironForm = formOf(rowan)
+  await posts(async () => {
+    await ironForm.update({ 'ownership.-=bob': null })
+    await rowan.update({ 'ownership.-=bob': null })
+  }, "Rowan's sheet, no player", 'rowan')
+  assert.deepEqual([knownAt('anyIronBear00000', 'rowan').why, lastSheet('rowan').form?.flooredAc], ['owner', true], 'H12: no player: "owner", and the Moon\'s floor')
+  await posts(async () => {
+    await rowan.update({ 'ownership.bob': OWNER })
+    await ironForm.update({ 'ownership.bob': OWNER })
+  }, "Rowan's sheet, Bob his Owner again", 'rowan')
+  assert.equal(lastSheet('rowan').form?.flooredAc, false)
   assert.equal((await made(revert({ actorId: 'rowan' }))).result.status, 'done')
   await transformation(true, 'updateSetting')
   fromAnywhere.add('H12')
@@ -1525,7 +1594,7 @@ async function formsFromAnywhere() {
   await freshUses(rowan)
   await settle(80)
   assert.deepEqual([formOf(), formOf(rowan), lastSheet().wildShape.known.length, game.permissions.ACTOR_CREATE], [undefined, undefined, before.length, undefined], 'R: put back')
-  ok(`known forms from anywhere (0.54.0; ${[...fromAnywhere].join(', ')}): to an app that says wildShape 1, by name alone with no why and refused "form"; at 2, sent again with no hello, each with why not, the form's own reasons first ("source" a token's actor or an item, "gone" a world actor or compendium not there, "owner" no player or one not her Owner, "permission" one may not observe it, Limited or a hidden compendium, never telling an entry missing from it, "transformation", then "create"), each usable listed with its numbers, a world actor's read as it stands and never through fromUuid, a compendium's loaded once, an entry gone found false; Allow Transformation and the compendiums' configuration watched by createSetting and updateSetting, a world actor's creation, change and deletion; a permission that can't be read not held, her Wild Shape kept; a change into the world's Grey Wolf as into a Beast of the compendiums, its record, use, line and tokens, a return never refused once unusable; a deleted one "gone", an entry gone refused "gone", the rules' "form" (CR, a world folder named Summons); the Moon's floor from a world beast's own armor class; back at 1 as before`)
+  ok(`known forms from anywhere (0.54.0; ${[...fromAnywhere].join(', ')}): to an app that says wildShape 1, by name alone with no why and refused "form"; at 2, sent again with no hello, and nothing sent for the same answer again; at 3 as at 2; each with why not, the form's own reasons first ("source" a token's actor or an item, "gone" a world actor or compendium not there, "owner" no player or one not her Owner, an assigned player with no level on her or only her Observer, or beside another assigned her who is Owner through her default, "permission" one may not observe it, Limited or a hidden compendium, never telling an entry missing from it, "transformation", then "create", one player without Create New Actors of his own beside one with it), each usable listed with its numbers, a world actor's read as it stands and never through fromUuid, a compendium's loaded once, an entry gone found false; Allow Transformation and the compendiums' configuration watched by createSetting and updateSetting, a world actor's creation, change and deletion, for a druid who knows only forms from anywhere else too; a permission that can't be read not held, her Wild Shape kept; a change into the world's Grey Wolf as into a Beast of the compendiums, its record, use, line and tokens, a return never refused once unusable; a deleted one "gone", an entry gone refused "gone", the rules' "form" (CR, a world folder named Summons); the Moon's floor from a world beast's own armor class, at 2 or 3 where his players may observe it, never at 1 or with no player; back at 1 as before`)
 }
 
 if (DND5E6) {
