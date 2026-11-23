@@ -592,6 +592,53 @@
   width: auto;
 }
 
+/* A campaign's constant companions (module 0.54.0): a box for each character, its companions' rows,
+   and a dashed place to drop an NPC from the Actors sidebar, lit while one is dragged over it. */
+#sending-stone-settings .sending-stone-constant {
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--ss-line);
+  border-radius: 8px;
+}
+
+#sending-stone-settings .sending-stone-constant-head {
+  min-height: 0;
+  padding: 0;
+  background: none;
+}
+
+#sending-stone-settings .sending-stone-constant-head .sending-stone-row-name > :first-child {
+  font-weight: bold;
+}
+
+#sending-stone-settings .sending-stone-constant > p.hint {
+  margin: 0;
+}
+
+#sending-stone-settings .sending-stone-drop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px dashed var(--ss-line);
+  border-radius: 4px;
+}
+
+#sending-stone-settings .sending-stone-drop > .hint {
+  margin: 0;
+}
+
+#sending-stone-settings .sending-stone-drop > button {
+  flex: none;
+  width: auto;
+}
+
+#sending-stone-settings .sending-stone-drop[data-over] {
+  border-color: var(--ss-accent);
+  background: var(--ss-tint);
+}
+
 /* Adding characters: the list in place of the campaign's players, its buttons below. */
 #sending-stone-settings .sending-stone-picker {
   display: flex;

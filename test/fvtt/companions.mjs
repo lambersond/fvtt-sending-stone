@@ -19,6 +19,7 @@
 import assert from 'node:assert/strict'
 import { isDeepStrictEqual } from 'node:util'
 import { settings, user, users, actors } from './stub.mjs'
+import { click, document as page, drop, find, openSettings, save, view } from './settings-app.mjs'
 import { DND5E5, DND5E6 as DND5E6_ROOT } from './paths.mjs'
 
 const MODULE = process.env.MODULE_DIR
@@ -2710,6 +2711,144 @@ if (!MIDI) {
   for (const each of mobs) scenes.delete(each.id)
   actors.delete('kMob')
   ok(`K21. 200 scenes of 50 tokens at 4 with a constant companion marked: Keepwatch's companions found in ${ms.toFixed(1)} ms, none of the 10,000 creatures made up`)
+}
+
+// K22-K25. Manage Campaigns' Companions tab, where the Gamemaster marks them: drawn from the real
+// template in jsdom (settings-app.mjs), used as the Gamemaster would.
+const C = 'SENDINGSTONE.Config.Companions'
+const Event = page.defaultView.Event
+const marksSaved = () => settings.get('campaigns').find(campaign => campaign.id === 'camp-k').constantCompanions
+const rowsOf = (win, character) => [...win.element.querySelectorAll(`[data-constant-character="${character}"] [data-constant-row]`)].map(row => row.dataset.constantRow)
+const addButton = character => `[data-action="openCompanionPicker"][data-character-id="${character}"]`
+const warned = []
+const warn = ui.notifications.warn
+ui.notifications.warn = message => { warned.push(message) }
+const openTab = async () => {
+  const win = await openSettings()
+  await view(win, 'campaign', { campaignId: 'camp-k', tab: 'companions' })
+  return win
+}
+await saveKeep({ constantCompanions: [] })
+
+// K22. The tab, between Party, where drawn, and Player actions; under another system, none.
+{
+  const win = await openTab()
+  const tabs = [...win.element.querySelectorAll('.sending-stone-tabs [data-tab]')].map(button => button.dataset.tab)
+  assert.deepEqual(tabs, ['players', 'companions', 'actions', 'connection'], 'Companions before Player actions (no Group actors here, so no Party tab)')
+  assert.equal(find(win, '.sending-stone-tabs [data-tab="companions"]').getAttribute('aria-current'), 'page')
+  assert.equal(find(win, '.sending-stone-scroll > p.hint').textContent.trim(), `${C}.Lead`, 'the lead first')
+  const box = character => find(win, `[data-constant-character="${character}"]`)
+  assert.match(box('thorin').textContent, /Thorin[\s\S]*Alice/, "Thorin's box names his player")
+  assert.ok(box('vex').textContent.includes(`${C}.None`), "Vex's: none")
+  assert.deepEqual([...win.element.querySelectorAll('[data-constant-character]')].map(each => each.dataset.constantCharacter), ['thorin', 'vex'], "in the campaign's order")
+  game.system.id = 'pf2e'
+  try {
+    await win.render()
+    assert.equal(win.element.querySelector('.sending-stone-tabs [data-tab="companions"]'), null, 'no tab under another system')
+    assert.equal(find(win, '.sending-stone-tabs [data-tab="players"]').getAttribute('aria-current'), 'page', 'and the view back on Players')
+  } finally {
+    game.system.id = 'dnd5e'
+    await win.close()
+  }
+  ok("K22. Manage Campaigns' Companions tab, before Player actions, opens on the lead and a box for each of the campaign's characters in its order, Thorin's naming Alice, Vex's with none; under another system there's no such tab, and a view on it goes back to Players")
+}
+
+// K23. Dropped from the Actors sidebar: an NPC kept, marked as unsaved, saved; anything else warned
+// and nothing kept; a drop after the tab is drawn again works; a token of it named by its scene.
+{
+  let win = await openTab()
+  const dropped = await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.steelDef' })
+  assert.ok(dropped.lit, 'lit while dragged over')
+  assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef'], 'a row')
+  assert.equal(find(win, '[data-constant-row="steelDef"] .hint').textContent.trim(), `${C}.NoToken`)
+  assert.equal(find(win, '[data-dirty]').dataset.dirty, 'true', 'unsaved')
+  assert.equal(page.activeElement, find(win, addButton('thorin')), "focus on Thorin's Add companions")
+  const group = companionActor('kBand', 'Band', { type: 'group' })
+  warned.length = 0
+  for (const data of [{ type: 'Actor', uuid: 'Actor.kBand' }, { type: 'Actor', uuid: 'Actor.vex' }, { type: 'Actor', uuid: 'Compendium.dnd5e.monsters.Actor.sd' }, 'not json']) {
+    await drop(win, '[data-constant-drop="thorin"]', data)
+  }
+  assert.deepEqual(warned.map(each => String(each)), [`${C}.NotNpc`, `${C}.IsCharacter {"name":"Vex"}`, `${C}.NotNpc`, `${C}.NotNpc`], 'each warned')
+  assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef'], 'nothing more kept')
+  actors.delete(group.id)
+  await click(win, '[data-action="removeConstant"][data-actor-id="steelDef"]')
+  assert.deepEqual(rowsOf(win, 'thorin'), [], 'removed')
+  await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.steelDef' })
+  assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef'], 'dropped again after a render')
+  await save(win)
+  await settle(); await settle()
+  assert.deepEqual(marksSaved(), [STEEL], 'saved')
+  await placedAt(arena, 'sd7')
+  win = await openTab()
+  assert.equal(find(win, '[data-constant-row="steelDef"] .hint').textContent.trim(), `${C}.OnScene {"scene":"arena"}`, 'its token named by its scene')
+  await win.close()
+  await arena.tokens.get('sd7').delete()
+  await settle(); await settle()
+  ok("K23. an NPC dropped from the Actors sidebar on Thorin's place, lit while dragged over, is kept as his, its row saying no token, the window unsaved and focus on his Add companions, and saved; a Group, a campaign character, a compendium's actor and text that isn't one are each warned and nothing kept; dropped again after a render it's kept again; with a token on the arena its row names the arena")
+}
+
+// K24. Add companions: the world's NPCs, by name, those his already ticked and disabled, dnd5e's
+// copies hinted; nothing to add until one is ticked; a filter by name; Add Selected; Escape.
+{
+  const win = await openTab()
+  await click(win, addButton('thorin'))
+  assert.equal(find(win, '#sending-stone-companion-picker-title').textContent.trim(), `${C}.PickerTitle {"character":"Thorin"}`)
+  assert.equal(page.activeElement, find(win, '[data-filter="companions"]'), 'focus on its filter')
+  const boxes = [...win.element.querySelectorAll('[data-pick-companion]')]
+  const ids = boxes.map(box => box.dataset.pickCompanion)
+  assert.ok(ids.every(id => game.actors.get(id)?.type === 'npc'), 'NPCs only')
+  assert.ok(!ids.includes('thorin') && !ids.includes('brakkaWolf') && ids.includes('dragon'), "no campaign character, nor a transformed one; another campaign's NPC character is one")
+  const names = ids.map(id => game.actors.get(id).name)
+  assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b, 'en')), 'by name')
+  const rowOf = id => find(win, `[data-pick-companion="${id}"]`).closest('label')
+  assert.deepEqual([find(win, '[data-pick-companion="steelDef"]').checked, find(win, '[data-pick-companion="steelDef"]').disabled], [true, true], 'his already: ticked, disabled')
+  assert.equal(rowOf('steelDef').querySelector('.hint').textContent.trim(), `${C}.Already {"character":"Thorin"}`)
+  assert.equal(rowOf('steelCopy').querySelector('.hint').textContent.trim(), `${C}.SummonCopy`, "dnd5e's copy hinted")
+  assert.ok(find(win, '[data-action="addPickedCompanions"]').disabled, 'nothing to add yet')
+  const hawkBox = find(win, '[data-pick-companion="hawk"]')
+  hawkBox.checked = true
+  hawkBox.dispatchEvent(new Event('change', { bubbles: true }))
+  assert.equal(find(win, '[data-action="addPickedCompanions"]').disabled, false, 'one ticked')
+  assert.equal(find(win, '[data-pick-companion-count]').textContent, 'SENDINGSTONE.Config.Picker.Selected {"count":1}')
+  const filter = find(win, '[data-filter="companions"]')
+  filter.value = 'haw'
+  filter.dispatchEvent(new Event('input', { bubbles: true }))
+  const shown = [...win.element.querySelectorAll('[data-filter-list="companions"] [data-search]')].filter(row => !row.hidden).map(row => row.querySelector('input').dataset.pickCompanion)
+  assert.deepEqual(shown.map(id => game.actors.get(id).name), shown.map(() => 'Hawk'), 'filtered by name')
+  await click(win, '[data-action="addPickedCompanions"]')
+  assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef', 'hawk'], 'added')
+  assert.equal(page.activeElement, find(win, addButton('thorin')), "focus back on Thorin's Add companions")
+  await click(win, addButton('thorin'))
+  win.element.querySelector('[data-filter="companions"]').dispatchEvent(new page.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  for (let i = 0; i < 10; i++) await new Promise(resolve => setTimeout(resolve, 0))
+  assert.equal(win.element.querySelector('[data-companion-picker]'), null, 'Escape closes it')
+  assert.equal(page.activeElement, find(win, addButton('thorin')), "focus on Thorin's Add companions")
+  await save(win)
+  await settle(); await settle()
+  assert.deepEqual(marksSaved(), [STEEL, { actorId: 'hawk', characterId: 'thorin' }])
+  ok("K24. Add companions offers the world's NPCs by name, no campaign character or transformed actor, Thorin's own ticked and disabled, already his, and dnd5e's copy for a summon hinted; Add Selected waits for a tick and counts it; the filter narrows by name; added, focus returns to his Add companions; Escape closes it the same; saved")
+}
+
+// K25. Removed, focus on Add companions; saved without it; and a save drops the mark of an actor
+// deleted, and of a character taken out of the campaign.
+{
+  const win = await openTab()
+  await drop(win, '[data-constant-drop="vex"]', { type: 'Actor', uuid: 'Actor.hawk' })
+  const temp = companionActor('kTemp', 'Gargoyle', { linked: true })
+  await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.kTemp' })
+  assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef', 'hawk', 'kTemp'])
+  await click(win, '[data-action="removeConstant"][data-actor-id="steelDef"][data-character-id="thorin"]')
+  assert.deepEqual([rowsOf(win, 'thorin'), rowsOf(win, 'vex')], [['hawk', 'kTemp'], ['hawk']], 'that one removed, no other')
+  assert.equal(page.activeElement, find(win, addButton('thorin')), "focus on Thorin's Add companions")
+  actors.delete(temp.id)
+  await click(win, '.sending-stone-tabs [data-tab="players"]')
+  await click(win, '[data-action="removeCharacter"][data-actor-id="vex"]')
+  await save(win)
+  await settle(); await settle()
+  assert.deepEqual(marksSaved(), [{ actorId: 'hawk', characterId: 'thorin' }], "saved without it, the deleted actor's mark or the departed character's")
+  ui.notifications.warn = warn
+  await saveKeep({ constantCompanions: [STEEL], characters: ['thorin', 'vex'] })
+  ok("K25. Remove takes that one alone off, focus on Thorin's Add companions; saved without it; and a save drops the mark of an actor deleted since, and of a character taken out of the campaign")
 }
 
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

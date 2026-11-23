@@ -183,6 +183,37 @@ export function tick(app, name, checked = true) {
   return box
 }
 
+/**
+ * Drag something over a place in the window and drop it there, since module 0.54.0, as the Actors
+ * sidebar drops an actor: a bubbling `dragover`, then `drop`, each carrying a `dataTransfer` whose
+ * `text/plain` is the data as JSON, or the text given. Foundry's own
+ * `TextEditor.implementation.getDragEventData` reads it, as core's does: the JSON parsed, `{}` where
+ * none parses or there's no `dataTransfer`; given here where the harness has none. Waits for what
+ * the drop sets off, and gives back the place, with whether the drag lit it.
+ * @param {object} app
+ * @param {string} selector
+ * @param {object|string} data
+ * @returns {Promise<{zone: HTMLElement, lit: boolean}>}
+ */
+export async function drop(app, selector, data) {
+  const ux = foundry.applications.ux
+  ux.TextEditor ??= { implementation: {} }
+  ux.TextEditor.implementation.getDragEventData ??= event => {
+    if (!('dataTransfer' in event)) return {}
+    try { return JSON.parse(event.dataTransfer.getData('text/plain')) } catch { return {} }
+  }
+  const zone = find(app, selector)
+  const text = (typeof data === 'string') ? data : JSON.stringify(data)
+  const event = type => Object.assign(new window.Event(type, { bubbles: true, cancelable: true }), {
+    dataTransfer: { getData: format => ((format === 'text/plain') ? text : '') },
+  })
+  zone.dispatchEvent(event('dragover'))
+  const lit = zone.hasAttribute('data-over')
+  zone.dispatchEvent(event('drop'))
+  for (let i = 0; i < 10; i++) await new Promise(resolve => setTimeout(resolve, 0))
+  return { zone, lit }
+}
+
 /** Save Changes, as its button does: rejects with what the window threw, which leaves it open. */
 export async function save(app) {
   await click(app, 'button[type="submit"]')

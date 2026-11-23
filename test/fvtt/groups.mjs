@@ -471,7 +471,8 @@ let win = await openSettings()
 await view(win, 'campaign', { campaignId: 'camp-a', tab: 'party' })
 assert.equal(find(win, '.sending-stone-tabs [data-tab="party"]').textContent.trim(), 'SENDINGSTONE.Config.Tabs.Party')
 const tabs = [...win.element.querySelectorAll('.sending-stone-tabs [data-tab]')].map(b => b.dataset.tab)
-assert.deepEqual(tabs, ['players', 'party', 'actions', 'connection'], 'Party between Players and Actions')
+// Changed on purpose (module 0.54.0, item 98): Companions between Party and Player actions.
+assert.deepEqual(tabs, ['players', 'party', 'companions', 'actions', 'connection'], 'Party and Companions between Players and Actions')
 let rowsShown = [...win.element.querySelectorAll('[data-party-list] > li')]
 assert.deepEqual(rowsShown.map(r => r.dataset.groupId), ['party'])
 assert.ok(find(win, '[data-action="removeParty"]').getAttribute('aria-label').startsWith('SENDINGSTONE.Config.Party.Remove'))
