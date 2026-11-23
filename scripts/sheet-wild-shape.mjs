@@ -10,8 +10,8 @@ import {
  * wild-shape.mjs, command-wildshape.mjs): on a 2024 druid's sheet, `wildShape`, what a change gives
  * her now, her known forms and her last ending; and on a transformed character's, which is its form's,
  * `form`, what she is now. Each is left out, never the sheet, should building it fail. Since 0.54.0,
- * to an app that says `wildShape` 2, a known form from anywhere else is listed as one from the
- * campaign's compendiums is where each of her players could use it in Foundry, and with why not
+ * to an app that says `wildShape` 2 or more, a known form from anywhere else is listed as one from
+ * the campaign's compendiums is where each of her players could use it in Foundry, and with why not
  * where not.
  */
 

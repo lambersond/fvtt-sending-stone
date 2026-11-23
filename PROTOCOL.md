@@ -2711,10 +2711,10 @@ An ask:
   numbers, as one from the campaign's compendiums is, where each of her players could change into it
   in Foundry, and a `transform` into it is taken. Any other from anywhere else gains `why`. A
   listener that says `1`, as every one before, is sent such forms as before, `pool: false` with no
-  `why`, and a change into one is refused `"form"`. A listener whose heartbeat answer moves between
-  `1` and `2` is sent every character again. The hello says nothing new: `pool: true` on such a
-  form, and `why`, are their own sign, and a listener asks for a change only into a form listed
-  `pool: true`. A module before 0.54.0 reads `2` as it reads `1`.
+  `why`, and a change into one is refused `"form"`. A listener whose heartbeat answer changes the
+  number, as from `1` to `2` or back, is sent every character again. The hello says nothing new:
+  `pool: true` on such a form, and `why`, are their own sign, and a listener asks for a change only
+  into a form listed `pool: true`. A module before 0.54.0 reads `2` as it reads `1`.
 
 ## Changes from protocol 1
 

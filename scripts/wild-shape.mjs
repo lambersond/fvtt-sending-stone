@@ -34,7 +34,7 @@ import { chainedBaseline, expiredOf, formEffectsOf, gainedOf, isStatusEffect, ti
  *
  * Since module 0.54.0 a known form from anywhere else, another Actor compendium or a world actor, is
  * used from the app too where each of the druid's players could use it in Foundry (`foundryOnlyWhy`),
- * for an app that says `wildShape` 2.
+ * for an app that says `wildShape` 2 or more.
  */
 
 /**
