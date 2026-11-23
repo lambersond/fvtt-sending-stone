@@ -437,9 +437,9 @@ an attack hit only where the game shows players.
   size, its card says what the player chose, "Chosen on Sending Stone: Owl (Fey)", and when its
   Summon button is clicked, on any browser, dnd5e's dialog opens with that chosen, for you to change
   or keep; then you place it as always. Allow Summoning and your players' roles don't matter, as
-  when a player casts it in Foundry; a player Allow Summoning lets summon sees the button too, and
-  may place it. One by Challenge Rating has its creature picked in dnd5e's compendium browser. A
-  staff's, a free casting's, a companion's and a druid's form's are cast alike. With no scene up,
+  when a player casts it in Foundry; a player whom Allow Summoning lets summon also sees the button,
+  and may place it. One by Challenge Rating has its creature picked in dnd5e's compendium browser.
+  A staff's, a free casting's, a companion's and a druid's form's are cast alike. With no scene up,
   Summon does nothing, as in Foundry; each click places the creature again.
 - **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
