@@ -5513,8 +5513,8 @@ Then, for `transform`: a known form usable from the app (from the campaign's com
 module 0.54.0, to a listener that says `"wildShape": 2` or more, from anywhere else each of the
 character's players could use it in Foundry, as **Known forms** above says; fitting the druid now;
 its entry, or world actor, still there), else `"form"`, or `"gone"` for one whose compendium entry
-was deleted, or since 0.54.0 whose compendium or world actor isn't there; not the form the
-character is now (`"form"`); not another kind of transformation, as a
+was deleted, or since 0.54.0 whose compendium or world actor isn't there, or whose compendium isn't
+one of Actors; not the form the character is now (`"form"`); not another kind of transformation, as a
 Polymorph, a 2014 Wild Shape or a form made before 0.40.0 (`"transformed"`); not Incapacitated,
 Unconscious, Paralyzed, Petrified, Stunned, Asleep or Dead, nor at 0 hit points, as the actor the
 character is now (`"incapacitated"`); a use left, on that actor (`"consume"`); and since module
@@ -5655,7 +5655,7 @@ ran out." (at levels 2 and 3, "its hour ran out"), "{name}'s Wild Shape ends at 
 | `"off"` | The campaign is gone, its switch is off now, or the system isn't D&D Fifth Edition. |
 | `"invalid"` | As above: `by`, `of`, `wildShape`, then `"dice"`. |
 | `"unknown"` | `actorId` isn't one of the campaign's characters with an actor; one of its groups is unknown too. |
-| `"gone"` | No 2024 Wild Shape; a known form's or a Beast's compendium entry isn't there; since module 0.54.0, to a listener that says `"wildShape": 2` or more, a known form's world actor or compendium. |
+| `"gone"` | No 2024 Wild Shape; a known form's or a Beast's compendium entry isn't there; since module 0.54.0, to a listener that says `"wildShape": 2` or more, a known form's world actor or compendium, or one whose compendium isn't one of Actors. |
 | `"form"` | Not a known form, or not one usable from the app now (since module 0.54.0, one from anywhere else its players couldn't use in Foundry, or any from anywhere else asked by a listener that says `"wildShape": 1`); the form the character is now; a Beast not in the campaign's compendiums, or not fitting the druid. |
 | `"full"`, `"swap"` | Every place for a known form taken; a replacement with none since the last Long Rest. |
 | `"shaped"` | A replacement of the form the character is now. |
