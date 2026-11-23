@@ -112,7 +112,13 @@ export function registerSettings() {
       // after its character, where this module keeps them.
       companionInitiative: new StringField({
         blank: false, choices: Object.values(COMPANION_INITIATIVE), initial: COMPANION_INITIATIVE.OWN
-      })
+      }),
+      // The NPCs its Gamemaster marked as its characters' constant companions, since 0.54.0, each with
+      // the character it's kept for.
+      constantCompanions: new ArrayField(new SchemaField({
+        actorId: new StringField({ blank: false }),
+        characterId: new StringField({ blank: false })
+      }))
     })),
     default: [],
     // Since 0.36.0 a campaign switched to keep its companions right after their characters places

@@ -15,7 +15,7 @@ import { companionFeatures, rollFeatures, stopPollers, syncPollers } from "./com
 import { involvesCampaign, snapshotCombat } from "./combat-data.mjs";
 import { healthFeatures } from "./creature-health.mjs";
 import { followAll } from "./creature-initiative.mjs";
-import { awayReader, companionList } from "./creatures.mjs";
+import { awayReader, companionList, constantReader } from "./creatures.mjs";
 import { noteListed } from "./creature-sync.mjs";
 import { diceAsksOf } from "./dice-plan.mjs";
 import { expireDishEffects } from "./dish-effects.mjs";
@@ -94,7 +94,9 @@ const resent = new Map();
  * two switches, off until turned on, under D&D Fifth Edition. Since 0.51.0, beside its
  * companions, `companionsEverywhere`, those on every scene, each saying whether it's away, the list an
  * app that reads companions there keeps, as this is built before the app has said whether it does;
- * `companions` stays the active scene's, for any other app. Since
+ * `companions` stays the active scene's, for any other app. Since 0.54.0, after them,
+ * `companionsConstant`, the list an app that answers 4 keeps, the Gamemaster's constant companions
+ * among them; the other two stay as before. Since
  * 0.44.0 too, under D&D Fifth Edition, what of Tidy 5e Sheets' journal its characters hold, and
  * whether Tidy is active, `features.notes.tidy` (tidy-journal.mjs); and it lists the dice asks
  * waiting on its players, `diceAsks`, so that a hello sent again, as when the settings change,
@@ -126,9 +128,11 @@ export function announce({ campaignId }={}) {
     // 0.36.0 its companions as this lists them, which its combats are then told by.
     forgetTold(campaign.id);
     forgetSent(campaign.id);
-    const companions = companionList(campaign, { everywhere: false });
-    const companionsEverywhere = companionList(campaign, { everywhere: true });
-    noteListed(campaign.id, awayReader(campaign.id) ? companionsEverywhere : companions);
+    const companions = companionList(campaign, { everywhere: false, constant: false });
+    const companionsEverywhere = companionList(campaign, { everywhere: true, constant: false });
+    const companionsConstant = companionList(campaign, { everywhere: true, constant: true });
+    noteListed(campaign.id, constantReader(campaign.id) ? companionsConstant
+      : awayReader(campaign.id) ? companionsEverywhere : companions);
     const combats = combatEnabled() ? game.combats.filter(combat => involvesCampaign(combat, campaign)) : [];
     for ( const combat of combats ) noteCombatSent(combat.id, campaign.id);
     const settings = foundrySettings(campaign);
@@ -147,6 +151,7 @@ export function announce({ campaignId }={}) {
       groups: campaignGroups(campaign).map(group => groupEntry(group, campaign)),
       companions,
       companionsEverywhere,
+      companionsConstant,
       settings,
       combats: combats.map(combat => snapshotCombat(combat, campaign)),
       prompts: openPrompts(campaign),

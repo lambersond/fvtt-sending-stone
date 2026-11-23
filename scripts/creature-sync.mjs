@@ -5,7 +5,8 @@ import { recheckCombats } from "./campaign-combats.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { combatEnabled } from "./config.mjs";
 import {
-  awayReader, companionFormat, companionKeyOf, companionOfActor, companionsOf, noteCompanionFormat, ownedByPlayers
+  awayReader, companionFormat, companionKeyOf, companionOfActor, companionsOf, constantReader, noteCompanionFormat,
+  ownedByPlayers
 } from "./creatures.mjs";
 import { characterSheet } from "./sheet.mjs";
 import { SheetTexts } from "./sheet-texts.mjs";
@@ -54,8 +55,9 @@ const DELTA_KEYS = ["ownership", "flags", "name", "img"];
 const NPC_KEYS = ["ownership", "name", "img", "type", "prototypeToken", "flags"];
 
 /**
- * What's told when companions leave a campaign's list, with their keys: since 0.41.0, prompts.mjs's
- * closing of what the game asked of them, which this file needn't import.
+ * What's told when companions leave a campaign's list, or since 0.54.0 whose copy changes, with
+ * their keys: since 0.41.0, prompts.mjs's closing of what the game asked of them, which this file
+ * needn't import.
  * @type {((campaignId: string, keys: string[]) => void)[]}
  */
 const leftListeners = [];
@@ -161,7 +163,8 @@ export function registerSheetSync(sync) {
  * their prompts open now are sent again (round 0.41.0 §3.6.6). Since 0.51.0, one whose heartbeat's
  * answer moves to or from 3, as an app deployed or rolled back mid-session, is sent its list as it
  * now reads it at once, of every scene or of the active one; a hello's answer is compared once the
- * hello is delivered.
+ * hello is delivered. Since 0.54.0 likewise to or from 4, with or without the Gamemaster's constant
+ * companions.
  * @param {string} campaignId
  * @param {object|null} features
  * @param {string} [type]   The event answered.
@@ -169,11 +172,13 @@ export function registerSheetSync(sync) {
  */
 export function noteCompanionReader(campaignId, features, type) {
   const wide = awayReader(campaignId);
+  const constant = constantReader(campaignId);
   const was = noteCompanionFormat(campaignId, features);
   const format = companionFormat(campaignId);
   if ( !format ) return;
+  const moved = (awayReader(campaignId) !== wide) || (constantReader(campaignId) !== constant);
   if ( !was && (type === EVENTS.HEARTBEAT) ) companionsWanted(campaignId);
-  else if ( was && (type === EVENTS.HEARTBEAT) && (awayReader(campaignId) !== wide) ) companionsRelisted(campaignId);
+  else if ( was && (type === EVENTS.HEARTBEAT) && moved ) companionsRelisted(campaignId);
   if ( (format >= 2) && (was < 2) ) {
     for ( const fn of promptReaderListeners ) fn(campaignId);
   }
@@ -199,7 +204,8 @@ export function companionPromptReader(campaignId) {
 }
 
 /**
- * Be told of the companions that leave a campaign's list, by their keys, as the list is compared.
+ * Be told of the companions that leave a campaign's list, or since 0.54.0 whose copy changes, by
+ * their keys, as the list is compared.
  * @param {(campaignId: string, keys: string[]) => void} fn
  * @returns {void}
  */
@@ -382,7 +388,8 @@ function companionsRelisted(campaignId) {
  * known to read companions described its combats without them: those it knows of with a companion
  * among them are sent again, whole. Since 0.51.0 the hello's own list is the one its app keeps: its
  * `companionsEverywhere` for an app that reads companions on every scene, as it was built before the
- * app was known to, else its `companions`.
+ * app was known to, else its `companions`. Since 0.54.0 its `companionsConstant` for an app that
+ * reads the Gamemaster's constant companions.
  * @param {Campaign} campaign
  * @param {object} [hello]   The hello answered.
  * @returns {void}
@@ -390,7 +397,9 @@ function companionsRelisted(campaignId) {
 export function companionsDelivered(campaign, hello) {
   if ( !companionReader(campaign.id) ) return;
   const everywhere = hello?.data?.companionsEverywhere;
-  const kept = (awayReader(campaign.id) && Array.isArray(everywhere)) ? everywhere : hello?.data?.companions;
+  const constant = hello?.data?.companionsConstant;
+  const kept = (constantReader(campaign.id) && Array.isArray(constant)) ? constant
+    : (awayReader(campaign.id) && Array.isArray(everywhere)) ? everywhere : hello?.data?.companions;
   const listed = Array.isArray(kept) ? kept : [];
   noteListed(campaign.id, listed);
   const found = companionsOf(campaign);
@@ -474,7 +483,9 @@ function compareLists() {
  * which the posts' order keeps ahead of it. Then its combats are checked again: one with no
  * character but a companion in it now reaches it, one with none leaves it, and one whose combatants
  * it would be told of otherwise now goes again, whole. Not while a hello is on its way, which is
- * compared once it's answered.
+ * compared once it's answered. Since 0.54.0, a companion whose copy changed under the same key, a
+ * constant companion summoned, dismissed or moved, has what it was asked closed and its sheet sent
+ * again.
  * @param {Campaign} campaign
  * @param {object} [options]
  * @param {{entry: CompanionEntry, actor: Actor}[]} [options.found]   The campaign's companions now.
@@ -491,22 +502,28 @@ function compareList(campaign, { found, before }={}) {
   const again = unseen.get(campaign.id);
   if ( !changed && (before === undefined) && !again ) return;
   const old = new Set((told?.entries ?? []).map(entry => entry.key));
+  const toldBy = new Map((told?.entries ?? []).map(entry => [entry.key, entry]));
+  // Since 0.54.0 those listed before and now whose copy is another creature.
+  const switched = list.filter(entry => toldBy.has(entry.key) && (toldBy.get(entry.key).uuid !== entry.uuid))
+    .map(entry => entry.key);
   if ( changed ) {
     send(EVENTS.COMPANIONS_LISTED, { companions: list }, campaign);
     const keys = new Set(list.map(entry => entry.key));
     const left = (told?.entries ?? []).map(entry => entry.key).filter(key => !keys.has(key));
     for ( const key of left ) forgetCompanion(campaign.id, key);
     noteListed(campaign.id, list);
-    // Since 0.41.0 what the game asked of those that left closes at once, as they're no one's now.
-    if ( left.length ) {
-      for ( const fn of leftListeners ) fn(campaign.id, left);
+    // Since 0.41.0 what the game asked of those that left closes at once, as they're no one's now;
+    // since 0.54.0 of those whose copy changed too, as it was asked of another creature.
+    if ( left.length || switched.length ) {
+      for ( const fn of leftListeners ) fn(campaign.id, [...left, ...switched]);
     }
   }
   unseen.delete(campaign.id);
-  // Each new to the list has its sheet sent after it, and each sent after a list that was lost again.
+  // Each new to the list has its sheet sent after it, each whose copy changed too, and each sent after
+  // a list that was lost again.
   for ( const { entry, actor } of found ) {
     if ( again?.has(entry.key) ) forgetSheetTold(campaign.id, `c:${entry.key}`);
-    else if ( !changed || old.has(entry.key) ) continue;
+    else if ( !changed || (old.has(entry.key) && !switched.includes(entry.key)) ) continue;
     sendCompanion(campaign, entry, actor);
   }
   if ( combatEnabled() ) {

@@ -164,10 +164,11 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean,
    *   dishes: boolean, effects: boolean, wildShape: boolean, wildShapePacks: string[], hitPoints: boolean,
    *   coins: boolean, coinChange: boolean, health: boolean, healthHitPoints: boolean,
-   *   companionInitiative: string}[]}
+   *   companionInitiative: string, constantCompanions: {actorId: string, characterId: string}[]}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({
-    ...campaign, wildShapePacks: [...campaign.wildShapePacks], secret: getSecret(campaign.id)
+    ...campaign, wildShapePacks: [...campaign.wildShapePacks], secret: getSecret(campaign.id),
+    constantCompanions: campaign.constantCompanions.map(mark => ({ ...mark }))
   }));
 
   /**
@@ -1158,7 +1159,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
       attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false,
       wildShape: false, wildShapePacks: [...WILD_SHAPE_PACKS], hitPoints: true, coins: true, coinChange: true,
-      health: false, healthHitPoints: false, companionInitiative: COMPANION_INITIATIVE.OWN
+      health: false, healthHitPoints: false, companionInitiative: COMPANION_INITIATIVE.OWN, constantCompanions: []
     };
     this.#campaigns.push(campaign);
     await this.#show({ section: "campaign", campaignId: campaign.id, tab: "connection" }, "[name='campaign.title']");
@@ -1424,7 +1425,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       title: campaign.title.trim(),
       secret: campaign.secret.trim(),
       characters: Array.from(campaign.characters).filter(id => game.actors.has(id)),
-      groups: Array.from(campaign.groups).filter(isGroup)
+      groups: Array.from(campaign.groups).filter(isGroup),
+      constantCompanions: savedMarks(campaign)
     }));
 
     // Thrown rather than notified, so that the window stays open with what was entered. Each
@@ -1468,7 +1470,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       coinChange: campaign.coinChange,
       health: campaign.health,
       healthHitPoints: campaign.healthHitPoints,
-      companionInitiative: campaign.companionInitiative
+      companionInitiative: campaign.companionInitiative,
+      constantCompanions: campaign.constantCompanions
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {
       const value = this.#general[name];
@@ -1502,6 +1505,23 @@ function wildShapePackChoices(campaign) {
     label: `${pack.title ?? pack.metadata?.label ?? pack.collection} (${owner(pack) ?? ""})`,
     checked: campaign.wildShapePacks.includes(pack.collection)
   }));
+}
+
+/**
+ * A campaign's constant companions as they're saved, since 0.54.0: each NPC that still is one, for a
+ * character the campaign still has, once each, in the order marked.
+ * @param {{characters: Set<string>, constantCompanions: {actorId: string, characterId: string}[]}} campaign
+ * @returns {{actorId: string, characterId: string}[]}
+ */
+function savedMarks(campaign) {
+  const seen = new Set();
+  return campaign.constantCompanions.filter(({ actorId, characterId }) => {
+    const pair = `${actorId}:${characterId}`;
+    const kept = !seen.has(pair) && (game.actors.get(actorId)?.type === "npc") && campaign.characters.has(characterId)
+      && game.actors.has(characterId);
+    seen.add(pair);
+    return kept;
+  }).map(({ actorId, characterId }) => ({ actorId, characterId }));
 }
 
 /**

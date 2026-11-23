@@ -127,9 +127,11 @@ export async function activate(next) {
  * @param {object} [options.spec]           Actor5e's options: mods, hp, skills, prof, npc (hit dice).
  * @param {object} [options.gear]           equip()'s: items, spells, ac.
  * @param {object} [options.system]         Merged into its system: details, resources, traits.
+ * @param {object} [options.stats]          Since module 0.54.0, its `_stats`, as core keeps a world actor's:
+ *                                          `compendiumSource` and `duplicateSource`, which dnd5e's summons read.
  * @returns {Actor5e}
  */
-export function companionActor(id, name, { owners = [], ownership, linked = true, type = 'npc', flags = {}, spec = {}, gear = {}, system = {}, img } = {}) {
+export function companionActor(id, name, { owners = [], ownership, linked = true, type = 'npc', flags = {}, spec = {}, gear = {}, system = {}, img, stats } = {}) {
   const make = () => {
     // Its own copy of what it's made of, as each document has its own data.
     const actor = new Actor5e({ id, name, npc: { denomination: 8, max: 0, spent: 0 }, ...deepClone(spec) })
@@ -141,6 +143,7 @@ export function companionActor(id, name, { owners = [], ownership, linked = true
     actor.flags = mergeObject(actor.flags, deepClone(flags))
     actor.ownership = deepClone(ownership ?? { default: 0, ...Object.fromEntries(owners.map(user => [user, OWNER])) })
     actor.prototypeToken = { actorLink: linked }
+    if (stats) actor._stats = deepClone(stats)
     // Core's testUserPermission, by its ownership: the user's own level, else its default.
     actor.testUserPermission = user => ((actor.ownership[user.id] ?? actor.ownership.default ?? 0) >= OWNER)
     Object.defineProperty(actor, 'hasPlayerOwner', {

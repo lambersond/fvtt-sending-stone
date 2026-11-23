@@ -35,9 +35,10 @@ await save(win)
 // points from the app, on, as every new campaign is.
 // Changed on purpose (module 0.50.0, item 58): and whether its players see other creatures' health,
 // and their hit points, both off, as every new campaign's are.
+// Changed on purpose (module 0.54.0, item 98): and its constant companions, none.
 assert.deepEqual(settings.get('campaigns'), [
-  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, health: false, healthHitPoints: false, companionInitiative: 'own' },
-  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, health: false, healthHitPoints: false, companionInitiative: 'own' },
+  { id: a, title: 'Erebor', characters: ['thorin'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, health: false, healthHitPoints: false, companionInitiative: 'own', constantCompanions: [] },
+  { id: b, title: 'Mirkwood', characters: ['vex'], groups: [], rolls: false, attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false, wildShape: false, wildShapePacks: ['dnd5e.actors24'], hitPoints: true, coins: true, coinChange: true, health: false, healthHitPoints: false, companionInitiative: 'own', constantCompanions: [] },
 ])
 assert.equal(win.element.isConnected, false, 'saved, it closes')
 console.log('ok - saves campaigns in order, trims titles, drops unticked and missing characters')
@@ -342,6 +343,11 @@ assert.ok((campaignFields.hitPoints instanceof foundry.data.fields.BooleanField)
 for (const name of ['coins', 'coinChange']) {
   assert.ok((campaignFields[name] instanceof foundry.data.fields.BooleanField) && (campaignFields[name].initial === true), `${name} is in the schema, on`)
 }
+// Module 0.54.0 (item 98): so are its constant companions, a list of each NPC's id and its character's.
+const { constantCompanions: marksField } = campaignFields
+assert.ok((marksField instanceof foundry.data.fields.ArrayField) && (marksField.element instanceof foundry.data.fields.SchemaField), 'constantCompanions is in the schema')
+assert.deepEqual(Object.keys(marksField.element.fields), ['actorId', 'characterId'])
+assert.ok(Object.values(marksField.element.fields).every(field => (field instanceof foundry.data.fields.StringField) && (field.blank === false)), 'each a string, never blank')
 assert.equal(campaignFields.manualDice.initial, false)
 assert.deepEqual(Object.keys(campaignFields).sort(), Object.keys(settings.get('campaigns')[0]).sort())
 const hellosNow = () => Object.fromEntries(posts.splice(0).filter(post => post.envelope.type === 'bridge.hello')

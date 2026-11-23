@@ -306,15 +306,17 @@ export function rollFeatures(campaign) {
  * Gamemaster chooses it per campaign, how its companions enter initiative, whether or not its rolls
  * are made here: each its own roll, or right after its character (creature-initiative.mjs). And
  * since 0.51.0 `away`, that it lists companions on every scene, each saying whether it's away, to
- * an app that answers `companions` 3 (creatures.mjs).
+ * an app that answers `companions` 3 (creatures.mjs); and since 0.54.0 `constant`, that it lists the
+ * Gamemaster's constant companions to an app that answers 4.
  * @param {Campaign} campaign
- * @returns {{kinds: string[], initiative: string, away: boolean}}
+ * @returns {{kinds: string[], initiative: string, away: boolean, constant: boolean}}
  */
 export function companionFeatures(campaign) {
   return {
     kinds: rollFeatures(campaign).kinds.filter(kind => !COMPANION_UNTAKEN.includes(kind)),
     initiative: campaign.companionInitiative,
-    away: true
+    away: true,
+    constant: true
   };
 }
 
