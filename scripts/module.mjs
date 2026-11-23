@@ -17,6 +17,7 @@ import { registerFollowHooks } from "./creature-initiative.mjs";
 import { combatantCompanion, registerCreatureHooks, registerSheetSync } from "./creature-sync.mjs";
 import { registerDishHooks, renderDishCard } from "./dish-card.mjs";
 import { registerEffectHooks } from "./command-effects.mjs";
+import { registerSummonHooks } from "./command-summon.mjs";
 import { registerSheetSenders } from "./wild-shape.mjs";
 import { registerWildShapeHooks } from "./wild-shape-hooks.mjs";
 import { topUpAfterRest } from "./dish-effects.mjs";
@@ -58,6 +59,7 @@ Hooks.once("init", () => {
   registerSettingsWatch();
   registerDishHooks();
   registerEffectHooks();
+  registerSummonHooks();
   registerWildShapeHooks();
 });
 

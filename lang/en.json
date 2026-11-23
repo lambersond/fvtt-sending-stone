@@ -398,7 +398,8 @@
       "BadgeGM": "Rolled on Sending Stone by the Gamemaster",
       "BadgeTyped": "Entered by hand on Sending Stone",
       "GM": "GM",
-      "Plain": "Dice roll"
+      "Plain": "Dice roll",
+      "SummonChoice": "Chosen on Sending Stone: {choice}"
     },
     "DiceAsk": {
       "Title": "Waiting for a player's dice",

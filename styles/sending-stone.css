@@ -973,6 +973,14 @@
   font-weight: bold;
 }
 
+/* Says on a summoning's card the creature its player chose in the app (module 0.54.0), as a card's
+   hint is written. */
+.chat-message .sending-stone-summon-choice {
+  margin: 0.25rem 0;
+  opacity: 0.75;
+  font-size: var(--font-size-12, 0.75rem);
+}
+
 /* Marks a dish's card (module 0.38.0) with a bowl, drawn in the text's colour. */
 .chat-message .sending-stone-badge .sending-stone-bowl {
   display: inline-block;

@@ -163,7 +163,8 @@ const MONSTER = name => Object.keys(CREATURES).find(uuid => CREATURES[uuid].name
 
 // ---- The characters ----
 const add = actor => { actors.set(actor.id, actor); return actor }
-const spells = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => [`spell${level}`, { value: 2, max: 2, level }]))
+// Slots enough for every case's casting, each at the level it names.
+const spells = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => [`spell${level}`, { value: 9, max: 9, level }]))
 const profile = (_id, fields = {}) => ({ _id, count: '', cr: '', name: '', uuid: '', level: { min: null, max: null }, types: [], ...fields })
 // A spell whose summon activity's duration is the spell's, its concentration too (base-activity.mjs).
 const summonSpell = (id, name, level, activity, system = {}) => ({
@@ -492,13 +493,40 @@ const refusalOf = made => [made.status, made.reason, made.error ?? null]
 const cardsMade = () => messages.size
 /** The Summon button on a card's content, as the card draws it under each release. */
 const summonButton = card => /data-action="placeSummons"/.test(String(card?.content ?? ''))
-const nothingPlaced = () => { assert.equal(screen.summons, 0, 'dnd5e placed nothing as it was used'); assert.deepEqual(screen.placed, [], 'nothing placed') }
+// What the cards' Summon buttons have placed so far: a use from the app places nothing.
+let placedSeen = 0
+const nothingPlaced = () => { assert.equal(screen.summons, 0, 'dnd5e placed nothing as it was used'); assert.equal(screen.placed.length, placedSeen, 'nothing placed') }
+const linesOf = html => [...html.querySelectorAll('.sending-stone-summon-choice')]
+/** The summoning dialog something opens, once it's drawn, and the promise of its action's end. */
+async function dialogOf(start) {
+  const before = screen.summonDialogs.length
+  const done = start()
+  await until(() => (screen.summonDialogs.length > before) && (screen.summonDialogs.at(-1).renders > 0), 'the summoning dialog')
+  return { dialog: screen.summonDialogs.at(-1), done }
+}
+const fieldOf = (dialog, name) => [...dialog.form.elements].find(element => element.name === name) ?? null
+const choiceIn = dialog => ({ profile: fieldOf(dialog, 'summons.profile')?.value ?? null, type: fieldOf(dialog, 'summons.creatureType')?.value ?? null })
+/**
+ * The Gamemaster clicks a card's Summon button, drawn for them: its dialog, with its configuration
+ * as first drawn (`first`), Summon pressed in it.
+ */
+async function summonThrough(card, expected, why) {
+  const { dialog, done } = await dialogOf(async () => clickSummon(card, await renderCard(card)))
+  assert.equal(dialog.renders, 1, `${why}: drawn once`)
+  if (expected) assert.deepEqual(choiceIn(dialog), expected, `${why}: its first form`)
+  dialog.first = structuredClone(dialog.config.summons)
+  await dialog.use()
+  await done
+  placedSeen = screen.placed.length
+  return dialog
+}
 
 /* -------------------------------------------- */
 /*  U4: the cast, nothing placed                   */
 /* -------------------------------------------- */
 
 let owlCard = null
+let airCard = null
 {
   // What dnd5e would do by default: the Gamemaster may summon, and a scene is up.
   const familiar = thorin.items.get('findFamiliar').system.activities.get('ffSummon')
@@ -517,7 +545,13 @@ let owlCard = null
   assert.deepEqual(owlCard.flags['sending-stone'].summon, { item: 'findFamiliar', activity: 'ffSummon', profile: P.owl, label: 'Owl', type: 'fey' })
   assert.ok(summonButton(owlCard), "dnd5e's Summon button on it")
   nothingPlaced()
-  ok("Find Familiar cast from the app as Owl, Fey, the Gamemaster able to summon and a scene up: a 1st-level slot spent, its card Alice's with dnd5e's Summon button, flagged with the Owl and Fey labelled \"Owl\", nothing placed; done, a summon's use, no damage")
+  // The card drawn, and drawn again on the same element: one line, before its buttons.
+  const html = await renderCard(owlCard)
+  await Hooks.callAll('dnd5e.renderChatMessage', owlCard, html)
+  const lines = linesOf(html)
+  assert.deepEqual(lines.map(line => line.textContent), ['Chosen on Sending Stone: Owl (Fey)'], 'one line')
+  assert.ok(lines[0].nextElementSibling?.matches(DND5E6 ? 'section.icon-row' : '.card-buttons'), 'just before the buttons')
+  ok("Find Familiar cast from the app as Owl, Fey, the Gamemaster able to summon and a scene up: a 1st-level slot spent, its card Alice's with dnd5e's Summon button, flagged with the Owl and Fey labelled \"Owl\", nothing placed; done, a summon's use, no damage; the card drawn twice says once, before its buttons, \"Chosen on Sending Stone: Owl (Fey)\"")
 }
 
 /* -------------------------------------------- */
@@ -532,6 +566,7 @@ let owlCard = null
   assert.deepEqual([slots(thorin), cardsMade()], [before, cards], 'nothing spent or posted')
   made = await use('summonBeast', 'sbSummon', { slot: 'spell3', summon: { profile: 'airProfile000000' } })
   assert.equal(made.status, 'done', JSON.stringify(made))
+  airCard = useCard(made.id)
   assert.equal(slots(thorin).spell3, before.spell3 - 1, 'a 3rd-level slot spent')
   assert.equal(concentratingOn(thorin, 'summonBeast').length, 1, 'concentration begun')
   assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'summonBeast', activity: 'sbSummon', profile: 'airProfile000000', label: 'Air' })
@@ -608,6 +643,80 @@ let owlCard = null
 }
 
 /* -------------------------------------------- */
+/*  U8: the Summon button, the choice in dnd5e's dialog */
+/* -------------------------------------------- */
+
+{
+  const owl = await summonThrough(owlCard, { profile: P.owl, type: 'fey' }, 'the Owl')
+  assert.deepEqual([owl.config.summons.profile, owl.config.summons.creatureType], [P.owl, 'fey'])
+  assert.deepEqual(screen.placed.at(-1), { profile: P.owl, creatureType: 'fey', scaling: 0, item: 'findFamiliar', activity: 'ffSummon' }, 'the Owl, Fey, placed')
+  // Summon Beast cast at the 3rd as Air: the dialog at the card's level, Air chosen.
+  const air = await summonThrough(airCard, null, 'Summon Beast at the 3rd')
+  assert.deepEqual([[...fieldOf(air, 'summons.profile').options].map(option => option.textContent), choiceIn(air).profile],
+    [['Land', 'Sea', 'Air'], 'airProfile000000'], 'Air, offered at the 3rd, chosen')
+  assert.equal(screen.placed.at(-1).scaling, 1, "at the card's level")
+  // A card cast at the 2nd whose flag names Air: dnd5e's default kept, Air never set.
+  let made = await use('summonBeast', 'sbSummon', { slot: 'spell2', summon: { profile: 'landProfile00000' } })
+  const second = useCard(made.id)
+  second.flags['sending-stone'].summon.profile = 'airProfile000000'
+  const kept = await summonThrough(second, null, 'an Air at the 2nd')
+  assert.notEqual(kept.first.profile, 'airProfile000000', 'not set where the dialog offers it not')
+  assert.notEqual(kept.config.summons.profile, 'airProfile000000')
+  assert.deepEqual([...fieldOf(kept, 'summons.profile').options].map(option => option.value), ['landProfile00000', 'seaProfile000000'])
+  // Conjure Animals at the 5th as its Challenge Rating 1: the line by the count there, chosen.
+  made = await use('conjureAnimals', 'caSummon', { slot: 'spell5', summon: { profile: 'caCr100000000000' } })
+  const animals = useCard(made.id)
+  assert.deepEqual(linesOf(await renderCard(animals)).map(line => line.textContent), ['Chosen on Sending Stone: 4 × Challenge Rating of 1 or lower'])
+  await summonThrough(animals, { profile: 'caCr100000000000', type: null }, 'Conjure Animals at the 5th')
+  ok("the Gamemaster clicks the Owl's Summon button: dnd5e's dialog drawn once with the Owl and Fey chosen, and placed so; Summon Beast at the 3rd offers its Air and has it chosen; an Air named at the 2nd is never set; Conjure Animals at the 5th says \"4 × Challenge Rating of 1 or lower\" and has it chosen")
+}
+
+/* -------------------------------------------- */
+/*  U9: the note, and what clears it               */
+/* -------------------------------------------- */
+
+{
+  const familiar = thorin.items.get('findFamiliar').system.activities.get('ffSummon')
+  const defaults = { profile: P.bat, type: '' }
+  // A card cast in Foundry, no choice on it, clicked: dnd5e's defaults, even after another card's click.
+  const plainClick = async card => (await renderCard(card)).querySelector('[data-action="placeSummons"]').click()
+  await plainClick(owlCard)
+  const foundryCard = (await familiar.use({ create: { summons: false }, spell: { slot: 'spell1' } }, { configure: false }, {})).message
+  assert.equal(foundryCard.flags?.['sending-stone'], undefined, 'a card of Foundry\'s own')
+  await summonThrough(foundryCard, defaults, "Foundry's card")
+  // (a) dnd5e places a summoning: the note spent.
+  await plainClick(owlCard)
+  const wolves = [...messages.values()].find(m => m.flags?.['sending-stone']?.use && (m.getAssociatedActivity?.()?.id === 'pwSummon'))
+  await summonFromCard(wolves)
+  placedSeen = screen.placed.length
+  let opened = await dialogOf(() => summonFromCard(owlCard))
+  assert.deepEqual(choiceIn(opened.dialog), defaults, '(a) spent as dnd5e placed the wolves')
+  await opened.dialog.use(); await opened.done; placedSeen = screen.placed.length
+  // (b) another activity used from the app: kept.
+  await plainClick(owlCard)
+  const save = await send({ id: `use-${++ids}`, actorId: 'vex', kind: 'use', item: 'sacredFlame', activity: 'sfSave', targets: [], slot: null })
+  assert.equal(save.status, 'done', JSON.stringify(save))
+  Hooks.call('dnd5e.preUseActivity', vex.items.get('sacredFlame').system.activities.get('sfSave'), {}, { configure: true }, {})
+  opened = await dialogOf(() => summonFromCard(owlCard))
+  assert.deepEqual(choiceIn(opened.dialog), { profile: P.owl, type: 'fey' }, '(b) kept through a save, from the app or by hand')
+  await opened.dialog.use(); await opened.done; placedSeen = screen.placed.length
+  // (c) the same activity used from the app, with no dialog: kept.
+  await plainClick(owlCard)
+  const again = await use('findFamiliar', 'ffSummon')
+  assert.equal(again.status, 'done', JSON.stringify(again))
+  opened = await dialogOf(() => summonFromCard(owlCard))
+  assert.deepEqual(choiceIn(opened.dialog), { profile: P.owl, type: 'fey' }, '(c) kept through the app\'s own use')
+  await opened.dialog.use(); await opened.done; placedSeen = screen.placed.length
+  // (d) the same activity used by hand, its dialog to open: forgotten.
+  await plainClick(owlCard)
+  Hooks.call('dnd5e.preUseActivity', familiar, {}, { configure: true }, {})
+  opened = await dialogOf(() => summonFromCard(owlCard))
+  assert.deepEqual(choiceIn(opened.dialog), defaults, '(d) forgotten as it\'s used by hand')
+  await opened.dialog.use(); await opened.done; placedSeen = screen.placed.length
+  ok("the note of a click: a card cast in Foundry clicked gets dnd5e's defaults; spent as dnd5e places a summoning; kept through another activity's use, from the app or by hand, and the same one's from the app; forgotten as that activity is used by hand")
+}
+
+/* -------------------------------------------- */
 /*  U10: through Midi-QOL's workflow                 */
 /* -------------------------------------------- */
 
@@ -622,8 +731,10 @@ if (MIDI) {
   const [concentration] = concentratingOn(thorin, 'summonBeast').slice(-1)
   assert.ok(concentration, 'concentration begun')
   assert.equal(concentration.flags.dnd5e.dependents, undefined, 'nothing tied to it, as nothing was placed')
+  assert.equal(linesOf(await renderCard(card)).length, 1, 'the line on it')
+  await summonThrough(card, { profile: 'seaProfile000000', type: null }, "Midi's card")
   delete midi.settings.autoRemoveSummonedCreature
-  ok("through Midi-QOL's workflow: Summon Beast as Sea, nothing placed, the card flagged with dnd5e's Summon button on it, concentration begun with nothing tied to it")
+  ok("through Midi-QOL's workflow: Summon Beast as Sea, nothing placed, the card flagged with dnd5e's Summon button and the line on it, concentration begun with nothing tied to it; its Summon button has the Sea chosen")
 }
 
 /* -------------------------------------------- */
@@ -636,11 +747,13 @@ if (MIDI) {
   assert.equal(made.status, 'done', JSON.stringify(made))
   assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'staffCopy', activity: 'scSummon', profile: P.owl, label: 'Owl' }, "the spell's copy's")
   assert.deepEqual([usesOf(thorin, 'staffFamiliar'), slots(thorin)], [1, before], "the staff's charge spent, no slot")
+  await summonThrough(useCard(made.id), { profile: P.owl, type: '' }, "the staff's")
   made = await use('feyFamiliar', 'fyFree', { summon: { profile: P.cat } })
   assert.equal(made.status, 'done', JSON.stringify(made))
   assert.deepEqual(useCard(made.id).flags['sending-stone'].summon, { item: 'feyFamiliar', activity: 'fyCall', profile: P.cat, label: 'Cat' }, "the summon's, not the forward's")
   assert.deepEqual([thorin.items.get('feyFamiliar').system.activities.get('fyFree').uses.spent, slots(thorin)], [1, before], "the free casting's use spent, no slot")
-  ok("the staff's Find Familiar as Owl, its card the spell's copy's, flagged with it, a charge spent; Fey Touched's free casting as Cat, flagged with the summon activity, its use spent and no slot")
+  await summonThrough(useCard(made.id), { profile: P.cat, type: '' }, 'the free casting\'s')
+  ok("the staff's Find Familiar as Owl, its card the spell's copy's, flagged with it, a charge spent; Fey Touched's free casting as Cat, flagged with the summon activity, its use spent and no slot; each card's Summon button has its choice chosen")
 }
 {
   let made = await send({ id: `use-${++ids}`, actorId: 'brakka', of: 'thorin', kind: 'use', item: 'brakkaCall', activity: 'bcSummon', targets: [], slot: null })
@@ -675,6 +788,35 @@ if (MIDI) {
   settings.delete('allowSummoning')
   nothingPlaced()
   ok("Allow Summoning off and Alice's role unable to create tokens or actors: the Gamemaster's command and Alice's own both cast, the card Alice's, the Gamemaster's marked by: gm")
+}
+
+/* -------------------------------------------- */
+/*  U16, U17: the card as each release, and each viewer, draws it */
+/* -------------------------------------------- */
+
+if (DND5E6) {
+  const html = await renderCard(owlCard)
+  const button = html.querySelector('section.icon-row button[data-action="placeSummons"][data-index]')
+  assert.ok(button, "6.0.5's Summon button, in its icon row")
+  assert.equal(linesOf(html)[0]?.nextElementSibling, button.closest('section.icon-row'), 'the line before the row')
+  ok("under dnd5e 6 the card's Summon button is 6.0.5's, in its icon row, the line before it; its click has the choice chosen (U8)")
+}
+{
+  // Alice, who may not summon, is shown the card without the Summon button (hidden under 5.3.3,
+  // left out under 6.0.5), and the line all the same.
+  const content = await summonCardHtml(owlCard, { asGm: false })
+  const html = await renderCard(Object.assign(Object.create(owlCard), { content }), { asGm: false })
+  const lines = linesOf(html)
+  assert.equal(lines.length, 1, 'one line')
+  if (DND5E6) {
+    assert.equal(html.querySelector('[data-action="placeSummons"]'), null, 'no Summon button')
+    assert.equal(lines[0].parentElement, html.querySelector('.message-content .chat-card'), 'at the end of the card')
+    assert.equal(html.querySelector('.message-content .chat-card').lastElementChild, lines[0])
+  } else {
+    assert.equal(html.querySelector('[data-action="placeSummons"]').hidden, true, 'its Summon button hidden')
+    assert.ok(lines[0].nextElementSibling?.matches('.card-buttons'), 'before its buttons')
+  }
+  ok("drawn for Alice, who may not summon: the line once, before the hidden Summon button's row under dnd5e 5.3.3, at the end of the card under 6.0.5, which leaves the button out")
 }
 
 /* -------------------------------------------- */

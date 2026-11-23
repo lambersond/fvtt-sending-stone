@@ -32,8 +32,9 @@ The scripts stand in seven layers, bottom to top:
    Foundry's initiative.
 6. **Commands.** What the app asks to be made here: each command's check and each kind's run, the
    dice the game rolls later, whose answer is a command, and the fetcher with its queues; the
-   player's choice of creature, written on a summoning's card; and a campaign's Foundry settings for
-   its Gamemaster, which say why attacks can't be made.
+   player's choice of creature, written on a summoning's card and chosen beforehand in dnd5e's
+   dialog; and a campaign's Foundry settings for its Gamemaster, which say why attacks can't be
+   made.
 7. **The bridge and the entry.** The hello, the settings' registration and their windows, Wild
    Shape's hooks, which wait on the command queue, and `module.mjs`.
 
