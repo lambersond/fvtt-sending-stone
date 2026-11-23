@@ -84,6 +84,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; since 0.44.0 whether Tidy 5e Sheets is active, turned off or not installed, none of which is a fault; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
+| A campaign's Companions | | Its constant companions, by character: drop an NPC from the Actors sidebar onto a character, or **Add companions**, and **Remove**. Under D&D Fifth Edition. |
 | A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Allow Players to add and take away coins from the app, Pay with other coins when a character is short of one, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Allow Players to change their hit points from the app, Companions' initiative, Allow Players to see other creatures' health in the app, Show their hit points too | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Coins**, whether its players may [add coins to their characters and take them away](#adding-and-taking-away-coins) from the app, on until you turn it off, and whether a character short of a coin pays with its other coins, on until you turn it off too. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Hit points**, whether its players may set their characters', forms' and companions' hit points and temporary hit points from the app, on by default ([Hit points](#hit-points)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. Under **Other creatures' health**, whether its players see in the app how hurt the other creatures in a fight are, and their hit points too, both off by default ([Other creatures' health](#other-creatures-health)). |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
@@ -146,7 +147,8 @@ Edition, and an app that reads them.
 **Companions.** A character's companions show beside it in the app: the creatures it summons, such
 as a familiar from Find Familiar, while their tokens are on the active scene, whoever cast the
 spell; and the NPCs its player owns in Foundry (give the player Owner on the NPC by name, or on one
-placed token). A linked NPC shows always; an unlinked one while its token is on the active scene.
+placed token); and since 0.54.0 the NPCs you keep beside it on the campaign's Companions tab. A
+linked NPC shows always; an unlinked one while its token is on the active scene.
 Since 0.51.0, to an app that reads them there, a summoned or unlinked one shows while its token is
 on any scene, even one left on an old map, until you delete or hide it; and a companion on another
 scene and not on the active one, a linked NPC too, is marked so. Before 0.51.0, or to an older app,
@@ -167,6 +169,18 @@ each of its companions in that combat is set just below it, so it acts straight 
 the character may still come between them. A companion's own roll from the app is then refused while
 its character is in the combat; a change you make to its initiative here stands until its
 character's next, whatever else you save in Manage Campaigns, and through a reload.
+
+**Constant companions** (since 0.54.0, with an app that reads them). On a campaign's
+**Companions** tab in Manage Campaigns, drop an NPC from the Actors sidebar onto a character, or
+choose it with **Add companions**, to keep it beside that character in the app whether or not a
+token of it is on a scene: a sidekick, a Steel Defender or a familiar summoned every session. While
+a token of it is on any scene, hidden or not, the app uses that token, the active scene's first;
+with none, dnd5e's linked copy of it kept for a summon, where a character summoned one, with the
+summon's bonuses and its last hit points and uses, else the actor itself. Its player rolls for it
+and uses its features with no token, its attacks and spells going without a target; its initiative
+needs a token in a fight, and it's asked its concentration checks as dnd5e's card asks the actor;
+the save cards that target tokens need a token. **Remove** takes it off; deleting the actor, or
+taking its character out of the campaign, does too. Nothing is kept until you **Save Changes**.
 
 ### Players' rolls
 
