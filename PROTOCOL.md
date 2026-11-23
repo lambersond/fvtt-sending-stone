@@ -5459,7 +5459,7 @@ Any other from anywhere else ends, since 0.54.0 to such a listener, with `why`, 
 that holds:
 
 - `"source"`: its uuid names neither of those;
-- `"gone"`: the world actor, or the compendium, isn't there;
+- `"gone"`: the world actor isn't there, or the compendium isn't, or isn't one of Actors;
 - `"owner"`: the character has no player, or a player isn't its Owner;
 - `"permission"`: a player may not observe the world actor or the compendium;
 - `"transformation"`: Allow Transformation is off;
