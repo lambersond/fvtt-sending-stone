@@ -1322,6 +1322,10 @@ async function formsFromAnywhere() {
   const greyWolf = await worldBeast('Wolf', { _id: 'greyWolf00000000', name: 'Grey Wolf' })
   await worldBeast('Giant Ape', { _id: 'worldApe00000000' })
   await worldBeast('Wolf', { _id: 'summonWolf000000', name: 'Pack Wolf', folder: 'summonsFolder000' })
+  // And a world compendium of Items, which holds no form.
+  const staves = new t5.PackStandIn({ collection: 'world.staves', title: 'Staves', packageType: 'world' })
+  staves.documentName = 'Item'
+  packs.set(staves.collection, staves)
   const MONSTERS_WOLF = beastUuid('Wolf', 'dnd5e.monsters')
   const ANYWHERE = [
     { _id: 'anyGreyWolf00000', name: 'Grey Wolf', uuid: 'Actor.greyWolf00000000' },
@@ -1336,6 +1340,10 @@ async function formsFromAnywhere() {
     { _id: 'anyNoPack0000000', name: 'Lost Wolf', uuid: 'Compendium.world.nothing.Actor.abcdefghijklmnop' },
     { _id: 'anyToken00000000', name: 'Token Wolf', uuid: 'Scene.hall.Token.elowenHallToken0.Actor.x' },
     { _id: 'anyItem000000000', name: 'Staff', uuid: 'Item.abcdefghijklmnop' },
+    { _id: 'anyEmbedded00000', name: 'Wolf Fang', uuid: 'Actor.greyWolf00000000.Item.abcdefghijklmnop' },
+    { _id: 'anyPackItem00000', name: 'Wolf Pelt', uuid: 'Compendium.dnd5e.monsters.Item.abcdefghijklmnop' },
+    { _id: 'anyPackEmbed0000', name: 'Wolf Bite', uuid: `${MONSTERS_WOLF}.Item.abcdefghijklmnop` },
+    { _id: 'anyItemPack00000', name: 'Staff Wolf', uuid: 'Compendium.world.staves.Actor.abcdefghijklmnop' },
   ]
   const anywhereMark = port.fromUuid.length
   const loadedSince = (uuids, from = anywhereMark) => port.fromUuid.slice(from).filter(uuid => uuids.includes(uuid))
@@ -1345,7 +1353,8 @@ async function formsFromAnywhere() {
   const asH1 = (changes = {}) => ({
     anyGreyWolf00000: 'transformation', anyMonWolf000000: 'transformation', anyThorin0000000: 'permission', anyHare000000000: 'permission',
     anySecretGone000: 'permission', anyMonGone000000: 'transformation', anyApe0000000000: 'transformation', anyPackWolf00000: 'transformation',
-    anyLateWolf00000: 'gone', anyNoPack0000000: 'gone', anyToken00000000: 'source', anyItem000000000: 'source', ...changes,
+    anyLateWolf00000: 'gone', anyNoPack0000000: 'gone', anyToken00000000: 'source', anyItem000000000: 'source',
+    anyEmbedded00000: 'source', anyPackItem00000: 'source', anyPackEmbed0000: 'source', anyItemPack00000: 'gone', ...changes,
   })
   const USABLE = ['anyGreyWolf00000', 'anyMonWolf000000', 'anyMonGone000000', 'anyApe0000000000', 'anyPackWolf00000']
   const each = (ids, why) => Object.fromEntries(ids.map(id => [id, why]))
@@ -1362,7 +1371,7 @@ async function formsFromAnywhere() {
   let hellos = sent('bridge.hello').length
   await answerAs(2)
   assert.equal(sent('bridge.hello').length, hellos, 'H1: with no hello')
-  assert.deepEqual(reads(), asH1(), 'H1: Thorin, the Gamemaster\'s hare and a hare gone from that pack "permission"; those she could see "transformation"; a world actor and a compendium that aren\'t there "gone"; a token\'s actor and an item "source"')
+  assert.deepEqual(reads(), asH1(), 'H1: Thorin, the Gamemaster\'s hare and a hare gone from that pack "permission"; those she could see "transformation"; a world actor and a compendium that aren\'t there, and a compendium of Items, "gone"; a token\'s actor, an item, and an item of a world actor or of a compendium\'s or in one "source"')
   assert.deepEqual(knownAt('anyThorin0000000'), { id: 'anyThorin0000000', name: 'Thorin', pool: false, why: 'permission' }, 'H1: by name, with why')
   assert.deepEqual(loadedSince(ANYWHERE.map(profile => profile.uuid)), [], 'H1: none loaded')
   // The same answer again sends nothing: only a change of the format sends every character again.
@@ -1448,6 +1457,13 @@ async function formsFromAnywhere() {
     await refusedInto('anyGreyWolf00000', 'form', `H4: into the Grey Wolf, ${what} and the app not told: "form"`)
     open()
   }
+  // Every gate open, a uuid of another shape refused all the same: "form" for a token's actor, an item
+  // of the Grey Wolf, there, one in the Monsters and one of its Wolf; "gone" for a compendium of Items.
+  for (const [id, what] of [['anyToken00000000', "a token's actor"], ['anyEmbedded00000', "the Grey Wolf's item"],
+    ['anyPackItem00000', 'an item in the Monsters'], ['anyPackEmbed0000', "the Monsters' Wolf's item"]]) {
+    await refusedInto(id, 'form', `H4: into ${what}, "source": "form"`)
+  }
+  await refusedInto('anyItemPack00000', 'gone', 'H4: into an entry of a compendium of Items, "gone": "gone"')
   fromAnywhere.add('H4')
 
   // H5, a second player, and Limited: each of her players must observe the form.
@@ -1618,13 +1634,14 @@ async function formsFromAnywhere() {
   delete game.permissions.ACTOR_CREATE
   await Actor.implementation.deleteDocuments(['lateWolf00000000', 'worldApe00000000', 'summonWolf000000', 'ironBear00000000'])
   game.folders.delete('summonsFolder000')
+  packs.delete('world.staves')
   await posts(() => shapeItem().update({ [`system.activities.${ACTIVITY}.profiles`]: before }), 'her sheet, her profiles put back')
   await shapeItem(rowan).update({ [`system.activities.${ACTIVITY}.profiles`]: rowanBefore })
   await freshUses()
   await freshUses(rowan)
   await settle(80)
   assert.deepEqual([formOf(), formOf(rowan), lastSheet().wildShape.known.length, game.permissions.ACTOR_CREATE], [undefined, undefined, before.length, undefined], 'R: put back')
-  ok(`known forms from anywhere (0.54.0; ${[...fromAnywhere].join(', ')}): to an app that says wildShape 1, by name alone with no why and refused "form"; at 2, sent again with no hello, and nothing sent for the same answer again; at 3 as at 2; each with why not, the form's own reasons first ("source" a token's actor or an item, "gone" a world actor or compendium not there, "owner" no player or one not her Owner, an assigned player with no level on her or only her Observer, or beside another assigned her who is Owner through her default, "permission" one may not observe it, Limited or a hidden compendium, never telling an entry missing from it, "transformation", then "create", one player without Create New Actors of his own beside one with it), each usable listed with its numbers, a world actor's read as it stands and never through fromUuid, a compendium's loaded once, an entry gone found false; Allow Transformation and the compendiums' configuration watched by createSetting and updateSetting, a world actor's creation, change and deletion, for a druid who knows only forms from anywhere else too; a permission that can't be read not held, her Wild Shape kept; a change into the world's Grey Wolf as into a Beast of the compendiums, its record, use, line and tokens, a return never refused once unusable; a deleted one "gone", an entry gone refused "gone", the rules' "form" (CR, a world folder named Summons); the Moon's floor from a world beast's own armor class, at 2 or 3 where his players may observe it, never at 1 or with no player; back at 1 as before`)
+  ok(`known forms from anywhere (0.54.0; ${[...fromAnywhere].join(', ')}): to an app that says wildShape 1, by name alone with no why and refused "form"; at 2, sent again with no hello, and nothing sent for the same answer again; at 3 as at 2; each with why not, the form's own reasons first ("source" a token's actor, an item, or an item of a world actor or of a compendium's or in one, "gone" a world actor or compendium not there or a compendium of Items, "owner" no player or one not her Owner, an assigned player with no level on her or only her Observer, or beside another assigned her who is Owner through her default, "permission" one may not observe it, Limited or a hidden compendium, never telling an entry missing from it, "transformation", then "create", one player without Create New Actors of his own beside one with it), each usable listed with its numbers, a world actor's read as it stands and never through fromUuid, a compendium's loaded once, an entry gone found false; Allow Transformation and the compendiums' configuration watched by createSetting and updateSetting, a world actor's creation, change and deletion, for a druid who knows only forms from anywhere else too; a permission that can't be read not held, her Wild Shape kept; a change into the world's Grey Wolf as into a Beast of the compendiums, its record, use, line and tokens, a return never refused once unusable; a deleted one "gone", an entry gone refused "gone", the rules' "form" (CR, a world folder named Summons); the Moon's floor from a world beast's own armor class, at 2 or 3 where his players may observe it, never at 1 or with no player; back at 1 as before`)
 }
 
 if (DND5E6) {
@@ -2965,6 +2982,7 @@ const DROPPED = [
   { _id: 'dropHare00000000', uuid: OUTSIDE[2].uuid }, { _id: 'dropMonWolf00000', uuid: beastUuid('Wolf', 'dnd5e.monsters') },
   { _id: 'dropDire00000000', uuid: uuidOf('Dire Wolf') }, { _id: 'dropCroc00000000', uuid: uuidOf('Crocodile') },
   { _id: 'dropGone00000000', uuid: 'Compendium.dnd5e.actors24.Actor.nothing000000000' },
+  { _id: 'dropRowanItem000', uuid: 'Actor.rowan.Item.abcdefghijklmnop' },
 ]
 const askedDropped = port.fromUuid.length
 const droppedMark = app.events.length
@@ -2974,8 +2992,8 @@ const nameOf = (sheet, id) => sheet.wildShape.known.find(each => each.id === id)
 const sheetsAfter = sheetsSince(droppedMark).map(e => e.data.character.sheet).filter(sheet => sheet.wildShape?.known?.some(each => each.id === 'dropDire00000000'))
 assert.ok(sheetsAfter.length && sheetsAfter.every(sheet => sheet.wildShape.known.every(each => (typeof each.name === 'string') && each.name.trim())), 'never a blank name, from the first sheet on')
 assert.equal(nameOf(sheetsAfter[0], 'dropDire00000000'), 'Dire Wolf', "a pool form's from its compendium's index, before its summary loads")
-assert.deepEqual(DROPPED.map(({ _id }) => nameOf(sheetsAfter.at(-1), _id)), [FROM_FOUNDRY, 'Rowan', FROM_FOUNDRY, 'Wolf', 'Dire Wolf', 'Crocodile', FROM_FOUNDRY],
-  "Carol's Thorin and the Gamemaster's own Beast as a form from Foundry; Rowan, whom Alice may observe, and the Monsters' Wolf by name; the gone one as a form from Foundry")
+assert.deepEqual(DROPPED.map(({ _id }) => nameOf(sheetsAfter.at(-1), _id)), [FROM_FOUNDRY, 'Rowan', FROM_FOUNDRY, 'Wolf', 'Dire Wolf', 'Crocodile', FROM_FOUNDRY, FROM_FOUNDRY],
+  "Carol's Thorin and the Gamemaster's own Beast as a form from Foundry; Rowan, whom Alice may observe, and the Monsters' Wolf by name; the gone one, and an item of Rowan's, as a form from Foundry")
 assert.ok(!port.fromUuid.slice(askedDropped).some(uuid => ['Actor.thorin', 'Actor.rowan', OUTSIDE[2].uuid, beastUuid('Wolf', 'dnd5e.monsters')].includes(uuid)), 'never loaded for its name')
 it = await made(learn(uuidOf('Crocodile')))
 assert.deepEqual(it.result.wildShape, { op: 'learn', form: { id: 'dropCroc00000000', name: 'Crocodile', uuid: uuidOf('Crocodile') }, replaced: null }, 'known already: named')
@@ -2984,7 +3002,7 @@ it = await made(learn(uuidOf('Panther'), 'dropThorin000000'))
 assert.deepEqual(it.result.wildShape.replaced, { id: 'dropThorin000000', name: FROM_FOUNDRY }, 'a replaced one: named')
 await shapeItem().update({ [`system.activities.${ACTIVITY}.profiles`]: before, 'flags.sending-stone.wildShape.swap': false })
 await rowan.update({ 'ownership.-=alice': null })
-ok('refusals: "invalid" for the Gamemaster\'s (by), a companion\'s (of), an extra key, a bad op, a world actor\'s uuid in learn, anything else beside it (wildShape) and dice (dice); "off" with the switch off after it was fetched and under another system; "unknown" for a group or an actor outside the campaign; "gone" for Thorin and Fern\'s 2014 Wild Shape, and a known form whose pack entry was deleted; "incapacitated" Incapacitated or at 0 hit points; "cancelled" for a hook stopping the use, no form; "error" for transformInto throwing, the use refunded; done for a throw in switchTokens, the use kept; known forms put there in Foundry naming Thorin, the hidden Ogre and a Beast of the Gamemaster\'s own pack listed by name alone and never loaded, the Giant Ape fits false, and a transform into each "form"; known forms with no name, as dnd5e\'s drop adds them, named as her player could see them already (an index entry, an actor or compendium they may observe) or "Foundry form", a bare name with no article of its own, never blank, never loaded, in learn\'s result too; a throw in switchTokens leaves the line and her sheet sent')
+ok('refusals: "invalid" for the Gamemaster\'s (by), a companion\'s (of), an extra key, a bad op, a world actor\'s uuid in learn, anything else beside it (wildShape) and dice (dice); "off" with the switch off after it was fetched and under another system; "unknown" for a group or an actor outside the campaign; "gone" for Thorin and Fern\'s 2014 Wild Shape, and a known form whose pack entry was deleted; "incapacitated" Incapacitated or at 0 hit points; "cancelled" for a hook stopping the use, no form; "error" for transformInto throwing, the use refunded; done for a throw in switchTokens, the use kept; known forms put there in Foundry naming Thorin, the hidden Ogre and a Beast of the Gamemaster\'s own pack listed by name alone and never loaded, the Giant Ape fits false, and a transform into each "form"; known forms with no name, as dnd5e\'s drop adds them, named as her player could see them already (an index entry, an actor or compendium they may observe, never an actor\'s item as the actor) or "Foundry form", a bare name with no article of its own, never blank, never loaded, in learn\'s result too; a throw in switchTokens leaves the line and her sheet sent')
 
 /* -------------------------------------------- */
 /*  15b. Known forms from anywhere (0.54.0)     */
