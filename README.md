@@ -181,8 +181,9 @@ and uses its features with no token, its attacks and spells going without a targ
 needs a token in a fight, and it's asked its concentration saves as dnd5e's card asks the actor;
 the save cards that target tokens need a token. **Remove** takes it off; deleting the actor, or
 taking its character out of the campaign, does too. Nothing is kept until you **Save Changes**.
-Mark an NPC or dnd5e's copy of it for a summon, not both: marked both, they're two companions, and
-a token of the copy is the copy's.
+Mark an NPC or dnd5e's copy of it for a summon, not both: marked both, they're two companions, the
+copy's row and its **Remove** saying it's dnd5e's copy for a summon, and a token of the copy goes to
+the copy first.
 
 ### Players' rolls
 

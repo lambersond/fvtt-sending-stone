@@ -3164,5 +3164,38 @@ await saveKeep({ constantCompanions: [] })
   ok("K30. with no token on the active scene, a constant companion's copy is the token on the first scene in Foundry's order, the den's over the Moor's though placed after it; the den's gone, the Moor's")
 }
 
+// K31. The Steel Defender and dnd5e's copies of it for a summon, flagged as dnd5e flags them now and
+// as it did, all marked for Thorin: each copy's row on the Companions tab says it's dnd5e's copy for a
+// summon, as the chooser does, and its Remove button is named and tooltipped so, so that two Steel
+// Defender rows are told apart, by sight and by name; the NPC's says neither. A token of the copy on
+// the arena, its row names the arena so; Remove on the copy's row takes off that mark alone.
+{
+  const marks = ['steelDef', 'steelCopy', 'steelOld'].map(actorId => ({ actorId, characterId: 'thorin' }))
+  await saveKeep({ constantCompanions: marks })
+  const rowOf = (win, id) => {
+    const remove = find(win, `[data-action="removeConstant"][data-actor-id="${id}"]`)
+    return [find(win, `[data-constant-row="${id}"] .sending-stone-row-name > span`).textContent.trim(), find(win, `[data-constant-row="${id}"] .hint`).textContent.trim(),
+      remove.getAttribute('aria-label'), remove.getAttribute('data-tooltip')]
+  }
+  const named = key => `${C}.${key} {"name":"Steel Defender","character":"Thorin"}`
+  let win = await openTab()
+  assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef', 'steelCopy', 'steelOld'], 'three Steel Defender rows, in the order marked')
+  assert.deepEqual(['steelDef', 'steelCopy', 'steelOld'].map(id => rowOf(win, id)), [
+    ['Steel Defender', `${C}.NoToken`, named('Remove'), named('Remove')],
+    ['Steel Defender', `${C}.CopyNoToken`, named('RemoveCopy'), named('RemoveCopy')],
+    ['Steel Defender', `${C}.CopyNoToken`, named('RemoveCopy'), named('RemoveCopy')],
+  ], "each copy's row and Remove button say it's dnd5e's copy for a summon, the older flag's too; the NPC's says neither")
+  await win.close()
+  const { token } = await placedAt(arena, 'sdc')
+  win = await openTab()
+  assert.deepEqual(['steelDef', 'steelCopy'].map(id => rowOf(win, id)[1]), [`${C}.NoToken`, `${C}.CopyOnScene {"scene":"arena"}`], "a token of the copy on the arena: the copy's row names it, dnd5e's copy, the NPC's no token")
+  await click(win, '[data-action="removeConstant"][data-actor-id="steelCopy"]')
+  assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef', 'steelOld'], "Remove on the copy's row: that mark alone off")
+  await win.close()
+  await token.delete()
+  await saveKeep({ constantCompanions: [STEEL] }, 'steelDef')
+  ok("K31. the Steel Defender and dnd5e's copies of it, flagged isAutoImported and summonedCopy, all marked for Thorin: each copy's row says dnd5e's copy for a summon, with no token and with one on the arena, its Remove button named and tooltipped so, the NPC's row neither; Remove on the copy's row takes off that mark alone")
+}
+
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
 process.exit(0)

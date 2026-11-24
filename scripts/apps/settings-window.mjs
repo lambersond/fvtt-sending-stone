@@ -795,13 +795,18 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
             .map(({ actorId }) => game.actors.get(actorId)).filter(Boolean)
             .map(actor => {
               const scene = copies.get(actor.id)?.token?.parent?.name;
+              // dnd5e's copy of an NPC for a summon says so, as the chooser does, so that its row and
+              // the NPC's, both marked, can be told apart.
+              const copy = isSummonCopy(actor);
+              const where = scene ? game.i18n.format(`SENDINGSTONE.Config.Companions.${copy ? "CopyOnScene" : "OnScene"}`, { scene })
+                : game.i18n.localize(`SENDINGSTONE.Config.Companions.${copy ? "CopyNoToken" : "NoToken"}`);
               return {
                 actorId: actor.id,
                 name: actor.name,
                 img: actor.img,
-                where: scene ? game.i18n.format("SENDINGSTONE.Config.Companions.OnScene", { scene })
-                  : game.i18n.localize("SENDINGSTONE.Config.Companions.NoToken"),
-                removeLabel: game.i18n.format("SENDINGSTONE.Config.Companions.Remove", { name: actor.name, character: character.name })
+                where,
+                removeLabel: game.i18n.format(`SENDINGSTONE.Config.Companions.${copy ? "RemoveCopy" : "Remove"}`,
+                  { name: actor.name, character: character.name })
               };
             })
         };
@@ -811,7 +816,6 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     if ( !character ) return context;
     const lang = game.i18n.lang;
     const marked = new Set(campaign.constantCompanions.filter(mark => mark.characterId === character.id).map(mark => mark.actorId));
-    const copyOf = actor => (actor.flags?.dnd5e?.isAutoImported === true) || (actor.flags?.dnd5e?.summonedCopy === true);
     const entries = game.actors.filter(actor => (actor.type === "npc") && !campaign.characters.has(actor.id) && !transformed(actor))
       .sort((a, b) => a.name.localeCompare(b.name, lang))
       .map(actor => {
@@ -822,7 +826,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
           img: actor.img,
           already,
           hint: already ? game.i18n.format("SENDINGSTONE.Config.Companions.Already", { character: character.name })
-            : copyOf(actor) ? game.i18n.localize("SENDINGSTONE.Config.Companions.SummonCopy") : null,
+            : isSummonCopy(actor) ? game.i18n.localize("SENDINGSTONE.Config.Companions.SummonCopy") : null,
           search: actor.name.toLocaleLowerCase(lang)
         };
       });
@@ -1742,6 +1746,16 @@ function savedMarks(campaign) {
     seen.add(pair);
     return kept;
   }).map(({ actorId, characterId }) => ({ actorId, characterId }));
+}
+
+/**
+ * Is an actor dnd5e's copy of another for a summon, flagged as dnd5e flags it now or as it did:
+ * since 0.54.0, as the Companions tab hints it in the chooser and on a marked row.
+ * @param {Actor} actor
+ * @returns {boolean}
+ */
+function isSummonCopy(actor) {
+  return (actor.flags?.dnd5e?.isAutoImported === true) || (actor.flags?.dnd5e?.summonedCopy === true);
 }
 
 /**
