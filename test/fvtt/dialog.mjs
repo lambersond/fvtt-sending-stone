@@ -358,6 +358,26 @@ assert.deepEqual(hellosNow(), {
 })
 console.log("ok - 0.26.0: saved per campaign, in the campaigns setting's schema, and saving sends each its hello again, with features.rolls.manualDice and each character's manualDice")
 
+// Module 0.54.0 (item 98): a campaign's constant companions read as saved, each an NPC's id and its
+// character's, and nothing else of one kept; a mark missing either, blank or not a string is none; a
+// campaign saved before 0.54.0, or holding anything but a list there, has none.
+{
+  const { getCampaigns } = await import(`${MODULE}/scripts/campaigns.mjs`)
+  const kept = settings.get('campaigns')
+  const mark = { actorId: 'wolf', characterId: 'thorin' }
+  const { constantCompanions: _, ...before } = kept[1]
+  settings.set('campaigns', [
+    { ...kept[0], constantCompanions: [{ ...mark, note: 'kept by hand' }, { actorId: '', characterId: 'thorin' }, { actorId: 'wolf', characterId: '' },
+      { actorId: 'wolf' }, { characterId: 'thorin' }, { actorId: 'wolf', characterId: 7 }, null, 'wolf'] },
+    before,
+    { ...kept[1], id: 'odd', title: 'Odd', constantCompanions: 'wolf' },
+  ])
+  assert.deepEqual(getCampaigns().map(campaign => campaign.constantCompanions), [[mark], [], []],
+    'the whole mark alone, as its two ids; none saved before 0.54.0; none from anything but a list')
+  settings.set('campaigns', kept)
+  console.log("ok - 0.54.0: a campaign's constant companions read as each NPC's id and its character's, a mark without both as strings none, and none for a campaign saved before or holding anything but a list")
+}
+
 // Changing only the choice is an unsaved change, and changing it back is none.
 win = await openSettings()
 await view(win, 'campaign', { campaignId: a, tab: 'actions' })
