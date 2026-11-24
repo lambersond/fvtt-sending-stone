@@ -136,7 +136,7 @@
         "NoGroups": "This world has no Group actors yet. Create one in the Actors directory."
       },
       "Companions": {
-        "Lead": "A constant companion shows beside its character in the app whether or not a token of it is on a scene, such as a sidekick, a Steel Defender or a familiar summoned every session. While a token of it is on a scene the app uses that token; with none placed, the linked copy dnd5e keeps of it for a summon, where there is one, else the actor here. Only you mark them.",
+        "Lead": "A constant companion, such as a sidekick, a Steel Defender or a familiar summoned every session, shows beside its character in the app whether or not a token of it is on a scene. While a token of it is on a scene the app uses that token; with none placed, the linked copy dnd5e keeps of it for a summon, where there is one, else the actor here. Only you mark them.",
         "None": "No constant companions",
         "Drop": "Drop an NPC here from the Actors sidebar to make it {character}'s",
         "Add": "Add companions",
