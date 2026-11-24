@@ -169,7 +169,8 @@ export function companionPart(entry) {
  *
  * Each copy is one mark's only, as the Gamemaster may mark both an NPC and dnd5e's copy of it: a
  * token goes to the mark of its own actor first, then to the first in the campaign's order it counts
- * for, and the others go on to their next token. With no token, a linked copy marked itself is left
+ * for, and the others go on to their next token, a linked one never to a second linked token of the
+ * same actor, which is the same creature. With no token, a linked copy marked itself is left
  * to its own mark, and one whose linked token is another mark's copy to that one; a mark left with
  * its own actor alone, while a linked token of that is another mark's copy, is left out while it is.
  * @param {Campaign} campaign
@@ -230,6 +231,8 @@ export function constantCopies(campaign) {
   const taken = new Set();
   for ( const scene of scenes ) {
     for ( const token of scene.tokens ?? [] ) {
+      // A linked token is its world actor: once one is a mark's copy, its others are that one too.
+      if ( token.actorLink && taken.has(token.actorId) ) continue;
       const waiting = (bases.get(token.actorId) ?? []).filter(markedId => !copies.get(markedId).token);
       if ( !waiting.length ) continue;
       const summon = (token.actorLink ? null : origin(token.delta)) ?? origin(game.actors.get(token.actorId));
@@ -273,9 +276,10 @@ export function constantCopies(campaign) {
  *
  * Since 0.54.0, `constant`, as for an app that answers 4: the Gamemaster's constant companions,
  * keyed by the NPC marked and named and pictured by it, found before the scenes' tokens, each its
- * characters' and those whose players own its copy; its copy's token isn't looked at again. Each
- * character's come last, after its summoned ones, and both cuts keep them first. Each entry of one
- * ends with `placed`.
+ * characters' and those whose players own its copy; its copy's token isn't looked at again, nor,
+ * where it's linked, any other token of its actor, which is the same creature. Each character's
+ * come last, after its summoned ones, and both cuts keep them first. Each entry of one ends with
+ * `placed`.
  * @param {Campaign} campaign
  * @param {object} [options]
  * @param {boolean} [options.everywhere]   Every scene, each with `away`: as the campaign's app reads them.
@@ -301,7 +305,8 @@ export function companionsOf(campaign, { everywhere=awayReader(campaign.id), con
     found.set(key, { key, kind, actor, token, of, marked, placedOn });
   };
 
-  // Since 0.54.0 the constant companions, first, so that nothing else takes their copies.
+  // Since 0.54.0 the constant companions, first, so that nothing else takes their copies: each
+  // claimed by its creature's key, a linked token's by its actor's id, as all its tokens are it.
   const claimed = new Set();
   if ( constant ) {
     for ( const [markedId, copy] of constantCopies(campaign) ) {
@@ -309,7 +314,7 @@ export function companionsOf(campaign, { everywhere=awayReader(campaign.id), con
       const of = characters.filter(character => copy.characters.includes(character) || owners.includes(character));
       const token = (copy.token && !copy.token.actorLink) ? copy.token : null;
       note(markedId, "constant", copy.actor, token, of, { marked: copy.marked, placedOn: copy.token?.parent ?? null });
-      if ( copy.token ) claimed.add(`${copy.token.parent?.id}-${copy.token.id}`);
+      if ( copy.token ) claimed.add(creatureKey(copy.token));
     }
   }
 
@@ -327,7 +332,7 @@ export function companionsOf(campaign, { everywhere=awayReader(campaign.id), con
         else place.elsewhere = true;
         places.set(token.actorId, place);
       }
-      if ( claimed.has(`${scene.id}-${token.id}`) ) continue;
+      if ( claimed.has(creatureKey(token)) ) continue;
       if ( token.hidden ) continue;
       const base = game.actors.get(token.actorId);
       if ( base?.type !== "npc" ) continue;

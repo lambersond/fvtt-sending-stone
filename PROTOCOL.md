@@ -989,14 +989,17 @@ through `default` too, so a character shared with *All Players: Owner* had every
      marked actor.
    - Each copy is one constant companion's, as both an NPC and dnd5e's copy of it may be marked: a
      token goes to the mark of its own actor first, then to the first mark in the campaign's order
-     it counts for, and the others go on to their next token. With no token, dnd5e's linked copy
+     it counts for, and the others go on to their next token. A linked token is its world actor, so
+     once one is a mark's copy, every other linked token of that actor is the same copy, never
+     another mark's; an unlinked token is a creature of its own. With no token, dnd5e's linked copy
      that is marked itself is its own mark's, and one whose linked token is another mark's copy is
      that one's. A mark left with its own actor alone, while a linked token of it is another mark's
      copy, isn't listed while it is.
    - Its `actorId`, `tokenId`, `sceneId` and `uuid` are its copy's, as any companion's. Its `name`
      and `img` are the marked actor's; its `summon` is `null`; its `away` is rule 8's, by its copy's
      token. It ends with `placed`, whether its copy is a token.
-   - The token its copy is isn't listed again; any other token of it is listed by rules 1 and 2.
+   - The token its copy is isn't listed again, nor, where it's linked, any other linked token of
+     the same actor, the same creature; any other token of it is listed by rules 1 and 2.
    - One marked for several characters, or whose copy a player owns by rule 2, is listed once, its
      `of` each of those characters in the roster's order.
    - Not listed: a mark whose actor is deleted, isn't an NPC, is transformed or is a campaign
@@ -2757,11 +2760,11 @@ An ask:
   `companionsConstant`, `companions.listed` and `companion.updated`; and
   `features.companions.constant`. A constant companion's copy is its token while one is on a scene,
   else dnd5e's linked copy of it kept for a summon, where there is one, else the actor, each copy
-  one constant companion's; as it changes, its prompts close `"gone"` and its sheet goes again. Per
-  character, constant ones come last, kept first at each cut. No command changes. A listener that
-  answers 3 or less is listed as before, byte for byte, the hello's `companions` and
-  `companionsEverywhere` included, and ignores the new key and feature. A module before 0.54.0 reads
-  4 as 3.
+  one constant companion's and listed once, a linked one whatever its tokens; as it changes, its
+  prompts close `"gone"` and its sheet goes again. Per character, constant ones come last, kept
+  first at each cut. No command changes. A listener that answers 3 or less is listed as before,
+  byte for byte, the hello's `companions` and `companionsEverywhere` included, and ignores the new
+  key and feature. A module before 0.54.0 reads 4 as 3.
 - Module 0.54.0 takes known forms from anywhere ([Wild Shape](#wild-shape)) from a listener that
   answers a hello or heartbeat with `"wildShape": 2` or more. A druid's known form from another Actor
   compendium or a world actor, put on her Wild Shape in Foundry, is listed `pool: true` with its
