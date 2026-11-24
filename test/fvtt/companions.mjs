@@ -3197,5 +3197,60 @@ await saveKeep({ constantCompanions: [] })
   ok("K31. the Steel Defender and dnd5e's copies of it, flagged isAutoImported and summonedCopy, all marked for Thorin: each copy's row says dnd5e's copy for a summon, with no token and with one on the arena, its Remove button named and tooltipped so, the NPC's row neither; Remove on the copy's row takes off that mark alone")
 }
 
+// K32. What a constant companion's copy is never, each read at once from the campaign given: a campaign
+// with no marks at all, as one before 0.54.0 was; another NPC from the same compendium, marked for
+// Vex, which isn't dnd5e's copy of Thorin's Steel Defender, so a second token of his isn't Vex's; a
+// linked import of the compendium's own Steel Defender that Thorin summoned, which isn't the NPC's
+// linked copy (dnd5e's clone of it, by its duplicateSource), so with no token the NPC is itself; a
+// token of dnd5e's copy that isn't an NPC, or that has no actor, which isn't taken; a list for the
+// active scene alone, which holds none unless asked; and a linked NPC's token that isn't its copy,
+// as another summoned it, which makes it neither placed nor away.
+{
+  const marked = (...marks) => ({ ...keepwatch(), constantCompanions: [STEEL, ...marks] })
+  assert.equal(constantCopies({ ...keepwatch(), constantCompanions: undefined }).size, 0, 'a campaign with no marks list: none')
+  const sd2 = companionActor('kSd2', 'Steel Defender', { linked: false, stats: { compendiumSource: SD_SOURCE }, spec: steelSpec })
+  placeToken(arena, steelDef, { id: 'g1', name: 'Steel Defender' })
+  placeToken(arena, steelDef, { id: 'g2', name: 'Steel Defender' })
+  const two = constantCopies(marked({ actorId: 'kSd2', characterId: 'vex' }))
+  assert.deepEqual([two.get('steelDef')?.token?.id, two.get('kSd2')?.token ?? null, two.get('kSd2')?.actor?.id], ['g1', null, 'kSd2'],
+    "two NPCs from one compendium: the second token of Thorin's isn't Vex's, whose is itself")
+  for (const id of ['g1', 'g2']) arena.tokens.delete(id)
+  const imported = companionActor('kSdImport', 'Steel Defender', {
+    linked: true, flags: { dnd5e: { isAutoImported: true, summon: { origin: 'Actor.thorin.Item.findFamiliar', activity: 'ff-summon' } } },
+    stats: { compendiumSource: SD_SOURCE }, spec: steelSpec,
+  })
+  assert.deepEqual(copyOf(steelOf(companionList(marked()))), ['steelDef', null, null, 'Actor.steelDef', false, false],
+    "a linked import of the compendium's own that Thorin summoned, with no token: the NPC itself")
+  actors.delete(imported.id)
+  const odd = companionActor('kSdOdd', 'Steel Defender', { linked: false, type: 'character', flags: { dnd5e: { isAutoImported: true } }, stats: { compendiumSource: SD_SOURCE } })
+  placeToken(arena, odd, { id: 'g3', name: 'Steel Defender' })
+  const bare = placeToken(arena, steelCopy, { id: 'g4', name: 'Steel Defender' })
+  Object.defineProperty(bare, 'actor', { configurable: true, get: () => null })
+  try {
+    assert.deepEqual(copyOf(steelOf(companionList(marked()))), ['steelDef', null, null, 'Actor.steelDef', false, false],
+      "a token of a copy that isn't an NPC, and one with no actor: neither its copy")
+  } finally {
+    for (const id of ['g3', 'g4']) arena.tokens.delete(id)
+    for (const each of [sd2, odd]) actors.delete(each.id)
+  }
+  // Read for an app that reads no scene but the active one, as the hello's first list is: none of
+  // them by default, though Keepwatch's app reads 4.
+  assert.deepEqual(companionList(marked(), { everywhere: false }).filter(each => each.kind === 'constant'), [],
+    'the active scene alone: no constant companions by default')
+  // A linked NPC marked for Thorin whose own flags say Vex summoned it: its linked token on the den
+  // isn't its copy, so it's itself, not placed and not away, though its token is on another scene.
+  const kite = companionActor('kKite', 'Kite', { linked: true, flags: BY_VEX, spec: creature({ dex: 3 }) })
+  placeToken(den, kite, { id: 'g6', actorLink: true, name: 'Kite' })
+  try {
+    const kiteOf = companionList(marked({ actorId: 'kKite', characterId: 'thorin' })).find(each => each.key === 'kKite')
+    assert.deepEqual(copyOf(kiteOf), ['kKite', null, null, 'Actor.kKite', false, false],
+      "a linked NPC Vex summoned, marked for Thorin, its token on the den: itself, not placed, not away")
+  } finally {
+    den.tokens.delete('g6')
+    actors.delete(kite.id)
+  }
+  ok("K32. a campaign with no marks list has none; another NPC from the Steel Defender's compendium marked for Vex isn't its copy, nor a second token of it Vex's; a linked import of the compendium's own that Thorin summoned isn't its linked copy; a token of a copy that isn't an NPC, or has no actor, isn't its copy; read for the active scene alone, none by default; a linked NPC Vex summoned, marked for Thorin, its token on the den: not placed, not away")
+}
+
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
 process.exit(0)
