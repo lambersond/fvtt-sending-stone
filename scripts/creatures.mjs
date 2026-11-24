@@ -170,9 +170,12 @@ export function companionPart(entry) {
  * Each copy is one mark's only, as the Gamemaster may mark both an NPC and dnd5e's copy of it: a
  * token goes to the mark of its own actor first, then to the first in the campaign's order it counts
  * for, and the others go on to their next token, a linked one never to a second linked token of the
- * same actor, which is the same creature. With no token, a linked copy marked itself is left
- * to its own mark, and one whose linked token is another mark's copy to that one; a mark left with
- * its own actor alone, while a linked token of that is another mark's copy, is left out while it is.
+ * same actor, which is the same creature. Before any, a marked actor whose tokens may be another
+ * mark's too, as dnd5e's copy of a marked NPC's may, takes its own linked token, wherever it is: that
+ * is its world actor, then never the other mark's while its own takes an unlinked token of it. With
+ * no token, a linked copy marked itself is left to its own mark, and one whose linked token is
+ * another mark's copy to that one; a mark left with its own actor alone, while a linked token of that
+ * is another mark's copy, is left out while it is.
  * @param {Campaign} campaign
  * @returns {Map<string, {marked: Actor, characters: Actor[], token: TokenDocument|null, actor: Actor}>}
  */
@@ -229,20 +232,28 @@ export function constantCopies(campaign) {
   const scenes = [active, ...Array.from(game.scenes ?? []).filter(scene => scene !== active)].filter(Boolean);
   const origin = source => foundry.utils.getProperty(source, "flags.dnd5e.summon.origin");
   const taken = new Set();
+  const claim = (token, markedIds) => {
+    // A linked token is its world actor: once one is a mark's copy, its others are that one too.
+    if ( token.actorLink && taken.has(token.actorId) ) return;
+    const waiting = markedIds.filter(markedId => !copies.get(markedId).token);
+    if ( !waiting.length ) return;
+    const summon = (token.actorLink ? null : origin(token.delta)) ?? origin(game.actors.get(token.actorId));
+    const markedId = waiting.find(id => (typeof summon !== "string") || summonerOf(summon, copies.get(id).characters, forms));
+    if ( !markedId ) return;
+    const actor = token.actor;
+    if ( !actor || (actor.type !== "npc") || transformed(actor) ) return;
+    Object.assign(copies.get(markedId), { token, actor });
+    if ( token.actorLink ) taken.add(token.actorId);
+  };
+  // First, a marked actor whose tokens may be another mark's too, as dnd5e's copy of a marked NPC's
+  // may, takes its own linked token, wherever it is: that is its world actor, then never the other
+  // mark's while its own takes an unlinked token of it. Any other mark, the active scene's first.
+  const shared = id => copies.has(id) && (bases.get(id).length > 1);
   for ( const scene of scenes ) {
-    for ( const token of scene.tokens ?? [] ) {
-      // A linked token is its world actor: once one is a mark's copy, its others are that one too.
-      if ( token.actorLink && taken.has(token.actorId) ) continue;
-      const waiting = (bases.get(token.actorId) ?? []).filter(markedId => !copies.get(markedId).token);
-      if ( !waiting.length ) continue;
-      const summon = (token.actorLink ? null : origin(token.delta)) ?? origin(game.actors.get(token.actorId));
-      const markedId = waiting.find(id => (typeof summon !== "string") || summonerOf(summon, copies.get(id).characters, forms));
-      if ( !markedId ) continue;
-      const actor = token.actor;
-      if ( !actor || (actor.type !== "npc") || transformed(actor) ) continue;
-      Object.assign(copies.get(markedId), { token, actor });
-      if ( token.actorLink ) taken.add(token.actorId);
-    }
+    for ( const token of scene.tokens ?? [] ) if ( token.actorLink && shared(token.actorId) ) claim(token, [token.actorId]);
+  }
+  for ( const scene of scenes ) {
+    for ( const token of scene.tokens ?? [] ) claim(token, bases.get(token.actorId) ?? []);
   }
 
   // With no token, dnd5e's linked copy kept for a summon by one of its characters, else the NPC

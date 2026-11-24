@@ -182,9 +182,10 @@ needs a token in a fight, and it's asked its concentration saves as dnd5e's card
 the save cards that target tokens need a token. **Remove** takes it off; deleting the actor, or
 taking its character out of the campaign, does too. Nothing is kept until you **Save Changes**.
 Mark an NPC or dnd5e's copy of it for a summon, not both: marked both, they're two companions, the
-copy's row and its **Remove** saying it's dnd5e's copy for a summon, and a token of the copy goes to
-the copy first. A mark the app doesn't show, as a linked token of it is another mark's copy, says so
-on its row, with whose that token is.
+copy's row and its **Remove** saying it's dnd5e's copy for a summon; a token of the copy goes to the
+copy first, its linked token before any unlinked one, whatever the scene, and the NPC takes a token
+of its own or an unlinked one of the copy's. A mark the app doesn't show, as a linked token of it is
+another mark's copy, says so on its row, with whose that token is.
 
 ### Players' rolls
 
