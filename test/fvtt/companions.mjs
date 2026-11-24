@@ -3324,22 +3324,26 @@ await saveKeep({ constantCompanions: [] })
 // copy, says so on its row, and whose that token is: dnd5e's linked copy of the Hawk that Vex's summon
 // made, marked for Thorin, and the Hawk marked for Vex, a linked token of the copy on the arena. Thorin's
 // row names the arena and Vex's Hawk, and that his isn't shown while it is; Vex's row names the arena;
-// the Hawk marked for Thorin too, the token is Thorin and Vex's; the token gone, his row is the copy's
-// with no token.
+// the Hawk marked for Thorin too, the token is Thorin and Vex's. An unlinked token of the copy Thorin
+// summoned onto the den, his mark's own, listed: his row names the den, though the linked one is still
+// the Hawk's. A Wild Hawk from the copy's compendium, marked for Vex before the Hawk, taking an unlinked
+// token of the copy placed before the linked one: Thorin's row names the Hawk, whose is the linked
+// token, not the Wild Hawk. The tokens gone, his row is the copy's with no token.
 {
   const copy = companionActor('hawkVexCopy', 'Hawk', {
     linked: true, flags: { dnd5e: { isAutoImported: true, summon: { origin: 'Actor.vex.Item.steelDefender', activity: 'sd-summon' } } },
-    stats: { duplicateSource: 'Actor.hawk' }, spec: creature({ dex: 3 }),
+    stats: { duplicateSource: 'Actor.hawk', compendiumSource: 'Compendium.dnd5e.monsters.Actor.hawk' }, spec: creature({ dex: 3 }),
   })
+  const wildHawk = companionActor('hawkWild2', 'Wild Hawk', { linked: false, stats: { compendiumSource: 'Compendium.dnd5e.monsters.Actor.hawk' }, spec: creature({ dex: 3 }) })
   const COPY_THORIN = { actorId: 'hawkVexCopy', characterId: 'thorin' }
   const HAWK_VEX = { actorId: 'hawk', characterId: 'vex' }
   const hintOf = (win, character, id) => find(win, `[data-constant-character="${character}"] [data-constant-row="${id}"] .hint`).textContent.trim()
+  const copiesNow = () => [...constantCopies(keepwatch())].map(([key, each]) => [key, each.token?.id ?? null])
   placeToken(arena, copy, { id: 'hkc', actorLink: true, name: 'Hawk' })
   let win = null
   try {
     await saveKeep({ constantCompanions: [STEEL, COPY_THORIN, HAWK_VEX] })
-    assert.deepEqual([...constantCopies(keepwatch())].map(([key, each]) => [key, each.token?.id ?? null]), [['steelDef', null], ['hawk', 'hkc']],
-      "rule 9: the copy's linked token Vex's Hawk's, Thorin's mark of the copy left out")
+    assert.deepEqual(copiesNow(), [['steelDef', null], ['hawk', 'hkc']], "rule 9: the copy's linked token Vex's Hawk's, Thorin's mark of the copy left out")
     win = await openTab()
     assert.deepEqual([hintOf(win, 'thorin', 'hawkVexCopy'), hintOf(win, 'vex', 'hawk')],
       [`${C}.CopyShownAs {"scene":"arena","characters":"Vex","name":"Hawk"}`, `${C}.OnScene {"scene":"arena"}`],
@@ -3350,16 +3354,35 @@ await saveKeep({ constantCompanions: [] })
     assert.equal(hintOf(win, 'thorin', 'hawkVexCopy'), `${C}.CopyShownAs {"scene":"arena","characters":"Thorin and Vex","name":"Hawk"}`,
       "the Hawk marked for Thorin too: the token is Thorin and Vex's Hawk")
     await win.close()
+    await saveKeep({ constantCompanions: [STEEL, COPY_THORIN, HAWK_VEX] })
+    placeToken(den, copy, { id: 'hku', name: 'Hawk', delta: { flags: BY_THORIN } })
+    assert.deepEqual(copiesNow(), [['steelDef', null], ['hawkVexCopy', 'hku'], ['hawk', 'hkc']], "an unlinked token of the copy Thorin summoned: his mark's own, listed")
+    win = await openTab()
+    assert.equal(hintOf(win, 'thorin', 'hawkVexCopy'), `${C}.CopyOnScene {"scene":"den"}`, "his row names the den, though the copy's linked token is the Hawk's")
+    await win.close()
+    den.tokens.delete('hku')
+    arena.tokens.delete('hkc')
+    placeToken(arena, copy, { id: 'hkw', name: 'Hawk', delta: { flags: BY_VEX } })
+    placeToken(arena, copy, { id: 'hkc', actorLink: true, name: 'Hawk' })
+    await saveKeep({ constantCompanions: [STEEL, COPY_THORIN, { actorId: 'hawkWild2', characterId: 'vex' }, HAWK_VEX] })
+    assert.deepEqual(copiesNow(), [['steelDef', null], ['hawkWild2', 'hkw'], ['hawk', 'hkc']], "the Wild Hawk takes the unlinked token, placed first; the Hawk the linked one")
+    win = await openTab()
+    assert.equal(hintOf(win, 'thorin', 'hawkVexCopy'), `${C}.CopyShownAs {"scene":"arena","characters":"Vex","name":"Hawk"}`,
+      "Thorin's row names the Hawk, whose the linked token is, not the Wild Hawk with an unlinked one")
+    await win.close()
+    arena.tokens.delete('hkw')
     arena.tokens.delete('hkc')
     win = await openTab()
-    assert.equal(hintOf(win, 'thorin', 'hawkVexCopy'), `${C}.CopyNoToken`, "the token gone: Thorin's row is the copy's with no token")
+    assert.equal(hintOf(win, 'thorin', 'hawkVexCopy'), `${C}.CopyNoToken`, "the tokens gone: Thorin's row is the copy's with no token")
   } finally {
     await win?.close()
-    arena.tokens.delete('hkc')
+    for (const id of ['hkc', 'hkw']) arena.tokens.delete(id)
+    den.tokens.delete('hku')
     actors.delete(copy.id)
+    actors.delete(wildHawk.id)
     await saveKeep({ constantCompanions: [STEEL] }, 'steelDef')
   }
-  ok("K34. a mark left out while a linked token of its actor is another mark's copy says on its row whose that token is, by scene, the other mark's characters and name, and that it isn't shown while it is; the other mark's row names the scene; with the token gone, the copy's row says no token")
+  ok("K34. a mark left out while a linked token of its actor is another mark's copy says on its row whose that token is, by scene, the other mark's characters and name, and that it isn't shown while it is; the other mark's row names the scene; listed with an unlinked token of its own, its row names that token's scene; with another mark on an unlinked token of it, the row names the mark on the linked one; the tokens gone, the copy's row says no token")
 }
 
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
