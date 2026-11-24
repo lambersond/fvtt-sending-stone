@@ -3105,10 +3105,11 @@ await saveKeep({ constantCompanions: [] })
 // is its own mark's, listed once, and the NPC marked, with no token, itself; a second token of the copy,
 // unlinked, another creature, the NPC's. The Hawk and dnd5e's linked copy of it Thorin summoned, both
 // marked: with no token, each itself; a linked token of the copy, the copy's, and a second linked
-// token of it, the same creature, the copy's too, the Hawk still itself. A Wild Hawk from the
-// compendium the copy was made from, marked first: the copy's linked token its, by the compendium, and
-// never the Hawk's copy too. The copy marked for Thorin, the Hawk for Vex, a linked token of the copy
-// Vex summoned: the Hawk's, and Thorin's mark not listed while it is, its only copy the Hawk's.
+// token of it, the same creature, the copy's too, the Hawk still itself, and an unlinked token of it,
+// a creature of its own, the Hawk's. A Wild Hawk from the compendium the copy was made from, marked
+// first: the copy's linked token its, by the compendium, and never the Hawk's copy too. The copy marked
+// for Thorin, the Hawk for Vex, a linked token of the copy Vex summoned: the Hawk's, and Thorin's mark
+// not listed while it is, its only copy the Hawk's.
 {
   const marked = marks => companionList({ ...keepwatch(), constantCompanions: marks })
   const by = (list, key) => copyOf(list.find(each => each.key === key))
@@ -3143,6 +3144,12 @@ await saveKeep({ constantCompanions: [] })
   assert.deepEqual([by(list, 'hawk'), by(list, 'hawkTwin')], [['hawk', null, null, 'Actor.hawk', false, false], ['hawkTwin', null, null, 'Actor.hawkTwin', true, false]],
     "a second linked token of the copy: still the copy's alone, and the Hawk still itself")
   assert.deepEqual(list.filter(each => each.uuid === 'Actor.hawkTwin').map(each => each.key), ['hawkTwin'], 'the copy listed once')
+  // An unlinked token of the copy is a creature of its own: the Hawk's, its mark waiting for one.
+  placeToken(den, twin, { id: 'hkt3', name: 'Hawk' })
+  list = marked([HAWK, TWIN])
+  assert.deepEqual([by(list, 'hawk'), by(list, 'hawkTwin')], [['hawkTwin', 'hkt3', 'den', 'Scene.den.Token.hkt3.Actor.hawkTwin', true, true], ['hawkTwin', null, null, 'Actor.hawkTwin', true, false]],
+    "an unlinked token of the copy, a creature of its own: the Hawk's, and the copy still its linked token's")
+  den.tokens.delete('hkt3')
   const wild =companionActor('hawkWild', 'Wild Hawk', { linked: false, stats: { compendiumSource: 'Compendium.dnd5e.monsters.Actor.hawk' }, spec: creature({ dex: 3 }) })
   list = marked([{ actorId: 'hawkWild', characterId: 'thorin' }, HAWK])
   assert.deepEqual([by(list, 'hawkWild'), by(list, 'hawk')], [['hawkTwin', null, null, 'Actor.hawkTwin', true, false], ['hawk', null, null, 'Actor.hawk', false, false]],
@@ -3162,7 +3169,7 @@ await saveKeep({ constantCompanions: [] })
   assert.deepEqual([by(list, 'hawk'), by(list, 'hawkVexTwin')], [['hawk', null, null, 'Actor.hawk', false, false], ['hawkVexTwin', null, null, 'Actor.hawkVexTwin', false, false]],
     "the token gone, Thorin's mark listed again, itself, and the Hawk itself")
   for (const each of [twin, wild, vexTwin]) actors.delete(each.id)
-  ok("K29. each copy one mark's: a token of dnd5e's copy of the Steel Defender, both marked, the copy's own mark's, listed once, the NPC itself with no token, and a second token of the copy the NPC's; the Hawk and dnd5e's linked copy of it, both marked, each itself with no token, and a linked token of the copy the copy's, a second linked token of it the copy's too, listed once, the Hawk still itself; a Wild Hawk marked first, from the compendium the copy was made from, takes the copy's linked token, and the Hawk isn't that copy too; a linked token of the copy Vex summoned is Vex's Hawk's, and Thorin's mark of the copy isn't listed while it is, and is once it's gone")
+  ok("K29. each copy one mark's: a token of dnd5e's copy of the Steel Defender, both marked, the copy's own mark's, listed once, the NPC itself with no token, and a second token of the copy the NPC's; the Hawk and dnd5e's linked copy of it, both marked, each itself with no token, and a linked token of the copy the copy's, a second linked token of it the copy's too, listed once, the Hawk still itself, and an unlinked one of it the Hawk's; a Wild Hawk marked first, from the compendium the copy was made from, takes the copy's linked token, and the Hawk isn't that copy too; a linked token of the copy Vex summoned is Vex's Hawk's, and Thorin's mark of the copy isn't listed while it is, and is once it's gone")
 }
 
 // K30. With no token of it on the active scene, the first scene's in Foundry's order, whichever was
