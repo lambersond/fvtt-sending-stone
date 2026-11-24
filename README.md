@@ -183,7 +183,8 @@ the save cards that target tokens need a token. **Remove** takes it off; deletin
 taking its character out of the campaign, does too. Nothing is kept until you **Save Changes**.
 Mark an NPC or dnd5e's copy of it for a summon, not both: marked both, they're two companions, the
 copy's row and its **Remove** saying it's dnd5e's copy for a summon, and a token of the copy goes to
-the copy first.
+the copy first. A mark the app doesn't show, as a linked token of it is another mark's copy, says so
+on its row, with whose that token is.
 
 ### Players' rolls
 

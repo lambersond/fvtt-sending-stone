@@ -146,6 +146,7 @@
         "OnScene": "NPC · token on {scene}",
         "CopyNoToken": "NPC · dnd5e's copy for a summon · no token on any scene",
         "CopyOnScene": "NPC · dnd5e's copy for a summon · token on {scene}",
+        "CopyShownAs": "NPC · dnd5e's copy for a summon · token on {scene} is {characters}'s {name} in the app; this one isn't shown while it is",
         "FoundAlone": "Companions found on their own aren't listed here: a creature a character summoned, while its token is on a scene, and a linked NPC its player owns by name.",
         "NoCharacters": "Add characters on the Players tab first.",
         "PickerTitle": "Add companions to {character}",

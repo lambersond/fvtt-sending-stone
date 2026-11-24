@@ -794,12 +794,22 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
           marks: campaign.constantCompanions.filter(mark => mark.characterId === character.id)
             .map(({ actorId }) => game.actors.get(actorId)).filter(Boolean)
             .map(actor => {
-              const scene = copies.get(actor.id)?.token?.parent?.name;
+              const listed = copies.get(actor.id);
+              const scene = listed?.token?.parent?.name;
               // dnd5e's copy of an NPC for a summon says so, as the chooser does, so that its row and
               // the NPC's, both marked, can be told apart.
               const copy = isSummonCopy(actor);
-              const where = scene ? game.i18n.format(`SENDINGSTONE.Config.Companions.${copy ? "CopyOnScene" : "OnScene"}`, { scene })
-                : game.i18n.localize(`SENDINGSTONE.Config.Companions.${copy ? "CopyNoToken" : "NoToken"}`);
+              // A mark the app isn't shown while a linked token of its actor is another mark's copy
+              // says whose that token is.
+              const holder = listed ? null
+                : Array.from(copies.values()).find(each => each.token?.actorLink && (each.token.actorId === actor.id));
+              const where = holder ? game.i18n.format("SENDINGSTONE.Config.Companions.CopyShownAs", {
+                scene: holder.token.parent.name,
+                characters: new Intl.ListFormat(game.i18n.lang, { type: "conjunction" }).format(holder.characters.map(each => each.name)),
+                name: holder.marked.name
+              })
+                : scene ? game.i18n.format(`SENDINGSTONE.Config.Companions.${copy ? "CopyOnScene" : "OnScene"}`, { scene })
+                  : game.i18n.localize(`SENDINGSTONE.Config.Companions.${copy ? "CopyNoToken" : "NoToken"}`);
               return {
                 actorId: actor.id,
                 name: actor.name,

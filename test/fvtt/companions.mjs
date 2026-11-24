@@ -3320,5 +3320,47 @@ await saveKeep({ constantCompanions: [] })
   ok("K33. a hello answered with no companionsConstant has its companionsEverywhere kept as told; an NPC among Keepwatch's characters has its box say it has no player, and Thorin's chooser never offers it; a drop as anything but an Actor, though its uuid is an NPC's, and one whose uuid isn't text, are each warned and nothing kept; an NPC marked for Thorin deleted while the window is open leaves it unsaved")
 }
 
+// K34. A mark the app isn't shown, by rule 9, while a linked token of its actor is another mark's
+// copy, says so on its row, and whose that token is: dnd5e's linked copy of the Hawk that Vex's summon
+// made, marked for Thorin, and the Hawk marked for Vex, a linked token of the copy on the arena. Thorin's
+// row names the arena and Vex's Hawk, and that his isn't shown while it is; Vex's row names the arena;
+// the Hawk marked for Thorin too, the token is Thorin and Vex's; the token gone, his row is the copy's
+// with no token.
+{
+  const copy = companionActor('hawkVexCopy', 'Hawk', {
+    linked: true, flags: { dnd5e: { isAutoImported: true, summon: { origin: 'Actor.vex.Item.steelDefender', activity: 'sd-summon' } } },
+    stats: { duplicateSource: 'Actor.hawk' }, spec: creature({ dex: 3 }),
+  })
+  const COPY_THORIN = { actorId: 'hawkVexCopy', characterId: 'thorin' }
+  const HAWK_VEX = { actorId: 'hawk', characterId: 'vex' }
+  const hintOf = (win, character, id) => find(win, `[data-constant-character="${character}"] [data-constant-row="${id}"] .hint`).textContent.trim()
+  placeToken(arena, copy, { id: 'hkc', actorLink: true, name: 'Hawk' })
+  let win = null
+  try {
+    await saveKeep({ constantCompanions: [STEEL, COPY_THORIN, HAWK_VEX] })
+    assert.deepEqual([...constantCopies(keepwatch())].map(([key, each]) => [key, each.token?.id ?? null]), [['steelDef', null], ['hawk', 'hkc']],
+      "rule 9: the copy's linked token Vex's Hawk's, Thorin's mark of the copy left out")
+    win = await openTab()
+    assert.deepEqual([hintOf(win, 'thorin', 'hawkVexCopy'), hintOf(win, 'vex', 'hawk')],
+      [`${C}.CopyShownAs {"scene":"arena","characters":"Vex","name":"Hawk"}`, `${C}.OnScene {"scene":"arena"}`],
+      "Thorin's row: the token on the arena is Vex's Hawk, and his isn't shown while it is; Vex's row: the arena")
+    await win.close()
+    await saveKeep({ constantCompanions: [STEEL, COPY_THORIN, HAWK_VEX, { actorId: 'hawk', characterId: 'thorin' }] })
+    win = await openTab()
+    assert.equal(hintOf(win, 'thorin', 'hawkVexCopy'), `${C}.CopyShownAs {"scene":"arena","characters":"Thorin and Vex","name":"Hawk"}`,
+      "the Hawk marked for Thorin too: the token is Thorin and Vex's Hawk")
+    await win.close()
+    arena.tokens.delete('hkc')
+    win = await openTab()
+    assert.equal(hintOf(win, 'thorin', 'hawkVexCopy'), `${C}.CopyNoToken`, "the token gone: Thorin's row is the copy's with no token")
+  } finally {
+    await win?.close()
+    arena.tokens.delete('hkc')
+    actors.delete(copy.id)
+    await saveKeep({ constantCompanions: [STEEL] }, 'steelDef')
+  }
+  ok("K34. a mark left out while a linked token of its actor is another mark's copy says on its row whose that token is, by scene, the other mark's characters and name, and that it isn't shown while it is; the other mark's row names the scene; with the token gone, the copy's row says no token")
+}
+
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
 process.exit(0)
