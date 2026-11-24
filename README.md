@@ -178,7 +178,7 @@ a token of it is on any scene, hidden or not, the app uses that token, the activ
 with none, dnd5e's linked copy of it kept for a summon, where a character summoned one, with the
 summon's bonuses and its last hit points and uses, else the actor itself. Its player rolls for it
 and uses its features with no token, its attacks and spells going without a target; its initiative
-needs a token in a fight, and it's asked its concentration checks as dnd5e's card asks the actor;
+needs a token in a fight, and it's asked its concentration saves as dnd5e's card asks the actor;
 the save cards that target tokens need a token. **Remove** takes it off; deleting the actor, or
 taking its character out of the campaign, does too. Nothing is kept until you **Save Changes**.
 
