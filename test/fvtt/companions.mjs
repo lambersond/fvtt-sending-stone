@@ -3130,5 +3130,19 @@ await saveKeep({ constantCompanions: [] })
   ok("K29. each copy one mark's: a token of dnd5e's copy of the Steel Defender, both marked, the copy's own mark's, listed once, the NPC itself with no token, and a second token of the copy the NPC's; the Hawk and dnd5e's linked copy of it, both marked, each itself with no token, and a linked token of the copy the copy's, the Hawk still itself; a Wild Hawk marked first, from the compendium the copy was made from, takes the copy's linked token, and the Hawk isn't that copy too; a linked token of the copy Vex summoned is Vex's Hawk's, and Thorin's mark of the copy isn't listed while it is, and is once it's gone")
 }
 
+// K30. With no token of it on the active scene, the first scene's in Foundry's order, whichever was
+// placed first: Thorin's summons of dnd5e's copy, one on the Moor, a scene after the den, then one on
+// the den: the den's; the den's deleted, the Moor's.
+{
+  const moor = scene('kMoor')
+  placeToken(moor, steelCopy, { id: 'sdm1', name: 'Steel Defender', delta: { flags: BY_THORIN } })
+  placeToken(den, steelCopy, { id: 'sdd1', name: 'Steel Defender', delta: { flags: BY_THORIN } })
+  assert.deepEqual(copyOf(steelOf()).slice(1, 3), ['sdd1', 'den'], "the den's, first in Foundry's order of scenes, though placed second")
+  den.tokens.delete('sdd1')
+  assert.deepEqual(copyOf(steelOf()).slice(1, 3), ['sdm1', 'kMoor'], "the den's gone, the Moor's")
+  scenes.delete(moor.id)
+  ok("K30. with no token on the active scene, a constant companion's copy is the token on the first scene in Foundry's order, the den's over the Moor's though placed after it; the den's gone, the Moor's")
+}
+
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
 process.exit(0)
