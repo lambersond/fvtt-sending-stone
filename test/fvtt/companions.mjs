@@ -2559,10 +2559,20 @@ const placedAt = async (on, id, flags = BY_THORIN, system = {}, { name = 'Steel 
   await changeActor(sideOwl, { ownership: { bob: 3 } })
   await settle(); await settle()
   assert.deepEqual(owls().map(each => [each.key, each.kind, each.of]), [['sideOwl', 'constant', ['thorin', 'vex']]], "Bob's too: Vex's")
+  // dnd5e's copies for a summon that Bob's summon for Vex made, his as dnd5e makes them, each marked
+  // for Thorin: an unlinked one, flagged isAutoImported, and a linked one with Vex's summon on it.
+  // Thorin's alone: a copy or a summon is never an owned companion (rule 2), so Bob's owning it makes
+  // it nothing of Vex's.
+  const bobCopy = companionActor('kBobCopy', 'Owl', { owners: ['bob'], linked: false, flags: { dnd5e: { isAutoImported: true } }, stats: { compendiumSource: 'Compendium.dnd5e.monsters.Actor.owl' }, spec: creature({ dex: 2 }) })
+  const bobClone = companionActor('kBobClone', 'Owl', { owners: ['bob'], linked: true, flags: { dnd5e: { isAutoImported: true, summon: { origin: 'Actor.vex.Item.steelDefender', activity: 'sd-summon' } } }, stats: { duplicateSource: 'Actor.hawk' }, spec: creature({ dex: 2 }) })
+  const bobsMarked = companionList({ ...keepwatch(), constantCompanions: [STEEL, ...['kBobCopy', 'kBobClone'].map(actorId => ({ actorId, characterId: 'thorin' }))] })
+  assert.deepEqual(['kBobCopy', 'kBobClone'].map(key => bobsMarked.filter(each => each.uuid === `Actor.${key}`).map(each => [each.key, each.kind, each.of])),
+    [[['kBobCopy', 'constant', ['thorin']]], [['kBobClone', 'constant', ['thorin']]]], "dnd5e's copies Bob's summon made, marked for Thorin: Thorin's alone, once each")
+  for (const each of [bobCopy, bobClone]) actors.delete(each.id)
   actors.delete('sideOwl')
   await Hooks.callAll('deleteActor', sideOwl, {}, 'gm')
   await saveKeep({ constantCompanions: [STEEL] }, 'steelDef')
-  ok("K9. an Owl Alice owns, marked for Thorin, is listed once, as constant, of Thorin; given Bob too, of Thorin and Vex, in the roster's order")
+  ok("K9. an Owl Alice owns, marked for Thorin, is listed once, as constant, of Thorin; given Bob too, of Thorin and Vex, in the roster's order; dnd5e's copies for a summon Bob's summon for Vex made, unlinked or linked, his, marked for Thorin, of Thorin alone")
 }
 
 // K10. Not listed, read from the campaign given before anything is saved: a mark of a campaign
@@ -2604,6 +2614,16 @@ const placedAt = async (on, id, flags = BY_THORIN, system = {}, { name = 'Steel 
   await until(() => listed(at, 'camp-k').length, 'the list with no scene active', 1000)
   await settle(); await settle()
   assert.deepEqual(copyOf(steelOf(listed(at, 'camp-k').at(-1).data.companions)), ['steelDef', null, null, 'Actor.steelDef', false, false], 'no scene active')
+  // A token of its copy placed on the den while no scene is active: the list still built, that token
+  // its copy, placed, and not away, as none is away with no scene active (rule 8).
+  {
+    const { token, at: placing } = await placedAt(den, 'sdk')
+    const told = steelOf(listed(placing, 'camp-k').at(-1).data.companions)
+    assert.deepEqual(copyOf(told), ['steelCopy', 'sdk', 'den', 'Scene.den.Token.sdk.Actor.steelCopy', true, false], 'no scene active, a token of its copy on the den: its copy, placed, not away')
+    assert.deepEqual(copyOf(steelOf()), copyOf(told), 'and so as read at once')
+    await token.delete()
+    await settle(); await settle()
+  }
   const all = [...scenes.entries()]
   scenes.clear()
   try {
@@ -2618,7 +2638,7 @@ const placedAt = async (on, id, flags = BY_THORIN, system = {}, { name = 'Steel 
   at = app.events.length
   await activate(arena)
   await settle(); await settle()
-  ok('K14. with no scene active, and with no scene at all, the Steel Defender is listed, placed and away false, and its check and its attack at no one are made')
+  ok('K14. with no scene active, and with no scene at all, the Steel Defender is listed, placed and away false, and its check and its attack at no one are made; with no scene active and a token of its copy placed on the den, that token its copy, placed, not away')
 }
 
 // K15, K16. With no token, everything its sheet in Foundry allows, on the NPC: a check, a save, an
