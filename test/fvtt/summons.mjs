@@ -8,6 +8,8 @@
 // them); scenes and tokens as v14 has them (token-core.mjs); with MIDI=1, midi-fake.mjs's workflow;
 // a stand-in Foundry core and app. Run with --import ./unref-timers.mjs --import
 // ./dnd5e-register.mjs, and SLIM_CHECK=1 (every full sheet posted slims and expands back).
+// Since constant companions (module 0.54.0, item 98), U19: a Steel Defender the Gamemaster marked
+// Thorin's constant companion, placed from its card, listed as that companion.
 import assert from 'node:assert/strict'
 import { JSDOM } from 'jsdom'
 import { settings, user, users, actors } from './stub.mjs'
@@ -1071,6 +1073,88 @@ if (DND5E6) {
   const flagged = [...messages.values()].filter(m => m.flags?.['sending-stone']?.summon?.profile === P.owl)
   assert.ok(flagged.length >= 2 && flagged.includes(owlCard) && flagged.includes(useCard(made.id)), 'two cards, each with its choice')
   ok("Find Familiar cast again while an Owl it placed is on the arena: the Owl stays, and both cards carry their choice, as dnd5e has it")
+}
+
+/* -------------------------------------------- */
+/*  U19: a constant companion placed from the card */
+/* -------------------------------------------- */
+
+{
+  // Constant companions (module 0.54.0, item 98) meet the summons here. The Gamemaster marks the
+  // Steel Defender, the world NPC Thorin's feature summons, as his constant companion, saved as
+  // Manage Campaigns' Companions tab saves it, and Ashlands' app answers companions: 4. Cast from
+  // the app, nothing is placed; its card's Summon button clicked, the token placed is the one
+  // dnd5e's fetchExisting gives for an unlinked world NPC, a token of the marked actor itself
+  // (5.3.3 actor.mjs:388-390), its delta flagged as getTokenData flags it (summon.mjs:268-274). It
+  // is the constant companion's copy: listed once, as that companion, placed, never a summoned one
+  // of its own.
+  const { companionFormat, constantReader } = await import(`${MODULE}/scripts/creatures.mjs`)
+  const helloOf = from => ofType(since(from), 'bridge.hello').at(-1)
+  const saveAshlands = async fields => {
+    const from = app.events.length
+    const campaigns = settings.get('campaigns').map(c => {
+      if (c.id !== 'camp-a') return c
+      const { constantCompanions, ...rest } = c
+      return { ...rest, ...fields }
+    })
+    await game.settings.set('sending-stone', 'campaigns', campaigns)
+    await until(() => helloOf(from), "Ashlands' hello")
+    return from
+  }
+  const MARK = { actorId: 'steelDef', characterId: 'thorin' }
+  app.answers['camp-a'] = { ...READS, companions: 4 }
+  let from = await saveAshlands({ constantCompanions: [MARK] })
+  await until(() => constantReader('camp-a'), 'Ashlands reading constant companions')
+  await until(() => companionSheet('steelDef', 'camp-a', from), "the Steel Defender's sheet")
+  await settle(); await settle()
+  assert.equal(companionFormat('camp-a'), 4)
+  const marked = helloOf(from).data.companionsConstant.filter(each => each.key === 'steelDef')
+  assert.deepEqual(marked.map(each => [each.kind, each.of, each.actorId, each.tokenId, each.uuid, each.placed]),
+    [['constant', ['thorin'], 'steelDef', null, 'Actor.steelDef', false]], 'listed with no token before anything is placed')
+
+  // Cast from the app: done, nothing noted or drawn on its card, as U7; nothing placed.
+  const made = await use('steelDefender', 'sdSummon', { summon: { profile: 'defenderProfile0' } })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  const card = useCard(made.id)
+  assert.equal(card.flags['sending-stone'].summon, undefined, 'nothing chosen, nothing noted')
+  assert.deepEqual(linesOf(await renderCard(card)), [], 'no line')
+  nothingPlaced()
+  // The Gamemaster clicks its Summon button: one creature, no choice, so dnd5e places it at once.
+  await clickSummon(card, await renderCard(card))
+  assert.equal(screen.placed.length, placedSeen + 1, 'placed once')
+  assert.deepEqual([screen.placed.at(-1).profile, screen.placed.at(-1).item, screen.placed.at(-1).activity],
+    ['defenderProfile0', 'steelDefender', 'sdSummon'])
+  placedSeen = screen.placed.length
+
+  // dnd5e's token of the marked actor, on the arena.
+  from = app.events.length
+  const started = realNow()
+  const origin = thorin.items.get('steelDefender').uuid
+  const token = await createToken(arena, steelDef, {
+    id: 'sdPlaced00000000', name: 'Steel Defender',
+    delta: { flags: { dnd5e: { summon: { origin, activity: 'sdSummon', profile: 'defenderProfile0' } } } },
+  })
+  await until(() => ofType(since(from), 'companions.listed').length, 'the list with the token placed', 1000)
+  // The module settles changes for 250 ms; what's past 300 is the harness's own polling and load.
+  assert.ok(realNow() - started < 300 + 200, `within 300 ms (${realNow() - started} ms)`)
+  await settle(); await settle()
+  const lists = ofType(since(from), 'companions.listed')
+  assert.equal(lists.length, 1, 'one companions.listed')
+  const { companions } = lists[0].data
+  const steel = companions.filter(each => each.key === 'steelDef')
+  assert.deepEqual(steel.map(each => [each.kind, each.of, each.actorId, each.tokenId, each.sceneId, each.uuid, each.placed, each.away]),
+    [['constant', ['thorin'], 'steelDef', 'sdPlaced00000000', 'arena', 'Scene.arena.Token.sdPlaced00000000.Actor.steelDef', true, false]],
+    'listed once, as the constant companion, its copy the token placed')
+  assert.ok(!companions.some(each => each.key === 'arena-sdPlaced00000000'), 'no summoned companion of its own')
+  assert.equal(companions.filter(each => each.tokenId === 'sdPlaced00000000').length, 1, 'the token listed once')
+
+  // Put back: the token gone, the mark taken off, Ashlands' app answering as before.
+  await token.delete()
+  app.answers['camp-a'] = READS
+  from = await saveAshlands({})
+  await until(() => companionFormat('camp-a') === READS.companions, 'Ashlands answering as before')
+  await settle(); await settle()
+  ok("U19. the Steel Defender marked Thorin's constant companion, to an app that answers companions: 4: listed with no token, placed false; cast from the app, nothing noted, nothing placed; its card's Summon button clicked, the token dnd5e places, of the marked actor itself, is its copy: one companions.listed within 300 ms, the Steel Defender listed once, as the constant companion, its token's ids and uuid, placed, no summoned companion of its own")
 }
 
 console.log(`summons${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
