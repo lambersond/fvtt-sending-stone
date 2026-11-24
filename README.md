@@ -1209,7 +1209,10 @@ Gamemaster-only information switched on.
   or system class is otherwise overridden.
 - **A card's Summon button is listened to,** since 0.54.0, on every browser: the dialog it opens has
   the player's choice set on its own configuration before it is drawn, as dnd5e sets it on any
-  change. Nothing of dnd5e's is replaced.
+  change. Nothing of dnd5e's is replaced. It relies on dnd5e's `SummonUsageDialog` drawing its
+  fields from its own `config` after Foundry's `preRenderSummonUsageDialog` hook, where the choice
+  is set; were they drawn first, it would open with dnd5e's defaults, the card's line still saying
+  the choice. With Midi-QOL the line may sit elsewhere on Midi's card, such as at its end.
 - **Summons are placed on the scene whoever places them is viewing,** for one cast from the app the
   Gamemaster who clicks the card's Summon button: one placed on a prep scene shows once its token is
   on the active scene; it shows at once, marked on another scene, to an app from v0.51.0.
