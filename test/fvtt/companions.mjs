@@ -3252,5 +3252,51 @@ await saveKeep({ constantCompanions: [] })
   ok("K32. a campaign with no marks list has none; another NPC from the Steel Defender's compendium marked for Vex isn't its copy, nor a second token of it Vex's; a linked import of the compendium's own that Thorin summoned isn't its linked copy; a token of a copy that isn't an NPC, or has no actor, isn't its copy; read for the active scene alone, none by default; a linked NPC Vex summoned, marked for Thorin, its token on the den: not placed, not away")
 }
 
+// K33. A hello answered that holds no companionsConstant, as no hello of 0.54.0's lacks: its
+// companionsEverywhere is kept as told, so nothing is told again. Then the Companions tab with an NPC
+// among Keepwatch's characters, as a campaign saved so may hold one: its box says it has no player,
+// and Thorin's chooser never offers it; a drop that says it's anything but an Actor, though its uuid
+// is an NPC's, and one whose uuid isn't text, are each warned and nothing kept; and an NPC marked for
+// Thorin deleted while the window is open leaves it unsaved, as its mark won't be saved again.
+{
+  const { companionsDelivered } = await import(`${MODULE}/scripts/creature-sync.mjs`)
+  const now = companionList(keepwatch())
+  let at = app.events.length
+  companionsDelivered(keepwatch(), { data: { companions: [], companionsEverywhere: now } })
+  await settle(); await settle()
+  assert.deepEqual(listed(at, 'camp-k'), [], 'no companionsConstant: its companionsEverywhere kept as told, nothing told again')
+  const hireling = companionActor('kHire', 'Hireling', {})
+  const kite = companionActor('kKite2', 'Kite', {})
+  await saveKeep({ characters: ['thorin', 'vex', 'kHire'], constantCompanions: [STEEL, { actorId: 'kKite2', characterId: 'thorin' }] })
+  const win = await openTab()
+  try {
+    const playersOf = character => find(win, `[data-constant-character="${character}"] .sending-stone-constant-head .hint`).textContent.trim()
+    assert.deepEqual([playersOf('thorin'), playersOf('kHire')], ['Alice', 'SENDINGSTONE.Config.Players.NoOwner'], "Thorin's box names Alice; the Hireling's, who has no player, says so")
+    await click(win, addButton('thorin'))
+    const offered = [...win.element.querySelectorAll('[data-pick-companion]')].map(box => box.dataset.pickCompanion)
+    assert.ok(offered.includes('hawk') && !offered.includes('kHire'), "Thorin's chooser never offers the Hireling, an NPC of the campaign's characters")
+    await click(win, '.sending-stone-picker-footer [data-action="closeCompanionPicker"]')
+    warned.length = 0
+    ui.notifications.warn = message => { warned.push(message) }
+    try {
+      for (const data of [{ type: 'Item', uuid: 'Actor.hawk' }, { type: 'Actor', uuid: ['Actor.hawk'] }]) await drop(win, '[data-constant-drop="thorin"]', data)
+    } finally {
+      ui.notifications.warn = warn
+    }
+    assert.deepEqual([warned.map(each => String(each)), rowsOf(win, 'thorin')], [[`${C}.NotNpc`, `${C}.NotNpc`], ['steelDef', 'kKite2']],
+      "dropped as an Item though its uuid is the Hawk's, and as an Actor with a uuid that isn't text: each warned, nothing kept")
+    assert.equal(find(win, '[data-dirty]').dataset.dirty, 'false', 'nothing unsaved')
+    actors.delete(kite.id)
+    await win.render()
+    assert.equal(find(win, '[data-dirty]').dataset.dirty, 'true', 'the Kite, marked for Thorin, deleted while the window is open: unsaved, as its mark won\'t be saved again')
+  } finally {
+    await win.close()
+    actors.delete(kite.id)
+    await saveKeep({ constantCompanions: [STEEL] }, 'steelDef')
+    actors.delete(hireling.id)
+  }
+  ok("K33. a hello answered with no companionsConstant has its companionsEverywhere kept as told; an NPC among Keepwatch's characters has its box say it has no player, and Thorin's chooser never offers it; a drop as anything but an Actor, though its uuid is an NPC's, and one whose uuid isn't text, are each warned and nothing kept; an NPC marked for Thorin deleted while the window is open leaves it unsaved")
+}
+
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
 process.exit(0)
