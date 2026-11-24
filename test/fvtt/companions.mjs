@@ -2293,8 +2293,9 @@ if (MIDI) {
 // The app's ROADMAP item 98: the NPCs the Gamemaster marks as a character's constant companions on
 // Manage Campaigns, listed to an app that answers `companions: 4` whether or not a token of them is on
 // a scene, keyed by the NPC marked. Keepwatch, Thorin's and Vex's, answers 4. Its Steel Defender, a
-// world NPC no player owns, unlinked, and dnd5e's copy of it for a summon; the Hawk, linked, whose
-// copy dnd5e makes when Thorin summons it; and an Owl of Alice's.
+// world NPC no player owns, unlinked, and dnd5e's copies of it for a summon, flagged as dnd5e flags
+// them now and as it did; the Hawk, linked, whose copy dnd5e makes when Thorin summons it; and an Owl
+// of Alice's.
 const CONSTANT = { commands: true, companions: 4 }
 const keepwatch = () => getCampaigns().find(campaign => campaign.id === 'camp-k')
 const { constantCopies, companionFormat } = await import(`${MODULE}/scripts/creatures.mjs`)
@@ -2309,6 +2310,8 @@ const steelGear = { items: [weapon('forceRend', 'Force-Empowered Rend', rendHit)
 const steelSpec = { ...creature({ str: 2, dex: 1 }), hp: { value: 20, max: 20, temp: 0 } }
 const steelDef = withConcentrationChecks(companionActor('steelDef', 'Steel Defender', { linked: false, stats: { compendiumSource: SD_SOURCE }, spec: steelSpec, gear: steelGear }))
 const steelCopy = companionActor('steelCopy', 'Steel Defender', { linked: false, flags: { dnd5e: { isAutoImported: true } }, stats: { compendiumSource: SD_SOURCE }, spec: steelSpec, gear: steelGear })
+// dnd5e's older copy of it for a summon, flagged with the older `summonedCopy` alone, as dnd5e still reads it.
+const steelOld = companionActor('steelOld', 'Steel Defender', { linked: false, flags: { dnd5e: { summonedCopy: true } }, stats: { compendiumSource: SD_SOURCE }, spec: steelSpec, gear: steelGear })
 companionActor('hawk', 'Hawk', { linked: true, spec: creature({ dex: 3 }) })
 const STEEL = { actorId: 'steelDef', characterId: 'thorin' }
 const steelOf = (list = companionList(keepwatch())) => list.find(each => each.key === 'steelDef')
@@ -2412,26 +2415,28 @@ const unmarked = helloOf('camp-k').data
 }
 
 // K4. Thorin summons dnd5e's copy onto the den, not the active scene: one companions.listed, its key
-// the NPC marked, its copy the token, placed and away, no entry of its own; its sheet the token's.
-const placedAt = async (on, id, flags = BY_THORIN, system = {}) => {
+// the NPC marked, its copy the token, placed and away, no entry of its own; its sheet the token's. The
+// token is renamed, as a Gamemaster may name it: the companion is still named by the NPC marked.
+const placedAt = async (on, id, flags = BY_THORIN, system = {}, { name = 'Steel Defender', base = steelCopy } = {}) => {
   const at = app.events.length
-  const token = await createToken(on, steelCopy, { id, name: 'Steel Defender', delta: { flags, system } })
+  const token = await createToken(on, base, { id, name, delta: { flags, system } })
   await until(() => listed(at, 'camp-k').length, `the list with ${id}`, 1000)
   await settle(); await settle()
   return { token, at }
 }
 {
-  const { at } = await placedAt(den, 'sd1', BY_THORIN, { attributes: { hp: { value: 15 } } })
+  const { at } = await placedAt(den, 'sd1', BY_THORIN, { attributes: { hp: { value: 15 } } }, { name: 'Steel Defender (Thorin)' })
   const lists = listed(at, 'camp-k')
   assert.equal(lists.length, 1, 'one companions.listed')
   const entry = steelOf(lists[0].data.companions)
   assert.deepEqual(copyOf(entry), ['steelCopy', 'sd1', 'den', 'Scene.den.Token.sd1.Actor.steelCopy', true, true])
-  assert.deepEqual([entry.name, entry.img, entry.summon], ['Steel Defender', 'steelDef.webp', null], "named and pictured by the NPC marked")
+  assert.deepEqual([entry.name, entry.img, entry.summon], ['Steel Defender', 'steelDef.webp', null], "named and pictured by the NPC marked, not by its token, Steel Defender (Thorin)")
   assert.ok(!keysOf(lists[0].data.companions).includes('den-sd1'), 'no entry of its own')
   const sheet = sheetsOf('steelDef', at).at(-1)
   assert.ok(sheet && (app.events.indexOf(sheet) > app.events.indexOf(lists[0])), 'its sheet sent again, after the list')
   assert.equal(sheet.data.sheet.hp.value, 15, "the token's hit points")
-  ok("K4. Thorin's summon of dnd5e's copy onto the den: one companions.listed, the Steel Defender keyed as marked, its actorId, tokenId, sceneId and uuid the token's, placed and away, no den-sd1 of its own; then its sheet again, the token's hit points")
+  assert.equal(sheet.data.companion.name, 'Steel Defender', 'its sheet under the same name')
+  ok("K4. Thorin's summon of dnd5e's copy onto the den: one companions.listed, the Steel Defender keyed as marked, its actorId, tokenId, sceneId and uuid the token's, placed and away, no den-sd1 of its own, and named by the NPC marked though its token is Steel Defender (Thorin); then its sheet again, the token's hit points")
 }
 
 // K5. A second token, on the arena: the active scene's first, whatever the order of scenes; deleted,
@@ -2482,33 +2487,55 @@ const placedAt = async (on, id, flags = BY_THORIN, system = {}) => {
   ok("K7. a token of dnd5e's copy that Vex summoned stays Vex's summoned companion, arena-sdv; Thorin's Steel Defender keeps his own token")
 }
 
-// K8. The Hawk, linked, marked: with no summon yet the NPC itself; Thorin summons it, and dnd5e
-// makes its linked copy for the summon and places its token: the copy, placed; the token gone, the
-// copy kept, with no sheet sent again, as it's the same creature.
+// K8. The Hawk, linked, marked: with no summon yet the NPC itself, though dnd5e keeps two copies of
+// it for other summons, a linked one Vex summoned and an unlinked one; Thorin summons it, and dnd5e
+// makes its linked copy for the summon, which the Gamemaster has renamed, and places its token: the
+// copy, placed; the token gone, the copy kept, with no sheet sent again, as it's the same creature;
+// named the Hawk all the while. Marked for Vex too, Vex's mark first, Thorin's copy, as he comes first
+// in the campaign; for Vex alone, the copy Vex summoned.
 {
   await saveKeep({ constantCompanions: [STEEL, { actorId: 'hawk', characterId: 'thorin' }] }, 'hawk')
   const hawkOf = (list = companionList(keepwatch())) => list.find(each => each.key === 'hawk')
   assert.deepEqual(copyOf(hawkOf()), ['hawk', null, null, 'Actor.hawk', false, false], 'no summon yet: the NPC itself')
-  let at = app.events.length
-  const clone = companionActor('hawkClone', 'Hawk', {
-    linked: true, flags: { dnd5e: { isAutoImported: true, summon: { origin: 'Actor.thorin.Item.summonDragon', activity: 'sd-summon' } } },
-    stats: { duplicateSource: 'Actor.hawk' }, spec: { ...creature({ dex: 3 }), hp: { value: 9, max: 12, temp: 0 } },
+  const hawkCopy = (id, name, origin, linked, hp = 12) => companionActor(id, name, {
+    linked, flags: { dnd5e: { isAutoImported: true, summon: { origin, activity: 'sd-summon' } } },
+    stats: { duplicateSource: 'Actor.hawk' }, spec: { ...creature({ dex: 3 }), hp: { value: hp, max: 12, temp: 0 } },
   })
+  const vexHawk = hawkCopy('hawkVex', 'Hawk', 'Actor.vex.Item.steelDefender', true)
+  const looseHawk = hawkCopy('hawkLoose', 'Hawk', 'Actor.thorin.Item.summonDragon', false)
+  for (const each of [vexHawk, looseHawk]) await Hooks.callAll('createActor', each, {}, 'gm')
+  await settle(); await settle()
+  assert.deepEqual(copyOf(hawkOf()), ['hawk', null, null, 'Actor.hawk', false, false], "Vex's linked copy and an unlinked one aren't Thorin's: still the NPC itself")
+  let at = app.events.length
+  const clone = hawkCopy('hawkClone', 'Hawk (Thorin)', 'Actor.thorin.Item.summonDragon', true, 9)
   await Hooks.callAll('createActor', clone, {}, 'gm')
-  const hk1 = await createToken(arena, clone, { id: 'hk1', actorLink: true, name: 'Hawk' })
+  const hk1 = await createToken(arena, clone, { id: 'hk1', actorLink: true, name: 'Hawk (Thorin)' })
   await until(() => listed(at, 'camp-k').length && sheetsOf('hawk', at).length, "the list and the Hawk's sheet", 1000)
   await settle(); await settle()
   const placed = listed(at, 'camp-k').at(-1).data.companions
   assert.deepEqual(copyOf(hawkOf(placed)), ['hawkClone', null, null, 'Actor.hawkClone', true, false], "dnd5e's linked copy, placed")
+  assert.equal(hawkOf(placed).name, 'Hawk', 'named by the NPC marked, not its copy, Hawk (Thorin)')
   assert.ok(!keysOf(placed).includes('hawkClone'), 'no entry of its own')
   assert.equal(sheetsOf('hawk', at).at(-1).data.sheet.hp.value, 9, "the copy's hit points")
   at = app.events.length
   await hk1.delete()
   await until(() => listed(at, 'camp-k').length, 'the list without the token', 1000)
   await settle(); await settle()
-  assert.deepEqual(copyOf(hawkOf(listed(at, 'camp-k').at(-1).data.companions)), ['hawkClone', null, null, 'Actor.hawkClone', false, false], 'the copy kept, with no token')
+  const kept = hawkOf(listed(at, 'camp-k').at(-1).data.companions)
+  assert.deepEqual(copyOf(kept), ['hawkClone', null, null, 'Actor.hawkClone', false, false], "the copy Thorin summoned kept, with no token, not Vex's")
+  assert.equal(kept.name, 'Hawk', 'still named by the NPC marked')
   assert.deepEqual(sheetsOf('hawk', at), [], 'no sheet sent again')
-  ok("K8. a linked Hawk marked: with no summon yet the NPC itself; summoned by Thorin, dnd5e's linked copy of it, its token placed, the copy's sheet sent; its token deleted, the copy kept, with the summon's last hit points, placed false and no sheet sent again")
+  const forVex = { actorId: 'hawk', characterId: 'vex' }
+  const markedFor = marks => hawkOf(companionList({ ...keepwatch(), constantCompanions: [STEEL, ...marks] }))
+  const both = markedFor([forVex, { actorId: 'hawk', characterId: 'thorin' }])
+  assert.deepEqual([both?.uuid, both?.of], ['Actor.hawkClone', ['thorin', 'vex']], "marked for Vex and Thorin, Vex's mark first: Thorin's copy, first in the campaign")
+  assert.equal(markedFor([forVex])?.uuid, 'Actor.hawkVex', "for Vex alone, the copy Vex summoned")
+  for (const each of [vexHawk, looseHawk, clone]) {
+    actors.delete(each.id)
+    await Hooks.callAll('deleteActor', each, {}, 'gm')
+  }
+  await settle(); await settle()
+  ok("K8. a linked Hawk marked: with no summon yet the NPC itself, though dnd5e keeps a linked copy Vex summoned and an unlinked one; summoned by Thorin, dnd5e's linked copy of it, its token placed, the copy's sheet sent; its token deleted, the copy Thorin summoned kept, with the summon's last hit points, placed false and no sheet sent again; named the Hawk though its copy is renamed; marked for Vex and Thorin, Vex's mark first, Thorin's copy, and for Vex alone, Vex's")
 }
 
 // K9. An Owl Alice owns, marked for Thorin: listed once, constant; Bob given Owner, Vex's too.
@@ -2753,8 +2780,9 @@ await saveKeep({ constantCompanions: [] })
   ok("K22. Manage Campaigns' Companions tab, before Player actions, opens on the lead and a box for each of the campaign's characters in its order, Thorin's naming Alice, Vex's with none; under another system there's no such tab, and a view on it goes back to Players")
 }
 
-// K23. Dropped from the Actors sidebar: an NPC kept, marked as unsaved, saved; anything else warned
-// and nothing kept; a drop after the tab is drawn again works; a token of it named by its scene.
+// K23. Dropped from the Actors sidebar: an NPC kept, marked as unsaved, saved; dropped again on the
+// same character, still one; anything else warned and nothing kept; a drop after the tab is drawn again
+// works; a token of it named by its scene.
 {
   let win = await openTab()
   const dropped = await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.steelDef' })
@@ -2763,12 +2791,14 @@ await saveKeep({ constantCompanions: [] })
   assert.equal(find(win, '[data-constant-row="steelDef"] .hint').textContent.trim(), `${C}.NoToken`)
   assert.equal(find(win, '[data-dirty]').dataset.dirty, 'true', 'unsaved')
   assert.equal(page.activeElement, find(win, addButton('thorin')), "focus on Thorin's Add companions")
-  const group = companionActor('kBand', 'Band', { type: 'group' })
   warned.length = 0
-  for (const data of [{ type: 'Actor', uuid: 'Actor.kBand' }, { type: 'Actor', uuid: 'Actor.vex' }, { type: 'Actor', uuid: 'Compendium.dnd5e.monsters.Actor.sd' }, 'not json']) {
+  await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.steelDef' })
+  assert.deepEqual([rowsOf(win, 'thorin'), warned], [['steelDef'], []], 'dropped again on Thorin: still one row, and no warning')
+  const group = companionActor('kBand', 'Band', { type: 'group' })
+  for (const data of [{ type: 'Actor', uuid: 'Actor.kBand' }, { type: 'Actor', uuid: 'Actor.vex' }, { type: 'Actor', uuid: 'Actor.brakkaWolf' }, { type: 'Actor', uuid: 'Compendium.dnd5e.monsters.Actor.sd' }, 'not json']) {
     await drop(win, '[data-constant-drop="thorin"]', data)
   }
-  assert.deepEqual(warned.map(each => String(each)), [`${C}.NotNpc`, `${C}.IsCharacter {"name":"Vex"}`, `${C}.NotNpc`, `${C}.NotNpc`], 'each warned')
+  assert.deepEqual(warned.map(each => String(each)), [`${C}.NotNpc`, `${C}.IsCharacter {"name":"Vex"}`, `${C}.NotNpc`, `${C}.NotNpc`, `${C}.NotNpc`], 'each warned, a transformed NPC among them')
   assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef'], 'nothing more kept')
   actors.delete(group.id)
   await click(win, '[data-action="removeConstant"][data-actor-id="steelDef"]')
@@ -2784,7 +2814,7 @@ await saveKeep({ constantCompanions: [] })
   await win.close()
   await arena.tokens.get('sd7').delete()
   await settle(); await settle()
-  ok("K23. an NPC dropped from the Actors sidebar on Thorin's place, lit while dragged over, is kept as his, its row saying no token, the window unsaved and focus on his Add companions, and saved; a Group, a campaign character, a compendium's actor and text that isn't one are each warned and nothing kept; dropped again after a render it's kept again; with a token on the arena its row names the arena")
+  ok("K23. an NPC dropped from the Actors sidebar on Thorin's place, lit while dragged over, is kept as his, its row saying no token, the window unsaved and focus on his Add companions, and saved; dropped on him again, still one row; a Group, a campaign character, a transformed NPC, a compendium's actor and text that isn't one are each warned and nothing kept; dropped again after a render it's kept again; with a token on the arena its row names the arena")
 }
 
 // K24. Add companions: the world's NPCs, by name, those his already ticked and disabled, dnd5e's
@@ -2803,7 +2833,7 @@ await saveKeep({ constantCompanions: [] })
   const rowOf = id => find(win, `[data-pick-companion="${id}"]`).closest('label')
   assert.deepEqual([find(win, '[data-pick-companion="steelDef"]').checked, find(win, '[data-pick-companion="steelDef"]').disabled], [true, true], 'his already: ticked, disabled')
   assert.equal(rowOf('steelDef').querySelector('.hint').textContent.trim(), `${C}.Already {"character":"Thorin"}`)
-  assert.equal(rowOf('steelCopy').querySelector('.hint').textContent.trim(), `${C}.SummonCopy`, "dnd5e's copy hinted")
+  assert.deepEqual(['steelCopy', 'steelOld'].map(id => rowOf(id).querySelector('.hint').textContent.trim()), [`${C}.SummonCopy`, `${C}.SummonCopy`], "dnd5e's copies hinted, flagged as it flags them now and as it did")
   assert.ok(find(win, '[data-action="addPickedCompanions"]').disabled, 'nothing to add yet')
   assert.equal(find(win, '[data-pick-companion-count]').textContent, 'SENDINGSTONE.Config.Picker.NoneSelected', 'and it says so')
   const hawkBox = find(win, '[data-pick-companion="hawk"]')
@@ -2827,7 +2857,7 @@ await saveKeep({ constantCompanions: [] })
   await save(win)
   await settle(); await settle()
   assert.deepEqual(marksSaved(), [STEEL, { actorId: 'hawk', characterId: 'thorin' }])
-  ok("K24. Add companions offers the world's NPCs by name, no campaign character or transformed actor, Thorin's own ticked and disabled, already his, and dnd5e's copy for a summon hinted; Add Selected waits for a tick and counts it; the filter narrows by name; added, focus returns to his Add companions; Escape closes it the same; saved")
+  ok("K24. Add companions offers the world's NPCs by name, no campaign character or transformed actor, Thorin's own ticked and disabled, already his, and dnd5e's copies for a summon hinted, the older flag's too; Add Selected waits for a tick and counts it; the filter narrows by name; added, focus returns to his Add companions; Escape closes it the same; saved")
 }
 
 // K25. Removed, focus on Add companions; saved without it; and a save drops the mark of an actor
@@ -2847,9 +2877,43 @@ await saveKeep({ constantCompanions: [] })
   await save(win)
   await settle(); await settle()
   assert.deepEqual(marksSaved(), [{ actorId: 'hawk', characterId: 'thorin' }], "saved without it, the deleted actor's mark or the departed character's")
+  // Marks saved by hand, outside the window: a pair twice, and a character-type actor's. The window's
+  // save keeps the pair once and drops the other.
+  const hireling = companionActor('kHireling', 'Hireling', { linked: true, type: 'character' })
+  const hawkMark = { actorId: 'hawk', characterId: 'thorin' }
+  await saveKeep({ constantCompanions: [hawkMark, hawkMark, { actorId: 'kHireling', characterId: 'thorin' }] })
+  const again = await openTab()
+  await save(again)
+  await settle(); await settle()
+  assert.deepEqual(marksSaved(), [hawkMark], 'the pair once, and no character-type actor')
+  actors.delete(hireling.id)
   ui.notifications.warn = warn
   await saveKeep({ constantCompanions: [STEEL], characters: ['thorin', 'vex'] })
-  ok("K25. Remove takes that one alone off, focus on Thorin's Add companions; saved without it; and a save drops the mark of an actor deleted since, and of a character taken out of the campaign")
+  ok("K25. Remove takes that one alone off, focus on Thorin's Add companions; saved without it; and a save drops the mark of an actor deleted since, of a character taken out of the campaign, a pair marked twice by hand but once, and a character-type actor's")
+}
+
+// K26. A token of dnd5e's older copy, flagged summonedCopy alone, that Thorin summoned: his constant
+// companion's copy, as dnd5e still takes such a copy for the summon, and no summoned companion of his own.
+{
+  const { token } = await placedAt(den, 'sdo', BY_THORIN, {}, { base: steelOld })
+  const list = companionList(keepwatch())
+  assert.deepEqual(copyOf(steelOf(list)), ['steelOld', 'sdo', 'den', 'Scene.den.Token.sdo.Actor.steelOld', true, true], 'the older copy\'s token, its copy')
+  assert.ok(!keysOf(list).includes('den-sdo'), 'no entry of its own')
+  await token.delete()
+  await settle(); await settle()
+  ok("K26. a token of dnd5e's older copy, flagged summonedCopy alone, that Thorin summoned onto the den is his Steel Defender's copy, placed and away, with no den-sdo of its own")
+}
+
+// K27. A token of the NPC marked itself, dragged onto the arena from the Actors sidebar, with no summon
+// about it: its copy, as the Gamemaster placed it.
+{
+  const { token } = await placedAt(arena, 'sdm', {}, {}, { base: steelDef })
+  const list = companionList(keepwatch())
+  assert.deepEqual(copyOf(steelOf(list)), ['steelDef', 'sdm', 'arena', 'Scene.arena.Token.sdm.Actor.steelDef', true, false], 'the token of the NPC marked, no summon about it')
+  assert.ok(!keysOf(list).includes('arena-sdm'), 'no entry of its own')
+  await token.delete()
+  await settle(); await settle()
+  ok("K27. a token of the NPC marked itself, placed on the arena with no summon about it, is its copy, placed, with no arena-sdm of its own")
 }
 
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
