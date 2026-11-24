@@ -1068,12 +1068,12 @@ Foundry, so a familiar the Gamemaster summoned, or a wolf two players own, rolls
 familiar the Gamemaster summoned, its sheet's descriptions are sent without secrets, and its
 biography is dnd5e's public one, none where that's blank; its links stay ones to act on.
 **What stays in Foundry:** placing a creature summoned (since module 0.54.0 a summon activity is
-[cast from the app](#summons), and the Gamemaster places its creature from its card), dismissing
-and changing a companion; spending its charges by
-hand, its hit dice, Heroic Inspiration, moves, removals and journal notes, none of which a companion
-has in the app; a companion's own transformation, a transformed actor being no companion; and the
-saves the game asks of a companion, rolled in Foundry, but since module 0.41.0 asked in the app of a
-listener that answers `"companions": 2` (see [Saves the game asks for](#saves-the-game-asks-for)).
+[cast from the app](#summons), and the Gamemaster places its creature from its card), dismissing and
+changing a companion; spending its charges by hand, its hit dice, Heroic Inspiration, moves,
+removals and journal notes, none of which a companion has in the app; a companion's own
+transformation, a transformed actor being no companion; and the saves the game asks of a companion,
+rolled in Foundry, but since module 0.41.0 asked in the app of a listener that answers
+`"companions": 2` (see [Saves the game asks for](#saves-the-game-asks-for)).
 Since module 0.44.0 its hit points and temporary hit points are set from the app where the campaign
 takes them, as a player could on its sheet ([Hit points](#hit-points)).
 
