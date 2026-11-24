@@ -21,6 +21,12 @@
             {{localize "SENDINGSTONE.Config.Tabs.Party"}}
         </button>
         {{/if}}
+        {{#if campaign.companionsTab}}
+        <button type="button" data-action="view" data-section="campaign" data-campaign-id="{{campaign.id}}"
+                data-tab="companions" {{#if campaign.tabs.companions}}aria-current="page"{{/if}}>
+            {{localize "SENDINGSTONE.Config.Tabs.Companions"}}
+        </button>
+        {{/if}}
         <button type="button" data-action="view" data-section="campaign" data-campaign-id="{{campaign.id}}"
                 data-tab="actions" {{#if campaign.tabs.actions}}aria-current="page"{{/if}}>
             {{localize "SENDINGSTONE.Config.Tabs.Actions"}}
@@ -245,6 +251,96 @@
         </div>
     </div>
     {{/if}}
+</div>
+{{/if}}
+
+{{else if campaign.tabs.companions}}
+{{#if campaign.companions.picker}}
+{{!-- The world's NPCs that can be kept beside a character, in place of the campaign's companions. --}}
+<div class="sending-stone-picker" data-companion-picker role="group" aria-labelledby="sending-stone-companion-picker-title">
+    <div class="sending-stone-toolbar sending-stone-picker-head">
+        <h3 id="sending-stone-companion-picker-title">{{campaign.companions.picker.title}}</h3>
+        <button type="button" class="icon fa-solid fa-xmark" data-action="closeCompanionPicker"
+                data-tooltip="SENDINGSTONE.Config.Picker.Cancel"
+                aria-label="{{localize "SENDINGSTONE.Config.Picker.Cancel"}}"></button>
+    </div>
+    <div class="sending-stone-toolbar">
+        <input type="search" data-filter="companions" value="{{campaign.companions.picker.filter}}"
+               placeholder="{{localize "SENDINGSTONE.Config.Companions.Filter"}}"
+               aria-label="{{localize "SENDINGSTONE.Config.Companions.Filter"}}">
+    </div>
+    <div class="sending-stone-scroll" data-filter-list="companions">
+        <section class="sending-stone-group">
+            {{#each campaign.companions.picker.entries as |npc|}}
+            <label class="sending-stone-row sending-stone-pick" data-search="{{npc.search}}">
+                <input type="checkbox" data-pick-companion="{{npc.id}}" {{#if npc.already}}checked disabled{{/if}}>
+                <img src="{{npc.img}}" alt="">
+                <span class="sending-stone-row-name">
+                    <span>{{npc.name}}</span>
+                    {{#if npc.hint}}<span class="hint">{{npc.hint}}</span>{{/if}}
+                </span>
+            </label>
+            {{/each}}
+        </section>
+        <p class="sending-stone-empty" data-filter-empty hidden>{{localize "SENDINGSTONE.Config.Companions.NoMatch"}}</p>
+        {{#if campaign.companions.picker.empty}}
+        <p class="sending-stone-empty" data-companion-picker-empty>{{campaign.companions.picker.empty}}</p>
+        {{/if}}
+    </div>
+    <div class="sending-stone-picker-footer">
+        <span data-pick-companion-count role="status" aria-live="polite"></span>
+        <button type="button" data-action="closeCompanionPicker">{{localize "SENDINGSTONE.Config.Picker.Cancel"}}</button>
+        <button type="button" data-action="addPickedCompanions" disabled>
+            <i class="fa-solid fa-user-plus" inert></i>
+            {{localize "SENDINGSTONE.Config.Picker.Add"}}
+        </button>
+    </div>
+</div>
+
+{{else}}
+{{!-- Each character's constant companions, and a place to drop more. --}}
+<div class="sending-stone-scroll">
+    <p class="hint">{{campaign.companions.lead}}</p>
+    {{#if campaign.companions.noCharacters}}
+    <p class="sending-stone-empty">{{campaign.companions.noCharacters}}</p>
+    {{/if}}
+    {{#each campaign.companions.characters as |character|}}
+    <section class="sending-stone-group sending-stone-constant" data-constant-character="{{character.id}}">
+        <div class="sending-stone-row sending-stone-constant-head">
+            <img src="{{character.img}}" alt="">
+            <span class="sending-stone-row-name">
+                <span>{{character.name}}</span>
+                <span class="hint">{{character.players}}</span>
+            </span>
+        </div>
+        {{#if character.marks.length}}
+        <ul class="sending-stone-list">
+            {{#each character.marks as |mark|}}
+            <li class="sending-stone-row" data-constant-row="{{mark.actorId}}">
+                <img src="{{mark.img}}" alt="">
+                <span class="sending-stone-row-name">
+                    <span>{{mark.name}}</span>
+                    <span class="hint">{{mark.where}}</span>
+                </span>
+                <button type="button" class="icon fa-solid fa-trash" data-action="removeConstant"
+                        data-actor-id="{{mark.actorId}}" data-character-id="{{character.id}}"
+                        data-tooltip="{{mark.removeLabel}}" aria-label="{{mark.removeLabel}}"></button>
+            </li>
+            {{/each}}
+        </ul>
+        {{else}}
+        <p class="hint">{{localize "SENDINGSTONE.Config.Companions.None"}}</p>
+        {{/if}}
+        <div class="sending-stone-drop" data-constant-drop="{{character.id}}">
+            <span class="hint">{{character.dropLabel}}</span>
+            <button type="button" data-action="openCompanionPicker" data-character-id="{{character.id}}">
+                <i class="fa-solid fa-plus" inert></i>
+                {{localize "SENDINGSTONE.Config.Companions.Add"}}
+            </button>
+        </div>
+    </section>
+    {{/each}}
+    <p class="hint">{{campaign.companions.foundAlone}}</p>
 </div>
 {{/if}}
 

@@ -7,7 +7,9 @@ import { wildShapeReader } from "./wild-shape.mjs";
  * tokens are on the active scene, and the NPCs its players own there by name (round 0.36.0 §2.1), its
  * players since 0.45.0 those who own it by name, else those it's assigned to (`characterPlayers`).
  * Since 0.51.0, for an app that reads them there (`"companions": 3`), on every scene, each saying
- * whether it's away, on another scene than the active one.
+ * whether it's away, on another scene than the active one. Since 0.54.0, to an app that answers
+ * `companions` 4, the Gamemaster's constant companions too (`constantCopies`), each listed with a
+ * token or without, last among its character's.
  * dnd5e has no companion, familiar or sidekick type; it marks a summoned creature with the item
  * that summoned it, `flags.dnd5e.summon.origin`, which this reads itself, as dnd5e's own registry
  * misses linked summons and fills lazily, per client.
@@ -43,11 +45,17 @@ const readers = new Map();
 const AWAY_FORMAT = 3;
 
 /**
+ * The format from which an app reads the Gamemaster's constant companions: since 0.54.0.
+ * @type {number}
+ */
+const CONSTANT_FORMAT = 4;
+
+/**
  * A companion as a campaign lists it, without its sheet, which follows to an app that reads them.
  * @typedef {object} CompanionEntry
  * @property {string} key             Its actor's id, or for a token's creature `<sceneId>-<tokenId>`.
  * @property {string[]} of            The campaign characters it's a companion of, by actor id.
- * @property {"owned"|"summoned"} kind
+ * @property {"owned"|"summoned"|"constant"} kind
  * @property {string} actorId         Its world actor's id; for a token's creature, its base actor's.
  * @property {string|null} tokenId    A token's creature only.
  * @property {string|null} sceneId    A token's creature only.
@@ -58,6 +66,8 @@ const AWAY_FORMAT = 3;
  *                                    For a summoned one: the item that summoned it, and its activity.
  * @property {boolean} [away]         Since 0.51.0, to an app that reads companions on every scene
  *                                    only: none of its tokens is on the active scene, and one is on another.
+ * @property {boolean} [placed]       Since 0.54.0, a constant companion's only, last: a token of it is
+ *                                    on a scene.
  */
 
 /* -------------------------------------------- */
@@ -99,6 +109,16 @@ export function awayReader(campaignId) {
   return companionFormat(campaignId) >= AWAY_FORMAT;
 }
 
+/**
+ * Does a campaign's app read the Gamemaster's constant companions, since 0.54.0: its latest answer
+ * said `companions` 4 or more?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function constantReader(campaignId) {
+  return companionFormat(campaignId) >= CONSTANT_FORMAT;
+}
+
 /* -------------------------------------------- */
 /*  The list                                    */
 /* -------------------------------------------- */
@@ -131,6 +151,124 @@ export function companionPart(entry) {
 }
 
 /**
+ * The copies of a campaign's constant companions now, since 0.54.0, by the NPC marked: what each is
+ * listed as and acts on. Read from the campaign given, as saved or as being edited in Manage
+ * Campaigns. A mark counts while its NPC is a world actor of type `npc`, not transformed and not a
+ * campaign character, for those of its characters still in the campaign, in the campaign's order.
+ *
+ * Its copy is one of its tokens, hidden or not, of the marked actor or of dnd5e's copy of it (a world
+ * actor flagged `isAutoImported`, or the older `summonedCopy`, whose `_stats.duplicateSource` is the
+ * marked actor's uuid or whose `_stats.compendiumSource` is the marked actor's own): the active
+ * scene's first, then each scene's in Foundry's order, each scene's tokens in order. A token whose
+ * creature is a summon counts only where one of its characters, or her form, summoned it. A token of
+ * no such actor is passed over by its actor's id alone, its creature never made up. With no token,
+ * its copy is dnd5e's linked copy of it kept for a summon by one of its characters, where there is
+ * one (dnd5e's `fetchExisting` makes one of a linked world actor, and `getTokenData` writes the
+ * summon's flags and bonuses onto it, which it keeps between summons, with its hit points and uses);
+ * else the marked actor.
+ *
+ * Each copy is one mark's only, as the Gamemaster may mark both an NPC and dnd5e's copy of it: a
+ * token goes to the mark of its own actor first, then to the first in the campaign's order it counts
+ * for, and the others go on to their next token, a linked one never to a second linked token of the
+ * same actor, which is the same creature. Before any, a marked actor whose tokens may be another
+ * mark's too, as dnd5e's copy of a marked NPC's may, takes its own linked token, wherever it is: that
+ * is its world actor, then never the other mark's while its own takes an unlinked token of it. With
+ * no token, a linked copy marked itself is left to its own mark, and one whose linked token is
+ * another mark's copy to that one; a mark left with its own actor alone, while a linked token of that
+ * is another mark's copy, is left out while it is.
+ * @param {Campaign} campaign
+ * @returns {Map<string, {marked: Actor, characters: Actor[], token: TokenDocument|null, actor: Actor}>}
+ */
+export function constantCopies(campaign) {
+  const copies = new Map();
+  const marks = Array.isArray(campaign.constantCompanions) ? campaign.constantCompanions : [];
+  if ( !marks.length ) return copies;
+  const characters = campaignActors(campaign);
+  const forms = new Map(characters.map(character => [character.id, activeForm(character)?.id ?? null]));
+
+  // The marks that count, by the NPC marked, each with its characters in the campaign's order.
+  const chosen = new Map();
+  for ( const { actorId, characterId } of marks ) {
+    const marked = game.actors.get(actorId);
+    if ( !marked || (marked.type !== "npc") || transformed(marked) || campaign.characters.has(marked.id) ) continue;
+    if ( !chosen.has(marked.id) ) chosen.set(marked.id, new Set());
+    chosen.get(marked.id).add(characterId);
+  }
+  for ( const [markedId, ids] of chosen ) {
+    const theirs = characters.filter(character => ids.has(character.id));
+    if ( theirs.length ) copies.set(markedId, { marked: game.actors.get(markedId), characters: theirs, token: null, actor: null });
+  }
+  if ( !copies.size ) return copies;
+
+  // The world actors a mark's tokens may be of, in one pass: each marked actor and dnd5e's copies of
+  // it; and its linked copies kept for a summon, should no token be placed.
+  const bases = new Map();
+  const linkedCopies = new Map();
+  const base = (id, markedId) => {
+    if ( !bases.has(id) ) bases.set(id, []);
+    bases.get(id).push(markedId);
+  };
+  const isCopy = actor => (actor.flags?.dnd5e?.isAutoImported === true) || (actor.flags?.dnd5e?.summonedCopy === true);
+  for ( const actor of game.actors.filter(each => copies.has(each.id) || isCopy(each)) ) {
+    if ( copies.has(actor.id) ) base(actor.id, actor.id);
+    if ( !isCopy(actor) ) continue;
+    const stats = actor._stats ?? {};
+    for ( const [markedId, { marked }] of copies ) {
+      if ( actor.id === markedId ) continue;
+      const source = marked._stats?.compendiumSource;
+      const duplicate = Boolean(stats.duplicateSource) && (stats.duplicateSource === marked.uuid);
+      if ( !duplicate && !(source && (stats.compendiumSource === source)) ) continue;
+      base(actor.id, markedId);
+      if ( duplicate && (actor.prototypeToken?.actorLink === true) ) {
+        if ( !linkedCopies.has(markedId) ) linkedCopies.set(markedId, []);
+        linkedCopies.get(markedId).push(actor);
+      }
+    }
+  }
+
+  // Its token, the first that passes, the active scene's first: each token one mark's, its own
+  // actor's mark first (`bases` lists it first), then the first in the campaign's order it counts for.
+  const active = game.scenes?.active ?? null;
+  const scenes = [active, ...Array.from(game.scenes ?? []).filter(scene => scene !== active)].filter(Boolean);
+  const origin = source => foundry.utils.getProperty(source, "flags.dnd5e.summon.origin");
+  const taken = new Set();
+  const claim = (token, markedIds) => {
+    // A linked token is its world actor: once one is a mark's copy, its others are that one too.
+    if ( token.actorLink && taken.has(token.actorId) ) return;
+    const waiting = markedIds.filter(markedId => !copies.get(markedId).token);
+    if ( !waiting.length ) return;
+    const summon = (token.actorLink ? null : origin(token.delta)) ?? origin(game.actors.get(token.actorId));
+    const markedId = waiting.find(id => (typeof summon !== "string") || summonerOf(summon, copies.get(id).characters, forms));
+    if ( !markedId ) return;
+    const actor = token.actor;
+    if ( !actor || (actor.type !== "npc") || transformed(actor) ) return;
+    Object.assign(copies.get(markedId), { token, actor });
+    if ( token.actorLink ) taken.add(token.actorId);
+  };
+  // First, a marked actor whose tokens may be another mark's too, as dnd5e's copy of a marked NPC's
+  // may, takes its own linked token, wherever it is: that is its world actor, then never the other
+  // mark's while its own takes an unlinked token of it. Any other mark, the active scene's first.
+  const shared = id => copies.has(id) && (bases.get(id).length > 1);
+  for ( const scene of scenes ) {
+    for ( const token of scene.tokens ?? [] ) if ( token.actorLink && shared(token.actorId) ) claim(token, [token.actorId]);
+  }
+  for ( const scene of scenes ) {
+    for ( const token of scene.tokens ?? [] ) claim(token, bases.get(token.actorId) ?? []);
+  }
+
+  // With no token, dnd5e's linked copy kept for a summon by one of its characters, else the NPC
+  // marked, neither another mark's.
+  for ( const [markedId, copy] of copies ) {
+    if ( copy.token ) continue;
+    const kept = (linkedCopies.get(markedId) ?? []).filter(actor => !copies.has(actor.id) && !taken.has(actor.id));
+    const by = character => kept.find(actor => summonerOf(origin(actor), [character], forms) === character);
+    copy.actor = copy.characters.map(by).find(Boolean) ?? copy.marked;
+    if ( taken.has(copy.actor.id) ) copies.delete(markedId);
+  }
+  return copies;
+}
+
+/**
  * A campaign's characters' companions now, by round 0.36.0 §2.1: each listed entry and its live
  * actor, in the list's order, at most MOST_COMPANIONS.
  *
@@ -146,12 +284,20 @@ export function companionPart(entry) {
  * actor could make it one, a summon or owned by one of the campaign's players by id
  * (`mayBeCompanion`), so that the NPCs of old maps cost nothing more than a look. Otherwise today's
  * list, of the active scene's tokens, byte for byte.
+ *
+ * Since 0.54.0, `constant`, as for an app that answers 4: the Gamemaster's constant companions,
+ * keyed by the NPC marked and named and pictured by it, found before the scenes' tokens, each its
+ * characters' and those whose players own its copy; its copy's token isn't looked at again, nor,
+ * where it's linked, any other token of its actor, which is the same creature. Each character's
+ * come last, after its summoned ones, and both cuts keep them first. Each entry of one ends with
+ * `placed`.
  * @param {Campaign} campaign
  * @param {object} [options]
  * @param {boolean} [options.everywhere]   Every scene, each with `away`: as the campaign's app reads them.
+ * @param {boolean} [options.constant]     The constant companions too: as the campaign's app reads them.
  * @returns {{entry: CompanionEntry, actor: Actor}[]}
  */
-export function companionsOf(campaign, { everywhere=awayReader(campaign.id) }={}) {
+export function companionsOf(campaign, { everywhere=awayReader(campaign.id), constant=everywhere && constantReader(campaign.id) }={}) {
   const characters = campaignActors(campaign);
   if ( !characters.length ) return [];
   const owner = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
@@ -164,17 +310,24 @@ export function companionsOf(campaign, { everywhere=awayReader(campaign.id) }={}
   // The campaign character whose item summoned a live actor, if one did. Since 0.40.0 one summoned
   // by her form's copy of the item, while she's shaped, is hers too, while the form exists.
   const forms = new Map(characters.map(character => [character.id, activeForm(character)?.id ?? null]));
-  const summonerOf = actor => {
-    const origin = foundry.utils.getProperty(actor, "flags.dnd5e.summon.origin");
-    if ( typeof origin !== "string" ) return null;
-    const by = id => Boolean(id) && origin.startsWith(`Actor.${id}.Item.`);
-    return characters.find(character => by(character.id) || by(forms.get(character.id))) ?? null;
-  };
   const found = new Map();
-  const note = (key, kind, actor, token, of) => {
+  const note = (key, kind, actor, token, of, { marked=null, placedOn=null }={}) => {
     if ( !key || found.has(key) || !of.length ) return;
-    found.set(key, { key, kind, actor, token, of });
+    found.set(key, { key, kind, actor, token, of, marked, placedOn });
   };
+
+  // Since 0.54.0 the constant companions, first, so that nothing else takes their copies: each
+  // claimed by its creature's key, a linked token's by its actor's id, as all its tokens are it.
+  const claimed = new Set();
+  if ( constant ) {
+    for ( const [markedId, copy] of constantCopies(campaign) ) {
+      const owners = ownable(copy.actor) ? ownersOf(copy.actor) : [];
+      const of = characters.filter(character => copy.characters.includes(character) || owners.includes(character));
+      const token = (copy.token && !copy.token.actorLink) ? copy.token : null;
+      note(markedId, "constant", copy.actor, token, of, { marked: copy.marked, placedOn: copy.token?.parent ?? null });
+      if ( copy.token ) claimed.add(creatureKey(copy.token));
+    }
+  }
 
   // The active scene's tokens, or since 0.51.0 every scene's: summoned ones of every kind, and owned
   // unlinked ones; and, on every scene, where each linked actor's tokens are, hidden or not.
@@ -190,6 +343,7 @@ export function companionsOf(campaign, { everywhere=awayReader(campaign.id) }={}
         else place.elsewhere = true;
         places.set(token.actorId, place);
       }
+      if ( claimed.has(creatureKey(token)) ) continue;
       if ( token.hidden ) continue;
       const base = game.actors.get(token.actorId);
       if ( base?.type !== "npc" ) continue;
@@ -198,7 +352,7 @@ export function companionsOf(campaign, { everywhere=awayReader(campaign.id) }={}
       // A transformed actor is never one: dnd5e copies its original's type, ownership and flags onto it.
       if ( !actor || (actor.type !== "npc") || transformed(actor) || campaign.characters.has(actor.id) ) continue;
       const key = creatureKey(token);
-      const summoner = summonerOf(actor);
+      const summoner = summonerOf(foundry.utils.getProperty(actor, "flags.dnd5e.summon.origin"), characters, forms);
       if ( summoner ) {
         note(key, "summoned", actor, token.actorLink ? null : token, [summoner]);
         continue;
@@ -217,7 +371,13 @@ export function companionsOf(campaign, { everywhere=awayReader(campaign.id) }={}
 
   // Since 0.51.0, where each is: a token's creature by its token's scene, a world actor's by its
   // tokens', away where none is on the active scene and one is on another. None is with no scene active.
+  // Since 0.54.0 a constant companion's by its copy's token alone, if it has one, and whether it does.
   for ( const each of found.values() ) {
+    if ( each.kind === "constant" ) {
+      each.away = everywhere && Boolean(active) && Boolean(each.placedOn) && (each.placedOn.id !== active.id);
+      each.placed = Boolean(each.placedOn);
+      continue;
+    }
     const place = each.token ? null : places.get(each.actor.id);
     each.away = everywhere && Boolean(active)
       && (each.token ? (each.token.parent?.id !== active.id) : Boolean(place?.elsewhere && !place.here));
@@ -228,10 +388,11 @@ export function companionsOf(campaign, { everywhere=awayReader(campaign.id) }={}
   const listed = new Map();
   for ( const character of characters ) {
     const own = Array.from(found.values()).filter(each => each.of.includes(character))
-      .map(each => ({ ...each, name: nameOf(each.actor, each.token) }));
-    const kept = presentFirst([
+      .map(each => ({ ...each, name: nameOf(each.marked ?? each.actor, each.marked ? null : each.token) }));
+    const kept = keptFirst([
       ...own.filter(each => each.kind === "owned").sort(byName),
-      ...own.filter(each => each.kind === "summoned").sort(byName)
+      ...own.filter(each => each.kind === "summoned").sort(byName),
+      ...own.filter(each => each.kind === "constant").sort(byName)
     ], MOST_COMPANIONS_EACH);
     for ( const each of kept ) {
       const entry = listed.get(each.key);
@@ -239,7 +400,7 @@ export function companionsOf(campaign, { everywhere=awayReader(campaign.id) }={}
       else listed.set(each.key, { ...each, of: [character.id], summoner: (each.kind === "summoned") ? character : null });
     }
   }
-  return presentFirst(Array.from(listed.values()), MOST_COMPANIONS).map(each => ({
+  return keptFirst(Array.from(listed.values()), MOST_COMPANIONS).map(each => ({
     entry: entryOf(each, everywhere),
     actor: each.actor
   }));
@@ -361,17 +522,38 @@ function mayBeCompanion(token, base, playerIds, owner) {
 }
 
 /**
+ * The campaign character, of those given, whose item a summon's origin names, or since 0.40.0 her
+ * form's copy of it while she's shaped; null for none, or for no origin.
+ * @param {unknown} origin                     A creature's `flags.dnd5e.summon.origin`.
+ * @param {Actor[]} characters
+ * @param {Map<string, string|null>} forms    Each character's form's id, by her id.
+ * @returns {Actor|null}
+ */
+function summonerOf(origin, characters, forms) {
+  if ( typeof origin !== "string" ) return null;
+  const by = id => Boolean(id) && origin.startsWith(`Actor.${id}.Item.`);
+  return characters.find(character => by(character.id) || by(forms.get(character.id))) ?? null;
+}
+
+/**
  * The first of a list, at most `most`, those not away kept first, in the list's own order: since
- * 0.51.0, so that a companion on the active scene is never left out for one on another. Where none
- * is away, the first `most`.
- * @template {{away?: boolean}} T
+ * 0.51.0, so that a companion on the active scene is never left out for one on another. Since 0.54.0
+ * the constant companions before them, so that the Gamemaster's marks are never left out for those
+ * found on their own. Where none is constant or away, the first `most`.
+ * @template {{kind: string, away?: boolean}} T
  * @param {T[]} list
  * @param {number} most
  * @returns {T[]}
  */
-function presentFirst(list, most) {
+function keptFirst(list, most) {
   if ( list.length <= most ) return list;
-  const kept = new Set([...list.filter(each => !each.away), ...list.filter(each => each.away)].slice(0, most));
+  const constant = each => each.kind === "constant";
+  const ranked = [
+    ...list.filter(constant),
+    ...list.filter(each => !constant(each) && !each.away),
+    ...list.filter(each => !constant(each) && each.away)
+  ];
+  const kept = new Set(ranked.slice(0, most));
   return list.filter(each => kept.has(each));
 }
 
@@ -397,14 +579,16 @@ function nameOf(actor, token) {
 
 /**
  * A creature found, as its entry lists it: since 0.51.0, for an app that reads companions on every
- * scene, ending with `away`.
+ * scene, ending with `away`; and since 0.54.0 a constant companion pictured by the NPC marked, ending
+ * with `placed`.
  * @param {{key: string, kind: string, actor: Actor, token: TokenDocument|null, of: string[],
- *   name: string, summoner: Actor|null, away: boolean}} found
+ *   name: string, summoner: Actor|null, away: boolean, marked: Actor|null, placed?: boolean}} found
  * @param {boolean} everywhere
  * @returns {CompanionEntry}
  */
-function entryOf({ key, kind, actor, token, of, name, summoner, away }, everywhere) {
-  const img = (typeof actor.img === "string") && actor.img && (actor.img.length <= LONGEST_IMG) ? actor.img : null;
+function entryOf({ key, kind, actor, token, of, name, summoner, away, marked, placed }, everywhere) {
+  const { img: portrait } = marked ?? actor;
+  const img = (typeof portrait === "string") && portrait && (portrait.length <= LONGEST_IMG) ? portrait : null;
   return {
     key,
     of,
@@ -416,7 +600,8 @@ function entryOf({ key, kind, actor, token, of, name, summoner, away }, everywhe
     name,
     img,
     summon: summoner ? summonOf(actor, summoner) : null,
-    ...(everywhere ? { away } : {})
+    ...(everywhere ? { away } : {}),
+    ...((kind === "constant") ? { placed } : {})
   };
 }
 

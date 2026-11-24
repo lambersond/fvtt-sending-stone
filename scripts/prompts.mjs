@@ -494,9 +494,10 @@ function closePrompt(id, reason) {
 }
 
 /**
- * Close the prompts of companions that left a campaign's list, since 0.41.0, at once, `gone`: the
- * card prompts that campaign was told of, filed under their keys, and Midi-QOL's, which go Midi's own
- * way (midi-prompts.mjs). An answer that comes later finds no companion, `unknown`.
+ * Close the prompts of companions that left a campaign's list, since 0.41.0, or since 0.54.0 whose
+ * copy changed, at once, `gone`: the card prompts that campaign was told of, filed under their keys,
+ * and Midi-QOL's, which go Midi's own way (midi-prompts.mjs). An answer that comes later finds no
+ * companion, `unknown`.
  * @param {string} campaignId
  * @param {string[]} keys
  * @returns {void}

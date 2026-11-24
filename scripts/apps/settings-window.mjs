@@ -2,7 +2,7 @@ import {
   CHAT_SCOPES, COMPANION_INITIATIVE, EVENTS, MODULE_ID, RESULTS_MODES, SETTINGS, STATUS_HOOK, TIDY, WILD_SHAPE_PACKS
 } from "../constants.mjs";
 import { getCampaigns, manualDiceOn } from "../campaigns.mjs";
-import { candidateActors, playerOwners } from "../characters.mjs";
+import { candidateActors, playerOwners, transformed } from "../characters.mjs";
 import { transferReader } from "../command-transfers.mjs";
 import { effectReader } from "../command-effects.mjs";
 import { hitPointReader } from "../command-hit-points.mjs";
@@ -12,6 +12,7 @@ import { attacksUnavailable } from "../command-rolls.mjs";
 import { commandsOffered } from "../commands.mjs";
 import { familyModules, MANUAL_DICE, moduleState } from "../companions.mjs";
 import { getDestination, getSecret, isMixedContent, parseDestination } from "../config.mjs";
+import { constantCopies } from "../creatures.mjs";
 import { campaignStatus, describeProblem } from "../delivery-status.mjs";
 import { diceStatus } from "../dice-plan.mjs";
 import { dishReader } from "../dish-card.mjs";
@@ -88,8 +89,9 @@ const FOCUS_TOOLTIPS = ".sending-stone-manual-dice[data-tooltip]";
  * The Gamemaster's window for every Sending Stone setting, in sections down its side: General,
  * for the app's address and what's sent; Modules, for the modules that change what Sending Stone
  * can do, the author's own among them; each campaign, one at a time, with its players, since 0.30.0
- * its parties, what they may do from the app, and its connection, under a line saying what its
- * players see in chat; and the Roster, every character against every campaign.
+ * its parties, since 0.54.0 its characters' constant companions, what they may do from the app, and
+ * its connection, under a line saying what its players see in chat; and the Roster, every character
+ * against every campaign.
  *
  * Only the open section is drawn, so a world with many players and campaigns never lists every
  * character once per campaign. What's typed and ticked is kept as it changes, whichever section
@@ -132,7 +134,11 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       openPartyPicker: SettingsWindow.#onOpenPartyPicker,
       closePartyPicker: SettingsWindow.#onClosePartyPicker,
       addPickedParties: SettingsWindow.#onAddPickedParties,
-      removeParty: SettingsWindow.#onRemoveParty
+      removeParty: SettingsWindow.#onRemoveParty,
+      removeConstant: SettingsWindow.#onRemoveConstant,
+      openCompanionPicker: SettingsWindow.#onOpenCompanionPicker,
+      closeCompanionPicker: SettingsWindow.#onCloseCompanionPicker,
+      addPickedCompanions: SettingsWindow.#onAddPickedCompanions
     }
   };
 
@@ -164,10 +170,11 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
    *   rolls: boolean, attacks: boolean, prompts: boolean, manualDice: boolean, transfers: boolean,
    *   dishes: boolean, effects: boolean, wildShape: boolean, wildShapePacks: string[], hitPoints: boolean,
    *   coins: boolean, coinChange: boolean, health: boolean, healthHitPoints: boolean,
-   *   companionInitiative: string}[]}
+   *   companionInitiative: string, constantCompanions: {actorId: string, characterId: string}[]}[]}
    */
   #campaigns = getCampaigns().map(campaign => ({
-    ...campaign, wildShapePacks: [...campaign.wildShapePacks], secret: getSecret(campaign.id)
+    ...campaign, wildShapePacks: [...campaign.wildShapePacks], secret: getSecret(campaign.id),
+    constantCompanions: campaign.constantCompanions.map(mark => ({ ...mark }))
   }));
 
   /**
@@ -179,7 +186,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   /**
    * The section open: General, Modules, the Roster, or a campaign at one of its tabs.
    * @type {{section: "general"|"modules"|"roster"|"campaign", campaignId: string|null,
-   *   tab: "players"|"actions"|"party"|"connection"}}
+   *   tab: "players"|"actions"|"party"|"companions"|"connection"}}
    */
   #view = this.#firstView();
 
@@ -196,11 +203,18 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   #partyPicker = false;
 
   /**
+   * The character of the open campaign whose constant companions are being chosen from the world's
+   * NPCs, in place of the Companions tab, since 0.54.0; null while none is.
+   * @type {string|null}
+   */
+  #companionPicker = null;
+
+  /**
    * What each list is filtered by, typed or chosen, kept for re-rendering.
    * @type {{players: string, picker: string, pickerScope: "outside"|"everyone", roster: string,
-   *   rosterScope: "everyone"|"unassigned"}}
+   *   rosterScope: "everyone"|"unassigned", companions: string}}
    */
-  #filters = { players: "", picker: "", pickerScope: "outside", roster: "", rosterScope: "everyone" };
+  #filters = { players: "", picker: "", pickerScope: "outside", roster: "", rosterScope: "everyone", companions: "" };
 
   /**
    * Is the open campaign's secret shown as typed?
@@ -286,7 +300,9 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
         coinChange: campaign.coinChange,
         health: campaign.health,
         healthHitPoints: campaign.healthHitPoints,
-        companionInitiative: campaign.companionInitiative
+        companionInitiative: campaign.companionInitiative,
+        constantCompanions: campaign.constantCompanions.filter(({ actorId }) => game.actors.has(actorId))
+          .map(({ actorId, characterId }) => `${actorId}:${characterId}`).sort()
       }))
     });
   }
@@ -366,6 +382,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     if ( (this.#view.section === "campaign") && !this.#current() ) this.#view = { section: "general", campaignId: null, tab: "players" };
     // A world without Group actors has no Party tab.
     if ( (this.#view.tab === "party") && !groupsAvailable() ) this.#view.tab = "players";
+    // Since 0.54.0 one under another system has no Companions tab: they're dnd5e's NPCs and summons.
+    if ( (this.#view.tab === "companions") && (game.system?.id !== "dnd5e") ) this.#view.tab = "players";
     const { section } = this.#view;
     const context = {
       nav: this.#navContext(saved, actors),
@@ -623,6 +641,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       summary: `${count(members.length, "Character")} · ${count(new Set(members.flatMap(m => m.owners)).size, "Player")}`,
       tabs: { [tab]: true },
       partyTab: groupsAvailable(),
+      companionsTab: game.system?.id === "dnd5e",
       results: verdictLine(),
       ...this.#stateOf(campaign, saved)
     };
@@ -680,6 +699,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     }
     else if ( tab === "actions" ) Object.assign(context, this.#actionsContext(campaign));
     else if ( tab === "party" ) context.party = this.#partyContext(campaign, others);
+    else if ( tab === "companions" ) context.companions = this.#companionsContext(campaign);
     else if ( tab === "connection" ) {
       Object.assign(context, {
         title: campaign.title,
@@ -744,6 +764,89 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       entries,
       empty: !entries.length ? game.i18n.localize("SENDINGSTONE.Config.Party.NoGroups")
         : entries.every(entry => entry.inCampaign) ? game.i18n.localize("SENDINGSTONE.Config.Party.PickerEmpty") : null
+    };
+    return context;
+  }
+
+  /**
+   * A campaign's Companions tab, since 0.54.0: a box for each of its characters, in its order, with
+   * the NPCs marked as its constant companions and where each one's token is, or in their place the
+   * world's NPCs that can be marked for one of them.
+   * @param {SettingsWindow["#campaigns"][number]} campaign
+   * @returns {object}
+   */
+  #companionsContext(campaign) {
+    const copies = constantCopies(campaign);
+    const characters = Array.from(campaign.characters, id => game.actors.get(id)).filter(Boolean);
+    const none = game.i18n.localize("SENDINGSTONE.Config.Players.NoOwner");
+    const context = {
+      lead: game.i18n.localize("SENDINGSTONE.Config.Companions.Lead"),
+      foundAlone: game.i18n.localize("SENDINGSTONE.Config.Companions.FoundAlone"),
+      noCharacters: characters.length ? null : game.i18n.localize("SENDINGSTONE.Config.Companions.NoCharacters"),
+      characters: characters.map(character => {
+        const players = playerOwners(character).map(user => user.name);
+        return {
+          id: character.id,
+          name: character.name,
+          img: character.img,
+          players: players.length ? players.join(", ") : none,
+          dropLabel: game.i18n.format("SENDINGSTONE.Config.Companions.Drop", { character: character.name }),
+          marks: campaign.constantCompanions.filter(mark => mark.characterId === character.id)
+            .map(({ actorId }) => game.actors.get(actorId)).filter(Boolean)
+            .map(actor => {
+              const listed = copies.get(actor.id);
+              const scene = listed?.token?.parent?.name;
+              // dnd5e's copy of an NPC for a summon says so, as the chooser does, so that its row and
+              // the NPC's, both marked, can be told apart.
+              const copy = isSummonCopy(actor);
+              // A mark the app isn't shown while a linked token of its actor is another mark's copy
+              // says whose that token is.
+              const holder = listed ? null
+                : Array.from(copies.values()).find(each => each.token?.actorLink && (each.token.actorId === actor.id));
+              const where = holder ? game.i18n.format("SENDINGSTONE.Config.Companions.CopyShownAs", {
+                scene: holder.token.parent.name,
+                characters: new Intl.ListFormat(game.i18n.lang, { type: "conjunction" }).format(holder.characters.map(each => each.name)),
+                name: holder.marked.name
+              })
+                : scene ? game.i18n.format(`SENDINGSTONE.Config.Companions.${copy ? "CopyOnScene" : "OnScene"}`, { scene })
+                  : game.i18n.localize(`SENDINGSTONE.Config.Companions.${copy ? "CopyNoToken" : "NoToken"}`);
+              return {
+                actorId: actor.id,
+                name: actor.name,
+                img: actor.img,
+                where,
+                removeLabel: game.i18n.format(`SENDINGSTONE.Config.Companions.${copy ? "RemoveCopy" : "Remove"}`,
+                  { name: actor.name, character: character.name })
+              };
+            })
+        };
+      })
+    };
+    const character = characters.find(each => each.id === this.#companionPicker);
+    if ( !character ) return context;
+    const lang = game.i18n.lang;
+    const marked = new Set(campaign.constantCompanions.filter(mark => mark.characterId === character.id).map(mark => mark.actorId));
+    const entries = game.actors.filter(actor => (actor.type === "npc") && !campaign.characters.has(actor.id) && !transformed(actor))
+      .sort((a, b) => a.name.localeCompare(b.name, lang))
+      .map(actor => {
+        const already = marked.has(actor.id);
+        return {
+          id: actor.id,
+          name: actor.name,
+          img: actor.img,
+          already,
+          hint: already ? game.i18n.format("SENDINGSTONE.Config.Companions.Already", { character: character.name })
+            : isSummonCopy(actor) ? game.i18n.localize("SENDINGSTONE.Config.Companions.SummonCopy") : null,
+          search: actor.name.toLocaleLowerCase(lang)
+        };
+      });
+    context.picker = {
+      title: game.i18n.format("SENDINGSTONE.Config.Companions.PickerTitle", { character: character.name }),
+      filter: this.#filters.companions,
+      entries,
+      empty: !entries.length ? game.i18n.localize("SENDINGSTONE.Config.Companions.NoNpcs")
+        : entries.every(entry => entry.already)
+          ? game.i18n.format("SENDINGSTONE.Config.Companions.PickerEmpty", { character: character.name }) : null
     };
     return context;
   }
@@ -868,6 +971,26 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     this.element.addEventListener("focusout", event => {
       if ( event.target.closest?.(FOCUS_TOOLTIPS) ) game.tooltip?.deactivate();
     });
+    // Since 0.54.0 an NPC dropped on a character's place on the Companions tab, drawn again on each
+    // render, so heard here, on the window, as everything else is.
+    const dropZone = event => event.target.closest?.("[data-constant-drop]") ?? null;
+    this.element.addEventListener("dragover", event => {
+      const zone = dropZone(event);
+      if ( !zone ) return;
+      event.preventDefault();
+      zone.setAttribute("data-over", "");
+    });
+    this.element.addEventListener("dragleave", event => {
+      const zone = dropZone(event);
+      if ( zone && !zone.contains(event.relatedTarget) ) zone.removeAttribute("data-over");
+    });
+    this.element.addEventListener("drop", event => {
+      const zone = dropZone(event);
+      if ( !zone ) return;
+      event.preventDefault();
+      zone.removeAttribute("data-over");
+      void this.#onDropCompanion(event, zone);
+    });
   }
 
   /** @inheritDoc */
@@ -876,6 +999,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     this.#applyFilters();
     this.#countPicks();
     this.#countPartyPicks();
+    this.#countCompanionPicks();
     const { focus, top } = this.#after;
     this.#after = { focus: null, top: false };
     if ( top ) this.element.querySelector(".sending-stone-scroll")?.scrollTo(0, 0);
@@ -902,6 +1026,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
     this.#view = { section: view.section, campaignId: view.campaignId ?? null, tab: view.tab ?? "players" };
     this.#picker = false;
     this.#partyPicker = false;
+    this.#companionPicker = null;
     if ( moved ) {
       this.#revealed = false;
       this.#filters.players = "";
@@ -935,6 +1060,10 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       this.#countPartyPicks();
       return;
     }
+    if ( target.dataset?.pickCompanion ) {
+      this.#countCompanionPicks();
+      return;
+    }
     if ( !target.name ) return;
     this.#capture();
     for ( const name of DEPENDENTS[target.name] ?? [] ) {
@@ -952,8 +1081,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   }
 
   /**
-   * Keep Enter in a filter from saving the window, and Escape in the character picker from
-   * closing it.
+   * Keep Enter in a filter from saving the window, and Escape in a picker from closing it: it closes
+   * the picker.
    * @param {KeyboardEvent} event
    * @returns {void}
    */
@@ -968,6 +1097,11 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       event.preventDefault();
       event.stopPropagation();
       SettingsWindow.#onClosePartyPicker.call(this);
+    }
+    else if ( (event.key === "Escape") && this.#companionPicker ) {
+      event.preventDefault();
+      event.stopPropagation();
+      SettingsWindow.#onCloseCompanionPicker.call(this);
     }
   }
 
@@ -1028,6 +1162,20 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       ? game.i18n.format("SENDINGSTONE.Config.Picker.Selected", { count: picked })
       : game.i18n.localize("SENDINGSTONE.Config.Picker.NoneSelected");
     picker.querySelector("[data-action='addPickedParties']").disabled = !picked;
+  }
+
+  /**
+   * Say how many NPCs are picked to keep beside a character, since 0.54.0.
+   * @returns {void}
+   */
+  #countCompanionPicks() {
+    const picker = this.element.querySelector("[data-companion-picker]");
+    if ( !picker ) return;
+    const picked = picker.querySelectorAll("[data-pick-companion]:checked:not(:disabled)").length;
+    picker.querySelector("[data-pick-companion-count]").textContent = picked
+      ? game.i18n.format("SENDINGSTONE.Config.Picker.Selected", { count: picked })
+      : game.i18n.localize("SENDINGSTONE.Config.Picker.NoneSelected");
+    picker.querySelector("[data-action='addPickedCompanions']").disabled = !picked;
   }
 
   /**
@@ -1158,7 +1306,7 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       id: foundry.utils.randomID(), title: "", secret: "", characters: new Set(), groups: new Set(), rolls: false,
       attacks: false, prompts: false, manualDice: false, transfers: false, dishes: false, effects: false,
       wildShape: false, wildShapePacks: [...WILD_SHAPE_PACKS], hitPoints: true, coins: true, coinChange: true,
-      health: false, healthHitPoints: false, companionInitiative: COMPANION_INITIATIVE.OWN
+      health: false, healthHitPoints: false, companionInitiative: COMPANION_INITIATIVE.OWN, constantCompanions: []
     };
     this.#campaigns.push(campaign);
     await this.#show({ section: "campaign", campaignId: campaign.id, tab: "connection" }, "[name='campaign.title']");
@@ -1391,6 +1539,93 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
   }
 
   /**
+   * Keep an NPC dropped from the Actors sidebar beside the character whose place it was dropped on,
+   * since 0.54.0, as Foundry's own sheets read a drop: an NPC of the world's, not transformed and not
+   * one of the campaign's characters, else a warning and nothing kept; one kept already, nothing.
+   * @param {DragEvent} event
+   * @param {HTMLElement} zone   The character's place, carrying its id.
+   * @returns {Promise<void>}
+   */
+  async #onDropCompanion(event, zone) {
+    const campaign = this.#current();
+    const characterId = zone.dataset.constantDrop;
+    if ( !campaign || !characterId ) return;
+    const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
+    const found = ((data?.type === "Actor") && (typeof data.uuid === "string")) ? fromUuidSync(data.uuid) : null;
+    const actor = (found && !found.pack && (game.actors.get(found.id) === found)) ? found : null;
+    if ( actor && campaign.characters.has(actor.id) ) {
+      ui.notifications.warn(game.i18n.format("SENDINGSTONE.Config.Companions.IsCharacter", { name: actor.name }));
+      return;
+    }
+    if ( !actor || (actor.type !== "npc") || transformed(actor) ) {
+      ui.notifications.warn("SENDINGSTONE.Config.Companions.NotNpc", { localize: true });
+      return;
+    }
+    if ( campaign.constantCompanions.some(mark => (mark.actorId === actor.id) && (mark.characterId === characterId)) ) return;
+    campaign.constantCompanions.push({ actorId: actor.id, characterId });
+    this.#after.focus = addCompanionsButton(characterId);
+    await this.render();
+  }
+
+  /**
+   * Show the world's NPCs that can be kept beside a character, in place of the Companions tab.
+   * @this {SettingsWindow}
+   * @param {PointerEvent} _event
+   * @param {HTMLButtonElement} target   Its Add companions button, carrying the character's id.
+   * @returns {Promise<void>}
+   */
+  static async #onOpenCompanionPicker(_event, target) {
+    this.#companionPicker = target.dataset.characterId;
+    this.#filters.companions = "";
+    this.#after = { focus: "[data-filter='companions']", top: true };
+    await this.render();
+  }
+
+  /**
+   * @this {SettingsWindow}
+   * @returns {Promise<void>}
+   */
+  static async #onCloseCompanionPicker() {
+    const characterId = this.#companionPicker;
+    this.#companionPicker = null;
+    this.#after = { focus: addCompanionsButton(characterId), top: false };
+    await this.render();
+  }
+
+  /**
+   * Keep the NPCs picked beside the character they were picked for, and show the tab again.
+   * @this {SettingsWindow}
+   * @returns {Promise<void>}
+   */
+  static async #onAddPickedCompanions() {
+    const campaign = this.#current();
+    const characterId = this.#companionPicker;
+    if ( !campaign || !characterId ) return;
+    for ( const box of this.element.querySelectorAll("[data-pick-companion]:checked:not(:disabled)") ) {
+      const actorId = box.dataset.pickCompanion;
+      const kept = campaign.constantCompanions.some(mark => (mark.actorId === actorId) && (mark.characterId === characterId));
+      if ( !kept ) campaign.constantCompanions.push({ actorId, characterId });
+    }
+    await SettingsWindow.#onCloseCompanionPicker.call(this);
+  }
+
+  /**
+   * @this {SettingsWindow}
+   * @param {PointerEvent} _event
+   * @param {HTMLButtonElement} target   The remove button, carrying the NPC's id and its character's.
+   * @returns {Promise<void>}
+   */
+  static async #onRemoveConstant(_event, target) {
+    const campaign = this.#current();
+    const { actorId, characterId } = target.dataset;
+    if ( !campaign ) return;
+    campaign.constantCompanions = campaign.constantCompanions
+      .filter(mark => (mark.actorId !== actorId) || (mark.characterId !== characterId));
+    this.#after.focus = addCompanionsButton(characterId);
+    await this.render();
+  }
+
+  /**
    * Show a list's characters in one scope or another: the picker's, those not in the campaign or
    * everyone; the Roster's, everyone or those in no campaign.
    * @this {SettingsWindow}
@@ -1424,7 +1659,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       title: campaign.title.trim(),
       secret: campaign.secret.trim(),
       characters: Array.from(campaign.characters).filter(id => game.actors.has(id)),
-      groups: Array.from(campaign.groups).filter(isGroup)
+      groups: Array.from(campaign.groups).filter(isGroup),
+      constantCompanions: savedMarks(campaign)
     }));
 
     // Thrown rather than notified, so that the window stays open with what was entered. Each
@@ -1468,7 +1704,8 @@ export default class SettingsWindow extends HandlebarsApplicationMixin(Applicati
       coinChange: campaign.coinChange,
       health: campaign.health,
       healthHitPoints: campaign.healthHitPoints,
-      companionInitiative: campaign.companionInitiative
+      companionInitiative: campaign.companionInitiative,
+      constantCompanions: campaign.constantCompanions
     })));
     for ( const [name, key] of Object.entries(GENERAL) ) {
       const value = this.#general[name];
@@ -1502,6 +1739,42 @@ function wildShapePackChoices(campaign) {
     label: `${pack.title ?? pack.metadata?.label ?? pack.collection} (${owner(pack) ?? ""})`,
     checked: campaign.wildShapePacks.includes(pack.collection)
   }));
+}
+
+/**
+ * A campaign's constant companions as they're saved, since 0.54.0: each NPC that still is one, for a
+ * character the campaign still has, once each, in the order marked.
+ * @param {{characters: Set<string>, constantCompanions: {actorId: string, characterId: string}[]}} campaign
+ * @returns {{actorId: string, characterId: string}[]}
+ */
+function savedMarks(campaign) {
+  const seen = new Set();
+  return campaign.constantCompanions.filter(({ actorId, characterId }) => {
+    const pair = `${actorId}:${characterId}`;
+    const kept = !seen.has(pair) && (game.actors.get(actorId)?.type === "npc") && campaign.characters.has(characterId)
+      && game.actors.has(characterId);
+    seen.add(pair);
+    return kept;
+  }).map(({ actorId, characterId }) => ({ actorId, characterId }));
+}
+
+/**
+ * Is an actor dnd5e's copy of another for a summon, flagged as dnd5e flags it now or as it did:
+ * since 0.54.0, as the Companions tab hints it in the chooser and on a marked row.
+ * @param {Actor} actor
+ * @returns {boolean}
+ */
+function isSummonCopy(actor) {
+  return (actor.flags?.dnd5e?.isAutoImported === true) || (actor.flags?.dnd5e?.summonedCopy === true);
+}
+
+/**
+ * A character's Add companions button on the Companions tab, as a selector, since 0.54.0.
+ * @param {string} characterId
+ * @returns {string}
+ */
+function addCompanionsButton(characterId) {
+  return `[data-action='openCompanionPicker'][data-character-id='${characterId}']`;
 }
 
 /**

@@ -24,14 +24,17 @@ The scripts stand in seven layers, bottom to top:
    combats as it is told them and how hurt a creature in them is, the rules of what players are
    shown of results, a dish's effects, and the rule of paying in coins.
 4. **Sheets.** A character's or a party's sheet as plain data, with its descriptions and their
-   links; a druid's Wild Shape and its forms; and which creatures are a character's companions.
+   links, and the creatures its summonings offer; a druid's Wild Shape and its forms; and which
+   creatures are a character's companions.
 5. **What each app was told.** Keeping every campaign's copy current: characters and parties,
    companions, journals, dishes' cards, chat, combat and its creatures' health, the saves the game
    asks, and heartbeats; and, posting nothing itself, companions set right after their characters in
    Foundry's initiative.
 6. **Commands.** What the app asks to be made here: each command's check and each kind's run, the
-   dice the game rolls later, whose answer is a command, and the fetcher with its queues; and a
-   campaign's Foundry settings for its Gamemaster, which say why attacks can't be made.
+   dice the game rolls later, whose answer is a command, and the fetcher with its queues; the
+   player's choice of creature, written on a summoning's card and chosen beforehand in dnd5e's
+   dialog; and a campaign's Foundry settings for its Gamemaster, which say why attacks can't be
+   made.
 7. **The bridge and the entry.** The hello, the settings' registration and their windows, Wild
    Shape's hooks, which wait on the command queue, and `module.mjs`.
 
@@ -126,7 +129,7 @@ those too. The module's only two, `findLink`'s in `command-links.mjs`, point dow
   `test/fvtt/<area>.mjs`, under both releases where they differ. A change that only moves code
   changes no assertion: only the import lines that name what moved. The app's e2e imports
   `test/fvtt/`'s stand-ins too: a change to one can break it.
-- **test/README.md's counts stay true:** "52 harnesses, 122 runs" changes with `harness-all.sh`.
+- **test/README.md's counts stay true:** "53 harnesses, 126 runs" changes with `harness-all.sh`.
 - **The dnd5e checkouts are read-only:** `test:setup` fetches them at pinned SHAs into
   `.cache/dnd5e/` (or set `DND5E5_DIR` and `DND5E6_DIR`). Never edit or commit them; a pin moves in
   `test/pins.env` alone.

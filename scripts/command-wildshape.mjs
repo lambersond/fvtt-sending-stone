@@ -7,8 +7,8 @@ import { campaignGroups } from "./groups.mjs";
 import { fightOf, markMidiBonusAction, midiActivities, midiBonusActionUsed } from "./midi-economy.mjs";
 import { finite } from "./sheet-values.mjs";
 import {
-  beastsFor, eligible, endWildShape, entryOf, forgetTokenData, formName, inPool, knownProfiles, recheckCharacter,
-  switchTokens, wildShapeItemOf, wildShapeOn, wildShapeRules
+  anywhereReader, beastsFor, eligible, endWildShape, entryOf, forgetTokenData, formName, foundryOnlyWhy, inPool,
+  knownProfiles, recheckCharacter, switchTokens, wildShapeItemOf, wildShapeOn, wildShapeRules
 } from "./wild-shape.mjs";
 
 /**
@@ -23,9 +23,12 @@ import {
  * return and ending.
  *
  * Only her player does it from the app, at their own seat, never the Gamemaster as her: a change in
- * the player's name would pass dnd5e's own Allow Polymorphing, which the Gamemaster's client never
- * meets. Offered under D&D Fifth Edition where the campaign's Gamemaster lets its players, by its own
- * switch, apart from its rolls: it throws no dice.
+ * the player's name would pass dnd5e's own Allow Transformation (`allowPolymorphing`), which the
+ * Gamemaster's client never meets. Offered under D&D Fifth Edition where the campaign's Gamemaster
+ * lets its players, by its own switch, apart from its rolls: it throws no dice. Since 0.54.0, for an
+ * app that takes them, a known form from anywhere else is changed into too where each of her
+ * players could use it in Foundry, Allow Transformation and Create New Actors among what's asked
+ * (wild-shape.mjs's `foundryOnlyWhy`), as the module's own change never meets them either.
  *
  * Since 0.41.0, where Midi-QOL makes uses and enforces Bonus Actions, a change or return is refused
  * once the character has used theirs in a fight, and marks it used, on the form, or on her once back.
@@ -131,12 +134,13 @@ function incapacitated(actor) {
 }
 
 /**
- * Change into a known form: one usable from the app, its Beast in the campaign's compendiums and
- * fitting her now; not while she's another kind of form, Incapacitated, or out of uses, nor since
- * 0.41.0 with Midi-QOL's Bonus Action used in a fight, where it enforces them. Shaped already, the
- * form she is is returned first, as one command. The use is spent on her own feature before dnd5e
- * changes her, refunded where the change doesn't happen; once the form exists it never is, and the
- * Bonus Action is marked on it.
+ * Change into a known form: one usable from the app, its Beast in the campaign's compendiums, or
+ * since 0.54.0, for an app that takes them, a form from anywhere else each of her players could use
+ * in Foundry; fitting her now; not while she's another kind of form, Incapacitated, or out of uses,
+ * nor since 0.41.0 with Midi-QOL's Bonus Action used in a fight, where it enforces them. Shaped
+ * already, the form she is is returned first, as one command. The use is spent on her own feature
+ * before dnd5e changes her, refunded where the change doesn't happen; once the form exists it never
+ * is, and the Bonus Action is marked on it.
  * @param {object} command
  * @param {Campaign} campaign
  * @param {Actor} character
@@ -146,7 +150,12 @@ function incapacitated(actor) {
 async function transform(command, campaign, character, rules) {
   const failed = (reason, error=null) => failedResult(command, reason, error);
   const profile = knownProfiles(rules.activity).find(each => each._id === command.wildShape.form);
-  if ( !profile || !inPool(profile.uuid, campaign) ) return failed("form");
+  if ( !profile ) return failed("form");
+  if ( !inPool(profile.uuid, campaign) ) {
+    const why = anywhereReader(campaign.id) ? foundryOnlyWhy(profile.uuid, character) : "source";
+    if ( why === "gone" ) return failed("gone");
+    if ( why ) return failed("form");
+  }
   const found = await entryOf(profile.uuid);
   if ( !found ) return failed("gone");
   if ( !eligible(found.entry, rules, found.pack) ) return failed("form");

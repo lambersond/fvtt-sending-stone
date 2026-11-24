@@ -2,7 +2,7 @@ import { ENDING_STATUSES, EVENTS, FORM_GONE_SETTLE, MODULE_ID, MOST_FORMS, NOT_F
 import { canSend } from "./bridge-role.mjs";
 import { getCampaigns } from "./campaigns.mjs";
 import { recheckCombats } from "./campaign-combats.mjs";
-import { endedForms, madeForm, originalOf, playerOwners, transformed } from "./characters.mjs";
+import { characterPlayers, endedForms, madeForm, originalOf, playerOwners, transformed } from "./characters.mjs";
 import { traitsOf } from "./sheet-details.mjs";
 import { damageOf, toHitOf } from "./sheet-rolls.mjs";
 import { finite, localize } from "./sheet-values.mjs";
@@ -31,6 +31,10 @@ import { chainedBaseline, expiredOf, formEffectsOf, gainedOf, isStatusEffect, ti
  * A transformation made in Foundry, Wild Shape or not, is recorded the same way on the client that
  * makes it, so the app follows it; a 2024 Wild Shape made there is timed and ended as one from the
  * app, while the campaign's switch is on.
+ *
+ * Since module 0.54.0 a known form from anywhere else, another Actor compendium or a world actor, is
+ * used from the app too where each of the druid's players could use it in Foundry (`foundryOnlyWhy`),
+ * for an app that says `wildShape` 2 or more.
  */
 
 /**
@@ -41,6 +45,14 @@ const INDEX_FIELDS = [
   "system.details.cr", "system.details.type", "system.traits.size", "system.attributes.movement",
   "system.attributes.ac", "system.abilities.dex.value", "img", "folder"
 ];
+
+/**
+ * The world settings, by their keys, whose change may change whether a known form from anywhere
+ * else is used from the app, since 0.54.0: dnd5e's Allow Transformation, and the world's compendium
+ * configuration, which keeps each compendium's sharing.
+ * @type {string[]}
+ */
+const FORM_SETTINGS = ["dnd5e.allowPolymorphing", "core.compendiumConfiguration"];
 
 /**
  * What a write of the module's own Wild Shape carries, so its hooks know it.
@@ -91,10 +103,18 @@ const summaries = new Map();
 const waiting = new Map();
 
 /**
- * The campaigns whose app takes Wild Shape, by id, as their latest answer to a hello or heartbeat said.
- * @type {Set<string>}
+ * The format of Wild Shape each campaign's app takes, by id, as its latest answer to a hello or
+ * heartbeat said: since 0.54.0 the number, not only whether.
+ * @type {Map<string, number>}
  */
-const readers = new Set();
+const readers = new Map();
+
+/**
+ * The format from which an app takes known forms from anywhere their players could use in Foundry,
+ * since 0.54.0.
+ * @type {number}
+ */
+const ANYWHERE_FORMAT = 2;
 
 /**
  * What notes that a character may have changed, and sends it once its changes settle:
@@ -106,10 +126,10 @@ const readers = new Set();
 let characterChanged = () => {};
 
 /**
- * What sends a campaign whose app has started or stopped taking Wild Shape every character again:
- * character-sync.mjs's `wildShapeTermsChanged`, handed over with `characterChanged`, for the same
- * reason. It does nothing until then, as `wildShapeTermsChanged` itself does while this client
- * can't send.
+ * What sends a campaign whose app has started or stopped taking Wild Shape, or since 0.54.0 changed
+ * the format it takes, every character again: character-sync.mjs's `wildShapeTermsChanged`, handed
+ * over with `characterChanged`, for the same reason. It does nothing until then, as
+ * `wildShapeTermsChanged` itself does while this client can't send.
  * @type {(campaignId: string) => void}
  */
 let wildShapeTermsChanged = () => {};
@@ -137,10 +157,11 @@ export function wildShapeOn(campaign) {
 }
 
 /**
- * Note whether a campaign's app takes Wild Shape: `features.wildShape`, 1 or later. One that says
- * nothing of it, as an older or rolled back app, is fetched from for it no longer, and is sent its
- * characters' own sheets. An answer to a heartbeat that changes it sends the campaign's sheets again,
- * with or without their forms; a hello's are sent after it anyway.
+ * Note the format a campaign's app takes Wild Shape in: `features.wildShape`, 1 or later. One that
+ * says nothing of it, as an older or rolled back app, is fetched from for it no longer, and is sent
+ * its characters' own sheets. An answer to a heartbeat that changes it, since 0.54.0 the format as
+ * well as whether, sends the campaign's sheets again, with or without their forms, and with or
+ * without known forms from anywhere; a hello's are sent after it anyway.
  * @param {string} campaignId
  * @param {object|null} features
  * @param {string} [type]   The event answered.
@@ -148,10 +169,10 @@ export function wildShapeOn(campaign) {
  */
 export function noteWildShapeReader(campaignId, features, type) {
   const format = features?.wildShape;
-  const was = readers.has(campaignId);
-  if ( Number.isInteger(format) && (format >= 1) ) readers.add(campaignId);
+  const was = readers.get(campaignId) ?? 0;
+  if ( Number.isInteger(format) && (format >= 1) ) readers.set(campaignId, format);
   else readers.delete(campaignId);
-  if ( (was !== readers.has(campaignId)) && (type !== EVENTS.HELLO) ) wildShapeTermsChanged(campaignId);
+  if ( (was !== (readers.get(campaignId) ?? 0)) && (type !== EVENTS.HELLO) ) wildShapeTermsChanged(campaignId);
 }
 
 /**
@@ -161,6 +182,16 @@ export function noteWildShapeReader(campaignId, features, type) {
  */
 export function wildShapeReader(campaignId) {
   return readers.has(campaignId);
+}
+
+/**
+ * Does a campaign's app take known forms from anywhere, since 0.54.0: its latest answer said
+ * `wildShape` 2 or more?
+ * @param {string} campaignId
+ * @returns {boolean}
+ */
+export function anywhereReader(campaignId) {
+  return (readers.get(campaignId) ?? 0) >= ANYWHERE_FORMAT;
 }
 
 /* -------------------------------------------- */
@@ -251,13 +282,178 @@ export function poolOf(campaign) {
   return (campaign?.wildShapePacks ?? []).map(id => game.packs?.get(id)).filter(pack => pack?.documentName === "Actor");
 }
 
+/* -------------------------------------------- */
+/*  Known forms from anywhere                   */
+/* -------------------------------------------- */
+
 /**
- * A pool form's index entry, with the fields it's judged by, read now; null where it's gone, or its
- * compendium is.
+ * The id of the world actor a uuid names, exactly `Actor.<id>`; null for any other.
+ * @param {unknown} uuid
+ * @returns {string|null}
+ */
+function worldActorId(uuid) {
+  const [kind, id, ...rest] = String(uuid ?? "").split(".");
+  return ((kind === "Actor") && id && !rest.length) ? id : null;
+}
+
+/**
+ * Has a user this level of permission on a document or a compendium, as core tests it? One that
+ * can't be read is not held, never a throw: a throw would drop the druid's whole Wild Shape block.
+ * @param {object|null|undefined} document   An actor, or a compendium.
+ * @param {User} user
+ * @param {string} level   "OBSERVER", "OWNER" and the like.
+ * @returns {boolean}
+ */
+function hasLevel(document, user, level) {
+  try {
+    return document?.testUserPermission?.(user, level) === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where a known form comes from, by its uuid, since 0.54.0: a world actor (`Actor.<id>`), or an
+ * Actor compendium (`Compendium.<package>.<pack>.Actor.<id>`), the document null where it isn't there
+ * or, for a compendium, isn't one of Actors; null for a uuid of any other shape.
+ * @param {unknown} uuid
+ * @returns {{kind: "actor"|"pack", document: Actor|CompendiumCollection|null}|null}
+ */
+function sourceOf(uuid) {
+  const id = worldActorId(uuid);
+  if ( id ) return { kind: "actor", document: game.actors?.get?.(id) ?? null };
+  const found = packOf(uuid);
+  if ( !found ) return null;
+  const pack = game.packs?.get?.(found.collection) ?? null;
+  return { kind: "pack", document: (pack?.documentName === "Actor") ? pack : null };
+}
+
+/**
+ * Is dnd5e's Allow Transformation on (`allowPolymorphing`), which lets players transform their own
+ * actors? One that can't be read is off.
+ * @returns {boolean}
+ */
+function isTransformationAllowed() {
+  try {
+    return game.settings.get("dnd5e", "allowPolymorphing") === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * May a user create actors, core's Create New Actors (`ACTOR_CREATE`), as a player's own
+ * transformation makes one? False where it can't be told.
+ * @param {User} user
+ * @returns {boolean}
+ */
+function mayCreateActors(user) {
+  try {
+    return user?.hasPermission?.("ACTOR_CREATE") === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * May each of a character's players observe a known form, since 0.54.0: the world actor, or the
+ * compendium it's in, at Observer or more? Limited or None is not shared. False where she has no
+ * player (`characterPlayers`), or the form's source isn't there or is of another shape.
+ * @param {unknown} uuid
+ * @param {Actor} original   The character, herself.
+ * @returns {boolean}
+ */
+export function canPlayersSee(uuid, original) {
+  const document = sourceOf(uuid)?.document;
+  const players = characterPlayers(original);
+  return Boolean(document) && (players.length > 0) && players.every(user => hasLevel(document, user, "OBSERVER"));
+}
+
+/**
+ * Why a known form from anywhere else is used only in Foundry, since 0.54.0; null where each of the
+ * character's players could use it there, as dnd5e lets a player: its `transformInto` refuses one
+ * without Allow Transformation and makes the new actor as them, which core allows only with Create
+ * New Actors, and its Transform activity's `canTransform` asks both. Each of her players is asked,
+ * since a command names no Foundry user. The first reason that holds, from the form's own to the
+ * table's: "source", its uuid names neither a world actor nor an Actor compendium's entry; "gone",
+ * the world actor isn't there, or the compendium isn't, or isn't one of Actors; "owner", she has no
+ * player, or one isn't her Owner; "permission", one may not observe the world actor or the
+ * compendium; "transformation", Allow Transformation is off; "create", one lacks Create New Actors.
+ * A compendium's entry isn't looked for here, so one hidden is never told apart from one gone: a
+ * usable form whose entry is gone is listed `found: false` once its load fails, and a change into
+ * it is refused "gone". Never throws.
+ * @param {unknown} uuid
+ * @param {Actor} original   The character, herself.
+ * @returns {"source"|"gone"|"owner"|"permission"|"transformation"|"create"|null}
+ */
+export function foundryOnlyWhy(uuid, original) {
+  const source = sourceOf(uuid);
+  if ( !source ) return "source";
+  if ( !source.document ) return "gone";
+  const players = characterPlayers(original);
+  if ( !players.length || !players.every(user => hasLevel(original, user, "OWNER")) ) return "owner";
+  if ( !canPlayersSee(uuid, original) ) return "permission";
+  if ( !isTransformationAllowed() ) return "transformation";
+  if ( !players.every(user => mayCreateActors(user)) ) return "create";
+  return null;
+}
+
+/**
+ * The campaigns' characters, once each, with a known form for which `test` holds, whatever their
+ * campaign's switch, as their sheets' Wild Shape block is sent whatever it.
+ * @param {(profile: object, campaign: Campaign) => boolean} test
+ * @returns {Actor[]}
+ */
+function knowingCharacters(test) {
+  const found = new Map();
+  for ( const campaign of getCampaigns() ) {
+    for ( const id of campaign.characters ) {
+      const actor = found.has(id) ? null : game.actors.get(id);
+      if ( !actor ) continue;
+      if ( knownProfiles(wildShapeItemOf(actor)?.activity).some(profile => test(profile, campaign)) ) found.set(id, actor);
+    }
+  }
+  return Array.from(found.values());
+}
+
+/**
+ * A world actor made, changed or deleted, since 0.54.0: each campaign character with a known form
+ * it is sent again, on the bridge, as whether her players could use it in Foundry, or what it is,
+ * may have changed. A compendium's actor is left be: a form from a compendium is loaded once a
+ * session. `characterChanged` posts only a sheet that changed.
+ * @param {Actor|null|undefined} actor
+ * @returns {void}
+ */
+export function formSourceChanged(actor) {
+  if ( !canSend() || !actor?.id || actor.compendium ) return;
+  for ( const character of knowingCharacters(profile => profile.uuid === actor.uuid) ) characterChanged(character);
+}
+
+/**
+ * A world setting stored or changed, since 0.54.0: where it's one that decides whether a known form
+ * from anywhere else is used from the app (`FORM_SETTINGS`), each campaign character with such a form
+ * is sent again, on the bridge. Core's roles' permissions, a user's, and a character's ownership
+ * send every character already (character-sync.mjs).
+ * @param {Setting} setting
+ * @returns {void}
+ */
+export function formSettingChanged(setting) {
+  if ( !FORM_SETTINGS.includes(setting?.key) || !canSend() ) return;
+  for ( const character of knowingCharacters((profile, campaign) => !inPool(profile.uuid, campaign)) ) characterChanged(character);
+}
+
+/**
+ * A known form's entry, with the fields it's judged by, read now: a compendium's index entry, or
+ * since 0.54.0 a world actor as it stands; null where it's gone, or its compendium is.
  * @param {string} uuid
- * @returns {Promise<{entry: object, pack: CompendiumCollection}|null>}
+ * @returns {Promise<{entry: object, pack: CompendiumCollection|null}|null>}
  */
 export async function entryOf(uuid) {
+  const id = worldActorId(uuid);
+  if ( id ) {
+    const actor = game.actors?.get?.(id) ?? null;
+    return actor ? { entry: actor, pack: null } : null;
+  }
   const found = packOf(uuid);
   const pack = found ? game.packs?.get(found.collection) : null;
   if ( !pack ) return null;
@@ -270,10 +466,12 @@ export async function entryOf(uuid) {
  * May a druid learn, or change into, this Beast now, by the 2024 rules: a stat block of type Beast,
  * not a swarm, with a Challenge Rating within hers, no Fly Speed before level 8 (in dnd5e 5's shape
  * or 6's), and not a spell's, an item's or a summon's creature, as a pack folder (or one within
- * one) named so says. Read the same of an index entry and of a loaded document.
+ * one) named so says, or since 0.54.0 a world folder for a world actor. Read the same of an index
+ * entry and of a loaded document.
  * @param {object|null} entry
  * @param {object|null} rules    wildShapeRules'.
- * @param {CompendiumCollection|null} [pack]   Its compendium, whose folders it's in.
+ * @param {CompendiumCollection|null} [pack]   Its compendium, whose folders it's in; none for a
+ *                                             world actor, whose folder is its own document.
  * @returns {boolean}
  */
 export function eligible(entry, rules, pack=null) {
@@ -297,7 +495,8 @@ function flies(movement) {
 }
 
 /**
- * Is an entry in a pack folder whose creatures are no form, or in a folder within one?
+ * Is an entry in a pack folder whose creatures are no form, or in a folder within one? Since 0.54.0
+ * a world actor too, by its folder's document and that folder's own.
  * @param {object} entry
  * @param {CompendiumCollection|null} pack
  * @returns {boolean}
@@ -410,13 +609,19 @@ function defaultLength() {
 /* -------------------------------------------- */
 
 /**
- * A pool form's summary, loaded once on this client and kept for the session: undefined while it
- * loads, which sends the character's sheet again once it's done; null where it can't be loaded.
+ * A known form's summary: a compendium's loaded once on this client and kept for the session,
+ * undefined while it loads, which sends the character's sheet again once it's done, null where it
+ * can't be loaded; since 0.54.0 a world actor's read as it stands, never kept, null where it's gone.
  * @param {string} uuid
  * @param {Actor} original   Whose sheet waits on it.
  * @returns {object|null|undefined}
  */
 export function formSummary(uuid, original) {
+  const id = worldActorId(uuid);
+  if ( id ) {
+    const actor = game.actors?.get?.(id) ?? null;
+    return actor ? summarise(actor) : null;
+  }
   const held = summaries.get(uuid);
   if ( (held !== undefined) && !(held instanceof Promise) ) return held;
   if ( !waiting.has(uuid) ) waiting.set(uuid, new Set());
@@ -426,7 +631,7 @@ export function formSummary(uuid, original) {
 }
 
 /**
- * Load a pool form and summarise it, then send again each character waiting on it.
+ * Load a compendium form and summarise it, then send again each character waiting on it.
  * @param {string} uuid
  * @returns {Promise<void>}
  */
@@ -506,22 +711,28 @@ export function formName(profile, original, campaign) {
     const pack = game.packs?.get(found.collection);
     if ( pack && (inPool(profile.uuid, campaign) || seenBy(pack)) ) name = pack.index?.get?.(found.id)?.name ?? null;
   } else {
-    const [kind, id, ...rest] = String(profile?.uuid ?? "").split(".");
-    const actor = ((kind === "Actor") && id && !rest.length) ? game.actors.get(id) : null;
+    const id = worldActorId(profile?.uuid);
+    const actor = id ? game.actors.get(id) : null;
     if ( actor && seenBy(actor) ) name = actor.name;
   }
   return name || localize("SENDINGSTONE.WildShape.FromFoundry");
 }
 
 /**
- * Does a pool form fit a druid now: by its loaded document where it has been, else by its pack's
- * index as it stands; false where neither says.
+ * Does a known form fit a druid now: a compendium's by its loaded document where it has been, else
+ * by its pack's index as it stands, false where neither says; since 0.54.0 a world actor's as it
+ * stands, false where it's gone.
  * @param {string} uuid
  * @param {object|null|undefined} summary
  * @param {object} rules
  * @returns {boolean}
  */
 export function fitsNow(uuid, summary, rules) {
+  const id = worldActorId(uuid);
+  if ( id ) {
+    const actor = game.actors?.get?.(id) ?? null;
+    return actor ? eligible(actor, rules) : false;
+  }
   const found = packOf(uuid);
   const pack = found ? (game.packs?.get(found.collection) ?? null) : null;
   if ( summary?.facts ) return eligible(summary.facts, rules, pack);

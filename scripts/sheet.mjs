@@ -37,7 +37,8 @@ import { combinedMode, finite, localize, rollMode } from "./sheet-values.mjs";
  * app, but on a companion's sheet (`ops: false`), whose effects take no commands. Since 0.41.0, for
  * an app that reads them (`aloneChoices`), each row's damage on its own carries its plans at its
  * other levels, modes and ammunition, and what it would spend. Since 0.52.0, for an app that reads
- * them (`anyAbility`), check activities on any ability the game has.
+ * them (`anyAbility`), check activities on any ability the game has. Since 0.54.0, for an app that
+ * reads them (`summons`), the summon activities it may cast.
  * @param {Actor} actor
  * @param {SheetTexts} [texts]  Collects the descriptions the sheet refers to.
  * @param {object} [options]
@@ -45,10 +46,11 @@ import { combinedMode, finite, localize, rollMode } from "./sheet-values.mjs";
  * @param {boolean} [options.ops]           Does each effect say what its player may do to it?
  * @param {boolean} [options.aloneChoices]  Does each row's `tableDamage` carry `choices` and `spends`?
  * @param {boolean} [options.anyAbility]    Are its check activities' checks on any ability?
+ * @param {boolean} [options.summons]       Does it carry the summon activities it may cast?
  * @returns {object|null}
  */
-export function characterSheet(actor, texts=new SheetTexts(), { secrets=true, ops=true, aloneChoices=false, anyAbility=false }={}) {
-  return enchantingSheet(() => tablingSheet(() => sheetOf(actor, texts, { secrets, ops }), { choices: aloneChoices, anyAbility }));
+export function characterSheet(actor, texts=new SheetTexts(), { secrets=true, ops=true, aloneChoices=false, anyAbility=false, summons=false }={}) {
+  return enchantingSheet(() => tablingSheet(() => sheetOf(actor, texts, { secrets, ops }), { choices: aloneChoices, anyAbility, summons }));
 }
 
 /**

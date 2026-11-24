@@ -101,6 +101,7 @@
         "Label": "Campaign sections",
         "Players": "Players",
         "Party": "Party",
+        "Companions": "Companions",
         "Actions": "Player actions",
         "Connection": "Connection"
       },
@@ -133,6 +134,30 @@
         "PickerTitle": "Add a group to {campaign}",
         "PickerEmpty": "Every group is already in this campaign.",
         "NoGroups": "This world has no Group actors yet. Create one in the Actors directory."
+      },
+      "Companions": {
+        "Lead": "A constant companion, such as a sidekick, a Steel Defender or a familiar summoned every session, shows beside its character in the app whether or not a token of it is on a scene. While a token of it is on a scene the app uses that token; with none placed, the linked copy dnd5e keeps of it for a summon, where there is one, else the actor here. Only you mark them.",
+        "None": "No constant companions",
+        "Drop": "Drop an NPC here from the Actors sidebar to make it {character}'s",
+        "Add": "Add companions",
+        "Remove": "Remove {name} from {character}'s companions",
+        "RemoveCopy": "Remove {name} (dnd5e's copy for a summon) from {character}'s companions",
+        "NoToken": "NPC · no token on any scene",
+        "OnScene": "NPC · token on {scene}",
+        "CopyNoToken": "NPC · dnd5e's copy for a summon · no token on any scene",
+        "CopyOnScene": "NPC · dnd5e's copy for a summon · token on {scene}",
+        "CopyShownAs": "NPC · dnd5e's copy for a summon · token on {scene} is {characters}'s {name} in the app; this one isn't shown while it is",
+        "FoundAlone": "Companions found on their own aren't listed here: a creature a character summoned, while its token is on a scene, and a linked NPC its player owns by name.",
+        "NoCharacters": "Add characters on the Players tab first.",
+        "PickerTitle": "Add companions to {character}",
+        "Filter": "Filter by name",
+        "NoMatch": "No NPCs match.",
+        "Already": "Already {character}'s",
+        "SummonCopy": "dnd5e's copy for a summon",
+        "PickerEmpty": "Every NPC in this world is already {character}'s.",
+        "NoNpcs": "This world has no NPCs yet. Create one in the Actors directory.",
+        "NotNpc": "Only an NPC from the Actors sidebar can be a constant companion.",
+        "IsCharacter": "{name} is one of this campaign's characters."
       },
       "Picker": {
         "Title": "Add to {campaign}",
@@ -202,7 +227,7 @@
         "WildShapeHint": "From the app, a 2024 druid's player chooses the Beasts their druid knows, within the rules, and changes into one and back, a use each time. Wild Shape then ends when its hours of world time run out, at 0 hit points or Incapacitated. Known forms are kept on the druid's own Wild Shape feature, as dnd5e's linked forms, so dnd5e's sheet offers the same ones in place of its Challenge Rating browser.",
         "WildShapeApp": "The app this campaign sends to doesn't take Wild Shape yet.",
         "WildShapePacks": "Beasts come from",
-        "WildShapePacksHint": "The compendiums a druid's player learns Beasts from. Players see these Beasts' names and statistics in the app. A form put on a Wild Shape feature in Foundry from anywhere else, or outside the rules, is used only in Foundry.",
+        "WildShapePacksHint": "The compendiums a druid's player learns Beasts from. Players see these Beasts' names and statistics in the app. A form put on a Wild Shape feature in Foundry from anywhere else is used from the app too where each of the druid's players could use it here: with Allow Transformation on, the Create New Actors permission, and the form shared with them. One outside the rules is used only in Foundry.",
         "HitPoints": "Hit points",
         "HitPointsPlayers": "Allow Players to change their hit points from the app",
         "HitPointsHint": "On by default. From the app, a player sets the hit points and temporary hit points of their own character, its Wild Shape form and their companions, as they could on the sheet here: just the numbers, with no damage types, resistances or rolls. dnd5e still asks for a concentration check when they go down; and with Wild Shape allowed above, a 2024 druid's Wild Shape form set to 0 hit points ends, as at 0 any other way. Nothing is posted in chat.",
@@ -211,7 +236,7 @@
         "CompanionInitiative": "Companions' initiative",
         "CompanionInitiativeOwn": "Its own roll",
         "CompanionInitiativeAfter": "Right after its character",
-        "CompanionInitiativeHint": "A character's companions are the creatures it summons and the NPCs its player owns. Its own roll: each rolls its own initiative, from its tab in the app or here. Right after its character: in a combat with its character, each is set just below the character's initiative whenever that's rolled, changed or cleared, here or in the app, and isn't rolled on its own.",
+        "CompanionInitiativeHint": "A character's companions are the creatures it summons, the NPCs its player owns, and the NPCs you keep beside it on the Companions tab. Its own roll: each rolls its own initiative, from its tab in the app or here. Right after its character: in a combat with its character, each is set just below the character's initiative whenever that's rolled, changed or cleared, here or in the app, and isn't rolled on its own.",
         "Health": "Other creatures' health",
         "HealthPlayers": "Allow Players to see other creatures' health in the app",
         "HealthHint": "Off by default. On the app's Combat tab, each creature in a fight that isn't the party's shows how hurt it is: Unhurt, Hurt, Bloodied (at dnd5e's Bloodied threshold, usually half its hit points) or Down (at 0). The party is this campaign's characters, their companions and any creature a player owns. Never a hidden combatant, nor one whose token is hidden or Secret. Where dnd5e's Bloodied Status is Never Display, Bloodied isn't used. Changes reach the app within a few seconds.",
@@ -373,7 +398,8 @@
       "BadgeGM": "Rolled on Sending Stone by the Gamemaster",
       "BadgeTyped": "Entered by hand on Sending Stone",
       "GM": "GM",
-      "Plain": "Dice roll"
+      "Plain": "Dice roll",
+      "SummonChoice": "Chosen on Sending Stone: {choice}"
     },
     "DiceAsk": {
       "Title": "Waiting for a player's dice",

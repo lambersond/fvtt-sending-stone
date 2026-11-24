@@ -318,7 +318,8 @@ const WOLF2 = 'arena-wolf2'
   // Changed on purpose (round 0.42.0 §8.2): `effectDice` and `keptRerolls` follow it, last.
   // Changed on purpose (module 0.44.0): `diceAsks` and `diceAsksReason` after them.
   // Changed on purpose (module 0.52.0, item 65): and `anyAbility`, true, last.
-  assert.deepEqual(keys.slice(keys.indexOf('companionPrompts')), ['companionPrompts', 'effectDice', 'keptRerolls', 'diceAsks', 'diceAsksReason', 'anyAbility'])
+  // Changed on purpose (module 0.54.0, item 59): and `summons`, true, after it, last.
+  assert.deepEqual(keys.slice(keys.indexOf('companionPrompts')), ['companionPrompts', 'effectDice', 'keptRerolls', 'diceAsks', 'diceAsksReason', 'anyAbility', 'summons'])
   assert.equal(rolls.anyAbility, true, 'the hello says it sends checks on any ability to an app that reads them')
   assert.deepEqual([helloOf('camp-b').data.features.rolls.prompts, helloOf('camp-b').data.features.rolls.companionPrompts], [false, false], 'off where its players are asked nothing')
   // An app answering companions: 1 is asked nothing of them.
@@ -752,6 +753,67 @@ if (MIDI) {
   await setOpen([])
   shortened = 100
   ok("13. with the module's readers cleared while Midi waits on the app for Wolf 1's save, a hello built before the answer leaves it out, the answer companions: 2 sends it again after the hello, and the app's answer is Midi's roll")
+}
+
+/* -------------------------------------------- */
+/*  14. A constant companion under Midi-QOL     */
+/* -------------------------------------------- */
+
+// Module 0.54.0 (the app's ROADMAP item 98): a Steel Defender, a world NPC no player owns, marked as
+// Thorin's constant companion, with the app answering companions: 4. With no token, Midi's own
+// concentration card, spoken by the NPC alone, asks it, filed under its key, as dnd5e's card does
+// (companions.mjs K18). A token of it placed, its copy then, and asked a save by Midi: the token
+// deleted while Midi waits on the app, its copy is the NPC again under the same key, so the save is let
+// go at once, gone, and Midi takes it its own way (companions.mjs K19 pins dnd5e's cards so).
+if (MIDI) {
+  const { midiSaves, saveWorkflow, runSaves, saveActivity } = saves
+  const steel = withConcentration(companionActor('steelDef', 'Steel Defender', {
+    linked: false, spec: creature({ con: 2 }), gear: { items: [spell('mend', 'Mending Field')] },
+  }))
+  settings.set('campaigns', CAMPAIGNS.map(campaign => ((campaign.id === 'camp-a') ? { ...campaign, constantCompanions: [{ actorId: 'steelDef', characterId: 'thorin' }] } : campaign)))
+  app.answers.set('camp-a', { ...FEATURES, companions: 4 })
+  await hello()
+  await until(() => sent('bridge.hello').at(-1)?.data.companionsConstant?.some(entry => entry.key === 'steelDef'), 'the Steel Defender listed')
+  const steelOf = () => sent('companions.listed').at(-1)?.data.companions.find(entry => entry.key === 'steelDef')
+  await setOpen(['thorin'])
+
+  // With no token, concentrating: Midi's concentration card, spoken by the NPC alone.
+  let count = opened().length
+  await steel.beginConcentrating({ id: 'mend-use', item: steel.items.get('mend') })
+  const card = await midiConcentrationCard(steel, 12)
+  assert.deepEqual([card.speaker.token ?? null, card.speaker.actor], [null, 'steelDef'], 'spoken by the NPC, with no token')
+  await until(() => opened().length > count, "the Steel Defender's concentration asked")
+  let prompt = opened()[count]
+  assert.match(prompt.id, /^[A-Za-z0-9]{1,64}-steelDef$/)
+  assert.deepEqual([prompt.actorId, prompt.type, prompt.source, prompt.messageId], ['steelDef', 'concentration', 'concentration', card.id], 'filed under its key')
+  let made = await answer({ actorId: 'steelDef', of: 'thorin', key: 'con', prompt: prompt.id, dice: [{ faces: 20, results: [15] }] })
+  assert.equal(made.status, 'done', JSON.stringify(made))
+  assert.deepEqual([messages.get(made.messageId).author.id, messages.get(made.messageId).speakerActor], ['alice', steel], 'rolled on the NPC, as Alice')
+  ok("14. under Midi-QOL a constant companion with no token, concentrating, is asked Midi's concentration card spoken by the NPC alone, filed under its key, <key>-steelDef, and answered from the app on the NPC as Alice")
+
+  // Its token placed, its copy; Midi's save of it waiting on the app; the token deleted.
+  shortened = 10
+  const sd1 = await createToken(arena, steel, { id: 'sd1', name: 'Steel Defender' })
+  await until(() => steelOf()?.tokenId === 'sd1', 'its token its copy')
+  count = opened().length
+  const queued = midiSaves.queued.length
+  const item = { id: 'holdSteel', name: 'Hold Monster', type: 'spell', uuid: 'Actor.goblin.Item.holdSteel', flags: {}, system: { description: { value: '' } } }
+  const workflow = await saveWorkflow({ actor: goblin, item, activity: saveActivity({ item, abilities: ['dex'], dc: 14 }), targets: [sd1.object] })
+  const running = runSaves(workflow)
+  await until(() => opened().length > count, "the Steel Defender's Midi save asked")
+  prompt = opened()[count]
+  assert.deepEqual([prompt.id.split('-').at(-1), prompt.actorId, prompt.source], ['sd1', 'steelDef', 'midi'], "its token's id, filed under its key")
+  await settle(60)
+  assert.equal(midiSaves.queued.length, queued, "Midi's own request waits on the app")
+  await sd1.delete()
+  await until(() => closeOf(prompt.id), 'its Midi prompt to close', 3000)
+  assert.deepEqual(closeOf(prompt.id), { id: prompt.id, reason: 'gone' })
+  assert.deepEqual([steelOf()?.tokenId, steelOf()?.uuid], [null, 'Actor.steelDef'], 'the NPC its copy again, under the same key')
+  await until(() => midiSaves.queued.length > queued, "Midi's own request, once released", 3000)
+  await running
+  await setOpen([])
+  shortened = 100
+  ok("14. under Midi-QOL a constant companion's token, its copy, asked a save by Midi under steelDef, sd1 in its id: the token deleted while Midi waits, its copy the NPC again under the same key, the prompt closes gone at once and Midi takes it its own way")
 }
 
 console.log(`companion-saves${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)

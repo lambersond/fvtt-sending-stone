@@ -1415,7 +1415,7 @@ export function midiCompanionPrompts(campaign) {
 
 /**
  * Leave to Midi's own way, at once, the saves waiting for companions that left a campaign's list,
- * since 0.41.0: closed `gone`, as they're no one's now.
+ * since 0.41.0, or since 0.54.0 whose copy changed: closed `gone`, as they're no one's now.
  * @param {string} campaignId
  * @param {string[]} keys
  * @returns {void}

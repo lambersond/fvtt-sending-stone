@@ -1,5 +1,6 @@
 import { MOST_ALONE_CHOICES } from "./constants.mjs";
 import { describeEnchant, enchantInPlay } from "./sheet-enchant.mjs";
+import { castAt, describeSummon, summonInPlay } from "./sheet-summon.mjs";
 import { formulaRoll } from "./dice-plan.mjs";
 import {
   aloneSubject, challenge, checkOptions, criticalAdditions, DND5E_ACTIVITIES, eligibleSlots, ownDamageConfig,
@@ -19,21 +20,26 @@ import { castCopy, countedUses, finite, limitedUses, localize, RESOURCES } from 
  * activity, such as Hex, with its Bonus Hex Damage, or a weapon that also grapples, lists each of
  * them besides, so that the app can roll or use each. A forward, such as a spell's free casting, is
  * used as the activity it names, for what the forward spends. An enchant activity says what it may
- * enchant, and with what.
+ * enchant, and with what; and since 0.54.0, to an app that reads them, a summon activity what it
+ * may summon, as sheet-summon.mjs has it.
  */
 
 /**
  * The kinds of activity a player can use from the app other than an attack: a saving throw, damage,
- * healing, a check, an enchantment, or anything else, such as an effect.
+ * healing, a check, an enchantment, or anything else, such as an effect; and since 0.54.0 a
+ * summoning, cast as dnd5e casts it, its creature placed by the Gamemaster from its card.
  */
-export const USES = new Set(["save", "damage", "heal", "utility", "check", "enchant"]);
+export const USES = new Set(["save", "damage", "heal", "utility", "check", "enchant", "summon"]);
 
 /**
  * The kinds of activity a forward may be used through from the app: an attack, and those used
- * otherwise; not a Cast, a summoning, a transformation or an enchantment, which are left to Foundry.
+ * otherwise; not a Cast, a transformation or an enchantment, which are left to Foundry. Since
+ * 0.54.0 a summoning, cast as dnd5e casts it, its creature placed by the Gamemaster from its card,
+ * for an app that reads summons; for any other, a forward to one rolls nothing, as its activity is
+ * none.
  * @type {Set<string>}
  */
-export const FORWARDED = new Set(["attack", "save", "damage", "heal", "utility", "check"]);
+export const FORWARDED = new Set(["attack", "save", "damage", "heal", "utility", "check", "summon"]);
 
 /**
  * The most forwards followed, one naming the next, to the activity they're used through.
@@ -156,29 +162,41 @@ let tablingChoices = false;
 let tablingAbilities = false;
 
 /**
+ * Does the sheet being built carry, since 0.54.0, the summon activities the app may cast, for an
+ * app that reads them?
+ * @type {boolean}
+ */
+let tablingSummons = false;
+
+/**
  * Build a sheet, working out each activity's damage on its own once; since 0.41.0 with its choices
- * where asked, and since 0.52.0 its check activities on any ability where asked. A sheet built
- * within another on other terms works out its own damage; its checks, which aren't kept, need not.
+ * where asked, since 0.52.0 its check activities on any ability where asked, and since 0.54.0 its
+ * summon activities where asked. A sheet built within another on other terms works out its own
+ * damage; its checks and summons, which aren't kept, need not.
  * @template T
  * @param {() => T} build
  * @param {object} [options]
  * @param {boolean} [options.choices]      With `choices` and `spends`?
  * @param {boolean} [options.anyAbility]   With checks on any ability the game has?
+ * @param {boolean} [options.summons]      With the summon activities the app may cast?
  * @returns {T}
  */
-export function tablingSheet(build, { choices=false, anyAbility=false }={}) {
+export function tablingSheet(build, { choices=false, anyAbility=false, summons=false }={}) {
   const outer = tabled;
   const outerChoices = tablingChoices;
   const outerAbilities = tablingAbilities;
+  const outerSummons = tablingSummons;
   tabled = (outer && (outerChoices === choices)) ? outer : new Map();
   tablingChoices = choices;
   tablingAbilities = anyAbility;
+  tablingSummons = summons;
   try {
     return build();
   } finally {
     tabled = outer;
     tablingChoices = outerChoices;
     tablingAbilities = outerAbilities;
+    tablingSummons = outerSummons;
   }
 }
 
@@ -494,12 +512,14 @@ function elvenAccuracyOf(item, activity) {
 /**
  * Is this an activity a player can use from the app, other than an attack: a saving throw, damage,
  * healing, an effect, a check that's made here, as `checkUsable` has it, or an enchantment that
- * is, as `enchantInPlay` has it?
+ * is, as `enchantInPlay` has it; or since 0.54.0, to an app that reads them, a summoning, as
+ * `summonInPlay` has it?
  * @param {Item} item
  * @param {Activity} activity
  * @returns {boolean}
  */
 function usedHere(item, activity) {
+  if ( activity?.type === "summon" ) return tablingSummons && summonInPlay(activity);
   if ( !USES.has(activity?.type) ) return false;
   if ( activity.type === "enchant" ) return enchantInPlay(activity);
   return (activity.type !== "check") || checkUsable(item, activity);
@@ -1020,9 +1040,10 @@ export function forwardTarget(forward) {
  * its Pact Magic's, so it targets as many as it does at that level, and no more for one higher. And
  * what the forward spends, such as a spell's own once a day, and whether there's that much left:
  * none, where it spends nothing. Nothing where it's used through anything the app doesn't use, such
- * as a summoning or a Cast, or a check called for once the spell is cast, as `followUpCheck` has it,
- * which a free casting would spend the day's use on for nothing; or lets the level be chosen, which
- * is left to Foundry.
+ * as a Cast, or a check called for once the spell is cast, as `followUpCheck` has it, which a free
+ * casting would spend the day's use on for nothing; or lets the level be chosen, which is left to
+ * Foundry. Since 0.54.0 a summoning is sent, to an app that reads them, what it summons at the
+ * level the forward casts it at, which is never another.
  * @param {Item} item
  * @param {Activity} forward
  * @param {SheetTexts} [texts]
@@ -1034,6 +1055,11 @@ function forwardRolls(item, forward, texts) {
     || (forward.consumption?.scaling?.allowed === true) ) return { ...NO_ROLLS, damage: [] };
   const { consumesSlot, ...rolls } = activityRolls(item, target, texts);
   if ( !rolls.attackId && !rolls.activity ) return { ...NO_ROLLS, damage: [] };
+  // A summoning offers what it summons at the level the forward casts it at, and no other.
+  if ( rolls.activity?.summon ) {
+    const level = (finite(item.system?.level) ?? 0) + forwardScaling(item, forward, target);
+    rolls.activity = { ...rolls.activity, summon: describeSummon(castAt(target, level), { fixed: true }) };
+  }
   const count = forwardCount(item, forward, target);
   const atLevel = targets => (targets && { ...targets, count: (count ?? targets.count), perLevel: null });
   const cost = forwardCost(item, forward, target);
@@ -1082,24 +1108,40 @@ function forwardSpendsNothing(item, forward, target) {
 }
 
 /**
+ * How many levels above its own a spell used through a forward is cast at, with no slot spent:
+ * worked out as dnd5e works out the slot, with the forward as what it's used for, so that a
+ * warlock's spell is cast at its Pact Magic's level. 0 where that's its own level, or it can't be
+ * worked out, or it's no spell.
+ * @param {Item} item
+ * @param {Activity} forward
+ * @param {Activity} target
+ * @returns {number}
+ */
+function forwardScaling(item, forward, target) {
+  if ( (item.type !== "spell") || (typeof target._prepareUsageConfig !== "function") ) return 0;
+  try {
+    const prepared = target._prepareUsageConfig({
+      cause: { activity: forward.relativeUUID }, consume: { resources: false, spellSlot: false }
+    });
+    const level = finite(item.actor?.system?.spells?.[prepared?.spell?.slot]?.level);
+    return Math.max((level ?? 0) - (finite(item.system?.level) ?? 0), 0);
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * How many a spell used through a forward targets, at the level dnd5e casts it at with no slot
- * spent: worked out as dnd5e works out the slot, with the forward as what it's used for, so that a
- * warlock's spell is cast at its Pact Magic's level. Null where that's its own level, or it can't be
- * worked out.
+ * spent, as `forwardScaling` has it. Null where that's its own level, or it can't be worked out.
  * @param {Item} item
  * @param {Activity} forward
  * @param {Activity} target
  * @returns {number|null}
  */
 function forwardCount(item, forward, target) {
-  if ( (item.type !== "spell") || (typeof target._prepareUsageConfig !== "function") ) return null;
+  const scaling = forwardScaling(item, forward, target);
+  if ( scaling <= 0 ) return null;
   try {
-    const prepared = target._prepareUsageConfig({
-      cause: { activity: forward.relativeUUID }, consume: { resources: false, spellSlot: false }
-    });
-    const level = finite(item.actor?.system?.spells?.[prepared?.spell?.slot]?.level);
-    const scaling = (level ?? 0) - (finite(item.system?.level) ?? 0);
-    if ( scaling <= 0 ) return null;
     const scaled = item.clone({ "flags.dnd5e.scaling": scaling }, { keepId: true });
     const count = finite(scaled.system?.activities?.get(target.id)?.target?.affects?.count);
     return (count > 0) ? count : null;
@@ -1113,13 +1155,14 @@ function forwardCount(item, forward, target) {
  * area, or a number of targets, and of what kind, such as allies or enemies; whether its range is
  * Self, as a potion's or Wild Shape's, which may still name a creature, for the app to offer its
  * user among them; for an enchant activity, what it may enchant, and with what, as
- * `describeEnchant` has it; and since 0.29.0, what using it spends, `spends`, as `spendsOf` has it,
- * where it spends anything, so that the app can tell a count it shows is the one using it spends.
+ * `describeEnchant` has it; since 0.29.0, what using it spends, `spends`, as `spendsOf` has it,
+ * where it spends anything, so that the app can tell a count it shows is the one using it spends;
+ * and since 0.54.0, for a summon activity, what it may summon, as `describeSummon` has it.
  * @param {Item} item
  * @param {Activity} activity
  * @returns {{id: string, type: string, targets: {self: boolean, area: boolean, count: number|null,
  *   perLevel: number|null, affects: string|null, fromSelf: boolean}, enchant?: object,
- *   spends?: {counter: object, amount: number|null}[]}}
+ *   summon?: object, spends?: {counter: object, amount: number|null}[]}}
  */
 export function describeUse(item, activity) {
   const target = activity.target ?? {};
@@ -1138,6 +1181,7 @@ export function describeUse(item, activity) {
       fromSelf: activity.range?.units === "self"
     },
     ...((activity.type === "enchant") && { enchant: describeEnchant(item, activity) }),
+    ...((activity.type === "summon") && { summon: describeSummon(activity) }),
     ...withSpends({}, spendsOf(item, activity))
   };
 }

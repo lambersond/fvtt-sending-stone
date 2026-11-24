@@ -84,6 +84,9 @@ define(Set.prototype, 'reduce', function (reducer, accumulator) {
   for (const value of this) accumulator = reducer(accumulator, value)
   return accumulator
 })
+// And since module 0.54.0 its first, which dnd5e's use reads (mixin.mjs:470-479) for the concentration
+// a second concentration spell ends, the e2e's characters' concentration effects being a Set.
+define(Set.prototype, 'first', function () { return this.values().next().value })
 Number.isNumeric = value => (typeof value === 'number' ? Number.isFinite(value)
   : (typeof value === 'string') && (value.trim() !== '') && Number.isFinite(Number(value)))
 Math.clamp = (value, min, max) => Math.min(Math.max(value, min), max)

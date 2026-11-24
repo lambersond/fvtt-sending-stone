@@ -288,6 +288,7 @@ export function commandRefusal(command, campaign) {
  * made from. And since 0.42.1 a spell prepared or unprepared, which and how. And since 0.44.0 hit
  * points set, to what and from what; and a plain roll of the dice tray, its dice and what it adds,
  * which no other kind names. And since 0.49.0 coins added or taken away, which and how many.
+ * And since 0.54.0 a use, the creature it summons, which no other kind names.
  * @param {object} command
  * @returns {string|null}
  */
@@ -317,6 +318,7 @@ export function checkCommand(command) {
   if ( command.kind === "coins" ) return checkCoinsCommand(command);
   if ( command.kind === "plainRoll" ) return checkPlainRollCommand(command);
   if ( (command.kind !== "use") && (command.enchant !== undefined) && (command.enchant !== null) ) return "enchant";
+  if ( (command.kind !== "use") && (command.summon !== undefined) && (command.summon !== null) ) return "summon";
   if ( command.kind === "ask" ) return checkAskCommand(command);
   if ( ["textRoll", "textDamage"].includes(command.kind) ) return checkTextCommand(command);
   if ( command.kind === "itemDamage" ) return checkItemDamageCommand(command);
@@ -554,6 +556,7 @@ function checkAttackCommand(command) {
     if ( !Array.isArray(targets) || (targets.length > 20) || !targets.every(isTarget) ) return "target";
     if ( !isOptional(command.self, self => typeof self === "boolean") ) return "self";
     if ( !isOptional(command.enchant, isEnchant) ) return "enchant";
+    if ( !isOptional(command.summon, isSummon) ) return "summon";
     return null;
   }
   if ( !isOptional(command.self, self => self === false) ) return "self";
@@ -1088,11 +1091,11 @@ export function checkPrepareCommand(command) {
 
 /**
  * What a roll names that damage on its own never does: a use, its targets, a description's link,
- * an enchantment, a key, a combat or a prompt. Since 0.41.0 it may name a spell slot, an attack mode
- * and ammunition, and ask to spend what it uses.
+ * an enchantment, since 0.54.0 a summoning's creature, a key, a combat or a prompt. Since 0.41.0 it
+ * may name a spell slot, an attack mode and ammunition, and ask to spend what it uses.
  * @type {string[]}
  */
-const NOT_ALONE = ["use", "targets", "target", "text", "link", "enchant", "key", "combatId", "prompt"];
+const NOT_ALONE = ["use", "targets", "target", "text", "link", "enchant", "summon", "key", "combatId", "prompt"];
 
 /**
  * Why a fetched action's damage on its own isn't one to make, if it isn't: it names the item and
@@ -1126,7 +1129,7 @@ export function checkItemDamageCommand(command) {
  */
 const NOT_RECHARGE = [
   "key", "combatId", "use", "targets", "target", "types", "modifiers", "critical", "text", "link", "prompt", "slot",
-  "enchant"
+  "enchant", "summon"
 ];
 
 /**
@@ -1183,6 +1186,18 @@ function isCounter(counter) {
 function isEnchant(value) {
   if ( !value || (typeof value !== "object") || Array.isArray(value) ) return false;
   return isId(value.profile) && isOptional(value.item, isId);
+}
+
+/**
+ * Is this the creature a summoning is cast for, as the player chose it, since 0.54.0: its profile,
+ * and the creature type and size where they chose them, and nothing else?
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isSummon(value) {
+  if ( !value || (typeof value !== "object") || Array.isArray(value) ) return false;
+  if ( Object.keys(value).some(key => !["profile", "type", "size"].includes(key)) ) return false;
+  return isId(value.profile) && isOptional(value.type, isKey) && isOptional(value.size, isKey);
 }
 
 /**

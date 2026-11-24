@@ -21,7 +21,9 @@
 // thrown away before dnd5e's use spends it (MidiActivityMixin.ts:776-779, 949-966). Since module
 // 0.49.0, its look for reactions as an attack's targets are attacked, then hit or missed
 // (utils.ts:5925-6105, Workflow.ts:7299-7301, 7337, 7371), and its Cast activity's activation
-// (CastActivity.ts:44-61). It can't stand for Midi itself.
+// (CastActivity.ts:44-61). Since module 0.54.0 its summon activity inherits activity5e.mjs's port of
+// dnd5e's, card, Summon button and dialog alike, as Midi keeps dnd5e's (SummonActivity.ts:35-56). It
+// can't stand for Midi itself.
 // Install it before the module is imported.
 
 import {

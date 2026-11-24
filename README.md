@@ -84,6 +84,7 @@ campaign. Edits are kept as you move between sections, and nothing is saved unti
 | General | Allow targets off your screen | Shown while Midi-QOL is active. Off by default: a player's use through Midi at a target on a level or scene you aren't viewing is refused. On: it's made, and you apply to such targets from its card what Midi can't. |
 | Modules | | Which of the author's other modules are installed and on, such as [Manual Dice](https://github.com/lambersond/fvtt-manual-dice) and [Combat Focus](https://github.com/lambersond/fvtt-combat-focus), and what each unlocks here; whether Midi-QOL and libWrapper are active, and a note naming Midi-QOL's version where it lacks what asking its saves in the app needs; since 0.44.0 whether Tidy 5e Sheets is active, turned off or not installed, none of which is a fault; and whether the game system is D&D Fifth Edition. |
 | A campaign's Players | | Its player characters, by player. **Add characters** lists the world's others, by player, to pick from, and a campaign with none can copy another's. While its players may enter their own dice results, each character shows whether its player may: its player's name where they have Make Manual Rolls, or that they need it, or that it has no player. |
+| A campaign's Companions | | Its constant companions, by character: drop an NPC from the Actors sidebar onto a character, or **Add companions**, and **Remove**. Under D&D Fifth Edition. |
 | A campaign's Player actions | Players roll in the app, Attacks, spells and features, Save and concentration prompts, Allow Players to enter dice results manually, Players move items and coins, Allow Players to add and take away coins from the app, Pay with other coins when a character is short of one, Dishes from the Magical Recipe Book, Allow Players to disable & remove their own active effects, Allow Players to use Wild Shape from the app, Allow Players to change their hit points from the app, Companions' initiative, Allow Players to see other creatures' health in the app, Show their hit points too | Whether its players' rolls, and attacks and spells, in the app are made here, and whether they're asked there for the saves the game asks of them, Midi-QOL's too while the character is open there. Under **Who rolls the dice**, whether its players may type in what their own dice show instead, which needs Players roll in the app and Manual Dice on; each player then turns it on for themselves in the app's settings, where their Foundry user has Make Manual Rolls, which Manual Dice's roles set. Under **Items and coins**, whether its players may [move items and coins](#moving-items-and-coins) from the app, apart from their rolls. Under **Coins**, whether its players may [add coins to their characters and take them away](#adding-and-taking-away-coins) from the app, on until you turn it off, and whether a character short of a coin pays with its other coins, on until you turn it off too. Under **Magical Recipe Book**, whether its players' [dishes](#dishes-from-the-magical-recipe-book) reach you, apart from their rolls. Under **Active effects**, whether its players may turn off and delete, from the app, the effects their party put on their own characters, and turn off their items' temporary ones ([Players' own effects](#players-own-effects)). Under **Wild Shape**, whether a 2024 druid's player may choose their known forms and change into them from the app, and which compendiums the Beasts come from ([Wild Shape](#wild-shape)). Under **Hit points**, whether its players may set their characters', forms' and companions' hit points and temporary hit points from the app, on by default ([Hit points](#hit-points)). Under **Companions**, whether its characters' companions roll their own initiative or act right after their character. Under **Other creatures' health**, whether its players see in the app how hurt the other creatures in a fight are, and their hit points too, both off by default ([Other creatures' health](#other-creatures-health)). |
 | A campaign's Connection | Title, Secret | Its title and its secret (sent as `Authorization: Bearer …` with its events), **Test**, and how its events and its players' rolls are going. |
 | Roster | | Every player character against every campaign, to tick who plays in which. |
@@ -146,7 +147,8 @@ Edition, and an app that reads them.
 **Companions.** A character's companions show beside it in the app: the creatures it summons, such
 as a familiar from Find Familiar, while their tokens are on the active scene, whoever cast the
 spell; and the NPCs its player owns in Foundry (give the player Owner on the NPC by name, or on one
-placed token). A linked NPC shows always; an unlinked one while its token is on the active scene.
+placed token); and since 0.54.0 the NPCs you keep beside it on the campaign's Companions tab. A
+linked NPC shows always; an unlinked one while its token is on the active scene.
 Since 0.51.0, to an app that reads them there, a summoned or unlinked one shows while its token is
 on any scene, even one left on an old map, until you delete or hide it; and a companion on another
 scene and not on the active one, a linked NPC too, is marked so. Before 0.51.0, or to an older app,
@@ -154,12 +156,14 @@ a summoned or unlinked one shows only while its token is on the active scene.
 Its player is a player you gave Owner on the character by name; since 0.45.0 a character shared with
 All Players as Owner isn't everyone's for this, so another campaign's sidekicks never show beside it,
 and where no player owns it by name, its player is the one it's assigned to in User Configuration.
-Players roll for them, attack and cast with them from the app, as for their character; summoning,
-dismissing and changing them stay in Foundry. A creature its player doesn't own in Foundry goes
-without its secrets, with its public biography. To take one from a player in the app, take their
-Owner away, or hide or delete its token. Since 0.41.0 the saves the game asks of a companion are
-asked in the app, on its own sheet, as a character's are, and the character's sheet says so; a
-Gamemaster's request in chat asks the characters only ([Saves the game asks for](#saves-the-game-asks-for)).
+Players roll for them, attack and cast with them from the app, as for their character; placing a
+creature summoned, dismissing and changing them stay in Foundry (since 0.54.0 a summon activity is
+cast from the app, and you place its creature from its card). A creature its player doesn't own in
+Foundry goes without its secrets, with its public biography. To take one from a player in the app,
+take their Owner away, or hide or delete its token. Since 0.41.0 the saves the game asks of a
+companion are asked in the app, on its own sheet, as a character's are, and the character's sheet
+says so; a Gamemaster's request in chat asks the characters only
+([Saves the game asks for](#saves-the-game-asks-for)).
 On the campaign's **Player actions** tab, **Companions' initiative** chooses how they enter
 combat: **Its own roll**, each rolled from its tab in the app or here; or **Right after its
 character**: whenever a character's initiative is rolled, changed or cleared, here or in the app,
@@ -167,6 +171,23 @@ each of its companions in that combat is set just below it, so it acts straight 
 the character may still come between them. A companion's own roll from the app is then refused while
 its character is in the combat; a change you make to its initiative here stands until its
 character's next, whatever else you save in Manage Campaigns, and through a reload.
+
+**Constant companions** (since 0.54.0, with an app that reads them). On a campaign's
+**Companions** tab in Manage Campaigns, drop an NPC from the Actors sidebar onto a character, or
+choose it with **Add companions**, to keep it beside that character in the app whether or not a
+token of it is on a scene: a sidekick, a Steel Defender or a familiar summoned every session. While
+a token of it is on any scene, hidden or not, the app uses that token, the active scene's first;
+with none, dnd5e's linked copy of it kept for a summon, where a character summoned one, with the
+summon's bonuses and its last hit points and uses, else the actor itself. Its player rolls for it
+and uses its features with no token, its attacks and spells going without a target; its initiative
+needs a token in a fight, and it's asked its concentration saves as dnd5e's card asks the actor;
+the save cards that target tokens need a token. **Remove** takes it off; deleting the actor, or
+taking its character out of the campaign, does too. Nothing is kept until you **Save Changes**.
+Mark an NPC or dnd5e's copy of it for a summon, not both: marked both, they're two companions, the
+copy's row and its **Remove** saying it's dnd5e's copy for a summon; a token of the copy goes to the
+copy first, its linked token before any unlinked one, whatever the scene, and the NPC takes a token
+of its own or an unlinked one of the copy's. A mark the app doesn't show, as a linked token of it is
+another mark's copy, says so on its row, with whose that token is.
 
 ### Players' rolls
 
@@ -385,7 +406,7 @@ an attack hit only where the game shows players.
   use, never a slot, at the spell's own level, or a warlock's at their pact slots' level, as dnd5e
   casts it, and its card is the spell's. Repeats of the same free casting, as dnd5e gives a spell
   granted more than once, are listed once; forwards that each spend uses of their own are each
-  listed. A forward to a summoning, a transformation, an enchantment or a Cast activity, or one
+  listed. A forward to a transformation, an enchantment or a Cast activity, or one
   whose level may be chosen, is left to Foundry (or Wild Shape from the app, where the campaign
   allows it), and so is a free casting of a check that isn't the
   spell cast, as the 2014 Silent Image's.
@@ -408,8 +429,18 @@ an attack hit only where the game shows players.
   game won't apply it once it's used, as when the item can no longer take it, it's left on the card
   for you; one whose concentration has ended by then isn't applied at all, as dnd5e's card no longer
   offers it. Choices made once, such as Eldritch Spear or Spell Mastery, and a magic item's
-  templates, such as a Shield's +1, are left to Foundry; summoning and transforming are yours to do,
-  or Wild Shape from the app where the campaign allows it.
+  templates, such as a Shield's +1, are left to Foundry; placing a summoned creature and
+  transforming are yours to do, or Wild Shape from the app where the campaign allows it.
+- **Summoning.** Since 0.54.0 a summon activity, such as Find Familiar, Summon Beast, Conjure
+  Animals or a Steel Defender, is cast from the app as dnd5e casts it, its slot or use spent and its
+  concentration begun, and nothing placed. Where dnd5e's dialog would ask which creature, type or
+  size, its card says what the player chose, "Chosen on Sending Stone: Owl (Fey)", and when its
+  Summon button is clicked, on any browser, dnd5e's dialog opens with that chosen, for you to change
+  or keep; then you place it as always. Allow Summoning and your players' roles don't matter, as
+  when a player casts it in Foundry; a player whom Allow Summoning lets summon also sees the button,
+  and may place it. One by Challenge Rating has its creature picked in dnd5e's compendium browser.
+  A staff's, a free casting's, a companion's and a druid's form's are cast alike. With no scene up,
+  Summon does nothing, as in Foundry; each click places the creature again.
 - **Changed damage.** A right-click or long-press on damage in the app lets a player roll it at its
   highest, or add more of its first die, or make that die another size, as a versatile weapon or
   Toll the Dead has, as dnd5e's damage dialog would. The game rolls it so, with their dice, a
@@ -432,8 +463,8 @@ an attack hit only where the game shows players.
   mode and the ammunition, and what was spent, or "nothing spent".
 - **Nothing asks you, where it can be helped.** An enchantment's profile and item are chosen in the
   app, so dnd5e's usage dialog never opens. Area attacks Midi targets itself around their user,
-  summoning, transforming (but Wild Shape from the app where the campaign allows it) and other
-  activities dnd5e asks about, Midi's Active Defence, a used
+  placing a summoned creature, transforming (but Wild Shape from the app where the campaign allows
+  it) and other activities dnd5e asks about, Midi's Active Defence, a used
   reaction or bonus action Midi enforces (in the encounter the creature fights in: the one you have
   up, or since 0.53.0 one you don't that has begun and is its scene's chosen one, where the module
   marks it itself and takes the mark off at the creature's next turn there), and an activity set to
@@ -671,14 +702,18 @@ in chat; the change shows on the character's sheet, in Foundry and in the app.
 
 Turn **Allow Players to use Wild Shape from the app** on for a campaign, under **Wild Shape** on its
 Player actions tab, and a 2024 druid's player can, from the app, choose the Beasts their druid knows
-and change into one and back, a use of Wild Shape each time, by the 2024 rules: 4, 6 or 8 known forms
-by level, the Challenge Rating the druid's level (or the Circle of the Moon) allows, no Fly Speed
-before level 8, one known form replaced after each Long Rest. **Beasts come from** lists the world's
-Actor compendiums; the players see the names and statistics of the Beasts in those you tick, dnd5e's
-2024 Actors by default. Known forms are kept on the druid's own Wild Shape feature, as dnd5e's
-linked forms ("By Direct Link"), so dnd5e's sheet and Tidy 5e offer the same ones in Foundry in place
-of their Challenge Rating browser. A form put there in Foundry from anywhere else, or outside the
-rules, is shown by name and used only in Foundry.
+and change into one and back, a use of Wild Shape each time, by the 2024 rules: 4, 6 or 8 known
+forms by level, the Challenge Rating the druid's level (or the Circle of the Moon) allows, no Fly
+Speed before level 8, one known form replaced after each Long Rest. **Beasts come from** lists the
+world's Actor compendiums; the players see the names and statistics of the Beasts in those you tick,
+dnd5e's 2024 Actors by default. Known forms are kept on the druid's own Wild Shape feature, as
+dnd5e's linked forms ("By Direct Link"), so dnd5e's sheet and Tidy 5e offer the same ones in Foundry
+in place of their Challenge Rating browser. Since 0.54.0 a form put there in Foundry from anywhere
+else, another Actor compendium or one of the world's actors, is used from the app too, with its
+statistics, where each of the druid's players could use it in Foundry: the druid theirs, the form
+shared with them as Observer, dnd5e's **Allow Transformation** on, and their **Create New Actors**
+permission. Any other is shown by name with why, and used only in Foundry. One outside the rules,
+from anywhere, is used only in Foundry.
 
 A change is dnd5e's own, with its Wild Shape preset, on your Foundry, with no dialog on your screen:
 the druid's linked tokens become the form on every scene, not only the one you're viewing, and a
@@ -1120,9 +1155,11 @@ Gamemaster-only information switched on.
   return its summon names a deleted actor.
 - **Enchantments on the druid's weapons** can't be ended from the app while shaped: the form's sheet
   lists none of them.
-- **A known form put on a druid's Wild Shape in Foundry** from outside the campaign's compendiums, or
-  outside the rules, is listed by name and used only in Foundry, where dnd5e's own Allow Polymorphing
-  and the source's permissions apply.
+- **A known form put on a druid's Wild Shape in Foundry from outside the campaign's compendiums** is
+  used from the app only where each of the druid's players could use it in Foundry: the druid
+  theirs, the form shared with them, Allow Transformation on, and the Create New Actors permission. A
+  form from another compendium is read once a session, as the campaign's are; a world actor's as it
+  stands. One outside the rules, from anywhere, is used only in Foundry.
 - **Dead on a form** (the wolf's combatant marked defeated) ends Wild Shape as at 0 hit points and
   isn't carried to the druid, who is at 0 hit points: mark the druid as you see fit.
 - **A druid's known forms are dnd5e's linked forms:** once a player has learned one from the app, the
@@ -1170,15 +1207,22 @@ Gamemaster-only information switched on.
   Edition, Foundry's `Roll#evaluate` and `DiceTerm#_roll` are wrapped, through libWrapper when it's
   active, so that a roll made for a player from the app takes their dice. Every other roll is left alone. No core
   or system class is otherwise overridden.
-- **Summons are placed on the scene the summoner is viewing:** one summoned while you view a prep
-  scene shows once its token is on the active scene; it shows at once, marked on another scene, to
-  an app from v0.51.0.
+- **A card's Summon button is listened to,** since 0.54.0, on every browser: the dialog it opens has
+  the player's choice set on its own configuration before it is drawn, as dnd5e sets it on any
+  change. Nothing of dnd5e's is replaced. It relies on dnd5e's `SummonUsageDialog` drawing its
+  fields from its own `config` after Foundry's `preRenderSummonUsageDialog` hook, where the choice
+  is set; were they drawn first, it would open with dnd5e's defaults, the card's line still saying
+  the choice. With Midi-QOL the line may sit elsewhere on Midi's card, such as at its end.
+- **Summons are placed on the scene whoever places them is viewing,** for one cast from the app the
+  Gamemaster who clicks the card's Summon button: one placed on a prep scene shows once its token is
+  on the active scene; it shows at once, marked on another scene, to an app from v0.51.0.
 - **View the active scene while companions act:** Foundry, and Midi-QOL, find a creature's token on
   your canvas.
 - **With dnd5e's *Automatic Recharge* on,** Foundry rolls a companion's recharge at the start of its
   turn.
 - **With Midi-QOL's *Auto Remove Summoned Creature*,** a summon's tab goes when its summoner's
-  concentration ends.
+  concentration ends, for one placed in the cast's own workflow; one placed later from the card's
+  Summon button, as every one cast from the app, stays.
 - **Midi-QOL shows less on cards of a creature no player owns,** as it does for any NPC.
 - **Midi-QOL reads only the encounter you have up.** Its own checks of a reaction or Bonus Action,
   its opportunity attacks and its marks read the encounter you view, and its *Requires targets* "in
@@ -1318,17 +1362,18 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/sheet-actions.mjs` | A character's actions, listed as Tidy 5e's Actions tab lists them, an item in a section for each kind of action it has |
 | `scripts/sheet-favorites.mjs` | A character's favorites, as dnd5e's sheet shows them under Favorites; and the feature each old-style resource stands for; whether one would be listed, for the app's to be added |
 | `scripts/sheet-enchant.mjs` | Which enchant activities the app may use, with their profiles and the items each may enchant, as dnd5e's rules have it; and the enchantments an item carries, and which of them its player may end |
+| `scripts/sheet-summon.mjs` | From 0.54.0, which summon activities may be cast from the app, and the creatures, creature types and sizes each offers, labelled at each level as dnd5e's usage dialog labels them; whether dnd5e's card would ask which; and which campaigns' apps read them |
 | `scripts/sheet-rolls.mjs` | What an action, spell, feature or inventory item rolls, and each activity it's used through; the levels an item may cast its spell at, and their cost; the checks a check activity calls for, and what a forward is used through and spends; what each use spends |
 | `scripts/sheet-texts.mjs` | Sheets' descriptions: enriched, their links marked, hashed, and sent only when a campaign lacks them; a group's without secrets and without links to act on, under hashes of their own |
 | `scripts/sheet-links.mjs` | The links in a description the app can act on, marked as its own spans, and one read back from a description by its number |
 | `scripts/check-abilities.mjs` | Which abilities a check sent to a campaign's app may be made with, from 0.52.0: dnd5e's six to an app before 0.52.0, and any the game has, by a key the app takes, to one that reads them. It imports nothing: every script that sends a check, from the sheets up, asks it |
-| `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON; which counter a count is, and whether its player may spend it; whether a spell is the copy an item casts; the kinds of item the inventory lists, and its sections |
+| `scripts/sheet-values.mjs` | Helpers for describing a sheet as plain JSON; which counter a count is, and whether its player may spend it; whether a spell is the copy an item casts, and whether an item is a leveled spell; the kinds of item the inventory lists, and its sections |
 | `scripts/groups.mjs` | A campaign's groups (party sheets): the world's Group actors to pick from, the primary party first, and which of the campaign's characters see each, by their players' ownership |
 | `scripts/sheet-group.mjs` | A group's sheet: its members' names and portraits, its description, and its inventory without what items roll or are used through |
 | `scripts/sheet-slim.mjs` | A sheet in the smaller shape the app expands: actions by reference, defaults left out, and since 0.41.0 damage on its own's choices with only what isn't their row's own |
 | `scripts/character-sync.mjs` | The hello's roster of a campaign's characters; sending each character's sheet after its campaign's hello, in a post of its own, and again when it changes, then each of the campaign's groups, again when it, its members' names or portraits, or its characters' ownership change, or one of its characters is deleted, and its removal when deleted, after the hello if one was on its way; withholding a sheet too large to post or a group's no player sees; sending again what was lost; from 0.41.0, which apps read damage on its own's choices |
-| `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene (from 0.51.0, for an app that reads them there, on every scene, each saying whether it's away), and the NPCs its players own by name, its players from 0.45.0 those who own it by name, else those it's assigned to, each read as its live actor, a token's synthetic actor for an unlinked token; their keys, the characters each is a companion of, and the creature a command names; and the format each campaign's app reads them in, as its latest answer said |
-| `scripts/creature-sync.mjs` | Sending each campaign's companions to an app that reads them: the list in its hello and in `companions.listed` when it changes, each companion's sheet in `companion.updated` after the hello and when it changes, without secrets where its players don't own it in Foundry; from 0.41.0, whether the app reads what the game asks of companions (by the format `creatures.mjs` keeps), and who left the list, for the prompts |
+| `scripts/creatures.mjs` | A campaign's characters' companions, from 0.36.0: the creatures each summoned, while their tokens are on the active scene (from 0.51.0, for an app that reads them there, on every scene, each saying whether it's away), and the NPCs its players own by name, its players from 0.45.0 those who own it by name, else those it's assigned to, each read as its live actor, a token's synthetic actor for an unlinked token; from 0.54.0, for an app that reads them, the Gamemaster's constant companions, each with its copy now: a token of it, else dnd5e's linked copy of it kept for a summon, else the NPC marked; their keys, the characters each is a companion of, and the creature a command names; and the format each campaign's app reads them in, as its latest answer said |
+| `scripts/creature-sync.mjs` | Sending each campaign's companions to an app that reads them: the list in its hello and in `companions.listed` when it changes, each companion's sheet in `companion.updated` after the hello and when it changes, without secrets where its players don't own it in Foundry; from 0.41.0, whether the app reads what the game asks of companions (by the format `creatures.mjs` keeps), and who left the list, for the prompts; from 0.54.0, for an app that reads them, the constant companions too, a sheet sent again, and its prompts told, as its copy changes |
 | `scripts/chat.mjs` | Chat hooks, and which campaigns a message belongs to: from 0.45.0, not a public one that's another campaign's alone as it's made, nor its edits |
 | `scripts/chat-data.mjs` | Chat message serialization and audience, its GM roll, and each roll's damage marks: whether it's damage, its type's label, its part of Midi-QOL's card and a bonus's name, and whether it's the attack; whether an attack hit each target, who saved and whether a save or check succeeded, by the rules of `results.mjs`; dnd5e 6's typed messages, and their data without what players don't see; its content without what cards keep from players; the Gamemaster's rolls on Midi-QOL's cards trimmed as Midi shows them to players |
 | `scripts/results.mjs` | The rules of what players see of chat results, as dnd5e and Midi-QOL show them, or always where the Gamemaster has players told so, read once per message, and the verdict on them that Manage Campaigns and the app show; whether an attack hit its target, and whether a character's player may see a card's DC |
@@ -1346,11 +1391,12 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-checks.mjs` | What the kinds' checks of a command ask in common: whether it names anything a roll names its item, targets, prompt or link by, whether it throws no dice, whether a value is a plain object or an id; and hit points' check whole, with the paths its two fields are kept at; a script below `command-rolls.mjs`, which asks it that check as it asks `journals.mjs` a note's |
 | `scripts/command-links.mjs` | Finding the link a player's command names in its character's descriptions, as the module sent them: above the sheet and its texts, which it loads as it's called |
 | `scripts/command-texts.mjs` | Asking the table for a description's save or check, and rolling a description's damage, healing or roll with a player's dice |
-| `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name; an enchant activity used, by dnd5e's card or Midi-QOL's workflow, with what `command-enchant.mjs` chose and applies |
+| `scripts/command-uses.mjs` | Making a player's attack, spell or feature and its damage or healing, through dnd5e's cards or Midi-QOL's workflow; a spell an item casts at the level chosen; check activities, and forwards used through the activity they name; an enchant activity used, by dnd5e's card or Midi-QOL's workflow, with what `command-enchant.mjs` chose and applies; from 0.54.0 a summon activity cast with nothing placed |
 | `scripts/command-alone.mjs` | An action's damage or healing on its own, dnd5e's card with no targets for the Gamemaster to apply, and a spent recharge rolled, each with the player's dice, outside Midi-QOL's workflow; from 0.41.0, at the level, in the attack mode and with the ammunition chosen, spending what its use would where asked |
 | `scripts/midi-economy.mjs` | Midi-QOL's Bonus Actions and reactions, from 0.41.0: whether Midi makes uses and enforces them for an actor, whether one is used, and marking one used, for uses, damage on its own and Wild Shape; from 0.53.0, which encounter a creature fights in, which a use at its user reads too, and taking off at its next turn there a mark written in an encounter you don't have up |
 | `scripts/dnd5e-generation.mjs` | Which generation of dnd5e the world runs, 5 or 6, by the first number of the system's version: for damage on its own, a plain roll, the dishes and, from 0.50.0, how hurt a creature is |
 | `scripts/command-enchant.mjs` | Enchant activities (Magic Weapon, Shillelagh, Flame Tongue…) on the character's own items: the profile and item a use is made with, as the player chose them, the enchantment applied as the card's tray would, and enchantments ended; sending a character's sheet ahead of what a command changed |
+| `scripts/command-summon.mjs` | Summoning from the app, from 0.54.0: the creature, type and size a use names, checked at the level it's cast at; written on its card where dnd5e would ask; and chosen beforehand in dnd5e's dialog when that card's Summon button is clicked |
 | `scripts/command-concentration.mjs` | Ending a character's concentration from the app, through dnd5e |
 | `scripts/command-turn.mjs` | Ending the current turn from the app, the character's or one of its companions', where it's still the turn the app was shown, by Foundry's own Next Turn; and taking back the turn one just ended, with Foundry's turn events off |
 | `scripts/command-charges.mjs` | Spending a character's charges and using or gaining Heroic Inspiration from the app, each with its line in chat; from 0.42.1, a spell slot spent or restored; from 0.49.0, a line whispered to the users named, never posted for no one |
@@ -1366,8 +1412,8 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/command-hit-points.mjs` | Hit points and temporary hit points set from the app, from 0.44.0, by the campaign's switch, on by default, under dnd5e: fetching them from an app that takes them; the character's, its form's or a companion's, each field only from the number the app showed, within the maximum the sheet shows, one plain update read again; nothing posted |
 | `scripts/command-plain.mjs` | A plain roll of the app's dice tray, from 0.44.0, wherever players' rolls are made: its formula from the dice and the number added, made by dnd5e's basic roll with the player's dice, its card dnd5e 5's generic roll or dnd5e 6's generic message |
 | `scripts/wild-shape-effects.mjs` | Which of a Wild Shape form's effects come back with the druid, from 0.49.0: those gained in form, told from the creature's own and the form's own doing, and those of the druid's taken off it |
-| `scripts/wild-shape.mjs` | Wild Shape, from 0.40.0, by the 2024 rules: the campaign's switch, under dnd5e, and which apps take it; a druid's Wild Shape and what the rules allow the druid now; the campaign's compendiums, the Beasts the druid may learn and the known forms' summaries; the record written on every form as dnd5e makes it; the character's tokens switched and put back on every scene; what comes back on every return, as sums, and the character's hit points; ending a form, and why one is due; a form deleted by hand, and a player's leftover form |
-| `scripts/wild-shape-hooks.mjs` | Wild Shape's hooks, from 0.40.0, and the watch that ends each form when it's due, on the bridge: as world time moves, as a form or its effects change, when a character's queue of commands settles, and when a browser becomes the one that sends |
+| `scripts/wild-shape.mjs` | Wild Shape, from 0.40.0, by the 2024 rules: the campaign's switch, under dnd5e, and which apps take it; a druid's Wild Shape and what the rules allow the druid now; the campaign's compendiums, the Beasts the druid may learn and the known forms' summaries; from 0.54.0, whether a known form from anywhere else is used from the app, by the gates Foundry sets each of the druid's players; the record written on every form as dnd5e makes it; the character's tokens switched and put back on every scene; what comes back on every return, as sums, and the character's hit points; ending a form, and why one is due; a form deleted by hand, and a player's leftover form |
+| `scripts/wild-shape-hooks.mjs` | Wild Shape's hooks, from 0.40.0, and the watch that ends each form when it's due, on the bridge: as world time moves, as a form or its effects change, when a character's queue of commands settles, and when a browser becomes the one that sends; from 0.54.0, also on the bridge, a known form's source and the settings that decide whether one from anywhere is used from the app |
 | `scripts/sheet-wild-shape.mjs` | A 2024 druid's `wildShape` block and a transformed character's `form` on the sheet, from 0.40.0 |
 | `scripts/command-wildshape.mjs` | Wild Shape from the app, from 0.40.0, by the campaign's switch under dnd5e: what its hello says of it; `transform`, `revert`, `learn` and `forms`, every check before any write; the use spent on the character's own feature and refunded where the change doesn't happen; dnd5e's own change with the module's numbers; the chat lines |
 | `scripts/command-dishes.mjs` | Dishes from the Magical Recipe Book, from 0.38.0: whether a campaign takes them, by its own switch under dnd5e 5, and what its hello says of them; each dish command posted once as its card, answered again from its card or its tombstone |
@@ -1375,7 +1421,7 @@ between releases; check the published manifest, not this file, to see what actua
 | `scripts/dish-effects.mjs` | A dish's Active Effect: its changes on dnd5e 5.3.3's paths, its one-offs, its duration and flags; whether the system is one dishes are taken under, dnd5e 5; cookbook strings made inert for enrichers; dish effects ended once their time has passed; the long rest's top-up |
 | `scripts/dice-plan.mjs` | Giving a player's roll the dice they rolled, Elven Accuracy's third d20 too, planning damage's dice as the world rolls them, an app roll's critical hits as dnd5e makes them, and the self-test that it works; from 0.42.0, the dice a typed roll's effects add, by faces and sign, and its rerolls kept at the table, each with its own self-test; from 0.44.0, a later roll's dice given per term, a die thrown again waiting for its value where the throw before it was its player's, and dnd5e's dice costs told by the use's spending, the module's own check of one, and Midi-QOL's of a use from the app, Foundry's computer dice; from 0.49.0, so is Midi-QOL's check of a reaction it looks for; from 0.53.0, so is its check of a use where it spends without its dialog, and of the activity it pairs with an attack; and what lists a campaign's open dice asks for its hello, once `later-dice.mjs` registers it |
 | `scripts/later-dice.mjs` | From 0.44.0, under dnd5e 5, the dice the game rolls later asked of a player typing theirs: a typed roll's run, bound to its Midi-QOL workflow; which rolls are its, by their subject, workflow, a use's own spending (its consumption hooks, and Midi's check of a workflow's other activity's consumption) and Midi's bonus damage; one ask per step, or per die thrown again, a minute's wait, the Gamemaster's window with Roll it now, the answers and their refusals, what the watchdog doesn't count, the hello's list, and its self-test |
-| `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, player actions and connection test, what its players see in chat, and the Roster; and from 0.39.0 the links to the module's issue forms at the end of its side |
+| `scripts/apps/settings-window.mjs` | The settings window: General, Modules, each campaign's players, party, from 0.54.0 companions, player actions and connection test, what its players see in chat, and the Roster; and from 0.39.0 the links to the module's issue forms at the end of its side |
 | `scripts/apps/help-window.mjs` | From 0.39.0, Configure Settings' Report a bug or request a feature, which any user may open: the links to the module's issue forms |
 | `scripts/issue-links.mjs` | From 0.39.0, the module's bug and feature forms on GitHub, the bug form's with the module's, Foundry's and the system's versions filled in |
 | `templates/settings/` | The settings window's templates, one for each kind of section |

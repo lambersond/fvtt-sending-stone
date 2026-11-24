@@ -70,6 +70,10 @@ import { diceStatus } from "./dice-plan.mjs";
  *                                    0.36.0: `"own"`, each rolls its own; or `"after"`, each in a
  *                                    combat with its character is kept right after it there, by
  *                                    creature-initiative.mjs. `"own"` until the Gamemaster chooses.
+ * @property {{actorId: string, characterId: string}[]} constantCompanions  The NPCs its Gamemaster
+ *                                    marked as its characters' constant companions, since 0.54.0,
+ *                                    each with the character it's kept for, as saved; creatures.mjs
+ *                                    reads them.
  */
 
 /**
@@ -80,7 +84,7 @@ export function getCampaigns() {
   const stored = game.settings.get(MODULE_ID, SETTINGS.CAMPAIGNS) ?? [];
   return stored.map(({
     id, title, characters, groups, rolls, attacks, prompts, manualDice, transfers, dishes, effects, wildShape, wildShapePacks,
-    companionInitiative, hitPoints, coins, coinChange, health, healthHitPoints
+    companionInitiative, hitPoints, coins, coinChange, health, healthHitPoints, constantCompanions
   }) => ({
     id,
     title,
@@ -112,8 +116,21 @@ export function getCampaigns() {
       : [...WILD_SHAPE_PACKS],
     // A campaign saved before 0.36.0, or holding anything else, rolls its companions' own.
     companionInitiative: (companionInitiative === COMPANION_INITIATIVE.AFTER)
-      ? COMPANION_INITIATIVE.AFTER : COMPANION_INITIATIVE.OWN
+      ? COMPANION_INITIATIVE.AFTER : COMPANION_INITIATIVE.OWN,
+    // A campaign saved before 0.54.0 has none.
+    constantCompanions: Array.isArray(constantCompanions) ? constantCompanions.filter(isMark)
+      .map(({ actorId, characterId }) => ({ actorId, characterId })) : []
   }));
+}
+
+/**
+ * Is a stored constant companion's mark whole: an NPC's id and its character's, each a string?
+ * @param {unknown} mark
+ * @returns {boolean}
+ */
+function isMark(mark) {
+  const filled = value => (typeof value === "string") && (value !== "");
+  return filled(mark?.actorId) && filled(mark?.characterId);
 }
 
 /**
