@@ -3025,5 +3025,62 @@ await saveKeep({ constantCompanions: [] })
   ok("K28. its only token, of dnd5e's copy Thorin summoned, transformed in its delta, isn't its copy: the NPC itself, placed false, and no arena-sdw of its own")
 }
 
+// K29. Each copy one mark's, as the Gamemaster may mark both an NPC and dnd5e's copy of it, which the
+// chooser offers both. The Steel Defender and dnd5e's copy of it marked for Thorin: a token of the copy
+// is its own mark's, listed once, and the NPC marked, with no token, itself; a second token of the copy,
+// the NPC's. The Hawk and dnd5e's linked copy of it Thorin summoned, both marked: with no token, each
+// itself; a linked token of the copy, the copy's, the Hawk still itself. A Wild Hawk from the compendium
+// the copy was made from, marked first: the copy's linked token its, by the compendium, and never the
+// Hawk's copy too. The copy marked for Thorin, the Hawk for Vex, a linked token of the copy Vex
+// summoned: the Hawk's, and Thorin's mark not listed while it is, its only copy the Hawk's.
+{
+  const marked = marks => companionList({ ...keepwatch(), constantCompanions: marks })
+  const by = (list, key) => copyOf(list.find(each => each.key === key))
+  const COPY = { actorId: 'steelCopy', characterId: 'thorin' }
+  placeToken(arena, steelCopy, { id: 'sdt1', name: 'Steel Defender', delta: { flags: BY_THORIN } })
+  let list = marked([STEEL, COPY])
+  assert.deepEqual([by(list, 'steelCopy'), by(list, 'steelDef')], [['steelCopy', 'sdt1', 'arena', 'Scene.arena.Token.sdt1.Actor.steelCopy', true, false], ['steelDef', null, null, 'Actor.steelDef', false, false]],
+    "a token of the copy, its own mark's; the NPC marked, with no token, itself")
+  assert.deepEqual(list.filter(each => each.tokenId === 'sdt1').map(each => each.key), ['steelCopy'], 'the token listed once')
+  placeToken(arena, steelCopy, { id: 'sdt2', name: 'Steel Defender', delta: { flags: BY_THORIN } })
+  list = marked([STEEL, COPY])
+  assert.deepEqual([by(list, 'steelCopy'), by(list, 'steelDef')], [['steelCopy', 'sdt1', 'arena', 'Scene.arena.Token.sdt1.Actor.steelCopy', true, false], ['steelCopy', 'sdt2', 'arena', 'Scene.arena.Token.sdt2.Actor.steelCopy', true, false]],
+    "a second token of the copy, the NPC's")
+  for (const id of ['sdt1', 'sdt2']) arena.tokens.delete(id)
+
+  const linkedCopy = (id, origin, stats) => companionActor(id, 'Hawk', {
+    linked: true, flags: { dnd5e: { isAutoImported: true, summon: { origin, activity: 'sd-summon' } } }, stats, spec: creature({ dex: 3 }),
+  })
+  const twin = linkedCopy('hawkTwin', 'Actor.thorin.Item.summonDragon', { duplicateSource: 'Actor.hawk', compendiumSource: 'Compendium.dnd5e.monsters.Actor.hawk' })
+  const HAWK = { actorId: 'hawk', characterId: 'thorin' }
+  const TWIN = { actorId: 'hawkTwin', characterId: 'thorin' }
+  list = marked([HAWK, TWIN])
+  assert.deepEqual([by(list, 'hawk'), by(list, 'hawkTwin')], [['hawk', null, null, 'Actor.hawk', false, false], ['hawkTwin', null, null, 'Actor.hawkTwin', false, false]],
+    "with no token, each itself: dnd5e's linked copy Thorin summoned, marked, isn't the Hawk's copy too")
+  placeToken(arena, twin, { id: 'hkt', actorLink: true, name: 'Hawk' })
+  list = marked([HAWK, TWIN])
+  assert.deepEqual([by(list, 'hawk'), by(list, 'hawkTwin')], [['hawk', null, null, 'Actor.hawk', false, false], ['hawkTwin', null, null, 'Actor.hawkTwin', true, false]],
+    "its linked token, the copy's own mark's; the Hawk still itself")
+  const wild = companionActor('hawkWild', 'Wild Hawk', { linked: false, stats: { compendiumSource: 'Compendium.dnd5e.monsters.Actor.hawk' }, spec: creature({ dex: 3 }) })
+  list = marked([{ actorId: 'hawkWild', characterId: 'thorin' }, HAWK])
+  assert.deepEqual([by(list, 'hawkWild'), by(list, 'hawk')], [['hawkTwin', null, null, 'Actor.hawkTwin', true, false], ['hawk', null, null, 'Actor.hawk', false, false]],
+    "marked first, the Wild Hawk takes the copy's linked token, by the compendium it was made from; the Hawk, with no token, itself, not that copy kept for a summon")
+  arena.tokens.delete('hkt')
+
+  const vexTwin = linkedCopy('hawkVexTwin', 'Actor.vex.Item.steelDefender', { duplicateSource: 'Actor.hawk' })
+  const VEX_HAWK = { actorId: 'hawk', characterId: 'vex' }
+  const THORIN_TWIN = { actorId: 'hawkVexTwin', characterId: 'thorin' }
+  placeToken(arena, vexTwin, { id: 'hkv', actorLink: true, name: 'Hawk' })
+  list = marked([THORIN_TWIN, VEX_HAWK])
+  assert.deepEqual([by(list, 'hawk'), list.find(each => each.key === 'hawkVexTwin')], [['hawkVexTwin', null, null, 'Actor.hawkVexTwin', true, false], undefined],
+    "a linked token of the copy Vex summoned: the Hawk's, Vex's, and Thorin's mark of the copy not listed while it is")
+  arena.tokens.delete('hkv')
+  list = marked([THORIN_TWIN, VEX_HAWK])
+  assert.deepEqual([by(list, 'hawk'), by(list, 'hawkVexTwin')], [['hawk', null, null, 'Actor.hawk', false, false], ['hawkVexTwin', null, null, 'Actor.hawkVexTwin', false, false]],
+    "the token gone, Thorin's mark listed again, itself, and the Hawk itself")
+  for (const each of [twin, wild, vexTwin]) actors.delete(each.id)
+  ok("K29. each copy one mark's: a token of dnd5e's copy of the Steel Defender, both marked, the copy's own mark's, listed once, the NPC itself with no token, and a second token of the copy the NPC's; the Hawk and dnd5e's linked copy of it, both marked, each itself with no token, and a linked token of the copy the copy's, the Hawk still itself; a Wild Hawk marked first, from the compendium the copy was made from, takes the copy's linked token, and the Hawk isn't that copy too; a linked token of the copy Vex summoned is Vex's Hawk's, and Thorin's mark of the copy isn't listed while it is, and is once it's gone")
+}
+
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
 process.exit(0)

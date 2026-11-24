@@ -166,6 +166,12 @@ export function companionPart(entry) {
  * one (dnd5e's `fetchExisting` makes one of a linked world actor, and `getTokenData` writes the
  * summon's flags and bonuses onto it, which it keeps between summons, with its hit points and uses);
  * else the marked actor.
+ *
+ * Each copy is one mark's only, as the Gamemaster may mark both an NPC and dnd5e's copy of it: a
+ * token goes to the mark of its own actor first, then to the first in the campaign's order it counts
+ * for, and the others go on to their next token. With no token, a linked copy marked itself is left
+ * to its own mark, and one whose linked token is another mark's copy to that one; a mark left with
+ * its own actor alone, while a linked token of that is another mark's copy, is left out while it is.
  * @param {Campaign} campaign
  * @returns {Map<string, {marked: Actor, characters: Actor[], token: TokenDocument|null, actor: Actor}>}
  */
@@ -216,31 +222,34 @@ export function constantCopies(campaign) {
     }
   }
 
-  // Its token, the first that passes, the active scene's first.
+  // Its token, the first that passes, the active scene's first: each token one mark's, its own
+  // actor's mark first (`bases` lists it first), then the first in the campaign's order it counts for.
   const active = game.scenes?.active ?? null;
   const scenes = [active, ...Array.from(game.scenes ?? []).filter(scene => scene !== active)].filter(Boolean);
   const origin = source => foundry.utils.getProperty(source, "flags.dnd5e.summon.origin");
+  const taken = new Set();
   for ( const scene of scenes ) {
     for ( const token of scene.tokens ?? [] ) {
       const waiting = (bases.get(token.actorId) ?? []).filter(markedId => !copies.get(markedId).token);
       if ( !waiting.length ) continue;
       const summon = (token.actorLink ? null : origin(token.delta)) ?? origin(game.actors.get(token.actorId));
-      for ( const markedId of waiting ) {
-        const copy = copies.get(markedId);
-        if ( (typeof summon === "string") && !summonerOf(summon, copy.characters, forms) ) continue;
-        const actor = token.actor;
-        if ( !actor || (actor.type !== "npc") || transformed(actor) ) continue;
-        Object.assign(copy, { token, actor });
-      }
+      const markedId = waiting.find(id => (typeof summon !== "string") || summonerOf(summon, copies.get(id).characters, forms));
+      if ( !markedId ) continue;
+      const actor = token.actor;
+      if ( !actor || (actor.type !== "npc") || transformed(actor) ) continue;
+      Object.assign(copies.get(markedId), { token, actor });
+      if ( token.actorLink ) taken.add(token.actorId);
     }
   }
 
-  // With no token, dnd5e's linked copy kept for a summon by one of its characters, else the NPC marked.
+  // With no token, dnd5e's linked copy kept for a summon by one of its characters, else the NPC
+  // marked, neither another mark's.
   for ( const [markedId, copy] of copies ) {
     if ( copy.token ) continue;
-    const kept = linkedCopies.get(markedId) ?? [];
+    const kept = (linkedCopies.get(markedId) ?? []).filter(actor => !copies.has(actor.id) && !taken.has(actor.id));
     const by = character => kept.find(actor => summonerOf(origin(actor), [character], forms) === character);
     copy.actor = copy.characters.map(by).find(Boolean) ?? copy.marked;
+    if ( taken.has(copy.actor.id) ) copies.delete(markedId);
   }
   return copies;
 }
