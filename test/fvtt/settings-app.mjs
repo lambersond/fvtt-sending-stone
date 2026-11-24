@@ -189,11 +189,12 @@ export function tick(app, name, checked = true) {
  * `text/plain` is the data as JSON, or the text given. Foundry's own
  * `TextEditor.implementation.getDragEventData` reads it, as core's does: the JSON parsed, `{}` where
  * none parses or there's no `dataTransfer`; given here where the harness has none. Waits for what
- * the drop sets off, and gives back the place, with whether the drag lit it.
+ * the drop sets off, and gives back the place, with whether the drag lit it, and whether the drag and
+ * the drop were each taken (`preventDefault`), without which a browser drops nothing there.
  * @param {object} app
  * @param {string} selector
  * @param {object|string} data
- * @returns {Promise<{zone: HTMLElement, lit: boolean}>}
+ * @returns {Promise<{zone: HTMLElement, lit: boolean, accepted: boolean, taken: boolean}>}
  */
 export async function drop(app, selector, data) {
   const ux = foundry.applications.ux
@@ -207,11 +208,13 @@ export async function drop(app, selector, data) {
   const event = type => Object.assign(new window.Event(type, { bubbles: true, cancelable: true }), {
     dataTransfer: { getData: format => ((format === 'text/plain') ? text : '') },
   })
-  zone.dispatchEvent(event('dragover'))
+  const over = event('dragover')
+  zone.dispatchEvent(over)
   const lit = zone.hasAttribute('data-over')
-  zone.dispatchEvent(event('drop'))
+  const dropped = event('drop')
+  zone.dispatchEvent(dropped)
   for (let i = 0; i < 10; i++) await new Promise(resolve => setTimeout(resolve, 0))
-  return { zone, lit }
+  return { zone, lit, accepted: over.defaultPrevented, taken: dropped.defaultPrevented }
 }
 
 /** Save Changes, as its button does: rejects with what the window threw, which leaves it open. */

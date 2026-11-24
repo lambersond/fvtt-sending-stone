@@ -2768,6 +2768,12 @@ await saveKeep({ constantCompanions: [] })
   assert.match(box('thorin').textContent, /Thorin[\s\S]*Alice/, "Thorin's box names his player")
   assert.ok(box('vex').textContent.includes(`${C}.None`), "Vex's: none")
   assert.deepEqual([...win.element.querySelectorAll('[data-constant-character]')].map(each => each.dataset.constantCharacter), ['thorin', 'vex'], "in the campaign's order")
+  assert.equal([...win.element.querySelectorAll('.sending-stone-scroll > p.hint')].at(-1).textContent.trim(), `${C}.FoundAlone`, 'and last, the companions it never lists')
+  // A campaign with no characters yet, added and not saved: no box, and where to add them.
+  await click(win, '[data-action="addCampaign"]')
+  await click(win, '.sending-stone-tabs [data-tab="companions"]')
+  assert.deepEqual([find(win, '.sending-stone-scroll > .sending-stone-empty').textContent.trim(), win.element.querySelectorAll('[data-constant-character]').length],
+    [`${C}.NoCharacters`, 0], 'a campaign with no characters: says to add them first')
   game.system.id = 'pf2e'
   try {
     await win.render()
@@ -2777,29 +2783,49 @@ await saveKeep({ constantCompanions: [] })
     game.system.id = 'dnd5e'
     await win.close()
   }
-  ok("K22. Manage Campaigns' Companions tab, before Player actions, opens on the lead and a box for each of the campaign's characters in its order, Thorin's naming Alice, Vex's with none; under another system there's no such tab, and a view on it goes back to Players")
+  ok("K22. Manage Campaigns' Companions tab, before Player actions, opens on the lead and a box for each of the campaign's characters in its order, Thorin's naming Alice, Vex's with none, and ends on those it never lists; a campaign with no characters says to add them first; under another system there's no such tab, and a view on it goes back to Players")
 }
 
 // K23. Dropped from the Actors sidebar: an NPC kept, marked as unsaved, saved; dropped again on the
 // same character, still one; anything else warned and nothing kept; a drop after the tab is drawn again
-// works; a token of it named by its scene.
+// works; a token of it named by its scene. Dragged over a character's place it's lit, still lit as the
+// drag moves onto a part of it, and unlit as it leaves, or as anything is dropped, kept or not; a drag
+// over the tab outside any character's place isn't taken.
 {
   let win = await openTab()
+  {
+    const zone = find(win, '[data-constant-drop="thorin"]')
+    const drag = (type, target, relatedTarget = null) => {
+      const event = Object.assign(new Event(type, { bubbles: true, cancelable: true }), { relatedTarget })
+      target.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    assert.deepEqual([drag('dragover', zone.querySelector('.hint')), zone.hasAttribute('data-over')], [true, true], 'dragged over a part of his place: taken, and lit')
+    drag('dragleave', zone, zone.querySelector('button'))
+    assert.ok(zone.hasAttribute('data-over'), 'moved onto its Add companions: still lit')
+    drag('dragleave', zone.querySelector('button'), find(win, '.sending-stone-tabs [data-tab="players"]'))
+    assert.equal(zone.hasAttribute('data-over'), false, 'and off his place: unlit')
+    assert.equal(drag('dragover', find(win, '.sending-stone-scroll > p.hint')), false, "over the lead, no character's place: not taken")
+  }
   const dropped = await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.steelDef' })
-  assert.ok(dropped.lit, 'lit while dragged over')
+  assert.deepEqual([dropped.accepted, dropped.lit, dropped.taken], [true, true, true], 'lit while dragged over, and the drop taken')
   assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef'], 'a row')
   assert.equal(find(win, '[data-constant-row="steelDef"] .hint').textContent.trim(), `${C}.NoToken`)
   assert.equal(find(win, '[data-dirty]').dataset.dirty, 'true', 'unsaved')
   assert.equal(page.activeElement, find(win, addButton('thorin')), "focus on Thorin's Add companions")
   warned.length = 0
-  await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.steelDef' })
+  const again = await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.steelDef' })
   assert.deepEqual([rowsOf(win, 'thorin'), warned], [['steelDef'], []], 'dropped again on Thorin: still one row, and no warning')
+  assert.equal(again.zone.hasAttribute('data-over'), false, 'and unlit, though nothing was drawn again')
   const group = companionActor('kBand', 'Band', { type: 'group' })
+  const lit = []
   for (const data of [{ type: 'Actor', uuid: 'Actor.kBand' }, { type: 'Actor', uuid: 'Actor.vex' }, { type: 'Actor', uuid: 'Actor.brakkaWolf' }, { type: 'Actor', uuid: 'Compendium.dnd5e.monsters.Actor.sd' }, 'not json']) {
-    await drop(win, '[data-constant-drop="thorin"]', data)
+    const { zone } = await drop(win, '[data-constant-drop="thorin"]', data)
+    lit.push(zone.hasAttribute('data-over'))
   }
   assert.deepEqual(warned.map(each => String(each)), [`${C}.NotNpc`, `${C}.IsCharacter {"name":"Vex"}`, `${C}.NotNpc`, `${C}.NotNpc`, `${C}.NotNpc`], 'each warned, a transformed NPC among them')
   assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef'], 'nothing more kept')
+  assert.deepEqual(lit, [false, false, false, false, false], 'and his place unlit after each')
   actors.delete(group.id)
   await click(win, '[data-action="removeConstant"][data-actor-id="steelDef"]')
   assert.deepEqual(rowsOf(win, 'thorin'), [], 'removed')
@@ -2814,11 +2840,14 @@ await saveKeep({ constantCompanions: [] })
   await win.close()
   await arena.tokens.get('sd7').delete()
   await settle(); await settle()
-  ok("K23. an NPC dropped from the Actors sidebar on Thorin's place, lit while dragged over, is kept as his, its row saying no token, the window unsaved and focus on his Add companions, and saved; dropped on him again, still one row; a Group, a campaign character, a transformed NPC, a compendium's actor and text that isn't one are each warned and nothing kept; dropped again after a render it's kept again; with a token on the arena its row names the arena")
+  ok("K23. dragged over Thorin's place it's taken and lit, still lit moving onto a part of it, unlit off it, and a drag over the lead isn't taken; an NPC dropped from the Actors sidebar on his place is kept as his, its row saying no token, the window unsaved and focus on his Add companions, and saved; dropped on him again, still one row; a Group, a campaign character, a transformed NPC, a compendium's actor and text that isn't one are each warned and nothing kept, his place unlit after each drop; dropped again after a render it's kept again; with a token on the arena its row names the arena")
 }
 
 // K24. Add companions: the world's NPCs, by name, those his already ticked and disabled, dnd5e's
-// copies hinted; nothing to add until one is ticked; a filter by name; Add Selected; Escape.
+// copies hinted; nothing to add until one is ticked; a filter by name, and one nothing matches; Add
+// Selected; opened again with no filter; Escape. Vex's chooser, which offers Thorin's Hawk as his to
+// pick, and adds what's picked as Vex's alone; Cancel, which keeps nothing; the chooser closed by
+// leaving for another tab; and what it says with every NPC his already, or none in the world.
 {
   const win = await openTab()
   await click(win, addButton('thorin'))
@@ -2842,36 +2871,100 @@ await saveKeep({ constantCompanions: [] })
   assert.equal(find(win, '[data-action="addPickedCompanions"]').disabled, false, 'one ticked')
   assert.equal(find(win, '[data-pick-companion-count]').textContent, 'SENDINGSTONE.Config.Picker.Selected {"count":1}')
   const filter = find(win, '[data-filter="companions"]')
+  const shownIds = () => [...win.element.querySelectorAll('[data-filter-list="companions"] [data-search]')].filter(row => !row.hidden).map(row => row.querySelector('input').dataset.pickCompanion)
+  filter.value = 'zzz'
+  filter.dispatchEvent(new Event('input', { bubbles: true }))
+  const noMatch = find(win, '[data-filter-list="companions"] [data-filter-empty]')
+  assert.deepEqual([shownIds(), noMatch.hidden, noMatch.textContent.trim()], [[], false, `${C}.NoMatch`], 'none matching: says so')
   filter.value = 'haw'
   filter.dispatchEvent(new Event('input', { bubbles: true }))
-  const shown = [...win.element.querySelectorAll('[data-filter-list="companions"] [data-search]')].filter(row => !row.hidden).map(row => row.querySelector('input').dataset.pickCompanion)
+  const shown = shownIds()
   assert.deepEqual(shown.map(id => game.actors.get(id).name), shown.map(() => 'Hawk'), 'filtered by name')
+  assert.equal(noMatch.hidden, true, 'and no word of none matching')
   await click(win, '[data-action="addPickedCompanions"]')
   assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef', 'hawk'], 'added')
   assert.equal(page.activeElement, find(win, addButton('thorin')), "focus back on Thorin's Add companions")
   await click(win, addButton('thorin'))
+  assert.deepEqual([find(win, '[data-filter="companions"]').value, shownIds().length], ['', ids.length], 'opened again: no filter, every NPC shown')
   win.element.querySelector('[data-filter="companions"]').dispatchEvent(new page.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   for (let i = 0; i < 10; i++) await new Promise(resolve => setTimeout(resolve, 0))
   assert.equal(win.element.querySelector('[data-companion-picker]'), null, 'Escape closes it')
   assert.equal(page.activeElement, find(win, addButton('thorin')), "focus on Thorin's Add companions")
+  // Vex's: Thorin's Hawk is his to pick, and what's picked is his alone.
+  const pick = id => {
+    const box = find(win, `[data-pick-companion="${id}"]`)
+    box.checked = true
+    box.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+  await click(win, addButton('vex'))
+  assert.equal(find(win, '#sending-stone-companion-picker-title').textContent.trim(), `${C}.PickerTitle {"character":"Vex"}`)
+  assert.deepEqual([find(win, '[data-pick-companion="hawk"]').checked, find(win, '[data-pick-companion="hawk"]').disabled, rowOf('hawk').querySelector('.hint')],
+    [false, false, null], "Thorin's Hawk, in Vex's chooser: not ticked, not disabled, not his already")
+  pick('hawk')
+  await click(win, '[data-action="addPickedCompanions"]')
+  assert.deepEqual([rowsOf(win, 'vex'), rowsOf(win, 'thorin')], [['hawk'], ['steelDef', 'hawk']], "added as Vex's, Thorin's as they were")
+  assert.equal(page.activeElement, find(win, addButton('vex')), "focus back on Vex's Add companions")
+  await click(win, addButton('vex'))
+  pick('dragon')
+  await click(win, '.sending-stone-picker-footer [data-action="closeCompanionPicker"]')
+  assert.deepEqual([win.element.querySelector('[data-companion-picker]'), rowsOf(win, 'vex')], [null, ['hawk']], 'Cancel: closed, and the one picked not kept')
+  assert.equal(page.activeElement, find(win, addButton('vex')), "focus on Vex's Add companions")
+  // Left open for Player actions, and back: the boxes, not the chooser.
+  await click(win, addButton('thorin'))
+  await click(win, '.sending-stone-tabs [data-tab="actions"]')
+  await click(win, '.sending-stone-tabs [data-tab="companions"]')
+  assert.deepEqual([win.element.querySelector('[data-companion-picker]'), rowsOf(win, 'thorin')], [null, ['steelDef', 'hawk']], 'left for Player actions and back: the boxes again')
+  // A world whose every NPC is Thorin's already, then one with none: the chooser says so. The world's
+  // actors are put back as they were, in their order.
+  await click(win, addButton('thorin'))
+  const world = [...actors.entries()]
+  try {
+    for (const [id, actor] of world) if ((actor.type === 'npc') && (id !== 'steelDef') && (id !== 'hawk')) actors.delete(id)
+    await win.render()
+    assert.equal(find(win, '[data-companion-picker-empty]').textContent.trim(), `${C}.PickerEmpty {"character":"Thorin"}`, 'every NPC his already: says so')
+    for (const id of ['steelDef', 'hawk']) actors.delete(id)
+    await win.render()
+    assert.deepEqual([find(win, '[data-companion-picker-empty]').textContent.trim(), win.element.querySelectorAll('[data-pick-companion]').length], [`${C}.NoNpcs`, 0], 'no NPC in the world: says so')
+  } finally {
+    actors.clear()
+    for (const [id, actor] of world) actors.set(id, actor)
+  }
+  await click(win, '.sending-stone-picker-footer [data-action="closeCompanionPicker"]')
   await save(win)
   await settle(); await settle()
-  assert.deepEqual(marksSaved(), [STEEL, { actorId: 'hawk', characterId: 'thorin' }])
-  ok("K24. Add companions offers the world's NPCs by name, no campaign character or transformed actor, Thorin's own ticked and disabled, already his, and dnd5e's copies for a summon hinted, the older flag's too; Add Selected waits for a tick and counts it; the filter narrows by name; added, focus returns to his Add companions; Escape closes it the same; saved")
+  assert.deepEqual(marksSaved(), [STEEL, { actorId: 'hawk', characterId: 'thorin' }, { actorId: 'hawk', characterId: 'vex' }], "saved: Thorin's two and Vex's Hawk")
+  ok("K24. Add companions offers the world's NPCs by name, no campaign character or transformed actor, Thorin's own ticked and disabled, already his, and dnd5e's copies for a summon hinted, the older flag's too; Add Selected waits for a tick and counts it; the filter narrows by name, and says when nothing matches; added, focus returns to his Add companions; opened again, no filter; Escape closes it the same; Vex's chooser offers Thorin's Hawk as Vex's to pick and adds it as Vex's alone; Cancel keeps nothing picked; leaving for another tab closes it; it says when every NPC is his already and when the world has none; saved")
 }
 
-// K25. Removed, focus on Add companions; saved without it; and a save drops the mark of an actor
-// deleted, and of a character taken out of the campaign.
+// K25. Removed, that pair alone: the Hawk off Thorin, Vex's Hawk kept; focus on Add companions; marked
+// again, in another order, nothing unsaved; saved without it, Vex's kept. A deleted actor's row isn't
+// drawn; and a save drops the mark of an actor deleted, and of a character taken out of the campaign.
 {
-  const win = await openTab()
-  await drop(win, '[data-constant-drop="vex"]', { type: 'Actor', uuid: 'Actor.hawk' })
+  let win = await openTab()
+  const dirty = () => find(win, '[data-dirty]').dataset.dirty
+  const removeHawk = () => click(win, '[data-action="removeConstant"][data-actor-id="hawk"][data-character-id="thorin"]')
+  assert.deepEqual([rowsOf(win, 'thorin'), rowsOf(win, 'vex')], [['steelDef', 'hawk'], ['hawk']], 'as saved')
+  await removeHawk()
+  assert.deepEqual([rowsOf(win, 'thorin'), rowsOf(win, 'vex')], [['steelDef'], ['hawk']], "the Hawk off Thorin, and Vex's kept")
+  assert.equal(page.activeElement, find(win, addButton('thorin')), "focus on Thorin's Add companions")
+  assert.equal(dirty(), 'true', 'unsaved')
+  await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.hawk' })
+  assert.deepEqual([rowsOf(win, 'thorin'), dirty()], [['steelDef', 'hawk'], 'false'], 'marked again, after Vex\'s now: nothing unsaved')
+  await removeHawk()
+  await save(win)
+  await settle(); await settle()
+  assert.deepEqual(marksSaved(), [STEEL, { actorId: 'hawk', characterId: 'vex' }], "saved: Vex's Hawk, and not Thorin's")
+  win = await openTab()
   const temp = companionActor('kTemp', 'Gargoyle', { linked: true })
   await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.kTemp' })
-  assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef', 'hawk', 'kTemp'])
+  await drop(win, '[data-constant-drop="thorin"]', { type: 'Actor', uuid: 'Actor.hawk' })
+  assert.deepEqual(rowsOf(win, 'thorin'), ['steelDef', 'kTemp', 'hawk'])
   await click(win, '[data-action="removeConstant"][data-actor-id="steelDef"][data-character-id="thorin"]')
-  assert.deepEqual([rowsOf(win, 'thorin'), rowsOf(win, 'vex')], [['hawk', 'kTemp'], ['hawk']], 'that one removed, no other')
+  assert.deepEqual([rowsOf(win, 'thorin'), rowsOf(win, 'vex')], [['kTemp', 'hawk'], ['hawk']], 'that one removed, no other')
   assert.equal(page.activeElement, find(win, addButton('thorin')), "focus on Thorin's Add companions")
   actors.delete(temp.id)
+  await win.render()
+  assert.deepEqual(rowsOf(win, 'thorin'), ['hawk'], "drawn again with the Gargoyle deleted: no row of it")
   await click(win, '.sending-stone-tabs [data-tab="players"]')
   await click(win, '[data-action="removeCharacter"][data-actor-id="vex"]')
   await save(win)
@@ -2889,7 +2982,7 @@ await saveKeep({ constantCompanions: [] })
   actors.delete(hireling.id)
   ui.notifications.warn = warn
   await saveKeep({ constantCompanions: [STEEL], characters: ['thorin', 'vex'] })
-  ok("K25. Remove takes that one alone off, focus on Thorin's Add companions; saved without it; and a save drops the mark of an actor deleted since, of a character taken out of the campaign, a pair marked twice by hand but once, and a character-type actor's")
+  ok("K25. Remove takes that pair alone off, the Hawk off Thorin and Vex's Hawk kept, focus on Thorin's Add companions; marked again, though in another order, nothing is unsaved; saved, Vex's Hawk kept and Thorin's gone; a deleted actor's row isn't drawn; and a save drops the mark of an actor deleted since, of a character taken out of the campaign, a pair marked twice by hand but once, and a character-type actor's")
 }
 
 // K26. A token of dnd5e's older copy, flagged summonedCopy alone, that Thorin summoned: his constant
@@ -2914,6 +3007,22 @@ await saveKeep({ constantCompanions: [] })
   await token.delete()
   await settle(); await settle()
   ok("K27. a token of the NPC marked itself, placed on the arena with no summon about it, is its copy, placed, with no arena-sdm of its own")
+}
+
+// K28. Its only token, of dnd5e's copy that Thorin summoned, transformed in Foundry as dnd5e transforms
+// an unlinked token, in its delta: not its copy, as a transformed creature is never a companion; with
+// no other, the NPC itself, placed false, and no entry of its own.
+{
+  const shaped = { dnd5e: { ...BY_THORIN.dnd5e, isPolymorphed: true, originalActor: 'steelCopy' } }
+  const token = await createToken(arena, steelCopy, { id: 'sdw', name: 'Steel Defender', delta: { flags: shaped } })
+  await settle(); await settle()
+  assert.ok(arena.tokens.get('sdw')?.actor?.flags?.dnd5e?.isPolymorphed, 'its creature transformed')
+  const list = companionList(keepwatch())
+  assert.deepEqual(copyOf(steelOf(list)), ['steelDef', null, null, 'Actor.steelDef', false, false], 'not its copy: the NPC itself')
+  assert.ok(!keysOf(list).includes('arena-sdw'), 'no entry of its own')
+  await token.delete()
+  await settle(); await settle()
+  ok("K28. its only token, of dnd5e's copy Thorin summoned, transformed in its delta, isn't its copy: the NPC itself, placed false, and no arena-sdw of its own")
 }
 
 console.log(`companions${MIDI ? ' (Midi)' : ''}${DND5E6 ? ' (dnd5e 6)' : ''}: done, ${oks} ok`)
