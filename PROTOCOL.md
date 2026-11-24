@@ -1007,8 +1007,8 @@ through `default` too, so a character shared with *All Players: Owner* had every
    - Its commands are made on its copy; with no token, on that world actor, dnd5e's linked copy of
      it kept for a summon, where there is one, else the actor, as on its sheet in Foundry. Its
      `initiative` is refused [`"not-in-combat"`](#commandresult), as it has no combatant. The game
-     asks it what dnd5e asks the actor itself, its concentration saves; a save card's targets and
-     a request need a token.
+     asks it what dnd5e asks the actor itself, its concentration saves; a save card asks it only
+     through a token it targets.
    - As its copy changes, what it was asked closes, `"gone"`, and its sheet is sent again.
 
 **Keys:** a world actor's companion is keyed by its actor id; a token's creature by
